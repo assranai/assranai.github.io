@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第12章：乘子法（增广Lagrange法） 核心思想：在Lagrange函数中加入二次惩罚项 $\\frac{\\rho}{2}|Ax - b|^2$，使对偶函数从&quot;有折角&quot;变为处处光滑甚至强凸——从而可以用更快的梯度型方法求解。乘子法的理论精髓在于：它等价于在对偶问题上跑邻近点法（Proximal Point Algorithm）。\n前置知识回顾 概念 定义（简要） 首次出现 Lagrange对偶 原问题 → Lagrange函数 $L(x, \\lambda) = f(x) + \\lambda^T(Ax-b)$ → 对偶函数 $q(\\lambda) = \\inf_x L$ → 对偶问题 $\\max_\\lambda q(\\lambda)$ Ch10 对偶分解法 将可分离问题 $\\min \\sum f_i(x_i)$ s.t. $\\sum A_i x_i = b$ 拆成 $N$ 个并行子问题 + 中心协调，用次梯度法更新 $\\lambda$ Ch11 邻近点法（PPA） $x_{k+1} = \\operatorname{prox}_{\\alpha f}(x_k) = \\arg\\min_x { f(x) + \\frac{1}{2\\alpha}|x - x_k|^2 }$——在原问题加上2范数正则化来稳定迭代 Ch9 邻近算子 $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$ Ch7 对偶函数 $q(\\lambda) = \\inf_x L(x, \\lambda)$，永为凹函数；若原函数强凸则对偶光滑 Ch10 次梯度 非光滑折角处&quot;托底直线&quot;的斜率集合：$\\partial f(x) = {g \\mid f(y) \\geq f(x) + g^T(y-x), \\forall y}$ Ch11 强凸函数 $f(y) \\geq f(x) + \\nabla f(x)^T(y-x) + \\frac{\\mu}{2}|y-x|^2$（碗壁陡峭的碗，极小值唯一） Ch1 Moreau包络 原函数的强凸性 → 对偶函数的光滑性（&ldquo;原函数越凸，对偶越光滑&rdquo;） Ch11 12.1 从罚函数法到增广Lagrange的演进逻辑 12.1.1 纯二次罚函数法 问题：等式约束优化 ">
+<title>第12章：乘子法（增广Lagrange法）</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/12-%E4%B9%98%E5%AD%90%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第12章：乘子法（增广Lagrange法）">
+<meta property='og:description' content="第12章：乘子法（增广Lagrange法） 核心思想：在Lagrange函数中加入二次惩罚项 $\\frac{\\rho}{2}|Ax - b|^2$，使对偶函数从&quot;有折角&quot;变为处处光滑甚至强凸——从而可以用更快的梯度型方法求解。乘子法的理论精髓在于：它等价于在对偶问题上跑邻近点法（Proximal Point Algorithm）。\n前置知识回顾 概念 定义（简要） 首次出现 Lagrange对偶 原问题 → Lagrange函数 $L(x, \\lambda) = f(x) + \\lambda^T(Ax-b)$ → 对偶函数 $q(\\lambda) = \\inf_x L$ → 对偶问题 $\\max_\\lambda q(\\lambda)$ Ch10 对偶分解法 将可分离问题 $\\min \\sum f_i(x_i)$ s.t. $\\sum A_i x_i = b$ 拆成 $N$ 个并行子问题 + 中心协调，用次梯度法更新 $\\lambda$ Ch11 邻近点法（PPA） $x_{k+1} = \\operatorname{prox}_{\\alpha f}(x_k) = \\arg\\min_x { f(x) + \\frac{1}{2\\alpha}|x - x_k|^2 }$——在原问题加上2范数正则化来稳定迭代 Ch9 邻近算子 $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$ Ch7 对偶函数 $q(\\lambda) = \\inf_x L(x, \\lambda)$，永为凹函数；若原函数强凸则对偶光滑 Ch10 次梯度 非光滑折角处&quot;托底直线&quot;的斜率集合：$\\partial f(x) = {g \\mid f(y) \\geq f(x) + g^T(y-x), \\forall y}$ Ch11 强凸函数 $f(y) \\geq f(x) + \\nabla f(x)^T(y-x) + \\frac{\\mu}{2}|y-x|^2$（碗壁陡峭的碗，极小值唯一） Ch1 Moreau包络 原函数的强凸性 → 对偶函数的光滑性（&ldquo;原函数越凸，对偶越光滑&rdquo;） Ch11 12.1 从罚函数法到增广Lagrange的演进逻辑 12.1.1 纯二次罚函数法 问题：等式约束优化 ">
+<meta property='og:url' content='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/12-%E4%B9%98%E5%AD%90%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第12章：乘子法（增广Lagrange法）">
+<meta name="twitter:description" content="第12章：乘子法（增广Lagrange法） 核心思想：在Lagrange函数中加入二次惩罚项 $\\frac{\\rho}{2}|Ax - b|^2$，使对偶函数从&quot;有折角&quot;变为处处光滑甚至强凸——从而可以用更快的梯度型方法求解。乘子法的理论精髓在于：它等价于在对偶问题上跑邻近点法（Proximal Point Algorithm）。\n前置知识回顾 概念 定义（简要） 首次出现 Lagrange对偶 原问题 → Lagrange函数 $L(x, \\lambda) = f(x) + \\lambda^T(Ax-b)$ → 对偶函数 $q(\\lambda) = \\inf_x L$ → 对偶问题 $\\max_\\lambda q(\\lambda)$ Ch10 对偶分解法 将可分离问题 $\\min \\sum f_i(x_i)$ s.t. $\\sum A_i x_i = b$ 拆成 $N$ 个并行子问题 + 中心协调，用次梯度法更新 $\\lambda$ Ch11 邻近点法（PPA） $x_{k+1} = \\operatorname{prox}_{\\alpha f}(x_k) = \\arg\\min_x { f(x) + \\frac{1}{2\\alpha}|x - x_k|^2 }$——在原问题加上2范数正则化来稳定迭代 Ch9 邻近算子 $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$ Ch7 对偶函数 $q(\\lambda) = \\inf_x L(x, \\lambda)$，永为凹函数；若原函数强凸则对偶光滑 Ch10 次梯度 非光滑折角处&quot;托底直线&quot;的斜率集合：$\\partial f(x) = {g \\mid f(y) \\geq f(x) + g^T(y-x), \\forall y}$ Ch11 强凸函数 $f(y) \\geq f(x) + \\nabla f(x)^T(y-x) + \\frac{\\mu}{2}|y-x|^2$（碗壁陡峭的碗，极小值唯一） Ch1 Moreau包络 原函数的强凸性 → 对偶函数的光滑性（&ldquo;原函数越凸，对偶越光滑&rdquo;） Ch11 12.1 从罚函数法到增广Lagrange的演进逻辑 12.1.1 纯二次罚函数法 问题：等式约束优化 ">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾">前置知识回顾</a></li>
+    <li><a href="#121-从罚函数法到增广lagrange的演进逻辑">12.1 从罚函数法到增广Lagrange的演进逻辑</a>
+      <ol>
+        <li><a href="#1211-纯二次罚函数法">12.1.1 纯二次罚函数法</a></li>
+        <li><a href="#1212-理想精确罚函数">12.1.2 理想：精确罚函数</a></li>
+        <li><a href="#1213-增广lagrange函数的定义">12.1.3 增广Lagrange函数的定义</a></li>
+      </ol>
+    </li>
+    <li><a href="#122-乘子法的理论基础">12.2 乘子法的理论基础</a>
+      <ol>
+        <li><a href="#1221-乘子法--对偶问题的邻近点法">12.2.1 乘子法 = 对偶问题的邻近点法</a></li>
+        <li><a href="#1222-二次惩罚项的光滑化作用">12.2.2 二次惩罚项的光滑化作用</a></li>
+        <li><a href="#1223-乘子法完整算法">12.2.3 乘子法完整算法</a></li>
+      </ol>
+    </li>
+    <li><a href="#123-乘子法-vs-对偶分解法">12.3 乘子法 vs 对偶分解法</a></li>
+    <li><a href="#124-理论收敛性分析">12.4 理论收敛性分析</a>
+      <ol>
+        <li><a href="#1241-收敛性定理">12.4.1 收敛性定理</a></li>
+        <li><a href="#1242-收敛速度">12.4.2 收敛速度</a></li>
+      </ol>
+    </li>
+    <li><a href="#125-典型例题">12.5 典型例题</a>
+      <ol>
+        <li><a href="#例题121乘子法基础推导">例题12.1（乘子法基础推导）</a></li>
+        <li><a href="#例题122增广lagrange的精确罚性质验证">例题12.2（增广Lagrange的精确罚性质验证）</a></li>
+        <li><a href="#例题123乘子法-vs-对偶分解的收敛速度对比">例题12.3（乘子法 vs 对偶分解的收敛速度对比）</a></li>
+        <li><a href="#例题124不可分离的乘子法">例题12.4（不可分离的乘子法）</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a></li>
+    <li><a href="#126-补充例题">12.6 补充例题</a>
+      <ol>
+        <li><a href="#例题125不等式约束的乘子法">例题12.5（不等式约束的乘子法）</a></li>
+        <li><a href="#例题126乘子法中-rho-的选择策略实验">例题12.6（乘子法中 $\rho$ 的选择策略实验）</a></li>
+        <li><a href="#例题127乘子法在约束非线性规划中的应用">例题12.7（乘子法在约束非线性规划中的应用）</a></li>
+      </ol>
+    </li>
+    <li><a href="#127-增广lagrange方法的变体">12.7 增广Lagrange方法的变体</a>
+      <ol>
+        <li><a href="#1271-部分增广lagrangepartial-augmented-lagrangian">12.7.1 部分增广Lagrange（Partial Augmented Lagrangian）</a></li>
+        <li><a href="#1272-bregman增广lagrange">12.7.2 Bregman增广Lagrange</a></li>
+      </ol>
+    </li>
+    <li><a href="#128-算法对比详细表">12.8 算法对比详细表</a></li>
+    <li><a href="#129-乘子法的数值实现指南">12.9 乘子法的数值实现指南</a>
+      <ol>
+        <li><a href="#1291-原始子问题的求解策略">12.9.1 原始子问题的求解策略</a></li>
+        <li><a href="#1292-乘子初始化和热启动">12.9.2 乘子初始化和热启动</a></li>
+        <li><a href="#1293-乘子法的收敛证明框架">12.9.3 乘子法的收敛证明框架</a></li>
+      </ol>
+    </li>
+    <li><a href="#1210-乘子法的扩展应用场景">12.10 乘子法的扩展应用场景</a>
+      <ol>
+        <li><a href="#12101-分布式乘子法">12.10.1 分布式乘子法</a></li>
+        <li><a href="#12102-乘子法用于非光滑优化">12.10.2 乘子法用于非光滑优化</a></li>
+        <li><a href="#12103-乘子法的在线随机变体">12.10.3 乘子法的在线/随机变体</a></li>
+      </ol>
+    </li>
+    <li><a href="#1211-知识地图乘子法的理论位置">12.11 知识地图：乘子法的理论位置</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/12-%E4%B9%98%E5%AD%90%E6%B3%95/">第12章：乘子法（增广Lagrange法）</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 11 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第12章乘子法增广lagrange法">第12章：乘子法（增广Lagrange法）
+</h1><blockquote>
+<p><strong>核心思想</strong>：在Lagrange函数中加入二次惩罚项 $\frac{\rho}{2}|Ax - b|^2$，使对偶函数从&quot;有折角&quot;变为处处光滑甚至强凸——从而可以用更快的梯度型方法求解。乘子法的理论精髓在于：<strong>它等价于在对偶问题上跑邻近点法（Proximal Point Algorithm）</strong>。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾">前置知识回顾
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>概念</th>
+					<th>定义（简要）</th>
+					<th>首次出现</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Lagrange对偶</td>
+					<td>原问题 → Lagrange函数 $L(x, \lambda) = f(x) + \lambda^T(Ax-b)$ → 对偶函数 $q(\lambda) = \inf_x L$ → 对偶问题 $\max_\lambda q(\lambda)$</td>
+					<td>Ch10</td>
+			</tr>
+			<tr>
+					<td>对偶分解法</td>
+					<td>将可分离问题 $\min \sum f_i(x_i)$ s.t. $\sum A_i x_i = b$ 拆成 $N$ 个并行子问题 + 中心协调，用次梯度法更新 $\lambda$</td>
+					<td>Ch11</td>
+			</tr>
+			<tr>
+					<td>邻近点法（PPA）</td>
+					<td>$x_{k+1} = \operatorname{prox}_{\alpha f}(x_k) = \arg\min_x { f(x) + \frac{1}{2\alpha}|x - x_k|^2 }$——在原问题加上2范数正则化来稳定迭代</td>
+					<td>Ch9</td>
+			</tr>
+			<tr>
+					<td>邻近算子</td>
+					<td>$\operatorname{prox}_f(v) = \arg\min_x { f(x) + \frac{1}{2}|x - v|^2 }$</td>
+					<td>Ch7</td>
+			</tr>
+			<tr>
+					<td>对偶函数</td>
+					<td>$q(\lambda) = \inf_x L(x, \lambda)$，永为凹函数；若原函数强凸则对偶光滑</td>
+					<td>Ch10</td>
+			</tr>
+			<tr>
+					<td>次梯度</td>
+					<td>非光滑折角处&quot;托底直线&quot;的斜率集合：$\partial f(x) = {g \mid f(y) \geq f(x) + g^T(y-x), \forall y}$</td>
+					<td>Ch11</td>
+			</tr>
+			<tr>
+					<td>强凸函数</td>
+					<td>$f(y) \geq f(x) + \nabla f(x)^T(y-x) + \frac{\mu}{2}|y-x|^2$（碗壁陡峭的碗，极小值唯一）</td>
+					<td>Ch1</td>
+			</tr>
+			<tr>
+					<td>Moreau包络</td>
+					<td>原函数的强凸性 → 对偶函数的光滑性（&ldquo;原函数越凸，对偶越光滑&rdquo;）</td>
+					<td>Ch11</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="121-从罚函数法到增广lagrange的演进逻辑">12.1 从罚函数法到增广Lagrange的演进逻辑
+</h2><h3 id="1211-纯二次罚函数法">12.1.1 纯二次罚函数法
+</h3><p><strong>问题</strong>：等式约束优化
+</p>
+$$\min_{x \in \mathbb{R}^n} f(x) \quad \text{s.t.} \quad Ax = b$$<p>
+其中 $A \in \mathbb{R}^{m \times n}$，$b \in \mathbb{R}^m$，$f$ 是凸函数。</p>
+<p><strong>二次罚函数法的思路</strong>：把约束直接作为惩罚项加入目标：
+</p>
+$$\boxed{P_\rho(x) = f(x) + \frac{\rho}{2}\|Ax - b\|^2}$$<p>符号逐字解释：</p>
+<ul>
+<li>$|Ax - b|^2 = (Ax - b)^T(Ax - b) = \sum_{i=1}^m (A_i x - b_i)^2$：约束违反量的平方和。如果 $x$ 满足所有约束（$Ax = b$），这一项为0。</li>
+<li>$\rho &gt; 0$：惩罚参数——$\rho$ 越大，对违反约束的惩罚越重，解越接近可行域。</li>
+<li>系数 $\frac{1}{2}$：仅为求导方便（导数出去掉2）。</li>
+</ul>
+<p><strong>标准流程</strong>：选取递增序列 $\rho_k \to \infty$，对每个 $\rho_k$ 求解 $\min_x P_{\rho_k}(x)$，得近似解 $x_k$。理论上 $\lim_{k \to \infty} x_k = x^*$。</p>
+<p><strong>三大致命缺陷</strong>：</p>
+<ol>
+<li>
+<p><strong>数值病态（Ill-conditioning）</strong>：
+当 $\rho \to \infty$ 时，$P_\rho(x)$ 的Hessian矩阵 $\nabla^2 P_\rho = \nabla^2 f + \rho A^T A$。取 $\rho \gg 1$，$\rho A^T A$ 主导，条件数 → $\infty$，任何基于梯度的算法都在数值上寸步难行。</p>
+</li>
+<li>
+<p><strong>有限 $\rho$ 下解不精确可行</strong>：
+对于任意有限的 $\rho$，$x_\rho^* = \arg\min P_\rho(x)$ 不会精确满足 $Ax = b$。要精确可行，必须 $\rho \to \infty$——而这正是缺陷1的来源。</p>
+</li>
+<li>
+<p><strong>丢弃了Lagrange乘子的信息</strong>：
+纯罚函数法完全丢弃了乘子 $\lambda$ 这个宝贵的&quot;向导&quot;——它提供了约束的<strong>影子价格</strong>（边际成本）信息，告诉算法&quot;每种约束违反的单位代价是多少&quot;。</p>
+</li>
+</ol>
+<h3 id="1212-理想精确罚函数">12.1.2 理想：精确罚函数
+</h3><p>假设我们已经知道最优乘子 $\lambda^*$。考察以下函数：
+</p>
+$$P^*(x) = f(x) + (\lambda^*)^T(Ax - b) + \frac{\rho}{2}\|Ax - b\|^2$$<p><strong>关键定理</strong>：若 $\rho$ 充分大（但有限），则 $x^<em>$（原问题最优解）是 $P^</em>(x)$ 的<strong>无约束全局极小点</strong>。</p>
+<p><strong>物理直觉</strong>：</p>
+<ul>
+<li>线性项 $(\lambda^*)^T(Ax - b)$ 精确反映了约束被违反的边际代价</li>
+<li>二次项 $\frac{\rho}{2}|Ax - b|^2$ 提供额外的&quot;凸形&quot;来确保极小值存在且稳定</li>
+<li>两者合在一起，使得 $x^*$ 确实是无约束极小点</li>
+</ul>
+<p>现实中我们不知道 $\lambda^*$，但可以<strong>迭代逼近它</strong>——这就是增广Lagrange乘子法的核心思想。</p>
+<h3 id="1213-增广lagrange函数的定义">12.1.3 增广Lagrange函数的定义
+</h3><p>将理想精确罚函数中的 $\lambda^*$ 替换为可迭代更新的估计 $\lambda$：</p>
+$$\boxed{L_\rho(x, \lambda) = f(x) + \lambda^T(Ax - b) + \frac{\rho}{2}\|Ax - b\|^2}$$<p><strong>逐项解释</strong>：</p>
+<ul>
+<li><strong>$f(x)$</strong>：原目标函数，输入 $n$ 维向量 $x$，输出一个实数——越小越好。</li>
+<li><strong>$\lambda^T(Ax - b)$</strong>：<strong>线性乘子项</strong>。$\lambda = (\lambda_1, \ldots, \lambda_m)^T \in \mathbb{R}^m$ 是对最优乘子的当前估计。内积 $\lambda^T(Ax - b) = \sum_{i=1}^m \lambda_i (A_i x - b_i)$。
+<ul>
+<li>如果当前 $\lambda$ 恰好等于 $\lambda^<em>$：这一项给出正确的&quot;边际代价&quot;方向，引导 $x$ 走向 $x^</em>$。</li>
+<li>如果 $\lambda$ 尚未精确：至少给了正确的趋势（高估了某种约束的代价，就多向满足它的方向走）。</li>
+</ul>
+</li>
+<li><strong>$\frac{\rho}{2}|Ax - b|^2$</strong>：<strong>二次惩罚项</strong>。即使 $\lambda$ 不精确（大多数迭代步），这一项提供额外的凸性，使得 $L_\rho(\cdot, \lambda)$ 在任何 $\rho &gt; 0$ 下都是&quot;良态&quot;的（比纯Lagrange函数更稳定）。</li>
+</ul>
+<p><strong>关键性质</strong>：</p>
+<blockquote>
+<p>对任意 $\rho &gt; 0$，若 $\lambda = \lambda^<em>$，则 $\arg\min_x L_\rho(x, \lambda^</em>) = x^*$。</p>
+</blockquote>
+<p><strong>证明（简明版）</strong>：
+由原问题的KKT条件：$\nabla f(x^<em>) + A^T \lambda^</em> = 0$ 且 $Ax^* = b$。
+计算 $L_\rho(x, \lambda^<em>)$ 在 $x^</em>$ 处的梯度：
+</p>
+$$\nabla_x L_\rho(x^*, \lambda^*) = \nabla f(x^*) + A^T \lambda^* + \rho A^T(Ax^* - b) = \nabla f(x^*) + A^T \lambda^* + \rho A^T \cdot 0 = 0$$<p>
+因此 $x^*$ 是驻点。由凸性，驻点即全局极小点。$\square$</p>
+<hr>
+<h2 id="122-乘子法的理论基础">12.2 乘子法的理论基础
+</h2><h3 id="1221-乘子法--对偶问题的邻近点法">12.2.1 乘子法 = 对偶问题的邻近点法
+</h3><p>这是本章最深刻的理论结果。</p>
+<p><strong>定理（乘子法的对偶解释）</strong>：乘子法的每一步更新等价于在<strong>对偶问题</strong> $\max_\lambda q(\lambda)$ 上用<strong>邻近点法</strong>迭代。</p>
+<p>具体来说，定义对偶目标（取负号转为极小化问题）：
+</p>
+$$h(\lambda) = -q(\lambda) = -\inf_x L(x, \lambda)$$<p>则乘子法等价于：
+</p>
+$$\boxed{\lambda^{k+1} = \operatorname{prox}_{\rho h}(\lambda^k) = \arg\min_\lambda \left\{ h(\lambda) + \frac{1}{2\rho}\|\lambda - \lambda^k\|^2 \right\}}$$<p><strong>完整推导（不跳步）</strong>：</p>
+<p><strong>步骤1</strong>：写出增广Lagrange的极小化问题
+</p>
+$$x^{k+1} = \arg\min_x L_\rho(x, \lambda^k) = \arg\min_x \left\{ f(x) + (\lambda^k)^T(Ax - b) + \frac{\rho}{2}\|Ax - b\|^2 \right\}$$<p><strong>步骤2</strong>：定义增广对偶函数
+</p>
+$$q_\rho(\lambda) = \min_x L_\rho(x, \lambda)$$<p>注意：这里不是 $\inf$ 而是 $\min$，因为二次罚项保证了解的存在性和唯一性（若 $f$ 闭凸且 $A$ 满秩）。</p>
+<p><strong>步骤3</strong>：由对偶理论，最大化 $q_\rho(\lambda)$ 等价于求解原问题。乘子更新为：
+</p>
+$$\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)$$<p><strong>步骤4</strong>：证明这个更新等价于邻近点法。
+令 $H(\lambda) = -q_\rho(\lambda)$ 为极小化目标。则需要证明：
+</p>
+$$\lambda^{k+1} = \operatorname{prox}_{\rho H}(\lambda^k)$$<p>计算 $q_\rho(\lambda)$ 在 $\lambda$ 处的梯度（利用Danskin定理：极值函数的导数等于在极值点处的偏导数）：
+</p>
+$$\nabla_\lambda q_\rho(\lambda) = \nabla_\lambda L_\rho(x^*(\lambda), \lambda) = Ax^*(\lambda) - b$$<p>
+其中 $x^*(\lambda) = \arg\min_x L_\rho(x, \lambda)$。</p>
+<p>因此 $\nabla H(\lambda^k) = -\nabla q_\rho(\lambda^k) = -(Ax^{k+1} - b)$，其中 $x^{k+1} = x^*(\lambda^k)$。</p>
+<p>邻近点法的迭代为：
+</p>
+$$\lambda^{k+1} = \lambda^k - \rho \nabla H(\lambda^{k+1})$$<p>
+（注意：邻近点法是<strong>隐式</strong>的——右侧出现了自身 $\lambda^{k+1}$）</p>
+<p>但利用 $H$ 的结构：
+</p>
+$$\nabla H(\lambda^{k+1}) = -(Ax^{k+1,*} - b)$$<p>
+其中 $x^{k+1,*} = \arg\min_x L_\rho(x, \lambda^{k+1})$。</p>
+<p>同时，由 $\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)$ 移项得：
+</p>
+$$Ax^{k+1} - b = \frac{\lambda^{k+1} - \lambda^k}{\rho}$$<p>这恰好满足邻近点法的隐式梯度关系！$\square$</p>
+<p><strong>直观总结</strong>：</p>
+<ul>
+<li>乘子法在对偶问题上跑邻近点法</li>
+<li>邻近点法比次梯度法<strong>快得多</strong>（利用了目标函数的曲率信息）</li>
+<li>这就是为什么乘子法比Ch11的对偶分解（次梯度法）收敛更快</li>
+</ul>
+<h3 id="1222-二次惩罚项的光滑化作用">12.2.2 二次惩罚项的光滑化作用
+</h3><p><strong>核心效应</strong>：二次惩罚项 $\frac{\rho}{2}|Ax - b|^2$ 使得对偶函数 $q_\rho(\lambda)$ 比原始对偶函数 $q(\lambda)$ 更加光滑。</p>
+<p><strong>几何解释</strong>：</p>
+<ul>
+<li>$q(\lambda)$ 可能是有&quot;折角&quot;的凹函数（原函数非强凸时）</li>
+<li>加入二次范数惩罚后，$q_\rho(\lambda)$ 变为处处光滑且<strong>强凹</strong>的函数</li>
+<li>折角被&quot;磨平&quot;——这就是Moreau包络效应的对偶版本</li>
+</ul>
+<p><strong>公式验证</strong>：$L_\rho(x, \lambda) = L(x, \lambda) + \frac{\rho}{2}|Ax - b|^2$。二次项的Hessian $\rho A^T A$（半正定）提供了额外的曲率信息，当取 $\inf_x$ 后通过Moreau包络传导到 $q_\rho$。</p>
+<p><strong>数值后果</strong>：</p>
+<ul>
+<li>原对偶函数 $q$：只能用<strong>次梯度法</strong>（速度 $O(1/\sqrt{k})$）</li>
+<li>增广对偶函数 $q_\rho$：可用<strong>梯度法</strong>（速度 $O(1/k)$）</li>
+<li>$\rho$ 越大 → $q_\rho$ 越光滑（曲率越大）→ 收敛越快</li>
+</ul>
+<h3 id="1223-乘子法完整算法">12.2.3 乘子法完整算法
+</h3>$$\boxed{\begin{aligned} &\textbf{初始化：} \lambda^0 \in \mathbb{R}^m, \; \rho > 0, \; k = 0 \\ &\textbf{重复：} \\ &\quad \text{① 原始步（Primal Step）：联合极小化增广Lagrange} \\ &\quad x^{k+1} = \arg\min_x L_\rho(x, \lambda^k) = \arg\min_x \left\{ f(x) + (\lambda^k)^T(Ax - b) + \frac{\rho}{2}\|Ax - b\|^2 \right\} \\ &\quad \text{② 对偶步（Dual Update）：梯度上升更新乘子} \\ &\quad \lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b) \\ &\textbf{直到收敛} \end{aligned}}$$<p><strong>乘子更新公式的推导</strong>：</p>
+<p>从KKT最优性条件 $\nabla f(x^<em>) + A^T \lambda^</em> = 0$ 出发，在 $x^{k+1}$ 处求增广Lagrange的梯度（拉格朗日乘子固定为 $\lambda^k$）：
+</p>
+$$\nabla f(x^{k+1}) + A^T \lambda^k + \rho A^T(Ax^{k+1} - b) = 0$$<p>将这一最优性条件与KKT方程 $\nabla f(x^<em>) + A^T \lambda^</em> = 0$ 对比：
+</p>
+$$\nabla f(x^{k+1}) + A^T \underbrace{(\lambda^k + \rho(Ax^{k+1} - b))}_{\text{应为我们对 } \lambda^* \text{ 的最新估计}} = 0$$<p>因此自然得到乘子更新：$\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)$。</p>
+<p><strong>参数 $\rho$ 的选择</strong>：</p>
+<ul>
+<li>太小：惩罚力度不够，收敛慢</li>
+<li>太大：原始子问题 $\arg\min_x L_\rho$ 变得病态（Hessian条件数大）</li>
+<li>实用策略：$\rho$ 从小开始，逐步调大（如 $\rho_{k+1} = \min{\rho_{\max}, \beta \rho_k}$，$\beta &gt; 1$）</li>
+</ul>
+<hr>
+<h2 id="123-乘子法-vs-对偶分解法">12.3 乘子法 vs 对偶分解法
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>维度</th>
+					<th>对偶分解法（Ch11）</th>
+					<th>乘子法（本章）</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>数学原理</strong></td>
+					<td>Lagrange对偶 + 次梯度上升</td>
+					<td>增广Lagrange + 梯度上升</td>
+			</tr>
+			<tr>
+					<td><strong>对偶函数性质</strong></td>
+					<td>可能有折角（非光滑）</td>
+					<td>处处光滑/强凹（二次惩罚的光滑化）</td>
+			</tr>
+			<tr>
+					<td><strong>对偶空间算法</strong></td>
+					<td>次梯度法</td>
+					<td><strong>邻近点法</strong></td>
+			</tr>
+			<tr>
+					<td><strong>收敛速度</strong></td>
+					<td>$O(1/\sqrt{k})$（慢）</td>
+					<td>$O(1/k)$（快）</td>
+			</tr>
+			<tr>
+					<td><strong>原问题条件</strong></td>
+					<td>需 $f_i$ 强凸才不振荡</td>
+					<td>无额外要求</td>
+			</tr>
+			<tr>
+					<td><strong>可分离性</strong></td>
+					<td>✅ 完全并行（目标是可分离的）</td>
+					<td>❌ 被二次惩罚项 $|Ax - b|^2$ 破坏</td>
+			</tr>
+			<tr>
+					<td><strong>子问题</strong></td>
+					<td>$N$ 个独立的并行子问题</td>
+					<td>一个联合极小化问题（维数 = 总维数）</td>
+			</tr>
+			<tr>
+					<td><strong>数值稳定性</strong></td>
+					<td>稳定（步长衰减）</td>
+					<td>$\rho$ 太大时原始子问题病态</td>
+			</tr>
+			<tr>
+					<td><strong>适用场景</strong></td>
+					<td>大规模分布式、可分离问题</td>
+					<td>中小规模、对精度要求高的问题</td>
+			</tr>
+			<tr>
+					<td><strong>进阶发展</strong></td>
+					<td>—</td>
+					<td>启发ADMM（Ch14）恢复可分离性</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>关键权衡</strong>：</p>
+<blockquote>
+<p>乘子法用&quot;失去可分离性&quot;换来了&quot;加速收敛&quot;。而ADMM（Ch14）则通过交替极小化，两者兼得——既快又可分解。</p>
+</blockquote>
+<hr>
+<h2 id="124-理论收敛性分析">12.4 理论收敛性分析
+</h2><h3 id="1241-收敛性定理">12.4.1 收敛性定理
+</h3><p><strong>定理</strong>：设原问题 $\min { f(x) \mid Ax = b }$ 有最优解 $x^<em>$，且存在最优乘子 $\lambda^</em>$，$f$ 为闭凸函数。则乘子法生成的序列 ${x^k}$ 和 ${\lambda^k}$ 满足：</p>
+<ol>
+<li>$Ax^k \to b$（<strong>原可行性收敛</strong>——约束逐渐满足）</li>
+<li>$f(x^k) \to f(x^*)$（<strong>目标值收敛</strong>）</li>
+<li>$\lambda^k \to \lambda^*$（<strong>乘子收敛</strong>）</li>
+</ol>
+<p><strong>关键优势</strong>：不需要 $f$ 强凸，不需要 $\rho \to \infty$（$\rho$ 固定即可），不需要约束矩阵 $A$ 满秩。</p>
+<p><strong>对比</strong>：纯罚函数法需要 $\rho \to \infty$ 才能保证 $Ax^k \to b$；乘子法只要 $\rho &gt; 0$ 即可——因为乘子 $\lambda$ 承担了&quot;微调&quot;的职责。</p>
+<h3 id="1242-收敛速度">12.4.2 收敛速度
+</h3><p>在适当的条件下（$f$ 强凸或 $A$ 满秩等），乘子法对 $x^k$ 是<strong>线性收敛</strong>的：存在常数 $0 &lt; \gamma &lt; 1$ 使得：
+</p>
+$$\|x^{k+1} - x^*\| \leq \gamma \|x^k - x^*\|$$<p>这比对偶分解的次线性速度 $O(1/\sqrt{k})$ 快得多。</p>
+<hr>
+<h2 id="125-典型例题">12.5 典型例题
+</h2><h3 id="例题121乘子法基础推导">例题12.1（乘子法基础推导）
+</h3><p><strong>题目</strong>：求解 $\min_x \frac{1}{2}|x - c|^2$ s.t. $Ax = b$，其中 $A \in \mathbb{R}^{m \times n}$（$m \leq n$）。写出乘子法的子问题解析解和乘子更新。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>增广Lagrange函数</strong>：
+</p>
+$$L_\rho(x, \lambda) = \frac{1}{2}\|x - c\|^2 + \lambda^T(Ax - b) + \frac{\rho}{2}\|Ax - b\|^2$$<p><strong>原始子问题</strong>（给定 $\lambda^k$）：
+</p>
+$$\min_x \frac{1}{2}\|x - c\|^2 + (\lambda^k)^T Ax + \frac{\rho}{2}\|Ax - b\|^2$$<p>梯度$\nabla_x L_\rho = (x - c) + A^T \lambda^k + \rho A^T(Ax - b) = 0$：
+</p>
+$$(I + \rho A^T A)x = c - A^T \lambda^k + \rho A^T b$$<p><strong>解析解</strong>：
+</p>
+$$\boxed{x^{k+1} = (I + \rho A^T A)^{-1} \left( c - A^T \lambda^k + \rho A^T b \right)}$$<p><strong>乘子更新</strong>：
+</p>
+$$\boxed{\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)}$$<p><strong>解析推导验证</strong>：在最优时 $Ax^* = b$，代入子问题解：
+</p>
+$$(I + \rho A^T A)x^* = c - A^T \lambda^k + \rho A^T(Ax^*) = c - A^T \lambda^k + \rho A^T b$$<p>
+但 $A^T \lambda^k$ 需要达到最优 $\lambda^<em>$。由于乘子法会收敛：$\lambda^k \to \lambda^</em>$，$\rho(Ax^{k+1} - b) \to 0$（因为 $Ax^{k+1} \to b$），乘子逐步调整到正确值。</p>
+<hr>
+<h3 id="例题122增广lagrange的精确罚性质验证">例题12.2（增广Lagrange的精确罚性质验证）
+</h3><p><strong>题目</strong>：验证对于 $\min_x |x|^2$ s.t. $x_1 + x_2 = 2$，若已知 $\lambda^* = -4$，$L_\rho(x, \lambda^<em>)$ 以 $x^</em> = (1,1)^T$ 为全局极小点（对任意 $\rho &gt; 0$）。</p>
+<p><strong>解答</strong>：</p>
+<p>$f(x) = x_1^2 + x_2^2$，$A = [1, 1]$，$b = 2$。</p>
+$$L_\rho(x, \lambda^*) = x_1^2 + x_2^2 + (-4)(x_1 + x_2 - 2) + \frac{\rho}{2}(x_1 + x_2 - 2)^2$$<p>计算梯度并令为0：
+</p>
+$$\frac{\partial L_\rho}{\partial x_1} = 2x_1 - 4 + \rho(x_1 + x_2 - 2) = 0$$<p>
+</p>
+$$\frac{\partial L_\rho}{\partial x_2} = 2x_2 - 4 + \rho(x_1 + x_2 - 2) = 0$$<p>两式相减：$2x_1 - 2x_2 = 0 \implies x_1 = x_2$。</p>
+<p>代入第一式：$2x_1 - 4 + \rho(2x_1 - 2) = (2 + 2\rho)x_1 - (4 + 2\rho) = 0$
+</p>
+$$\implies x_1 = \frac{4 + 2\rho}{2 + 2\rho} = \frac{2 + \rho}{1 + \rho} = 1 + \frac{1}{1 + \rho}$$<p><strong>注意</strong>：这并不是 $(1,1)$！我犯了错误——让我重新验证。</p>
+<p>实际上：若 $\lambda^<em>$ 真的是最优乘子，应有 $\arg\min_x L_\rho(x, \lambda^</em>) = x^*$。让我们验证。</p>
+<p>原问题：$\min {x_1^2 + x_2^2 \mid x_1 + x_2 = 2}$。代入约束：$x_2 = 2 - x_1$，目标：$x_1^2 + (2-x_1)^2 = 2x_1^2 - 4x_1 + 4$。求导：$4x_1 - 4 = 0 \implies x_1 = 1$。故 $x^* = (1,1)^T$，$p^* = 2$。</p>
+<p>KKT条件：$\nabla f(x^<em>) + A^T \lambda^</em> = 0 \implies (2, 2)^T + (1, 1)^T \lambda^* = 0 \implies \lambda^* = -2$。</p>
+<p>在 $L_\rho(x, -2)$ 的梯度：
+</p>
+$$\frac{\partial L_\rho}{\partial x_1} = 2x_1 - 2 + \rho(x_1 + x_2 - 2)$$<p>
+</p>
+$$\frac{\partial L_\rho}{\partial x_2} = 2x_2 - 2 + \rho(x_1 + x_2 - 2)$$<p>在 $x = (1,1)^T$ 处：$2(1) - 2 + \rho(1+1-2) = 0 + 0 = 0$。验证成立。且由于 $L_\rho$ 关于 $x$ 是强凸的（Hessian = $2I + \rho A^T A = 2I + \rho\begin{pmatrix}1&amp;1\1&amp;1\end{pmatrix}$，正定），驻点即唯一全局极小点。</p>
+<p><strong>关键教训</strong>：定理说的是：若你<strong>恰好用最优乘子 $\lambda^*$</strong>，则 $x^<em>$ 是 $L_\rho(x, \lambda^</em>)$ 的极小点。如果用了错误的乘子（如本例的 -4），极小点会偏离 $x^*$。</p>
+<hr>
+<h3 id="例题123乘子法-vs-对偶分解的收敛速度对比">例题12.3（乘子法 vs 对偶分解的收敛速度对比）
+</h3><p><strong>题目</strong>：考虑两变量问题 $\min_x \frac{1}{2}(x_1 - 3)^2 + \frac{1}{2}(x_2 - 5)^2$ s.t. $x_1 + x_2 = 10$。比较乘子法和Ch11对偶分解法的收敛行为。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>解析最优解</strong>：代入 $x_2 = 10 - x_1$，目标为 $\frac{1}{2}(x_1 - 3)^2 + \frac{1}{2}(7 - x_1)^2$。求导：
+$x_1 - 3 - (7 - x_1) = 0 \implies 2x_1 = 10 \implies x_1 = 5, x_2 = 5$。</p>
+<p><strong>乘子法迭代</strong>（取 $\rho = 1$，$\lambda^0 = 0$）：</p>
+<p>增广Lagrange：
+</p>
+$$L_1(x, \lambda) = \frac{1}{2}(x_1-3)^2 + \frac{1}{2}(x_2-5)^2 + \lambda(x_1 + x_2 - 10) + \frac{1}{2}(x_1 + x_2 - 10)^2$$<p>子问题解析解（梯度为0）：
+</p>
+$$x_1 - 3 + \lambda + (x_1 + x_2 - 10) = 0 \implies 2x_1 + x_2 = 13 - \lambda$$<p>
+</p>
+$$x_2 - 5 + \lambda + (x_1 + x_2 - 10) = 0 \implies x_1 + 2x_2 = 15 - \lambda$$<p>联立求解：
+</p>
+$$x_1^{k+1} = \frac{11 - \lambda^k}{3}, \quad x_2^{k+1} = \frac{19 - \lambda^k}{3}$$<p>乘子更新：$\lambda^{k+1} = \lambda^k + (x_1^{k+1} + x_2^{k+1} - 10) = \lambda^k + \left(\frac{30 - 2\lambda^k}{3} - 10\right) = \frac{1}{3}\lambda^k$</p>
+<p>因此 $\lambda^k = \lambda^0 (1/3)^k = 0$（所有 $\lambda^k = 0$…等等，这意味着 $\lambda^0 = 0$ 导致 $\lambda$ 不变）。</p>
+<p><strong>修正</strong>：$\lambda^{k+1} = \lambda^k + (x_1^{k+1} + x_2^{k+1} - 10) = \lambda^k + \frac{30 - 2\lambda^k}{3} - 10 = \lambda^k + \frac{30 - 2\lambda^k - 30}{3} = \lambda^k - \frac{2}{3}\lambda^k = \frac{1}{3}\lambda^k$。</p>
+<p>若 $\lambda^0 = 6$：$\lambda^1 = 2$，$\lambda^2 = 2/3$，$\lambda^3 = 2/9$，… $|\lambda^k| = 6 \cdot (1/3)^k$，<strong>线性收敛</strong>（每步缩小到 1/3）。</p>
+<p><strong>对偶分解法对比</strong>（取固定步长 $\alpha = 0.5$）：</p>
+<p>子问题：
+</p>
+$$x_1^{k+1} = \arg\min_{x_1} \frac{1}{2}(x_1-3)^2 + \lambda^k x_1 = 3 - \lambda^k$$<p>
+</p>
+$$x_2^{k+1} = \arg\min_{x_2} \frac{1}{2}(x_2-5)^2 + \lambda^k x_2 = 5 - \lambda^k$$<p>乘子更新：$\lambda^{k+1} = \lambda^k + 0.5(3 - \lambda^k + 5 - \lambda^k - 10) = \lambda^k - \lambda^k = 0$（一步到最优！这里因为步长恰好合适）。</p>
+<p>若取步长 $\alpha = 1$：$\lambda^{k+1} = \lambda^k + 1 \cdot (-2\lambda^k) = -\lambda^k$，在 $\lambda = 0$ 两侧反复振荡，<strong>不收敛</strong>。</p>
+<p><strong>结论</strong>：乘子法以线性速率稳定收敛（$\lambda^k \to 0$ 按 $(1/3)^k$ 缩），而对偶分解法对步长极其敏感——步长不合适可能不收敛或慢收敛（$O(1/k)$ 而非线性）。乘子法通过二次惩罚项提供了自适应的&quot;加速&quot;效果。</p>
+<hr>
+<h3 id="例题124不可分离的乘子法">例题12.4（不可分离的乘子法）
+</h3><p><strong>题目</strong>：解释为什么乘子法不适用于直接分布式并行，并给出一种可能的缓解方案。</p>
+<p><strong>解答</strong>：</p>
+<p>乘子法的原始子问题要求联合极小化：
+</p>
+$$\min_x \left\{ f(x) + (\lambda^k)^T(Ax - b) + \frac{\rho}{2}\|Ax - b\|^2 \right\}$$<p>展开二次项：$\frac{\rho}{2}|Ax - b|^2 = \frac{\rho}{2}\left|\sum_{i=1}^N A_i x_i - b\right|^2$。</p>
+<p>展开平方：$\left(\sum_i A_i x_i - b\right)$ 的模平方会产生交叉项 $x_i^T A_i^T A_j x_j$（$i \neq j$）——即不同子块的变量 $x_i$ 和 $x_j$ 耦合在一起，<strong>破坏了原Lagrange函数的可分离性</strong>。</p>
+<p>因此乘子法的子问题不可分解为 $N$ 个独立的并行子问题。</p>
+<p><strong>缓解方案</strong>：</p>
+<ol>
+<li><strong>ADMM（Ch14）</strong>：通过灵活引入辅助变量和交替极小化，在保留二次惩罚的同时恢复可分解性。</li>
+<li><strong>近似乘子法</strong>：在 $x$ 的极小化中做少许几步（而非精确求解），必要时用坐标下降法分解。</li>
+<li><strong>增广Lagrange的线性化</strong>：对光滑的 $f$，用梯度步替代精确极小化。</li>
+</ol>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><ol>
+<li>
+<p><strong>乘子法的本质</strong>：在Lagrange函数中引入<strong>二次惩罚项</strong> $\frac{\rho}{2}|Ax - b|^2$，使对偶函数变得光滑甚至强凹，从而能用更快的算法（梯度法/邻近点法）求解对偶问题。</p>
+</li>
+<li>
+<p><strong>罚函数 $\to$ 增广Lagrange的进化逻辑</strong>：纯罚函数法需要 $\rho \to \infty$（数值病态）→ 引入乘子项 $\lambda^T(Ax - b)$ 提供&quot;边际代价&quot;信息 → <strong>有限 $\rho$ 即可保证收敛</strong>。</p>
+</li>
+<li>
+<p><strong>乘子法 = 对偶邻近点法</strong>：$\lambda^{k+1} = \operatorname{prox}_{\rho h}(\lambda^k)$，其中 $h = -q$。这是理解乘子法快速收敛的理论关键——邻近点法比次梯度法快一个数量级。</p>
+</li>
+<li>
+<p><strong>乘子更新公式</strong> $\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)$ 直接来自增广Lagrange的KKT条件对比（当前 $x^{k+1}$ 的最优性条件 vs 全局最优的KKT条件）。</p>
+</li>
+<li>
+<p><strong>二次惩罚的双重作用</strong>：提供光滑性（使梯度可用） + 提供强制凸性（保证子问题适定）。</p>
+</li>
+<li>
+<p><strong>局限性</strong>：二次惩罚破坏了Lagrange函数的<strong>可分离性</strong>——这直接催生了Ch13（DR分裂法）和Ch14（ADMM）的发展。</p>
+</li>
+<li>
+<p><strong>与前后章节的衔接</strong>：Ch10对偶邻近梯度法（光滑对偶+邻近梯度）→ Ch11对偶分解（可分离+次梯度）→ <strong>Ch12乘子法</strong>（增广Lagrange+快速收敛，但损失可分离性）→ Ch14 ADMM（重获可分离性，兼顾速度与并行）。</p>
+</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>一句话总结</strong>：乘子法通过在Lagrange函数中&quot;加点二次惩罚 + 保留乘子信息&quot;，让对偶问题从&quot;次梯度的崎岖山路&quot;变成了&quot;梯度的高速公路&quot;——代价是原问题的可分离性被破坏，但这一缺陷将在ADMM中得到完美解决。</p>
+</blockquote>
+<hr>
+<h2 id="126-补充例题">12.6 补充例题
+</h2><h3 id="例题125不等式约束的乘子法">例题12.5（不等式约束的乘子法）
+</h3><p><strong>题目</strong>：用乘子法求解 $\min_x \frac{1}{2}|x|^2$ s.t. $x \geq 1$。</p>
+<p><strong>解答</strong>：</p>
+<p>引入松弛变量 $s \geq 0$，将不等式转为等式：$x - s = 1$。</p>
+<p>增广Lagrange：
+</p>
+$$L_\rho(x, s, \lambda) = \frac{1}{2}x^2 + \lambda(x - s - 1) + \frac{\rho}{2}(x - s - 1)^2$$<p>子问题1（给定 $\lambda^k$，联合极小化）：
+</p>
+$$\min_{x, s \geq 0} \frac{1}{2}x^2 + \lambda^k(x - s - 1) + \frac{\rho}{2}(x - s - 1)^2$$<p>梯度条件（对 $x$）：$x + \lambda^k + \rho(x - s - 1) = 0 \implies (1 + \rho)x = \rho s + \rho + 1 - \lambda^k$。</p>
+<p>对 $s \geq 0$：KKT条件 $\partial_s L = -\lambda^k - \rho(x - s - 1) \geq 0$，等号成立时 $s &gt; 0$。</p>
+<p>联立求解（分情况讨论），利用 $\lambda$ 的正负号判断 $s$ 是否碰界。</p>
+<p>乘子更新：$\lambda^{k+1} = \lambda^k + \rho(x^{k+1} - s^{k+1} - 1)$。最终 $\lambda^{k+1} \to \lambda^<em>$，此时 $s^</em> = 0$（约束激活），$x^* = 1$。</p>
+<p>解析验证：$\min_{x \geq 1} \frac{1}{2}x^2 = \frac{1}{2}$（$x=1$）。而 $\lambda^* = -1$（由KKT：$x^* + \lambda^* = 1 - 1 = 0$）。</p>
+<p>乘子法正确恢复了最优解和乘子。</p>
+<hr>
+<h3 id="例题126乘子法中-rho-的选择策略实验">例题12.6（乘子法中 $\rho$ 的选择策略实验）
+</h3><p><strong>题目</strong>：在例题12.1中，分析不同 $\rho$ 对收敛速度的影响。</p>
+<p><strong>解答</strong>：</p>
+<p>子问题解：$x^{k+1} = (I + \rho A^T A)^{-1}(c - A^T \lambda^k + \rho A^T b)$。
+乘子更新：$\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)$。</p>
+<p>合并得 $\lambda$ 的迭代：$\lambda^{k+1} = \lambda^k + \rho(A(I + \rho A^T A)^{-1}(c - A^T \lambda^k + \rho A^T b) - b)$。</p>
+<p>对 $A = [1, 1]$，$c = (0)^T$，$b = 2$，最优乘子 $\lambda^* = -2$：</p>
+<p>取不同 $\rho$ 的收敛因子（$\lambda$ 的等比缩小率）：</p>
+<ul>
+<li>$\rho = 0.1$：每步缩小约 0.71（慢但稳定）</li>
+<li>$\rho = 1$：每步缩小约 0.33（快速）</li>
+<li>$\rho = 10$：每步缩小约 0.048（极快）</li>
+<li>$\rho = 100$：每步缩小约 0.005（几乎一步收敛！但子问题矩阵 $(I + 100A^T A)$ 条件数 ≈ 201，数值不稳定）</li>
+</ul>
+<p><strong>最佳实践</strong>：$\rho$ 取 $\sqrt{|A^T A|}$ 的数量级通常效果最佳，兼顾速度和稳定性。</p>
+<hr>
+<h3 id="例题127乘子法在约束非线性规划中的应用">例题12.7（乘子法在约束非线性规划中的应用）
+</h3><p><strong>题目</strong>：用乘子法求解 $\min_x e^{x_1} + e^{x_2}$ s.t. $x_1 + x_2 = 0$。</p>
+<p><strong>解答</strong>：</p>
+<p>增广Lagrange：
+</p>
+$$L_\rho(x_1, x_2, \lambda) = e^{x_1} + e^{x_2} + \lambda(x_1 + x_2) + \frac{\rho}{2}(x_1 + x_2)^2$$<p>子问题梯度：
+</p>
+$$\frac{\partial L_\rho}{\partial x_1} = e^{x_1} + \lambda + \rho(x_1 + x_2) = 0$$<p>
+</p>
+$$\frac{\partial L_\rho}{\partial x_2} = e^{x_2} + \lambda + \rho(x_1 + x_2) = 0$$<p>两式相减：$e^{x_1} = e^{x_2} \implies x_1 = x_2$。</p>
+<p>代入 $x_1 + x_2 = 0$：$2x_1 = 0 \implies x_1 = x_2 = 0$。最优乘子 $\lambda^* = -1$（由 $e^0 + \lambda^* = 0$）。</p>
+<p><strong>经验</strong>：即使目标函数非线性（指数），乘子法通过增广Lagrange的二次惩罚项保持子问题的凸性优势。</p>
+<hr>
+<h2 id="127-增广lagrange方法的变体">12.7 增广Lagrange方法的变体
+</h2><h3 id="1271-部分增广lagrangepartial-augmented-lagrangian">12.7.1 部分增广Lagrange（Partial Augmented Lagrangian）
+</h3><p>当问题包含多组约束时，可以只对部分约束引入二次惩罚和乘子更新：</p>
+$$L_\rho^{\text{partial}}(x, \lambda) = f(x) + \sum_{j=1}^{p} \nu_j \ell_j(x) + \sum_{i=1}^{m} \left[ \lambda_i h_i(x) + \frac{\rho}{2}\max\{0, h_i(x)\}^2 \right]$$<p>其中等式约束仍用传统Lagrange法，不等式约束用增广形式。这对带有大量简单等式约束的问题尤其有效。</p>
+<h3 id="1272-bregman增广lagrange">12.7.2 Bregman增广Lagrange
+</h3><p>将欧氏距离的平方 $|Ax - b|^2$ 替换为Bregman散度 $D_\phi(Ax, b)$：
+</p>
+$$L_\rho^{\text{Bregman}}(x, \lambda) = f(x) + \lambda^T(Ax - b) + \rho D_\phi(Ax, b)$$<p>其中 $\phi$ 是严格凸函数。这允许在非欧氏几何（如指数族、单纯形约束）中使用乘子法的思想。</p>
+<hr>
+<h2 id="128-算法对比详细表">12.8 算法对比详细表
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>方法</th>
+					<th>惩罚方式</th>
+					<th>乘子更新</th>
+					<th>对偶光滑性</th>
+					<th>可分离性</th>
+					<th>收敛速度</th>
+					<th>参数敏感度</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>罚函数法</td>
+					<td>只二次罚，无乘子</td>
+					<td>无</td>
+					<td>—</td>
+					<td>✅（若f可分离）</td>
+					<td>$\rho \to \infty$ 时慢</td>
+					<td>极高（需 $\rho$ 递增序列）</td>
+			</tr>
+			<tr>
+					<td>Lagrange对偶</td>
+					<td>只线性乘子</td>
+					<td>$\lambda^{k+1} = \lambda^k + \alpha_k(Ax^k - b)$</td>
+					<td>可能有折角</td>
+					<td>✅</td>
+					<td>$O(1/\sqrt{k})$</td>
+					<td>中（步长衰减）</td>
+			</tr>
+			<tr>
+					<td><strong>乘子法</strong></td>
+					<td>线性 + 二次</td>
+					<td>$\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)$</td>
+					<td><strong>处处光滑</strong></td>
+					<td>❌（二次项耦合）</td>
+					<td><strong>线性/快</strong></td>
+					<td><strong>低</strong>（$\rho$ 固定即可）</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>演变路线总结</strong>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">罚函数法（$\rho \to \infty$ 数值灾难）
+</span></span><span class="line"><span class="cl">    │  加入乘子项
+</span></span><span class="line"><span class="cl">    ▼
+</span></span><span class="line"><span class="cl">增广Lagrange / 乘子法（有限 $\rho$，快速收敛）
+</span></span><span class="line"><span class="cl">    │  破坏可分离性 → ADMM的动机
+</span></span><span class="line"><span class="cl">    ▼
+</span></span><span class="line"><span class="cl">交替方向乘子法 ADMM（Ch14：交替更新恢复可分离）
+</span></span></code></pre></td></tr></table>
+</div>
+</div><hr>
+<h2 id="129-乘子法的数值实现指南">12.9 乘子法的数值实现指南
+</h2><h3 id="1291-原始子问题的求解策略">12.9.1 原始子问题的求解策略
+</h3><p>乘子法的核心计算瓶颈在于每一步精确求解：
+</p>
+$$x^{k+1} = \arg\min_x \left\{ f(x) + (\lambda^k)^T(Ax - b) + \frac{\rho}{2}\|Ax - b\|^2 \right\}$$<p><strong>策略1——闭式解</strong>：若 $f$ 是二次函数或邻近算子可解析表示，直接用闭式解。</p>
+<p><strong>策略2——牛顿法/拟牛顿法</strong>：若 $f$ 光滑但非二次（如逻辑回归），内层用几步L-BFGS近似求解子问题。由于二次惩罚项的存在，Hessian条件数可控。</p>
+<p><strong>策略3——不精确乘子法</strong>：不必每次精确求解子问题，只需&quot;足够精确&quot;即可（如 $| \nabla_x L_\rho(x^{k+1}, \lambda^k) | \leq \eta_k$，其中 $\eta_k \to 0$）。这显著降低每步计算代价。</p>
+<p><strong>策略4——线性化</strong>：若 $f$ 光滑，可在当前点对 $f$ 做一阶近似，将子问题转化为二次规划（可闭式求解）。</p>
+<h3 id="1292-乘子初始化和热启动">12.9.2 乘子初始化和热启动
+</h3><ul>
+<li><strong>$\lambda^0$ 初始化</strong>：通常取 $\lambda^0 = 0$（无先验信息）或利用问题的特殊结构（如LASSO中的最小二乘解作为初始乘子估计）。</li>
+<li><strong>热启动（Warm Start）</strong>：在一系列相关问题的求解中（如LASSO正则化路径的多个 $\lambda$ 值），将上一个 $\lambda$ 值的收敛乘子作为下一个 $\lambda$ 值的初始乘子，可节省大量迭代。</li>
+</ul>
+<h3 id="1293-乘子法的收敛证明框架">12.9.3 乘子法的收敛证明框架
+</h3><p><strong>证明概要</strong>（用于加深理解）：</p>
+<ol>
+<li>定义Lyapunov函数：$V_k = \frac{1}{2\rho}|\lambda^k - \lambda^*|^2 + \frac{\rho}{2}|Ax^{k+1} - b|^2$</li>
+<li>证明 $V_k$ 单调递减：$V_{k+1} \leq V_k - \frac{\rho}{2}|A(x^{k+1} - x^*)|^2$</li>
+<li>由单调有界序列收敛，$V_k \to 0$，从而 $\lambda^k \to \lambda^*$ 且 $Ax^k \to b$</li>
+<li>进一步可证线性收敛速率（若 $f$ 强凸或 $A$ 满秩）</li>
+</ol>
+<hr>
+<h2 id="1210-乘子法的扩展应用场景">12.10 乘子法的扩展应用场景
+</h2><h3 id="12101-分布式乘子法">12.10.1 分布式乘子法
+</h3><p>虽然标准乘子法破坏可分离性，但可以通过**交替方向乘子法（ADMM，Ch14）**恢复。在分布式场景中，乘子法的思想演化为：</p>
+<ul>
+<li>中心节点维护全局乘子 $\lambda$</li>
+<li>各工作节点交替求解局部子问题</li>
+<li>定期同步乘子</li>
+</ul>
+<h3 id="12102-乘子法用于非光滑优化">12.10.2 乘子法用于非光滑优化
+</h3><p>当 $f$ 非光滑时，增广Lagrange仍可使用，但子问题求解更困难。此时使用<strong>分裂技巧</strong>——将非光滑项分离为独立变量，引入等式约束，再用乘子法+ADMM交替更新的方式处理。</p>
+<h3 id="12103-乘子法的在线随机变体">12.10.3 乘子法的在线/随机变体
+</h3><p>在数据流式到达的大规模机器学习场景中（随机优化），乘子法可改造为<strong>随机乘子法</strong>——每次只用一个小批量数据求解近似子问题和更新乘子，无需等待全量数据。</p>
+<hr>
+<h2 id="1211-知识地图乘子法的理论位置">12.11 知识地图：乘子法的理论位置
+</h2><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">        罚函数法 ──加入乘子──▶ 增广Lagrange（乘子法）
+</span></span><span class="line"><span class="cl">          │                          │
+</span></span><span class="line"><span class="cl">    ρ→∞数值病态              有限ρ即可收敛
+</span></span><span class="line"><span class="cl">          │                          │
+</span></span><span class="line"><span class="cl">          │              ┌───────────┼───────────┐
+</span></span><span class="line"><span class="cl">          │              │           │           │
+</span></span><span class="line"><span class="cl">          │         对偶邻近点法  次梯度法     梯度法
+</span></span><span class="line"><span class="cl">          │         （本质等价）  （Ch11）   （可利用光滑性）
+</span></span><span class="line"><span class="cl">          │              │
+</span></span><span class="line"><span class="cl">          │        破坏可分离性 ──▶ ADMM (Ch14)
+</span></span><span class="line"><span class="cl">          │                        恢复可分离
+</span></span><span class="line"><span class="cl">          │
+</span></span><span class="line"><span class="cl">    纯罚函数在现代很少单独使用
+</span></span><span class="line"><span class="cl">    乘子法是ADMM和DR的理论前身
+</span></span></code></pre></td></tr></table>
+</div>
+</div>
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

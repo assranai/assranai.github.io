@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第11章：对偶分解法 核心思想：将大规模可分离凸优化问题通过对偶化拆成若干独立子问题并行求解，再通过对偶变量（乘子）汇总协调——这便是&quot;分而治之&quot;的对偶分解法（Dual Decomposition）。\n11.1 可分离凸优化问题 11.1.1 问题形式 对偶分解法主要针对具有可分离结构的约束优化问题。所谓“可分离”，是指整个大问题可以被拆解为多个互不干扰的小部分。其标准数学形式如下：\n$$\\boxed{\\min_{x = (x_1, \\ldots, x_N)} \\sum_{i=1}^N f_i(x_i) \\quad \\text{s.t.} \\quad \\sum_{i=1}^N A_i x_i = b}$$数学符号与概念定义：\n$x_i \\in \\mathbb{R}^{n_i}$：表示 $x_i$ 是一个含有 $n_i$ 个实数分量的列向量（可以理解为 $n_i$ 个未知数）。所有子向量 $x_1, x_2, \\ldots, x_N$ 拼在一起构成了总的未知向量 $x$，总维度为 $\\sum_i n_i = n$。 $f_i: \\mathbb{R}^{n_i} \\to \\mathbb{R} \\cup {+\\infty}$ 是闭凸函数（Closed Convex Function）。 凸函数：在图像上看，它就像一个开口向上的“碗”。对于凸函数来说，任何一个局部的极小值点，就是全局的最小值点，这保证了问题容易求解。 闭：表示它的等高线包含边界，避免出现取不到最小值的情况。 $A_i \\in \\mathbb{R}^{m \\times n_i}$：表示一个拥有 $m$ 行和 $n_i$ 列的矩阵。$A_i x_i$ 表示矩阵与向量相乘，其结果是一个 $m$ 维的列向量，代表着将 $x_i$ 转化为对应资源的消耗量。 $b \\in \\mathbb{R}^m$：一个 $m$ 维常数向量，通常代表系统总资源的上限或目标要求。 关键特征：\n">
+<title>第11章：对偶分解法</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/11-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第11章：对偶分解法">
+<meta property='og:description' content="第11章：对偶分解法 核心思想：将大规模可分离凸优化问题通过对偶化拆成若干独立子问题并行求解，再通过对偶变量（乘子）汇总协调——这便是&quot;分而治之&quot;的对偶分解法（Dual Decomposition）。\n11.1 可分离凸优化问题 11.1.1 问题形式 对偶分解法主要针对具有可分离结构的约束优化问题。所谓“可分离”，是指整个大问题可以被拆解为多个互不干扰的小部分。其标准数学形式如下：\n$$\\boxed{\\min_{x = (x_1, \\ldots, x_N)} \\sum_{i=1}^N f_i(x_i) \\quad \\text{s.t.} \\quad \\sum_{i=1}^N A_i x_i = b}$$数学符号与概念定义：\n$x_i \\in \\mathbb{R}^{n_i}$：表示 $x_i$ 是一个含有 $n_i$ 个实数分量的列向量（可以理解为 $n_i$ 个未知数）。所有子向量 $x_1, x_2, \\ldots, x_N$ 拼在一起构成了总的未知向量 $x$，总维度为 $\\sum_i n_i = n$。 $f_i: \\mathbb{R}^{n_i} \\to \\mathbb{R} \\cup {+\\infty}$ 是闭凸函数（Closed Convex Function）。 凸函数：在图像上看，它就像一个开口向上的“碗”。对于凸函数来说，任何一个局部的极小值点，就是全局的最小值点，这保证了问题容易求解。 闭：表示它的等高线包含边界，避免出现取不到最小值的情况。 $A_i \\in \\mathbb{R}^{m \\times n_i}$：表示一个拥有 $m$ 行和 $n_i$ 列的矩阵。$A_i x_i$ 表示矩阵与向量相乘，其结果是一个 $m$ 维的列向量，代表着将 $x_i$ 转化为对应资源的消耗量。 $b \\in \\mathbb{R}^m$：一个 $m$ 维常数向量，通常代表系统总资源的上限或目标要求。 关键特征：\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/11-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第11章：对偶分解法">
+<meta name="twitter:description" content="第11章：对偶分解法 核心思想：将大规模可分离凸优化问题通过对偶化拆成若干独立子问题并行求解，再通过对偶变量（乘子）汇总协调——这便是&quot;分而治之&quot;的对偶分解法（Dual Decomposition）。\n11.1 可分离凸优化问题 11.1.1 问题形式 对偶分解法主要针对具有可分离结构的约束优化问题。所谓“可分离”，是指整个大问题可以被拆解为多个互不干扰的小部分。其标准数学形式如下：\n$$\\boxed{\\min_{x = (x_1, \\ldots, x_N)} \\sum_{i=1}^N f_i(x_i) \\quad \\text{s.t.} \\quad \\sum_{i=1}^N A_i x_i = b}$$数学符号与概念定义：\n$x_i \\in \\mathbb{R}^{n_i}$：表示 $x_i$ 是一个含有 $n_i$ 个实数分量的列向量（可以理解为 $n_i$ 个未知数）。所有子向量 $x_1, x_2, \\ldots, x_N$ 拼在一起构成了总的未知向量 $x$，总维度为 $\\sum_i n_i = n$。 $f_i: \\mathbb{R}^{n_i} \\to \\mathbb{R} \\cup {+\\infty}$ 是闭凸函数（Closed Convex Function）。 凸函数：在图像上看，它就像一个开口向上的“碗”。对于凸函数来说，任何一个局部的极小值点，就是全局的最小值点，这保证了问题容易求解。 闭：表示它的等高线包含边界，避免出现取不到最小值的情况。 $A_i \\in \\mathbb{R}^{m \\times n_i}$：表示一个拥有 $m$ 行和 $n_i$ 列的矩阵。$A_i x_i$ 表示矩阵与向量相乘，其结果是一个 $m$ 维的列向量，代表着将 $x_i$ 转化为对应资源的消耗量。 $b \\in \\mathbb{R}^m$：一个 $m$ 维常数向量，通常代表系统总资源的上限或目标要求。 关键特征：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#111-可分离凸优化问题">11.1 可分离凸优化问题</a>
+      <ol>
+        <li><a href="#1111-问题形式">11.1.1 问题形式</a></li>
+        <li><a href="#1112-为什么叫对偶分解">11.1.2 为什么叫&quot;对偶分解&quot;</a></li>
+      </ol>
+    </li>
+    <li><a href="#112-对偶分解法的算法流程">11.2 对偶分解法的算法流程</a>
+      <ol>
+        <li><a href="#1121-对偶问题构造">11.2.1 对偶问题构造</a></li>
+        <li><a href="#1122-对偶次梯度法">11.2.2 对偶次梯度法</a></li>
+        <li><a href="#1123-对偶分解算法完整流程">11.2.3 对偶分解算法完整流程</a></li>
+        <li><a href="#1124-步长选择">11.2.4 步长选择</a></li>
+      </ol>
+    </li>
+    <li><a href="#113-乘子的经济学解释">11.3 乘子的经济学解释</a>
+      <ol>
+        <li><a href="#1131-影子价格shadow-price">11.3.1 影子价格（Shadow Price）</a></li>
+        <li><a href="#1132-资源分配的网络效用最大化num视角">11.3.2 资源分配的网络效用最大化（NUM）视角</a></li>
+      </ol>
+    </li>
+    <li><a href="#114-收敛性与理论分析">11.4 收敛性与理论分析</a>
+      <ol>
+        <li><a href="#1141-子问题解的最优性条件">11.4.1 子问题解的最优性条件</a></li>
+        <li><a href="#1142-收敛性定理概要">11.4.2 收敛性定理（概要）</a></li>
+        <li><a href="#1143-对偶分解-vs-乘子法-vs-admm">11.4.3 对偶分解 vs 乘子法 vs ADMM</a></li>
+      </ol>
+    </li>
+    <li><a href="#115-典型例题">11.5 典型例题</a>
+      <ol>
+        <li><a href="#例题111对偶分解基础构造">例题11.1（对偶分解基础构造）</a></li>
+        <li><a href="#例题112num问题建模与对偶分解">例题11.2（NUM问题建模与对偶分解）</a></li>
+        <li><a href="#例题113到凸集之交的投影">例题11.3（到凸集之交的投影）</a></li>
+        <li><a href="#例题114收敛慢的问题">例题11.4（收敛慢的问题）</a></li>
+        <li><a href="#例题115对偶分解的分布式实现">例题11.5（对偶分解的分布式实现）</a></li>
+        <li><a href="#增加与完善内容概述">增加与完善内容概述：</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/11-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3%E6%B3%95/">第11章：对偶分解法</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 6 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第11章对偶分解法">第11章：对偶分解法
+</h1><blockquote>
+<p><strong>核心思想</strong>：将大规模可分离凸优化问题通过对偶化拆成若干独立子问题<strong>并行求解</strong>，再通过对偶变量（乘子）汇总协调——这便是&quot;分而治之&quot;的对偶分解法（Dual Decomposition）。</p>
+</blockquote>
+<hr>
+<h2 id="111-可分离凸优化问题">11.1 可分离凸优化问题
+</h2><h3 id="1111-问题形式">11.1.1 问题形式
+</h3><p>对偶分解法主要针对具有<strong>可分离结构</strong>的约束优化问题。所谓“可分离”，是指整个大问题可以被拆解为多个互不干扰的小部分。其标准数学形式如下：</p>
+$$\boxed{\min_{x = (x_1, \ldots, x_N)} \sum_{i=1}^N f_i(x_i) \quad \text{s.t.} \quad \sum_{i=1}^N A_i x_i = b}$$<p><strong>数学符号与概念定义</strong>：</p>
+<ul>
+<li>$x_i \in \mathbb{R}^{n_i}$：表示 $x_i$ 是一个含有 $n_i$ 个实数分量的列向量（可以理解为 $n_i$ 个未知数）。所有子向量 $x_1, x_2, \ldots, x_N$ 拼在一起构成了总的未知向量 $x$，总维度为 $\sum_i n_i = n$。</li>
+<li>$f_i: \mathbb{R}^{n_i} \to \mathbb{R} \cup {+\infty}$ 是闭凸函数（Closed Convex Function）。
+<ul>
+<li><strong>凸函数</strong>：在图像上看，它就像一个开口向上的“碗”。对于凸函数来说，任何一个局部的极小值点，就是全局的最小值点，这保证了问题容易求解。</li>
+<li><strong>闭</strong>：表示它的等高线包含边界，避免出现取不到最小值的情况。</li>
+</ul>
+</li>
+<li>$A_i \in \mathbb{R}^{m \times n_i}$：表示一个拥有 $m$ 行和 $n_i$ 列的矩阵。$A_i x_i$ 表示矩阵与向量相乘，其结果是一个 $m$ 维的列向量，代表着将 $x_i$ 转化为对应资源的消耗量。</li>
+<li>$b \in \mathbb{R}^m$：一个 $m$ 维常数向量，通常代表系统总资源的上限或目标要求。</li>
+</ul>
+<p><strong>关键特征</strong>：</p>
+<ul>
+<li>目标函数<strong>分块可分离</strong>：总目标是 $\sum_{i=1}^N f_i(x_i)$，这意味着各个 $f_i(x_i)$ 之间没有交叉项（比如没有 $x_1 \times x_2$ 这样的项），它们可以被独立看待。</li>
+<li>约束是<strong>线性的</strong>：通过 $\sum_{i=1}^N A_i x_i = b$ 这个线性等式，将本来相互独立的 $x_i$ 耦合（绑定）在了一起。</li>
+</ul>
+<h3 id="1112-为什么叫对偶分解">11.1.2 为什么叫&quot;对偶分解&quot;
+</h3><p>在原始问题中，变量 $x_i$ 因为总资源约束 $\sum_{i=1}^N A_i x_i = b$ 而必须相互妥协。为了解开这种绑定，我们引入一个“惩罚机制”，即 Lagrange 乘子 $\lambda$（一个 $m$ 维向量）。</p>
+<p>构造 Lagrange 函数（将约束条件吸收到目标函数中）：</p>
+$$L(x, \lambda) = \sum_{i=1}^N f_i(x_i) + \lambda^T\left(\sum_{i=1}^N A_i x_i - b\right)$$<p>将括号展开并重新组合，按 $i$ 归类提取同类项：</p>
+$$L(x, \lambda) = \sum_{i=1}^N \left[f_i(x_i) + \lambda^T A_i x_i\right] - \lambda^T b$$<p><strong>分解性质</strong>：如果我们将惩罚系数 $\lambda$ 视为已知的固定常数，那么要使整体 $L(x, \lambda)$ 最小，只需要让每一个方括号里的部分 $\left[f_i(x_i) + \lambda^T A_i x_i\right]$ 各自达到最小即可。求极小值的任务自动分解为 $N$ 个独立的子问题：</p>
+$$\min_{x_i} \left\{ f_i(x_i) + (A_i^T\lambda)^T x_i \right\}, \quad i = 1, \ldots, N$$<p>由于这 $N$ 个子问题互不干扰，它们可以被分配给不同的计算机去<strong>并行求解</strong>！这就是&quot;对偶分解&quot;名称的由来。</p>
+<hr>
+<h2 id="112-对偶分解法的算法流程">11.2 对偶分解法的算法流程
+</h2><h3 id="1121-对偶问题构造">11.2.1 对偶问题构造
+</h3><p><strong>步骤1</strong>：对耦合约束引入 Lagrange 乘子向量 $\lambda \in \mathbb{R}^m$：</p>
+$$L(x, \lambda) = \sum_{i=1}^N f_i(x_i) + \lambda^T\left(\sum_i A_i x_i - b\right)$$<p><strong>步骤2</strong>：构造对偶函数 $q(\lambda)$。对偶函数定义为在给定 $\lambda$ 时，Lagrange 函数关于 $x$ 所能取到的<strong>下确界（infimum，可简单理解为最小值 $\min$）</strong>：</p>
+$$q(\lambda) = \inf_x L(x, \lambda) = \sum_{i=1}^N \inf_{x_i} \left\{ f_i(x_i) + (A_i^T\lambda)^T x_i \right\} - \lambda^T b$$<blockquote>
+<p><strong>凸共轭函数（Convex Conjugate Function）的定义</strong>：
+对于任何函数 $f(x)$，它的共轭函数定义为 $f^*(y) = \sup_x {y^T x - f(x)}$（其中 $\sup$ 为上确界，可理解为最大值）。
+如果我们看上式的方括号部分，并提取一个负号：
+</p>
+$$\inf_{x_i} \{ f_i(x_i) + (A_i^T\lambda)^T x_i \} = -\sup_{x_i} \{ -(A_i^T\lambda)^T x_i - f_i(x_i) \} = -f_i^*(-A_i^T\lambda)$$</blockquote>
+<p>代入共轭函数的表达，对偶函数可以简写为：
+</p>
+$$q(\lambda) = -\sum_{i=1}^N f_i^*(-A_i^T\lambda) - \lambda^T b$$<p><strong>步骤3</strong>：原问题的目标是找最小值，而对偶问题的目标是寻找最优的惩罚系数 $\lambda$ 来最大化这个极小值下界。所以对偶问题为（极大化形式）：
+</p>
+$$\boxed{\max_\lambda \; q(\lambda) = -\sum_{i=1}^N f_i^*(-A_i^T\lambda) - \lambda^T b}$$<h3 id="1122-对偶次梯度法">11.2.2 对偶次梯度法
+</h3><p>由于对偶函数 $q(\lambda)$ 有时在某些点上并不是平滑的曲线（像折线一样存在“尖角”，除非所有的 $f_i$ 都是强凸函数），它在这些点处没有传统的导数，因此我们引入**次梯度（Subgradient）**的概念。</p>
+<blockquote>
+<p><strong>次梯度定义</strong>：在非光滑的折角处，没有唯一的切线，但有无数条直线可以完全“托住”函数图像。这些直线的斜率集合构成了次梯度。</p>
+</blockquote>
+<p><strong>对偶次梯度计算</strong>：根据 Danskin 定理（该定理表明：含有参数 $\lambda$ 的极值函数，对其参数求导的结果，就等于直接对极值点处的参数求导），对偶函数 $q(\lambda)$ 的次梯度可以通过求最优解对应的偏导数获得：</p>
+$$g(\lambda) = \sum_{i=1}^N A_i x_i^*(\lambda) - b \in \partial(-q(\lambda))$$<p>其中，参数 $x_i^*(\lambda)$ 就是在给定 $\lambda$ 的情况下，让子问题取最小值的那个解：
+</p>
+$$x_i^*(\lambda) = \arg\min_{x_i} \{ f_i(x_i) + (A_i^T\lambda)^T x_i \}$$<p>
+注意，这里算出的是 $(-q(\lambda))$ 的次梯度。因为寻找最大化 $q(\lambda)$ 的过程等价于寻找最小化 $-q(\lambda)$ 的过程，所以我们沿着次梯度方向“爬坡”（梯度上升）更新。</p>
+<h3 id="1123-对偶分解算法完整流程">11.2.3 对偶分解算法完整流程
+</h3>$$\boxed{\begin{aligned} &\text{初始化 } \lambda^0 \in \mathbb{R}^m, \; k = 0 \\ &\textbf{repeat:} \\ &\quad \text{第一步（并行子问题）：各节点独立计算自己最优解} \\ &\quad x_i^{k+1} = \arg\min_{x_i} \left\{ f_i(x_i) + (A_i^T\lambda^k)^T x_i \right\}, \; i=1,\ldots,N \\ &\quad \text{第二步（汇总协调）：计算总的资源偏差量} \\ &\quad g^{k+1} = \sum_{i=1}^N A_i x_i^{k+1} - b \quad \text{(此项代表约束违反度)} \\ &\quad \text{第三步（乘子更新）：根据偏差量调整惩罚价格，} \alpha_k \text{为步长} \\ &\quad \lambda^{k+1} = \lambda^k + \alpha_k \cdot g^{k+1} \\ &\textbf{until 收敛（即偏差量 } g^{k+1} \text{ 趋近于0）} \end{aligned}}$$<h3 id="1124-步长选择">11.2.4 步长选择
+</h3><p>这里的步长 $\alpha_k$ 决定了每次调整惩罚价格的幅度。</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>步长规则</th>
+					<th>公式</th>
+					<th>特点</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>固定步长</td>
+					<td>$\alpha_k = \alpha$</td>
+					<td>简单，但只会在最优解附近的一个小区域（$\alpha G^2$ 邻域内）震荡。</td>
+			</tr>
+			<tr>
+					<td>衰减步长</td>
+					<td>$\alpha_k = \alpha_0 / \sqrt{k}$</td>
+					<td>满足总步长之和为无穷大（$\sum \alpha_k = \infty$）且平方和有限（$\sum \alpha_k^2 &lt; \infty$），能保证严格收敛到最优解。</td>
+			</tr>
+			<tr>
+					<td>Polyak步长</td>
+					<td>$\alpha_k = (q^* - q(\lambda^k))/|g^k|^2$</td>
+					<td>需要预先知道最终的最优对偶值 $q^*$，在实际中较少直接使用。</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>收敛率</strong>：在数学分析中使用大O符号表示误差缩小的速度。对偶分解法的收敛速度一般为 $O(1/\sqrt{k})$，即迭代100次误差缩小到1/10。当所有 $f_i$ 是强凸函数时，速度可提升到 $O(1/k)$。</p>
+<hr>
+<h2 id="113-乘子的经济学解释">11.3 乘子的经济学解释
+</h2><h3 id="1131-影子价格shadow-price">11.3.1 影子价格（Shadow Price）
+</h3><blockquote>
+<p>对偶变量 $\lambda_j$ 可以形象地理解为资源 $b_j$ 的<strong>影子价格</strong>或<strong>边际价值</strong>。</p>
+</blockquote>
+<p>考虑约束等式 $\sum_i A_i x_i = b$，其中 $b$ 代表某种资源的总限制（如网络总带宽、发电站电力容量）。</p>
+<ul>
+<li>若最优状态下 $\lambda_j &gt; 0$：说明第 $j$ 种资源目前非常“紧俏”已经用光，如果能多给出 1 单位的这种资源，总目标（如总收益）就会提升 $\lambda_j$。</li>
+<li>若最优状态下 $\lambda_j = 0$：说明资源并未被用完，不构成发展瓶颈，此时再增加哪怕1万个单位的资源，也无法带来任何目标值的提升。</li>
+</ul>
+<h3 id="1132-资源分配的网络效用最大化num视角">11.3.2 资源分配的网络效用最大化（NUM）视角
+</h3><p><strong>NUM问题</strong>：在网络中分配稀缺资源 $b$（如宽带流量），使得所有用户的**总效用（满意度）**最大化。</p>
+$$\begin{aligned} \max_{x_1, \ldots, x_N} \quad & \sum_{i=1}^N U_i(x_i) \quad \text{(使得总满意度最大)} \\ \text{s.t.} \quad & \sum_{i=1}^N x_i \leq b \quad \text{(分配的总流量不超过总资源约束)} \\ & x_i \geq 0 \quad \text{(分配的流量必须非负)} \end{aligned}$$<p>对偶分解法在这里呈现了完美的市场调节过程：</p>
+<ol>
+<li><strong>消费者计算</strong>：网络协调者公布当前的“流量单价” $\lambda$。每个用户 $i$ 根据自己的满意度函数 $U_i$ 独立权衡性价比，求解属于自己的最优消费量 $x_i^*(\lambda)$。</li>
+<li><strong>市场统计</strong>：网络管理者将所有人的需求汇总 $\sum_i x_i^*(\lambda)$，并比较它与总供水量 $b$ 的差距。</li>
+<li><strong>价格调控</strong>：如果供不应求（需求 &gt; 供给），偏差为正，则管理者根据更新公式上调价格 $\lambda$；价格一旦上升，用户的需求自然就会降低；反之价格下降，刺激需求增加。最终达到供需平衡。</li>
+</ol>
+<p><strong>这正是计算机网络中 TCP 拥塞控制算法的数学理论基础！</strong></p>
+<hr>
+<h2 id="114-收敛性与理论分析">11.4 收敛性与理论分析
+</h2><h3 id="1141-子问题解的最优性条件">11.4.1 子问题解的最优性条件
+</h3><p>寻找最小值点时，在光滑情况下要求函数的一阶导数为 0。对于闭凸函数 $f_i(x_i)$，我们用次梯度 $\partial f_i$ 替代导数，则子问题 $x_i^*(\lambda) = \arg\min_{x_i} {f_i(x_i) + (A_i^T\lambda)^T x_i}$ 的最优性条件为：</p>
+$$0 \in \partial f_i(x_i^*(\lambda)) + A_i^T\lambda$$<p>移项后即：
+</p>
+$$-A_i^T\lambda \in \partial f_i(x_i^*(\lambda))$$<p>
+这意味着，当达到子问题的极小值点时，原函数下降的趋势恰好被约束条件的“价格惩罚”所抵消。</p>
+<h3 id="1142-收敛性定理概要">11.4.2 收敛性定理（概要）
+</h3><p><strong>定理</strong>（对偶分解的收敛性）：如果满足以下条件：</p>
+<ol>
+<li>每个 $f_i$ 都是向下的“碗”形函数（闭凸函数）。</li>
+<li>问题确实存在一个最完美的对偶解 $\lambda^*$。</li>
+<li>更新步长 $\alpha_k$ 随时间慢慢缩小（如 $\alpha_k = 1/k$），满足 $\alpha_k \to 0$，累加和为无穷 $\sum \alpha_k = \infty$，但平方和有限 $\sum \alpha_k^2 &lt; \infty$。</li>
+</ol>
+<p>则：惩罚系数序列 $\lambda^k \to \lambda^*$（必定收敛到最优价格），且资源偏差 $\sum_i A_i x_i^{k+1} \to b$（约束最终一定会满足）。</p>
+<p><strong>局限性</strong>：虽然 $\lambda$ 收敛，但由于次梯度的波动性，原始的分配量 $x_i^{k+1}$ 可能一直在最优解附近反复横跳（除非 $f_i$ 像一个底端十分尖锐光滑的碗——严格凸，使得极小值点绝对唯一）。<strong>为了获得稳定的原问题解，通常需要取历史记录的平均值（运行平均）</strong>：
+</p>
+$$\bar{x}_i^K = \frac{1}{K}\sum_{k=1}^K x_i^k$$<h3 id="1143-对偶分解-vs-乘子法-vs-admm">11.4.3 对偶分解 vs 乘子法 vs ADMM
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>方法</th>
+					<th>收敛速度</th>
+					<th>可分离性</th>
+					<th>子问题</th>
+					<th>前提条件</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>对偶分解</td>
+					<td>慢 ($O(1/\sqrt{k})$)</td>
+					<td>✅ 完全并行，可分发给N台电脑</td>
+					<td>各自独立求解</td>
+					<td>需要 $f_i$ 强凸才不振荡</td>
+			</tr>
+			<tr>
+					<td>乘子法</td>
+					<td>快</td>
+					<td>❌ 引入平方惩罚项后，$x_i$和$x_j$之间产生了乘积，破坏了分离性</td>
+					<td>所有人必须一起联合求解</td>
+					<td>无特殊要求</td>
+			</tr>
+			<tr>
+					<td>ADMM</td>
+					<td>快</td>
+					<td>✅ 通过交替更新（轮流求解）的方式巧妙恢复了分离性</td>
+					<td>逐个顺序求解</td>
+					<td>无特殊要求</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="115-典型例题">11.5 典型例题
+</h2><h3 id="例题111对偶分解基础构造">例题11.1（对偶分解基础构造）
+</h3><p><strong>题目</strong>：考虑以下资源分配问题：
+</p>
+$$\min_{x_1, x_2} \; (x_1 - 2)^2 + (x_2 - 5)^2 \quad \text{s.t.} \quad x_1 + x_2 = 10$$<p>
+请写出对偶分解法的并行子问题和乘子更新公式，并求出解析解。</p>
+<p><strong>解答</strong>：</p>
+<p>首先构造 Lagrange 函数，引入一个实数乘子 $\lambda$：
+</p>
+$$L(x_1, x_2, \lambda) = (x_1-2)^2 + (x_2-5)^2 + \lambda(x_1 + x_2 - 10)$$<p>在给定第 $k$ 步的乘子 $\lambda^k$ 时，可以将目标函数分成完全只含有 $x_1$ 和完全只含有 $x_2$ 的两部分：</p>
+<p><strong>子问题1</strong>：求解 $\min_{x_1} (x_1-2)^2 + \lambda^k x_1$
+对 $x_1$ 求一次导数，并令其等于0：
+</p>
+$$\frac{d}{dx_1} [(x_1-2)^2 + \lambda^k x_1] = 2(x_1-2) + \lambda^k = 0$$<p>
+移项解得：$x_1^{k+1} = 2 - \frac{\lambda^k}{2}$</p>
+<p><strong>子问题2</strong>：求解 $\min_{x_2} (x_2-5)^2 + \lambda^k x_2$
+同样对 $x_2$ 求一次导数并令其等于0：
+</p>
+$$\frac{d}{dx_2} [(x_2-5)^2 + \lambda^k x_2] = 2(x_2-5) + \lambda^k = 0$$<p>
+解得：$x_2^{k+1} = 5 - \frac{\lambda^k}{2}$</p>
+<p><strong>乘子更新（梯度上升）</strong>：根据约束条件的偏差来调整 $\lambda$
+</p>
+$$\lambda^{k+1} = \lambda^k + \alpha_k (x_1^{k+1} + x_2^{k+1} - 10)$$<p><strong>求解全局解析解</strong>：
+让代数式严格满足约束条件 $x_1 + x_2 = 10$，将上面求得的包含 $\lambda$ 的表达式代入：
+</p>
+$$\left(2 - \frac{\lambda}{2}\right) + \left(5 - \frac{\lambda}{2}\right) = 10$$<p>
+</p>
+$$7 - \lambda = 10 \implies \lambda^* = -3$$<p>
+将最优的 $\lambda^* = -3$ 代回子问题解公式中，得到最优分配：
+$x_1^* = 2 - \frac{-3}{2} = 3.5$
+$x_2^* = 5 - \frac{-3}{2} = 6.5$</p>
+<hr>
+<h3 id="例题112num问题建模与对偶分解">例题11.2（NUM问题建模与对偶分解）
+</h3><p><strong>题目</strong>：两个用户共享总带宽 $b = 100$ Mbps。用户 $i$ 的效用（满意度）函数为对数模型 $U_i(x_i) = a_i \ln(1 + x_i)$，已知偏好系数 $a_1 = 10$，$a_2 = 20$。求能使整体效用最大化的最优带宽分配，以及当时的影子价格。</p>
+<p><strong>解答</strong>：</p>
+<p>构建NUM问题的标准数学形式：
+</p>
+$$\max_{x_1, x_2 \geq 0} 10\ln(1+x_1) + 20\ln(1+x_2) \quad \text{s.t.} \quad x_1 + x_2 \leq 100$$<p>
+为了统一为求最小值的标准格式，我们给目标函数加个负号：
+Lagrange函数（极小化形式）：
+</p>
+$$L = -a_1\ln(1+x_1) - a_2\ln(1+x_2) + \lambda(x_1 + x_2 - 100)$$<p>在给定 $\lambda$ 下，用户 $i$ 的子问题为：
+</p>
+$$\min_{x_i \geq 0} \left[ -a_i\ln(1+x_i) + \lambda x_i \right]$$<p>
+对 $x_i$ 求导（对数函数的导数为 $\frac{d}{dx} \ln(1+x) = \frac{1}{1+x}$），令导数等于0：
+</p>
+$$-\frac{a_i}{1+x_i} + \lambda = 0 \implies 1+x_i = \frac{a_i}{\lambda} \implies x_i = \frac{a_i}{\lambda} - 1$$<p>
+由于前提条件要求分配必须非负（$x_i \geq 0$），所以如果解出来的数值小于0，就被强制设为0，这就是求最大值 $\max$ 算子的来源：
+</p>
+$$x_i^*(\lambda) = \max\left\{0, \frac{a_i}{\lambda} - 1\right\}$$<p>设当前带宽会被全部用完（内部解），代入供需平衡方程 $x_1 + x_2 = 100$：
+</p>
+$$\left(\frac{10}{\lambda} - 1\right) + \left(\frac{20}{\lambda} - 1\right) = 100$$<p>
+</p>
+$$\frac{30}{\lambda} - 2 = 100 \implies \frac{30}{\lambda} = 102 \implies \lambda^* = \frac{30}{102} \approx 0.2941$$<p>
+由于求得的 $\frac{10}{0.2941}-1 &gt; 0$ 且 $\frac{20}{0.2941}-1 &gt; 0$，验证非负性成立。</p>
+<p>代入 $\lambda^<em>$ 得最优分配：
+$x_1^</em> = \frac{10}{30/102} - 1 = 34 - 1 = 33.0$
+$x_2^* = \frac{20}{30/102} - 1 = 68 - 1 = 67.0$</p>
+<p><strong>影子价格解释</strong>：$\lambda^* = 0.2941$ 表示当前系统处于最优状态时，如果能够额外再拉取 1 Mbps 的网络总带宽接入网络，那么系统内两个用户的总满意度（总效用）将会上升约 0.2941 单位。</p>
+<hr>
+<h3 id="例题113到凸集之交的投影">例题11.3（到凸集之交的投影）
+</h3><p><strong>题目</strong>：利用对偶分解法并行计算：寻找空间中距离基准点 $y$ 最近的一个点 $x$，并且要求这个点必须同时属于两个凸集合 $C_1$ 和 $C_2$（即属于两者的交集）。</p>
+<p><strong>解答</strong>：</p>
+<p>投影操作本质上是最小化欧氏距离的平方。问题可以写为：
+</p>
+$$\min_x \frac{1}{2}\|x - y\|^2 \quad \text{s.t.} \quad x \in C_1 \cap C_2$$<p>
+为了能将条件拆解，我们制造两个替身（复制变量） $x_1$ 和 $x_2$，将原问题改写为完全等价的形式：
+</p>
+$$\min_{x_1, x_2} \frac{1}{2}\|x_1 - y\|^2 + \frac{1}{2}\|x_2 - y\|^2 \quad \text{s.t.} \quad x_1 = x_2, \quad x_1 \in C_1, \quad x_2 \in C_2$$<p>
+引入对应于等式约束 $x_1 - x_2 = 0$ 的乘子向量 $\lambda$。Lagrange函数为：
+</p>
+$$L(x_1, x_2, \lambda) = \frac{1}{2}\|x_1 - y\|^2 + \frac{1}{2}\|x_2 - y\|^2 + \lambda^T(x_1 - x_2)$$<p><strong>对偶分解子问题推导</strong>：</p>
+<ul>
+<li>
+<p><strong>求 $x_1$ 的极小值</strong>：将 $L$ 中只含有 $x_1$ 的项提取出来，得到 $\frac{1}{2}|x_1 - y|^2 + \lambda^T x_1$。
+利用向量的配方法展开并重组：
+$\frac{1}{2}(x_1 - y)^T(x_1 - y) + \lambda^T x_1 = \frac{1}{2}x_1^T x_1 - y^T x_1 + \frac{1}{2}y^T y + \lambda^T x_1$
+提取公因子 $x_1$：
+$= \frac{1}{2}x_1^T x_1 - (y - \lambda)^T x_1 + \frac{1}{2}y^T y$
+加上再减去 $\frac{1}{2}|y - \lambda|^2$，完成完全平方公式：
+$= \frac{1}{2}|x_1 - (y - \lambda)|^2 + \text{与}x_1\text{无关的常数}$
+所以，最小化这个公式就等于寻找集合 $C_1$ 中距离点 $(y - \lambda^k)$ 最近的点。用投影算子 $P$ 表示即为：
+$x_1^{k+1} = P_{C_1}(y - \lambda^k)$</p>
+</li>
+<li>
+<p><strong>求 $x_2$ 的极小值</strong>：提取含有 $x_2$ 的部分 $\frac{1}{2}|x_2 - y|^2 - \lambda^T x_2$。
+通过相同的配方过程，原式等价于最小化 $\frac{1}{2}|x_2 - (y + \lambda)|^2$。
+由此求得投影解：
+$x_2^{k+1} = P_{C_2}(y + \lambda^k)$</p>
+</li>
+</ul>
+<p><strong>乘子更新</strong>：
+</p>
+$$\lambda^{k+1} = \lambda^k + \alpha_k(x_1^{k+1} - x_2^{k+1})$$<p>通过这个巧妙的重构，本来要直接找到 $C_1$ 和 $C_2$ 交集的高难度动作，被完美分解为了两台电脑各自在 $C_1$ 和 $C_2$ 内部找点的并行运算。当需要投影到无数个凸集交集时，这种分解的优势呈指数级放大。</p>
+<hr>
+<h3 id="例题114收敛慢的问题">例题11.4（收敛慢的问题）
+</h3><p><strong>题目</strong>：说明为什么对偶分解法收敛慢，以及在什么情况下这种慢速会得到显著改善。</p>
+<p><strong>解答</strong>：</p>
+<p>对偶分解法本质上就是在跑<strong>对偶次梯度法</strong>，其理论最坏收敛率为 $O(1/\sqrt{k})$。</p>
+<p><strong>慢的根本原因</strong>：对偶函数 $q(\lambda)$ 往往不平滑。特别是在多个约束切换的边界上，它的图像会有“折角”。在折角处，次梯度提供的方向可能并不是严格指向最优解的直线方向，导致算法需要在最优值附近反复绕弯路、来回振荡，就像下山时遇到曲折的沟壑一样。</p>
+<p><strong>改善情况与进阶算法</strong>：</p>
+<ol>
+<li>
+<p><strong>当原目标函数 $f_i$ 具有“强凸”性质时</strong>：
+所谓强凸，就是说这个函数不仅像个碗，而且碗壁特别陡峭（二阶导数大于某个固定正数）。在数学中有一个奇妙的效应（Moreau包络效应）：原函数的极度弯曲会使得对偶函数 $q(\lambda)$ 的“折角”被抹平，变得极其光滑。此时次梯度法自动升级为平滑的梯度下降法，不绕弯路，收敛速度大幅提升到 $O(1/k)$。</p>
+</li>
+<li>
+<p><strong>使用乘子法（将在第12章深入）</strong>：
+直接在最初的 Lagrange 函数中，强行加入一个平滑的二次惩罚项 $\frac{\rho}{2}|\sum A_i x_i - b|^2$。通过这种物理上的平滑化处理，大大加快了收敛速度。但代价是：这一平方展开后会让 $x_1$ 与 $x_2$ 产生乘法交叉项，彻底破坏了最初的可分离性（不能并行了）。</p>
+</li>
+<li>
+<p><strong>使用ADMM算法（交替方向乘子法，将在第14章深入）</strong>：
+这是一种堪称艺术的妥协。它保留了乘子法中能加速的二次惩罚项，但是通过“我算完你再算，不互相干涉”的交替极小化策略，把因为平方项而绑在一起的变量强行拆开顺序计算，从而兼顾了<strong>快</strong>与<strong>可分解</strong>。</p>
+</li>
+</ol>
+<hr>
+<h3 id="例题115对偶分解的分布式实现">例题11.5（对偶分解的分布式实现）
+</h3><p><strong>题目</strong>：描述对偶分解法在分布式计算架构（例如由 $N$ 个计算节点和 1 个中心协调节点组成的服务器集群）中的网络通信模式。</p>
+<p><strong>解答</strong>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">协调节点（Master服务器）：负责掌握全网的宏观价格 λ^k
+</span></span><span class="line"><span class="cl">    │
+</span></span><span class="line"><span class="cl">    ├─► 发送数据：向所有子节点广播当前价格 λ^k
+</span></span><span class="line"><span class="cl">    │       │
+</span></span><span class="line"><span class="cl">    │       ├─► 节点1：执行 min_{x₁} f₁(x₁) + (A₁^Tλ^k)^T x₁ → 解出后，仅返回资源消耗量向量 A₁x₁^{k+1}
+</span></span><span class="line"><span class="cl">    │       ├─► 节点2：执行 min_{x₂} f₂(x₂) + (A₂^Tλ^k)^T x₂ → 解出后，仅返回资源消耗量向量 A₂x₂^{k+1}
+</span></span><span class="line"><span class="cl">    │       ...
+</span></span><span class="line"><span class="cl">    │       └─► 节点N：执行 min_{x_N} f_N(x_N) + (A_N^Tλ^k)^T x_N → 返回 A_N x_N^{k+1}
+</span></span><span class="line"><span class="cl">    │
+</span></span><span class="line"><span class="cl">    ├─► 接收数据：汇总所有节点发回的消耗量，计算市场偏差 g^{k+1} = Σᵢ A_i x_i^{k+1} - b
+</span></span><span class="line"><span class="cl">    │
+</span></span><span class="line"><span class="cl">    └─► 更新数据：根据偏差更新价格 λ^{k+1} = λ^k + α_k g^{k+1}，进入下一轮循环
+</span></span></code></pre></td></tr></table>
+</div>
+</div><hr>
+<h3 id="增加与完善内容概述">增加与完善内容概述：
+</h3><ol>
+<li><strong>基础定义明晰化</strong>：对诸如向量空间 $\mathbb{R}^{n_i}$、矩阵操作、闭凸函数（比喻为“开口向上的碗”）、上下确界（$\inf$ 和 $\sup$）进行了符合直觉的非高等数学专业术语描述。</li>
+<li><strong>抽象概念形象化</strong>：对共轭函数 $f^*$ 和次梯度 $\partial$ 的物理与几何意义进行了补充阐释（如“没有唯一切线时的所有托底直线”），将 Danskin 定理转译为了直观的参数求导逻辑。</li>
+<li><strong>推导步骤连贯化</strong>：
+<ul>
+<li>在<strong>例题11.1</strong>中，补充了完整的偏导数计算并解一元一次方程的过程，让求解从“给出结论”变成了“一步步推导”。</li>
+<li>在<strong>例题11.2</strong>中，对含有对数 $\ln(x)$ 的函数进行了详细求导，并严格解释了由于非负约束带来的 $\max{0, \cdot}$ 算子的逻辑来源以及供需平衡方程的完整求解路径。</li>
+<li>在<strong>例题11.3</strong>中，重写了欧氏距离平方的配方法全过程，补全了向量代数与投影 $P_C$ 操作之间转换的空白步骤，不仅修正了原先可能具有歧义的常数系数，还让整个极小值映射变得有迹可循。</li>
+</ul>
+</li>
+<li><strong>补充应用场景感知</strong>：在 NUM 网络模型、强凸性与 Moreau 包络效应（原例题11.4）部分扩展了物理世界的类比，降低了生硬的公式感。</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

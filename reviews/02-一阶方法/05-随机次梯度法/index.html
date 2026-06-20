@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第5章：随机次梯度法（随机梯度下降，SGD） 核心思想：当目标函数 $f$ 是海量分量函数 $f_i$ 的平均值时（如 ERM），每步不计算全量（次）梯度，而是随机抽取一个（或一小批）样本分量，用其梯度作为真实梯度的无偏估计进行迭代。在期望意义下，SGD 的收敛率与确定性次梯度法完全相同——$O(1/\\sqrt{K})$，但每步的计算代价从 $O(m)$ 骤降至 $O(1)$（以样本数计）。\n前置知识回顾（来自第4章：次梯度法） 本章建立在第4章（次梯度法）的完整理论基础之上。下列关键点请在本章阅读过程中随时参考：\n次梯度法的迭代：$x_{k+1} = x_k - \\alpha_k g_k$，其中 $g_k \\in \\partial f(x_k)$。$\\partial f(x_k)$ 是 $f$ 在 $x_k$ 处的次微分（全体次梯度的集合），$g_k$ 是从该集合中任选的一个向量。 非单调性：$f(x_{k+1}) &lt; f(x_k)$ 不保证成立。因此必须记录历史最优 $f_{\\text{best}}^K = \\min_{0 \\le i \\le K} f(x_i)$ 及其对应点。 核心收敛界（确定性）： $$\\boxed{f_{\\text{best}}^K - f^* \\le \\frac{R^2 + G^2 \\sum_{k=0}^K \\alpha_k^2}{2 \\sum_{k=0}^K \\alpha_k}}$$ 其中 $R = |x_0 - x^*|$（初始点到最优解的距离），$G$ 是 Lipschitz 常数（$|g| \\le G$ 对所有次梯度 $g \\in \\partial f(x)$ 成立）。 步长三条件：$\\alpha_k \\to 0$（趋于零）、$\\sum \\alpha_k = \\infty$（总行程无穷大）、$\\sum \\alpha_k^2 &lt; \\infty$（噪声累积有界）→ 保证精确收敛到 $f^*$。 固定步长：只能收敛到以 $f^*$ 为中心、半径 $\\sim \\alpha G^2/2$ 的邻域。 收敛率：一般凸 → $O(1/\\sqrt{K})$，复杂度 $O(1/\\epsilon^2)$。强凸 → 加速到 $O(1/k)$。 5.1 从确定次梯度到随机次梯度 5.1.1 动机：为什么需要随机化 现代机器学习和数据科学中的优化问题通常呈现为经验风险最小化（Empirical Risk Minimization, ERM）的形式：\n">
+<title>第5章：随机次梯度法（随机梯度下降，SGD）</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/05-%E9%9A%8F%E6%9C%BA%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第5章：随机次梯度法（随机梯度下降，SGD）">
+<meta property='og:description' content="第5章：随机次梯度法（随机梯度下降，SGD） 核心思想：当目标函数 $f$ 是海量分量函数 $f_i$ 的平均值时（如 ERM），每步不计算全量（次）梯度，而是随机抽取一个（或一小批）样本分量，用其梯度作为真实梯度的无偏估计进行迭代。在期望意义下，SGD 的收敛率与确定性次梯度法完全相同——$O(1/\\sqrt{K})$，但每步的计算代价从 $O(m)$ 骤降至 $O(1)$（以样本数计）。\n前置知识回顾（来自第4章：次梯度法） 本章建立在第4章（次梯度法）的完整理论基础之上。下列关键点请在本章阅读过程中随时参考：\n次梯度法的迭代：$x_{k+1} = x_k - \\alpha_k g_k$，其中 $g_k \\in \\partial f(x_k)$。$\\partial f(x_k)$ 是 $f$ 在 $x_k$ 处的次微分（全体次梯度的集合），$g_k$ 是从该集合中任选的一个向量。 非单调性：$f(x_{k+1}) &lt; f(x_k)$ 不保证成立。因此必须记录历史最优 $f_{\\text{best}}^K = \\min_{0 \\le i \\le K} f(x_i)$ 及其对应点。 核心收敛界（确定性）： $$\\boxed{f_{\\text{best}}^K - f^* \\le \\frac{R^2 + G^2 \\sum_{k=0}^K \\alpha_k^2}{2 \\sum_{k=0}^K \\alpha_k}}$$ 其中 $R = |x_0 - x^*|$（初始点到最优解的距离），$G$ 是 Lipschitz 常数（$|g| \\le G$ 对所有次梯度 $g \\in \\partial f(x)$ 成立）。 步长三条件：$\\alpha_k \\to 0$（趋于零）、$\\sum \\alpha_k = \\infty$（总行程无穷大）、$\\sum \\alpha_k^2 &lt; \\infty$（噪声累积有界）→ 保证精确收敛到 $f^*$。 固定步长：只能收敛到以 $f^*$ 为中心、半径 $\\sim \\alpha G^2/2$ 的邻域。 收敛率：一般凸 → $O(1/\\sqrt{K})$，复杂度 $O(1/\\epsilon^2)$。强凸 → 加速到 $O(1/k)$。 5.1 从确定次梯度到随机次梯度 5.1.1 动机：为什么需要随机化 现代机器学习和数据科学中的优化问题通常呈现为经验风险最小化（Empirical Risk Minimization, ERM）的形式：\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/05-%E9%9A%8F%E6%9C%BA%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第5章：随机次梯度法（随机梯度下降，SGD）">
+<meta name="twitter:description" content="第5章：随机次梯度法（随机梯度下降，SGD） 核心思想：当目标函数 $f$ 是海量分量函数 $f_i$ 的平均值时（如 ERM），每步不计算全量（次）梯度，而是随机抽取一个（或一小批）样本分量，用其梯度作为真实梯度的无偏估计进行迭代。在期望意义下，SGD 的收敛率与确定性次梯度法完全相同——$O(1/\\sqrt{K})$，但每步的计算代价从 $O(m)$ 骤降至 $O(1)$（以样本数计）。\n前置知识回顾（来自第4章：次梯度法） 本章建立在第4章（次梯度法）的完整理论基础之上。下列关键点请在本章阅读过程中随时参考：\n次梯度法的迭代：$x_{k+1} = x_k - \\alpha_k g_k$，其中 $g_k \\in \\partial f(x_k)$。$\\partial f(x_k)$ 是 $f$ 在 $x_k$ 处的次微分（全体次梯度的集合），$g_k$ 是从该集合中任选的一个向量。 非单调性：$f(x_{k+1}) &lt; f(x_k)$ 不保证成立。因此必须记录历史最优 $f_{\\text{best}}^K = \\min_{0 \\le i \\le K} f(x_i)$ 及其对应点。 核心收敛界（确定性）： $$\\boxed{f_{\\text{best}}^K - f^* \\le \\frac{R^2 + G^2 \\sum_{k=0}^K \\alpha_k^2}{2 \\sum_{k=0}^K \\alpha_k}}$$ 其中 $R = |x_0 - x^*|$（初始点到最优解的距离），$G$ 是 Lipschitz 常数（$|g| \\le G$ 对所有次梯度 $g \\in \\partial f(x)$ 成立）。 步长三条件：$\\alpha_k \\to 0$（趋于零）、$\\sum \\alpha_k = \\infty$（总行程无穷大）、$\\sum \\alpha_k^2 &lt; \\infty$（噪声累积有界）→ 保证精确收敛到 $f^*$。 固定步长：只能收敛到以 $f^*$ 为中心、半径 $\\sim \\alpha G^2/2$ 的邻域。 收敛率：一般凸 → $O(1/\\sqrt{K})$，复杂度 $O(1/\\epsilon^2)$。强凸 → 加速到 $O(1/k)$。 5.1 从确定次梯度到随机次梯度 5.1.1 动机：为什么需要随机化 现代机器学习和数据科学中的优化问题通常呈现为经验风险最小化（Empirical Risk Minimization, ERM）的形式：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾来自第4章次梯度法">前置知识回顾（来自第4章：次梯度法）</a></li>
+    <li><a href="#51-从确定次梯度到随机次梯度">5.1 从确定次梯度到随机次梯度</a>
+      <ol>
+        <li><a href="#511-动机为什么需要随机化">5.1.1 动机：为什么需要随机化</a></li>
+        <li><a href="#512-随机-oraclerandom-oracle模型的精确定义">5.1.2 随机 Oracle（Random Oracle）模型的精确定义</a></li>
+        <li><a href="#513-三种典型的随机-oracle-实现方式">5.1.3 三种典型的随机 Oracle 实现方式</a>
+          <ol>
+            <li><a href="#类型-a含噪声梯度noisy-gradient">类型 A：含噪声梯度（Noisy Gradient）</a></li>
+            <li><a href="#类型-b增量次梯度法incremental-subgradient最常见的-sgd">类型 B：增量次梯度法（Incremental Subgradient）——最常见的 SGD</a></li>
+            <li><a href="#类型-c随机坐标下降randomized-coordinate-descent">类型 C：随机坐标下降（Randomized Coordinate Descent）</a></li>
+          </ol>
+        </li>
+        <li><a href="#514-sgd-的迭代格式及其与-gd-的全面对比">5.1.4 SGD 的迭代格式及其与 GD 的全面对比</a></li>
+        <li><a href="#515-mini-batch方差缩减与计算代价的折衷方案">5.1.5 Mini-batch：方差缩减与计算代价的折衷方案</a></li>
+      </ol>
+    </li>
+    <li><a href="#52-收敛性分析期望意义下">5.2 收敛性分析（期望意义下）</a>
+      <ol>
+        <li><a href="#521-前提假设">5.2.1 前提假设</a></li>
+        <li><a href="#522-核心递推条件期望版">5.2.2 核心递推（条件期望版）</a></li>
+        <li><a href="#523-全期望展开与-telescoping">5.2.3 全期望展开与 Telescoping</a></li>
+        <li><a href="#524-固定步长的渐近行为">5.2.4 固定步长的渐近行为</a></li>
+        <li><a href="#525-取步长得-o1sqrtk">5.2.5 取步长得 $O(1/\sqrt{K})$</a></li>
+      </ol>
+    </li>
+    <li><a href="#53-感知机sgd-的终极经典特例">5.3 感知机：SGD 的终极经典特例</a>
+      <ol>
+        <li><a href="#531-线性分类与-hinge-loss">5.3.1 线性分类与 Hinge Loss</a></li>
+        <li><a href="#532-感知机作为-sgd-的推导">5.3.2 感知机作为 SGD 的推导</a></li>
+        <li><a href="#533-novikoff-定理">5.3.3 Novikoff 定理</a></li>
+      </ol>
+    </li>
+    <li><a href="#54-典型例题">5.4 典型例题</a>
+      <ol>
+        <li><a href="#例题1sgd-基本收敛性证明">例题1：SGD 基本收敛性证明</a></li>
+        <li><a href="#例题2mini-batch-大小优化">例题2：Mini-batch 大小优化</a></li>
+        <li><a href="#例题3随机坐标下降的无偏性">例题3：随机坐标下降的无偏性</a></li>
+        <li><a href="#例题4强凸-sgd-的加速">例题4：强凸 SGD 的加速</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/05-%E9%9A%8F%E6%9C%BA%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/">第5章：随机次梯度法（随机梯度下降，SGD）</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 6 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第5章随机次梯度法随机梯度下降sgd">第5章：随机次梯度法（随机梯度下降，SGD）
+</h1><blockquote>
+<p><strong>核心思想</strong>：当目标函数 $f$ 是海量分量函数 $f_i$ 的平均值时（如 ERM），每步不计算全量（次）梯度，而是随机抽取一个（或一小批）样本分量，用其梯度作为真实梯度的<strong>无偏估计</strong>进行迭代。在期望意义下，SGD 的收敛率与确定性次梯度法完全相同——$O(1/\sqrt{K})$，但每步的计算代价从 $O(m)$ 骤降至 $O(1)$（以样本数计）。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾来自第4章次梯度法">前置知识回顾（来自第4章：次梯度法）
+</h2><p>本章建立在第4章（次梯度法）的完整理论基础之上。下列关键点请在本章阅读过程中随时参考：</p>
+<ul>
+<li><strong>次梯度法的迭代</strong>：$x_{k+1} = x_k - \alpha_k g_k$，其中 $g_k \in \partial f(x_k)$。$\partial f(x_k)$ 是 $f$ 在 $x_k$ 处的次微分（全体次梯度的集合），$g_k$ 是从该集合中任选的一个向量。</li>
+<li><strong>非单调性</strong>：$f(x_{k+1}) &lt; f(x_k)$ 不保证成立。因此必须记录历史最优 $f_{\text{best}}^K = \min_{0 \le i \le K} f(x_i)$ 及其对应点。</li>
+<li><strong>核心收敛界（确定性）</strong>：
+
+$$\boxed{f_{\text{best}}^K - f^* \le \frac{R^2 + G^2 \sum_{k=0}^K \alpha_k^2}{2 \sum_{k=0}^K \alpha_k}}$$
+其中 $R = |x_0 - x^*|$（初始点到最优解的距离），$G$ 是 Lipschitz 常数（$|g| \le G$ 对所有次梯度 $g \in \partial f(x)$ 成立）。</li>
+<li><strong>步长三条件</strong>：$\alpha_k \to 0$（趋于零）、$\sum \alpha_k = \infty$（总行程无穷大）、$\sum \alpha_k^2 &lt; \infty$（噪声累积有界）→ 保证精确收敛到 $f^*$。</li>
+<li><strong>固定步长</strong>：只能收敛到以 $f^*$ 为中心、半径 $\sim \alpha G^2/2$ 的邻域。</li>
+<li><strong>收敛率</strong>：一般凸 → $O(1/\sqrt{K})$，复杂度 $O(1/\epsilon^2)$。强凸 → 加速到 $O(1/k)$。</li>
+</ul>
+<hr>
+<h2 id="51-从确定次梯度到随机次梯度">5.1 从确定次梯度到随机次梯度
+</h2><h3 id="511-动机为什么需要随机化">5.1.1 动机：为什么需要随机化
+</h3><p>现代机器学习和数据科学中的优化问题通常呈现为<strong>经验风险最小化</strong>（Empirical Risk Minimization, ERM）的形式：</p>
+$$\boxed{f(x) = \frac{1}{m} \sum_{i=1}^{m} f_i(x)}$$<p>对这个形式的逐项解读：</p>
+<ul>
+<li>$m$：训练集的<strong>样本总数</strong>（sample size）。在 ImageNet 中 $m \approx 1.28 \times 10^6$；在大语言模型预训练中 $m$ 可达数十亿。</li>
+<li>$f_i(x)$：第 $i$ 个样本上的<strong>损失函数</strong>（loss function）在参数 $x$ 处的值。例如：
+<ul>
+<li>线性回归：$f_i(x) = \frac{1}{2}(a_i^T x - b_i)^2$（残差平方的 1/2 倍）</li>
+<li>二分类 SVM：$f_i(x) = \max(0, 1 - y_i a_i^T x)$（Hinge loss）</li>
+<li>逻辑回归：$f_i(x) = \log(1 + \exp(-y_i a_i^T x))$</li>
+</ul>
+</li>
+<li>$x \in \mathbb{R}^n$：待学习的<strong>参数向量</strong>（$n$ 个特征对应的 $n$ 个权重）。</li>
+</ul>
+<p>此时，精确（次）梯度需要对<strong>全部 $m$ 个样本</strong>的梯度求和：
+</p>
+$$\nabla f(x) = \frac{1}{m} \sum_{i=1}^{m} \nabla f_i(x) \quad \text{或} \quad g \in \frac{1}{m} \sum_{i=1}^{m} \partial f_i(x)$$<p>这一运算的复杂度为 $O(m \cdot n \cdot d)$，其中 $d$ 是每个样本特征的实际计算维度。当 $m$ 极庞大时，每一步都扫描全量数据的代价是任何算力都难以承受的。</p>
+<p><strong>三大现实场景迫使随机化</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>场景</th>
+					<th>数据特征</th>
+					<th>全量梯度为何不现实</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>大规模 ERM</strong></td>
+					<td>$m \ge 10^6$，训练集已静态收集完毕</td>
+					<td>跑 $10^3$ 步就要 $10^9$ 次梯度计算</td>
+			</tr>
+			<tr>
+					<td><strong>流式数据</strong>（Streaming）</td>
+					<td>数据一条一条连续到达，无固定训练集</td>
+					<td>每到达一条新数据就重新算全梯度？数据流永不停止</td>
+			</tr>
+			<tr>
+					<td><strong>在线学习</strong>（Online Learning）</td>
+					<td>当前决策直接影响未来数据分布</td>
+					<td>根本没有事先收集好的训练集，梯度必须在行动中即时估计</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>SGD 的核心策略</strong>：用一个<strong>随机量</strong> $\tilde{g}_k$ 代替真实的（次）梯度，只需满足<strong>无偏性</strong>——即 $\mathbb{E}[\tilde{g}_k] \in \partial f(x_k)$。那么在<strong>期望</strong>意义下，SGD 可以达到与确定性次梯度法完全相同的收敛率，而每步的计算代价却缩减了 $m$ 倍。</p>
+<h3 id="512-随机-oraclerandom-oracle模型的精确定义">5.1.2 随机 Oracle（Random Oracle）模型的精确定义
+</h3><p><strong>定义</strong>：对凸函数 $f$，称随机向量 $\tilde{g}(x; \xi)$ 是 $f$ 在点 $x$ 处的<strong>随机次梯度</strong>（stochastic subgradient），若其数学期望落在 $f$ 的次微分中：</p>
+$$\boxed{\mathbb{E}_{\xi}[\tilde{g}(x; \xi)] \in \partial f(x)}$$<p>对定义中每个符号的详细解释：</p>
+<ul>
+<li>$\tilde{g}(x; \xi)$：依赖于当前参数 $x$ 和一个随机变量 $\xi$ 的随机向量。波形符号 $\tilde{\ }$（tilde）是小波浪线，提示这是一个随机量而非确定量。</li>
+<li>$\xi$：从一个已知概率分布 $\mathcal{D}$ 中<strong>随机抽取</strong>的变量。$\xi$ 的具体性质取决于实现方式——可以是样本的索引（如 $i \in {1,\dots,m}$）、噪声向量、或坐标方向索引。</li>
+<li>$\mathbb{E}<em>{\xi}[\cdot]$：对随机变量 $\xi$ 的<strong>数学期望</strong>（expected value）。对于离散的 $\xi$，$\mathbb{E}[h(\xi)] = \sum</em>{\xi} h(\xi) \cdot \Pr[\xi]$（各可能取值乘以其概率之和）；对于连续的 $\xi$，$\mathbb{E}[h(\xi)] = \int h(\xi) p(\xi) d\xi$。</li>
+</ul>
+<p><strong>关键性质</strong>：$\tilde{g}$ 的单次抽样值<strong>不必</strong>落在 $\partial f(x)$ 中（可能&quot;不准&quot;）。但多次独立抽样的平均值一定会收敛到次微分中的某个元素——这就是<strong>无偏性</strong>的统计学含义。</p>
+<h3 id="513-三种典型的随机-oracle-实现方式">5.1.3 三种典型的随机 Oracle 实现方式
+</h3><h4 id="类型-a含噪声梯度noisy-gradient">类型 A：含噪声梯度（Noisy Gradient）
+</h4><p>最直接的随机化——在精确梯度上加<strong>零均值</strong>的随机扰动噪声：
+</p>
+$$\tilde{g}(x; \xi) = \nabla f(x) + \epsilon, \quad \mathbb{E}[\epsilon] = \mathbf{0}, \quad \mathbb{E}[\|\epsilon\|^2] \le \sigma^2$$<p>其中 $\epsilon \in \mathbb{R}^n$ 是一个随机噪声向量，每个分量的均值都是 $0$。噪声的二阶矩（平均&quot;能量&quot;）有界 $\le \sigma^2$。这一模型常用于描述传感测量误差或物理系统中的随机扰动。</p>
+<p><strong>无偏性验证</strong>：
+</p>
+$$\mathbb{E}[\tilde{g}] = \mathbb{E}[\nabla f(x) + \epsilon] = \nabla f(x) + \mathbb{E}[\epsilon] = \nabla f(x) + \mathbf{0} = \nabla f(x) \quad \checkmark$$<h4 id="类型-b增量次梯度法incremental-subgradient最常见的-sgd">类型 B：增量次梯度法（Incremental Subgradient）——最常见的 SGD
+</h4><p>每次迭代只使用<strong>一个随机均匀抽取的样本</strong>的（次）梯度：
+</p>
+$$\tilde{g}(x; \xi = i) = g_i(x), \quad g_i(x) \in \partial f_i(x), \quad \Pr[\xi = i] = \frac{1}{m}$$<p>逐项解释：</p>
+<ul>
+<li>$\xi$ 取值 $i \in {1, 2, \dots, m}$（样本索引），每个样本被抽到的概率<strong>相等</strong>，均为 $1/m$（即均匀分布）。</li>
+<li>$g_i(x) \in \partial f_i(x)$ 是第 $i$ 个<strong>分量函数</strong> $f_i$ 在点 $x$ 处的任意一个次梯度。</li>
+<li>计算量：从 $O(m)$（全量）骤降为 $O(1)$（归一化到单样本的计算量）——这就是 SGD 计算优势的根源。</li>
+</ul>
+<p><strong>无偏性验证</strong>（当所有 $f_i$ 可微时，次梯度退化为梯度）：
+</p>
+$$\mathbb{E}[\tilde{g}] = \sum_{i=1}^{m} \Pr[\xi = i] \cdot \nabla f_i(x) = \sum_{i=1}^{m} \frac{1}{m} \nabla f_i(x) = \frac{1}{m} \sum_{i=1}^{m} \nabla f_i(x) = \nabla f(x) \quad \checkmark$$<h4 id="类型-c随机坐标下降randomized-coordinate-descent">类型 C：随机坐标下降（Randomized Coordinate Descent）
+</h4><p>每次只沿一个<strong>随机选取的坐标方向更新</strong>：
+</p>
+$$\tilde{g}(x; \xi = j) = n \cdot e_j e_j^T \nabla f(x), \quad \Pr[\xi = j] = \frac{1}{n}, \quad j \in \{1, \dots, n\}$$<p>符号解释：</p>
+<ul>
+<li>$e_j \in \mathbb{R}^n$：第 $j$ 个<strong>标准基向量</strong>（第 $j$ 分量为 1，其余全 0）。</li>
+<li>$e_j e_j^T$：一个 $n \times n$ 的秩 1 矩阵，其作用是将任意向量&quot;投影&quot;到第 $j$ 个坐标轴——仅保留第 $j$ 个分量，其余归零。</li>
+<li>乘以因子 $n$：<strong>补偿</strong>抽样概率 $1/n$。因为每次只抽一个坐标，要保持期望为完整梯度，必须将被选中坐标方向的分量放大 $n$ 倍。</li>
+</ul>
+<p><strong>无偏性验证</strong>：
+</p>
+$$\begin{aligned}
+\mathbb{E}[\tilde{g}] &= \frac{1}{n} \sum_{j=1}^{n} n \cdot e_j e_j^T \nabla f(x) \\
+&= \sum_{j=1}^{n} e_j e_j^T \nabla f(x) \\
+&= \left(\sum_{j=1}^{n} e_j e_j^T\right) \nabla f(x)
+\end{aligned}$$<p><strong>关键恒等式</strong>：$\sum_{j=1}^{n} e_j e_j^T = I_n$，其中 $I_n$ 是 $n \times n$ 的<strong>单位矩阵</strong>（对角线全 1，其余为 0）。因此：
+</p>
+$$\mathbb{E}[\tilde{g}] = I_n \cdot \nabla f(x) = \nabla f(x) \quad \checkmark$$<p>随机坐标下降的迭代形式：
+</p>
+$$x_{k+1} = x_k - \alpha_k \cdot n \cdot e_{j_k} e_{j_k}^T \nabla f(x_k)$$<p>
+这意味着每次只有第 $j_k$ 个坐标分量被更新，其余 $n-1$ 个分量保持原样。</p>
+<h3 id="514-sgd-的迭代格式及其与-gd-的全面对比">5.1.4 SGD 的迭代格式及其与 GD 的全面对比
+</h3><p><strong>SGD 迭代格式</strong>：
+</p>
+$$\boxed{x_{k+1} = x_k - \alpha_k \tilde{g}_k}$$<p>
+其中 $\tilde{g}_k = \tilde{g}(x_k; \xi_k)$，且各步之间的随机变量 $\xi_0, \xi_1, \xi_2, \dots$ 是<strong>相互独立</strong>抽取的（各步的随机性互不影响）。</p>
+<p><strong>GD vs SGD 全维度对比表</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>比较维度</th>
+					<th>梯度下降 (GD)</th>
+					<th>随机次梯度下降 (SGD)</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>迭代公式</td>
+					<td>$x_{k+1} = x_k - \alpha_k \nabla f(x_k)$</td>
+					<td>$x_{k+1} = x_k - \alpha_k \tilde{g}_k$</td>
+			</tr>
+			<tr>
+					<td>每步计算量</td>
+					<td>$O(m n d)$（全量梯度）</td>
+					<td>$O(b n d)$（$b$ = mini-batch 大小）</td>
+			</tr>
+			<tr>
+					<td>方向质量</td>
+					<td>精确无误，确定性的</td>
+					<td>含噪声但<strong>期望无偏</strong>：$\mathbb{E}[\tilde{g}_k \mid x_k] \in \partial f(x_k)$</td>
+			</tr>
+			<tr>
+					<td>函数值单调性</td>
+					<td>是（合理步长下 $f(x_{k+1}) \le f(x_k)$）</td>
+					<td>否——函数值剧烈上下振荡</td>
+			</tr>
+			<tr>
+					<td>收敛保证类型</td>
+					<td>确定性（数学上严格既定的）</td>
+					<td>仅<strong>期望意义下</strong>收敛（有概率性）</td>
+			</tr>
+			<tr>
+					<td>轨迹外观</td>
+					<td>平滑、可预测、如流水般向最优解流淌</td>
+					<td><strong>剧烈抖动的醉汉步伐</strong>——趋势向下但步步颠簸</td>
+			</tr>
+			<tr>
+					<td>固定步长的终态</td>
+					<td>收敛到 $f^*$（取 $\alpha = 1/L$ 时）</td>
+					<td>收敛到半径为 $\sim \alpha G^2/2$ 的球</td>
+			</tr>
+	</tbody>
+</table></div>
+<h3 id="515-mini-batch方差缩减与计算代价的折衷方案">5.1.5 Mini-batch：方差缩减与计算代价的折衷方案
+</h3><p><strong>定义</strong>：不是单样本和全量之间做&quot;非此即彼&quot;的选择，而是取 $b$ 个样本做平均：
+</p>
+$$\boxed{\tilde{g}_k = \frac{1}{b} \sum_{i \in B_k} \nabla f_i(x_k)}$$<p>
+其中 $B_k \subset {1, \dots, m}$ 是从训练集中<strong>均匀随机无放回</strong>（或有放回）抽取的、大小为 $b$ 的子集。</p>
+<p><strong>方差分析</strong>：设单个样本梯度的内在方差为 $\sigma^2$，即 $\mathbb{E}[|\nabla f_i(x) - \nabla f(x)|^2] = \sigma^2$。由 $b$ 个独立同分布随机变量均值的方差公式——方差缩小 $b$ 倍：
+</p>
+$$\mathbb{E}[\|\tilde{g}_k - \nabla f(x_k)\|^2] = \frac{\sigma^2}{b}$$<p>
+这个公式揭示了 Mini-batch 的核心统计效应：<strong>批量翻倍 → 方差减半</strong>。</p>
+<p><strong>效率的权衡分析</strong>：</p>
+<ul>
+<li>$b = 1$（纯 SGD）：$K$ 步总计算量 $cK$，方向方差 $\sigma^2$ ——极便宜，极嘈杂。</li>
+<li>$b = m$（满量 GD）：$K$ 步总计算量 $cmK$，方向方差 $0$ ——极昂贵，极精准。</li>
+<li><strong>最优 $b$</strong> 位于中间：取决于噪声方差的量级、目标精度需求和硬件并行效率。实践常用 $b \in [32, 256]$。</li>
+</ul>
+<hr>
+<h2 id="52-收敛性分析期望意义下">5.2 收敛性分析（期望意义下）
+</h2><h3 id="521-前提假设">5.2.1 前提假设
+</h3><p>除第4章的凸性和 Lipschitz 连续假设之外，SGD 还需额外的随机性假设：</p>
+<ol>
+<li><strong>凸性</strong>：$f$ 是凸函数。$f^* = \min_x f(x)$，$x^*$ 为某最优解。</li>
+<li><strong>无偏性</strong>：$\mathbb{E}[\tilde{g}_k \mid x_k] = \bar{g}_k \in \partial f(x_k)$。这里的 $\mathbb{E}[\cdot \mid x_k]$ 是<strong>条件期望</strong>——给定当前点 $x_k$ 以及所有历史随机信息后，对第 $k$ 步的随机抽取 $\xi_k$ 取期望。</li>
+<li><strong>二阶矩有界</strong>：$\mathbb{E}[|\tilde{g}_k|^2 \mid x_k] \le G^2$。</li>
+<li>（可选更精细假设）条件方差有界：$\mathbb{E}[|\tilde{g}_k - \bar{g}_k|^2 \mid x_k] \le \sigma^2$。</li>
+</ol>
+<h3 id="522-核心递推条件期望版">5.2.2 核心递推（条件期望版）
+</h3><p>从 SGD 迭代出发，展开距离平方：
+</p>
+$$\begin{aligned}
+\|x_{k+1} - x^*\|^2 &= \|x_k - \alpha_k \tilde{g}_k - x^*\|^2 \\
+&= \|x_k - x^*\|^2 - 2\alpha_k \tilde{g}_k^T(x_k - x^*) + \alpha_k^2 \|\tilde{g}_k\|^2
+\end{aligned}$$<p>对历史 $\mathcal{F}_k$ 取<strong>条件期望</strong>：
+</p>
+$$\begin{aligned}
+\mathbb{E}[\|x_{k+1} - x^*\|^2 \mid \mathcal{F}_k]
+&\le \|x_k - x^*\|^2 - 2\alpha_k \underbrace{\mathbb{E}[\tilde{g}_k \mid \mathcal{F}_k]^T(x_k - x^*)}_{= \bar{g}_k^T(x_k - x^*)} + \alpha_k^2 \underbrace{\mathbb{E}[\|\tilde{g}_k\|^2 \mid \mathcal{F}_k]}_{\le G^2}
+\end{aligned}$$<p>由无偏假设和次梯度定义：$\bar{g}_k^T(x_k - x^<em>) \ge f(x_k) - f^</em> = \delta_k$。因此：
+</p>
+$$\boxed{\mathbb{E}[\|x_{k+1} - x^*\|^2 \mid \mathcal{F}_k] \le \|x_k - x^*\|^2 - 2\alpha_k \delta_k + \alpha_k^2 G^2}$$<p><strong>关键观察</strong>：该条件期望递推与第4章的确定性递推<strong>完全同构</strong>。差别仅在于外层还需展开全期望。</p>
+<h3 id="523-全期望展开与-telescoping">5.2.3 全期望展开与 Telescoping
+</h3><p>取全期望（对式子的两边再用一次期望）：
+</p>
+$$\mathbb{E}[\|x_{k+1} - x^*\|^2] \le \mathbb{E}[\|x_k - x^*\|^2] - 2\alpha_k \mathbb{E}[f(x_k) - f^*] + \alpha_k^2 G^2$$<p>对 $k = 0$ 到 $K$ 求和进行 Telescoping：
+</p>
+$$\begin{aligned}
+2\sum_{k=0}^K \alpha_k \mathbb{E}[f(x_k) - f^*]
+&\le \mathbb{E}[\|x_0 - x^*\|^2] - \mathbb{E}[\|x_{K+1} - x^*\|^2] + G^2 \sum_{k=0}^K \alpha_k^2 \\
+&\le \|x_0 - x^*\|^2 + G^2 \sum_{k=0}^K \alpha_k^2
+\end{aligned}$$<p><strong>构造加权平均迭代点</strong>（SGD 中替代历史最优的标准手段）：
+</p>
+$$\bar{x}_K = \frac{\sum_{k=0}^K \alpha_k x_k}{\sum_{k=0}^K \alpha_k}$$<p>由 Jensen 不等式（凸函数的加权平均函数值 $\le$ 函数值的加权平均）：
+</p>
+$$f(\bar{x}_K) \le \frac{\sum_{k=0}^K \alpha_k f(x_k)}{\sum_{k=0}^K \alpha_k}$$<p>取期望并代入 Telescoping 上界：
+</p>
+$$\boxed{\mathbb{E}[f(\bar{x}_K)] - f^* \le \frac{R^2 + G^2 \sum_{k=0}^K \alpha_k^2}{2 \sum_{k=0}^K \alpha_k}}$$<p><strong>惊人结论</strong>：SGD 的<strong>期望收敛界</strong>与确定性次梯度法完全一致！每步使用有噪声的随机方向，但期望意义上不损失收敛率。</p>
+<h3 id="524-固定步长的渐近行为">5.2.4 固定步长的渐近行为
+</h3><p>固定步长 $\alpha_k \equiv \alpha$ 时：
+</p>
+$$\mathbb{E}[f(\bar{x}_K)] - f^* \le \frac{R^2}{2(K+1)\alpha} + \frac{\alpha G^2}{2} \;\longrightarrow\; \frac{\alpha G^2}{2} \quad (K \to \infty)$$<ul>
+<li>固定步长 SGD 也只收敛到半径 $\alpha G^2/2$ 的球，无法精确收敛。</li>
+<li>深度学习中的<strong>学习率衰减</strong>策略（Step Decay、Cosine Annealing）正是为了在&quot;前期大步快进&quot;和&quot;后期小步精调&quot;之间寻找平衡。</li>
+</ul>
+<h3 id="525-取步长得-o1sqrtk">5.2.5 取步长得 $O(1/\sqrt{K})$
+</h3><p>取 $\alpha_k \equiv R/(G\sqrt{K+1})$：
+</p>
+$$\sum \alpha_k = \frac{R\sqrt{K+1}}{G}, \quad \sum \alpha_k^2 = \frac{R^2}{G^2}$$<p>
+代入得：
+</p>
+$$\boxed{\mathbb{E}[f(\bar{x}_K)] - f^* \le \frac{RG}{\sqrt{K+1}} = O\!\left(\frac{1}{\sqrt{K}}\right)}$$<hr>
+<h2 id="53-感知机sgd-的终极经典特例">5.3 感知机：SGD 的终极经典特例
+</h2><h3 id="531-线性分类与-hinge-loss">5.3.1 线性分类与 Hinge Loss
+</h3><p>二分类数据 ${(a_i, y_i)}_{i=1}^m$，其中 $a_i \in \mathbb{R}^n$ 是特征向量，$y_i \in {-1,+1}$ 是标签。感知机等价于极小化 Hinge Loss：
+</p>
+$$\boxed{f(w) = \frac{1}{m} \sum_{i=1}^m \max\{0, -y_i \cdot a_i^T w\}}$$<p><strong>损失函数的含义</strong>：</p>
+<ul>
+<li>若分类正确（$y_i \cdot a_i^T w &gt; 0$）：$\max{0, -\text{正数}} = 0$，该样本无损失。</li>
+<li>若分类错误（$y_i \cdot a_i^T w &lt; 0$）：$\max{0, -\text{负数}} = \text{正数}$，损失 = 错误程度。</li>
+</ul>
+<h3 id="532-感知机作为-sgd-的推导">5.3.2 感知机作为 SGD 的推导
+</h3><p>第 $i$ 个 Hinge Loss 对 $w$ 的次梯度：
+</p>
+$$g_i(w) = \begin{cases} -y_i a_i, & \text{若 } y_i a_i^T w < 0 \;\; \text{(误分类)} \\ \mathbf{0}, & \text{其他（分类正确）} \end{cases}$$<p>SGD 迭代（类型 B，均匀随机单样本抽取）：
+</p>
+$$w_{k+1} = w_k - \alpha_k \cdot (-y_i a_i) = w_k + \alpha_k y_i a_i \quad \text{(仅当误分类时更新)}$$<p>取 $\alpha_k = 1$ → 经典感知机更新规则（Rosenblatt, 1958）：</p>
+<ul>
+<li>误分类 → $w \leftarrow w + y_i a_i$</li>
+<li>分类正确 → $w$ 不变</li>
+</ul>
+<h3 id="533-novikoff-定理">5.3.3 Novikoff 定理
+</h3><p>若数据<strong>线性可分</strong>（存在 $w^<em>$ 完全正确分类全部样本），定义最大几何间隔 $\gamma = \min_i \frac{y_i a_i^T w^</em>}{|w^*|}$ 和样本最大范数 $R = \max_i |a_i|$。则步长 $\alpha = 1$ 的感知机在至多 $(R/\gamma)^2$ 步内收敛。</p>
+<hr>
+<h2 id="54-典型例题">5.4 典型例题
+</h2><h3 id="例题1sgd-基本收敛性证明">例题1：SGD 基本收敛性证明
+</h3><p><strong>题目</strong>：$f(x)=\frac{1}{m}\sum_i f_i(x)$，各 $f_i$ 可微且 $|\nabla f_i(x)| \le G$。取步长 $\alpha_k \equiv D/(G\sqrt{K+1})$ 运行 SGD 共 $K+1$ 步（$D=|x_0-x^<em>|$）。证明 $\mathbb{E}[f(\bar{x}_K)]-f^</em> \le DG/\sqrt{K+1}$。</p>
+<p><strong>证明</strong>：复用 §5.2.3 的 Telescoping 模板。无偏性 + 二阶矩有界 → 代入 $\alpha_k$ → 计算 $\sum\alpha_k = D\sqrt{K+1}/G$，$\sum\alpha_k^2 = D^2/G^2$ → 代数化简得证。</p>
+<h3 id="例题2mini-batch-大小优化">例题2：Mini-batch 大小优化
+</h3><p><strong>题目</strong>：线性最小二乘 $f(x)=\frac{1}{m}\sum_i \frac{1}{2}(a_i^T x-b_i)^2$，固定总计算预算 $C$ 次梯度计算。比较 $b=1$（$K=C$ 步）和 $b=C$（$K=1$ 步，满量GD）的效果。</p>
+<p><strong>解答</strong>：纯 SGD → 步数多但方向噪声大，期望误差 $O(1/\sqrt{C})$。满量 GD → 仅 1 步，误差 $\approx O(LD^2)$。最优 $b$ 取决于 $\sigma^2$、$L$ 和精度需求。实践中 $b \in [32,256]$ 是通用值。</p>
+<h3 id="例题3随机坐标下降的无偏性">例题3：随机坐标下降的无偏性
+</h3><p><strong>题目</strong>：$f(x) = \frac{1}{2}x^T Q x - c^T x$，$Q \succ 0$。写出随机坐标下降的 $\tilde{g}$ 并验证 $\mathbb{E}[\tilde{g}] = \nabla f(x)$。</p>
+<p><strong>解答</strong>：随机选坐标 $j \sim \text{Uniform}(1,\dots,n)$，$\tilde{g} = n \cdot e_j e_j^T(Qx-c)$。$\mathbb{E}[\tilde{g}] = \frac{1}{n}\sum_{j=1}^n n e_j e_j^T (Qx-c) = (\sum_j e_j e_j^T)(Qx-c) = I_n(Qx-c) = Qx-c = \nabla f(x)$。✓</p>
+<h3 id="例题4强凸-sgd-的加速">例题4：强凸 SGD 的加速
+</h3><p><strong>题目</strong>：$f$ 是 $\mu$-强凸，$\mathbb{E}[|\tilde{g}_k|^2] \le G^2$。取步长 $\alpha_k = 2/(\mu(k+1))$。证明 $\mathbb{E}[f(x_k)]-f^* \le 2G^2/(\mu(k+1))$。</p>
+<p><strong>要点</strong>：强凸性增强内积下界，递推中产生 $(1-\mu\alpha_k)$ 的几何收缩，取 $\alpha_k = 2/(\mu(k+1))$ 后得收缩比 $(k-1)/(k+1)$ → 归纳得 $O(1/k)$。</p>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><ol>
+<li><strong>随机 Oracle</strong>：$\mathbb{E}[\tilde{g}] \in \partial f(x)$ —— 仅需期望无偏，每步方向可以有噪声。</li>
+<li><strong>三种实现</strong>：噪声梯度、单样本抽样（SGD）、随机坐标下降。</li>
+<li><strong>Mini-batch</strong>：方差 $\propto 1/b$；噪声与计算代价的经典权衡。</li>
+<li><strong>期望收敛率</strong>：$O(1/\sqrt{K})$，与确定性子梯度法同阶。</li>
+<li><strong>固定步长陷阱</strong>：收敛到半径 $\alpha G^2/2$ 的球，无法精确收敛到 $f^*$。</li>
+<li><strong>感知机 = SGD</strong>：Hinge Loss + 单样本 SGD + $\alpha=1$ = 经典感知机。</li>
+<li><strong>口诀</strong>：「随机梯度省算力，固定步长到球里；递减步长到最优，方差决定收敛速」</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>交叉引用</strong>：确定性次梯度法见第4章；约束下的 SGD → 投影随机次梯度法（第6章 PGD 的随机版本）；SGD 的动量变体（Momentum, Adam）属于进阶课题。</p>
+</blockquote>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

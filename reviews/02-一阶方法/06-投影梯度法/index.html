@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第6章：投影梯度法 核心思想：将无约束优化的负梯度方向迈步与向可行凸集&quot;投影&quot;修正相结合——先迈出梯度步，若走出可行域则用投影弹回最近的可行点。当投影本身计算昂贵时，Frank-Wolfe（条件梯度法）以廉价的线性极小化取代投影，在同等 $O(1/k)$ 收敛率下大幅降低每步开销。\n前置知识回顾 从第2章（梯度下降 GD）回顾 GD 迭代：$x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)$。$\\nabla f(x_k)$ 是 $f$ 在 $x_k$ 处的梯度（$n$ 维偏导数向量），指向上升最快的方向。\n$L$-光滑（$L$-smooth）：存在 $L &gt; 0$（光滑常数），使得对任意 $x, y \\in \\mathbb{R}^n$： $$\\|\\nabla f(x) - \\nabla f(y)\\| \\le L\\|x - y\\|$$ 其中 $|z| = \\sqrt{\\sum_{i=1}^n z_i^2}$ 为欧几里得范数。光滑性意味着梯度不会&quot;突变&quot;——梯度的变化速度被 $L$ 约束。\n二次上界（Descent Lemma）：对 $L$-光滑的 $f$，以下不等式对一切 $x, y$ 成立： $$\\boxed{f(y) \\le f(x) + \\nabla f(x)^T(y - x) + \\frac{L}{2}\\|y - x\\|^2}$$ 含义是函数值在任意点不超过以 $x$ 处一阶展开为中心的二次函数。\n">
+<title>第6章：投影梯度法</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/06-%E6%8A%95%E5%BD%B1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第6章：投影梯度法">
+<meta property='og:description' content="第6章：投影梯度法 核心思想：将无约束优化的负梯度方向迈步与向可行凸集&quot;投影&quot;修正相结合——先迈出梯度步，若走出可行域则用投影弹回最近的可行点。当投影本身计算昂贵时，Frank-Wolfe（条件梯度法）以廉价的线性极小化取代投影，在同等 $O(1/k)$ 收敛率下大幅降低每步开销。\n前置知识回顾 从第2章（梯度下降 GD）回顾 GD 迭代：$x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)$。$\\nabla f(x_k)$ 是 $f$ 在 $x_k$ 处的梯度（$n$ 维偏导数向量），指向上升最快的方向。\n$L$-光滑（$L$-smooth）：存在 $L &gt; 0$（光滑常数），使得对任意 $x, y \\in \\mathbb{R}^n$： $$\\|\\nabla f(x) - \\nabla f(y)\\| \\le L\\|x - y\\|$$ 其中 $|z| = \\sqrt{\\sum_{i=1}^n z_i^2}$ 为欧几里得范数。光滑性意味着梯度不会&quot;突变&quot;——梯度的变化速度被 $L$ 约束。\n二次上界（Descent Lemma）：对 $L$-光滑的 $f$，以下不等式对一切 $x, y$ 成立： $$\\boxed{f(y) \\le f(x) + \\nabla f(x)^T(y - x) + \\frac{L}{2}\\|y - x\\|^2}$$ 含义是函数值在任意点不超过以 $x$ 处一阶展开为中心的二次函数。\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/06-%E6%8A%95%E5%BD%B1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第6章：投影梯度法">
+<meta name="twitter:description" content="第6章：投影梯度法 核心思想：将无约束优化的负梯度方向迈步与向可行凸集&quot;投影&quot;修正相结合——先迈出梯度步，若走出可行域则用投影弹回最近的可行点。当投影本身计算昂贵时，Frank-Wolfe（条件梯度法）以廉价的线性极小化取代投影，在同等 $O(1/k)$ 收敛率下大幅降低每步开销。\n前置知识回顾 从第2章（梯度下降 GD）回顾 GD 迭代：$x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)$。$\\nabla f(x_k)$ 是 $f$ 在 $x_k$ 处的梯度（$n$ 维偏导数向量），指向上升最快的方向。\n$L$-光滑（$L$-smooth）：存在 $L &gt; 0$（光滑常数），使得对任意 $x, y \\in \\mathbb{R}^n$： $$\\|\\nabla f(x) - \\nabla f(y)\\| \\le L\\|x - y\\|$$ 其中 $|z| = \\sqrt{\\sum_{i=1}^n z_i^2}$ 为欧几里得范数。光滑性意味着梯度不会&quot;突变&quot;——梯度的变化速度被 $L$ 约束。\n二次上界（Descent Lemma）：对 $L$-光滑的 $f$，以下不等式对一切 $x, y$ 成立： $$\\boxed{f(y) \\le f(x) + \\nabla f(x)^T(y - x) + \\frac{L}{2}\\|y - x\\|^2}$$ 含义是函数值在任意点不超过以 $x$ 处一阶展开为中心的二次函数。\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾">前置知识回顾</a>
+      <ol>
+        <li><a href="#从第2章梯度下降-gd回顾">从第2章（梯度下降 GD）回顾</a></li>
+        <li><a href="#从第4章次梯度法回顾">从第4章（次梯度法）回顾</a></li>
+      </ol>
+    </li>
+    <li><a href="#61-投影算子">6.1 投影算子</a>
+      <ol>
+        <li><a href="#611-投影的严格定义">6.1.1 投影的严格定义</a></li>
+        <li><a href="#612-存在性与唯一性投影定理">6.1.2 存在性与唯一性：投影定理</a></li>
+        <li><a href="#613-投影不等式的完整推导">6.1.3 投影不等式的完整推导</a></li>
+        <li><a href="#614-非扩张性nonexpansivenesspgd-的理论基石">6.1.4 非扩张性（Nonexpansiveness）——PGD 的理论基石</a></li>
+        <li><a href="#615-常见凸集投影的闭式解公式">6.1.5 常见凸集投影的闭式解公式</a>
+          <ol>
+            <li><a href="#ell_2-球投影的详细推导">$\ell_2$ 球投影的详细推导</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li><a href="#62-投影梯度法-projected-gradient-descent-pgd">6.2 投影梯度法 (Projected Gradient Descent, PGD)</a>
+      <ol>
+        <li><a href="#621-问题与迭代格式">6.2.1 问题与迭代格式</a></li>
+        <li><a href="#622-收敛性光滑凸--闭凸约束">6.2.2 收敛性（光滑凸 + 闭凸约束）</a></li>
+        <li><a href="#623-收敛性推导要点">6.2.3 收敛性推导要点</a></li>
+        <li><a href="#624-投影次梯度法非光滑情形">6.2.4 投影次梯度法（非光滑情形）</a></li>
+      </ol>
+    </li>
+    <li><a href="#63-frank-wolfefw--条件梯度法">6.3 Frank-Wolfe（FW / 条件梯度法）</a>
+      <ol>
+        <li><a href="#631-动机当投影变得昂贵">6.3.1 动机：当投影变得昂贵</a></li>
+        <li><a href="#632-fw-的迭代格式">6.3.2 FW 的迭代格式</a>
+          <ol>
+            <li><a href="#以-ell_1-球为例lmo-为何比投影便宜得多">以 $\ell_1$ 球为例：LMO 为何比投影便宜得多</a></li>
+          </ol>
+        </li>
+        <li><a href="#633-收敛性分析o1k-的数学归纳法完整证明">6.3.3 收敛性分析：$O(1/k)$ 的数学归纳法完整证明</a>
+          <ol>
+            <li><a href="#step-1利用-l-光滑二次上界">Step 1：利用 $L$-光滑二次上界</a></li>
+            <li><a href="#step-2lmo-的最优性导出核心不等式">Step 2：LMO 的最优性导出核心不等式</a></li>
+            <li><a href="#step-3代入得核心递推">Step 3：代入得核心递推</a></li>
+            <li><a href="#step-4数学归纳法">Step 4：数学归纳法</a></li>
+          </ol>
+        </li>
+        <li><a href="#634-fw-与-pgd-的系统对比">6.3.4 FW 与 PGD 的系统对比</a></li>
+      </ol>
+    </li>
+    <li><a href="#64-典型例题">6.4 典型例题</a>
+      <ol>
+        <li><a href="#例题1投影非扩张性完整证明">例题1：投影非扩张性完整证明</a></li>
+        <li><a href="#例题2pgd-收敛性">例题2：PGD 收敛性</a></li>
+        <li><a href="#例题3fw-收敛归纳法证明">例题3：FW 收敛归纳法证明</a></li>
+        <li><a href="#例题4ell_1-球-fw-vs-pgd-对比">例题4：$\ell_1$ 球 FW vs PGD 对比</a></li>
+        <li><a href="#例题5核范数约束-fw">例题5：核范数约束 FW</a></li>
+        <li><a href="#例题6半空间投影推导">例题6：半空间投影推导</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/06-%E6%8A%95%E5%BD%B1%E6%A2%AF%E5%BA%A6%E6%B3%95/">第6章：投影梯度法</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 9 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第6章投影梯度法">第6章：投影梯度法
+</h1><blockquote>
+<p><strong>核心思想</strong>：将无约束优化的负梯度方向迈步与向可行凸集&quot;投影&quot;修正相结合——先迈出梯度步，若走出可行域则用投影弹回最近的可行点。当投影本身计算昂贵时，Frank-Wolfe（条件梯度法）以廉价的<strong>线性极小化</strong>取代投影，在同等 $O(1/k)$ 收敛率下大幅降低每步开销。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾">前置知识回顾
+</h2><h3 id="从第2章梯度下降-gd回顾">从第2章（梯度下降 GD）回顾
+</h3><p><strong>GD 迭代</strong>：$x_{k+1} = x_k - \alpha_k \nabla f(x_k)$。$\nabla f(x_k)$ 是 $f$ 在 $x_k$ 处的梯度（$n$ 维偏导数向量），指向上升最快的方向。</p>
+<p><strong>$L$-光滑（$L$-smooth）</strong>：存在 $L &gt; 0$（光滑常数），使得对任意 $x, y \in \mathbb{R}^n$：
+</p>
+$$\|\nabla f(x) - \nabla f(y)\| \le L\|x - y\|$$<p>
+其中 $|z| = \sqrt{\sum_{i=1}^n z_i^2}$ 为欧几里得范数。光滑性意味着梯度不会&quot;突变&quot;——梯度的变化速度被 $L$ 约束。</p>
+<p><strong>二次上界</strong>（Descent Lemma）：对 $L$-光滑的 $f$，以下不等式对一切 $x, y$ 成立：
+</p>
+$$\boxed{f(y) \le f(x) + \nabla f(x)^T(y - x) + \frac{L}{2}\|y - x\|^2}$$<p>
+含义是函数值在任意点不超过以 $x$ 处一阶展开为中心的二次函数。</p>
+<p><strong>光滑凸 GD 收敛率</strong>（取步长 $\alpha = 1/L$）：
+</p>
+$$\boxed{f(x_k) - f^* \le \frac{L\|x_0 - x^*\|^2}{2k} = O(1/k)}$$<h3 id="从第4章次梯度法回顾">从第4章（次梯度法）回顾
+</h3><ul>
+<li><strong>次梯度迭代</strong>：$x_{k+1} = x_k - \alpha_k g_k$，$g_k \in \partial f(x_k)$（从次微分集合中任选）。</li>
+<li><strong>$G$-Lipschitz</strong>：$|g| \le G$ 对所有次梯度成立（等价于 $|f(x)-f(y)| \le G|x-y|$）。</li>
+<li><strong>收敛率</strong>：$f_{\text{best}}^K - f^* \le \frac{R^2 + G^2 \sum \alpha_k^2}{2\sum \alpha_k} = O(1/\sqrt{K})$。</li>
+<li><strong>关键区别</strong>：GD 复杂度 $O(1/\epsilon)$，次梯度 $O(1/\epsilon^2)$——差一个量级。</li>
+</ul>
+<hr>
+<h2 id="61-投影算子">6.1 投影算子
+</h2><h3 id="611-投影的严格定义">6.1.1 投影的严格定义
+</h3><p>设 $C \subset \mathbb{R}^n$ 是一个<strong>非空闭凸集</strong>。逐一定义这三个性质：</p>
+<ul>
+<li><strong>非空</strong>（nonempty）：$C$ 中至少含有一个点。空集的投影没有意义。</li>
+<li><strong>闭</strong>（closed）：$C$ 包含其所有的极限点（边界点）。这保证了&quot;最小化距离&quot;这个极小值<strong>可以取到</strong>。</li>
+<li><strong>凸</strong>（convex）：对任意 $x, y \in C$ 和 $\lambda \in [0, 1]$，凸组合 $\lambda x + (1-\lambda) y \in C$。凸性保证了投影的<strong>唯一性</strong>。</li>
+</ul>
+<p>对任意点 $y \in \mathbb{R}^n$，$y$ 到集合 $C$ 的<strong>投影</strong>（projection）定义为 $C$ 中使欧几里得距离平方最小的那个点：</p>
+$$\boxed{P_C(y) = \arg\min_{x \in C} \|x - y\|^2 = \arg\min_{x \in C} \sum_{i=1}^n (x_i - y_i)^2}$$<p>$\arg\min$ 意为&quot;令下列表达式取最小值的那个参数值&quot;。为什么最小化的是距离的<strong>平方</strong>而非距离本身？因为平方函数是光滑且严格凸的（Hessian 恒等于单位矩阵 $I_n \succ 0$），分析起来方便很多，且平方和距离在同一处取最小值（因为是单调变换）。</p>
+<h3 id="612-存在性与唯一性投影定理">6.1.2 存在性与唯一性：投影定理
+</h3><p><strong>投影定理</strong>（必背的核心结论）：</p>
+<blockquote>
+<p>设 $C \subset \mathbb{R}^n$ 为非空闭凸集。对任意 $y \in \mathbb{R}^n$，存在<strong>唯一</strong>的 $P_C(y) \in C$ 满足：
+</p>
+$$\boxed{\|P_C(y) - y\| = \min_{x \in C} \|x - y\|}$$<p>
+且 $x^* = P_C(y)$ 等价于以下<strong>投影不等式</strong>（也是最优化的一阶充要条件）：
+</p>
+$$\boxed{\langle y - x^*, z - x^* \rangle \le 0, \quad \forall z \in C}$$</blockquote>
+<p>其中 $\langle a, b \rangle = a^T b = \sum_{i=1}^n a_i b_i$ 是两个向量的<strong>内积</strong>（dot product）。</p>
+<p><strong>投影不等式的几何直觉</strong>：向量 $y - x^<em>$ 是从投影点指向原始点的方向；向量 $z - x^</em>$ 是从投影点指向 $C$ 内任意其他点的方向。这两个向量的<strong>夹角 $\ge 90^\circ$</strong>（因为内积 $\le 0$）。换句话说——整个凸集 $C$ 完全坐落在以 $x^<em>$ 为顶点、以外法向 $y - x^</em>$ 为方向的某个闭合<strong>半空间</strong>（half-space）之内，而点 $y$ 位于这个半空间的外部。想象用一个&quot;直角挡板&quot;把整个集合和点 $y$ 隔开，$x^*$ 正好在挡板的顶点处。</p>
+<p><strong>存在性的证明思路</strong>：由于目标函数 $|x - y|^2$ 是强制的（当 $|x| \to \infty$，$|x - y|^2 \to \infty$），极小化这个问题等价于在其有界子集上极小化。Weierstrass 定理保证闭集上的连续函数在有界闭子集上取到最小值。</p>
+<p><strong>唯一性的证明思路</strong>：$|x - y|^2$ 是<strong>严格凸函数</strong>（其二阶导 = $2I_n$ 恒正定）。严格凸函数在凸集上如果有两个不同的极小点 $x_1 \neq x_2$，取中点 $(x_1+x_2)/2$ 的函数值严格小于 $x_1$ 和 $x_2$ 的函数值（由严格凸性的定义），但这与它们都是极小点矛盾。因此极小点唯一。</p>
+<h3 id="613-投影不等式的完整推导">6.1.3 投影不等式的完整推导
+</h3><p>从优化问题的最优性条件出发，逐行推导投影不等式。设 $x^* = P_C(y)$。</p>
+<p>对任意 $z \in C$ 和 $\theta \in (0, 1]$，由 $C$ 的凸性，点 $x_\theta = (1-\theta) x^* + \theta z = x^* + \theta(z - x^*)$ 也属于 $C$。</p>
+<p>由 $x^*$ 是极小点：
+</p>
+$$\|y - x^*\|^2 \le \|y - x_\theta\|^2 = \|y - x^* - \theta(z - x^*)\|^2$$<p>展开右边的范数平方：
+</p>
+$$\|y - x^*\|^2 \le \|y - x^*\|^2 - 2\theta \langle y - x^*, z - x^* \rangle + \theta^2 \|z - x^*\|^2$$<p>两边的 $|y - x^*|^2$ 抵销后，两边同除以正数 $\theta$：
+</p>
+$$0 \le -2\langle y - x^*, z - x^* \rangle + \theta \|z - x^*\|^2$$<p>令 $\theta \to 0^+$（趋近于 0 但不等于 0），含 $\theta$ 的项 $\theta |z - x^*|^2 \to 0$，取极限得：
+</p>
+$$\langle y - x^*, z - x^* \rangle \le 0, \quad \forall z \in C$$<p>推导完成。全过程中每一步的代数操作都有明确依据。</p>
+<h3 id="614-非扩张性nonexpansivenesspgd-的理论基石">6.1.4 非扩张性（Nonexpansiveness）——PGD 的理论基石
+</h3><p><strong>定理</strong>：投影算子 $P_C$ 是<strong>非扩张的</strong>——即 1-Lipschitz：
+</p>
+$$\boxed{\|P_C(x) - P_C(y)\| \le \|x - y\|, \quad \forall x, y \in \mathbb{R}^n}$$<p>这个性质的含义是：两点的投影之间的距离<strong>绝不超过</strong>两点原距离。投影操作&quot;不会放大误差&quot;——这是 PGD 保持 GD 收敛率不衰减的终极原因。</p>
+<p><strong>完整证明</strong>：</p>
+<p>设 $u = P_C(x)$，$v = P_C(y)$。</p>
+<p>分别写出投影不等式。对于 $u$，取 $z = v \in C$：
+</p>
+$$\langle x - u, v - u \rangle \le 0 \tag{1}$$<p>
+对于 $v$，取 $z = u \in C$：
+</p>
+$$\langle y - v, u - v \rangle \le 0 \tag{2}$$<p>改写 (2)：将 $y - v$ 写为 $-(v - y)$，将 $u - v$ 写为 $-(v - u)$，两个负号相乘得正号：
+</p>
+$$\langle y - v, u - v \rangle = \langle v - y, v - u \rangle \le 0$$<p>将 (1) 和改写后的 (2) 相加：
+</p>
+$$\langle x - u, v - u \rangle + \langle v - y, v - u \rangle \le 0$$<p>利用内积对第一参数的双线性性，提取公因式 $(v - u)$：
+</p>
+$$\langle (x - u) + (v - y), v - u \rangle \le 0$$<p>
+即：
+</p>
+$$\langle (x - y) + (v - u), v - u \rangle \le 0$$<p>展开得含两项的内积和：
+</p>
+$$\langle x - y, v - u \rangle + \langle v - u, v - u \rangle \le 0$$<p>注意到 $\langle v - u, v - u \rangle = |v - u|^2$。移项：
+</p>
+$$\|v - u\|^2 \le -\langle x - y, v - u \rangle = \langle x - y, u - v \rangle$$<p>由 <strong>Cauchy-Schwarz 不等式</strong>（$|\langle a, b \rangle| \le |a| \cdot |b|$）：
+</p>
+$$\|u - v\|^2 \le \langle x - y, u - v \rangle \le \|x - y\| \cdot \|u - v\|$$<p>若 $|u - v| &gt; 0$，两边除以 $|u - v|$ 即得 $|u - v| \le |x - y|$。若 $|u - v| = 0$，不等式平凡成立。证毕。</p>
+<h3 id="615-常见凸集投影的闭式解公式">6.1.5 常见凸集投影的闭式解公式
+</h3><p>闭式解（closed-form）指仅需有限次基本运算（加、减、乘、除、取最大/最小）即可直接算出，无需迭代求解子问题。</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>集合</th>
+					<th>数学描述</th>
+					<th>投影 $P_C(y)$ 的闭式公式</th>
+					<th>计算复杂度</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>非负象限</td>
+					<td>${x \mid x_i \ge 0}$</td>
+					<td>$\max(y_i, 0)$（逐分量截断负数）</td>
+					<td>$O(n)$</td>
+			</tr>
+			<tr>
+					<td>箱子约束</td>
+					<td>$[l, u] = {x \mid l_i \le x_i \le u_i}$</td>
+					<td>$\max(l_i, \min(y_i, u_i))$</td>
+					<td>$O(n)$</td>
+			</tr>
+			<tr>
+					<td>$\ell_2$ 球</td>
+					<td>${x \mid |x|_2 \le r}$</td>
+					<td>$\frac{r}{\max(r, |y|_2)} \cdot y$</td>
+					<td>$O(n)$</td>
+			</tr>
+			<tr>
+					<td>仿射空间</td>
+					<td>${x \mid Ax = b}$，$A$ 行满秩</td>
+					<td>$y - A^T(AA^T)^{-1}(Ay - b)$</td>
+					<td>$O(n^2 m)$</td>
+			</tr>
+			<tr>
+					<td>$\ell_1$ 球</td>
+					<td>${x \mid |x|_1 \le 1}$</td>
+					<td>需排序 + 二分搜索</td>
+					<td>$O(n \log n)$</td>
+			</tr>
+			<tr>
+					<td>核范数球</td>
+					<td>${X \mid |X|_* \le \tau}$（奇异值和 ≤ τ）</td>
+					<td>需全量 SVD</td>
+					<td>$O(n^3)$ — 贵</td>
+			</tr>
+			<tr>
+					<td>概率单纯形</td>
+					<td>${x \mid x \ge 0, \sum_i x_i = 1}$</td>
+					<td>需排序 + 累加搜索</td>
+					<td>$O(n \log n)$</td>
+			</tr>
+			<tr>
+					<td>半空间</td>
+					<td>${x \mid a^T x \le b}$ ($a \neq 0$)</td>
+					<td>$y - \frac{\max(0, a^T y - b)}{|a|^2}a$</td>
+					<td>$O(n)$</td>
+			</tr>
+	</tbody>
+</table></div>
+<h4 id="ell_2-球投影的详细推导">$\ell_2$ 球投影的详细推导
+</h4><p>问题：$\min_{|x|_2 \le r} \frac{1}{2}|x - y|_2^2$（乘 $1/2$ 方便求导，不影响最优解位置）。</p>
+<p>构造 Lagrange 函数：$\mathcal{L}(x, \lambda) = \frac{1}{2}|x-y|^2 + \lambda(|x| - r)$，其中 $\lambda \ge 0$ 是不等式约束 $|x| \le r$ 对应的 Lagrange 乘子。</p>
+<p>对 $x$ 求梯度并令为零（设 $x \neq 0$）：
+</p>
+$$\nabla_x \mathcal{L} = x - y + \lambda \cdot \frac{x}{\|x\|} = \mathbf{0}$$<p>整理：$x(1 + \frac{\lambda}{|x|}) = y$。这说明 $x$ 和 $y$ <strong>共线</strong>——存在标量 $\gamma \in (0, 1]$ 使得 $x = \gamma y$。</p>
+<p><strong>分两种情况</strong>：</p>
+<ul>
+<li>$|y| \le r$（$y$ 已在球内）：取 $\gamma = 1$，$x = y$，不移动。</li>
+<li>$|y| &gt; r$（$y$ 在球外）：约束是紧的，$|x| = \gamma |y| = r$ → $\gamma = r / |y|$。</li>
+</ul>
+<p>合并公式：
+</p>
+$$\boxed{P_C(y) = \frac{r}{\max(r, \|y\|_2)} \cdot y}$$<p><strong>直觉</strong>：沿从原点到 $y$ 的射线方向缩放——在球外则缩到球面，在球内则保持不动。</p>
+<hr>
+<h2 id="62-投影梯度法-projected-gradient-descent-pgd">6.2 投影梯度法 (Projected Gradient Descent, PGD)
+</h2><h3 id="621-问题与迭代格式">6.2.1 问题与迭代格式
+</h3><p>考虑带凸约束的凸优化问题：
+</p>
+$$\boxed{\min_{x \in C} \; f(x)}$$<p>
+其中 $f$ 为可微凸函数，$C$ 为非空闭凸集且其投影 $P_C$ 计算代价可接受。</p>
+<p><strong>PGD 的迭代格式</strong>：
+</p>
+$$\boxed{x_{k+1} = P_C\!\big(x_k - \alpha_k \nabla f(x_k)\big)}$$<p><strong>分解为两步理解</strong>：</p>
+<ol>
+<li><strong>无约束梯度步</strong>：$\tilde{x}_{k+1} = x_k - \alpha_k \nabla f(x_k)$（同 GD）。</li>
+<li><strong>投影修正</strong>：$x_{k+1} = P_C(\tilde{x}_{k+1})$（若走出 $C$ 则弹回最近的可行点）。</li>
+</ol>
+<blockquote>
+<p><strong>物理类比</strong>：山坡上有限制区域（围栏）——第一步沿最陡方向迈出，若踩到围栏外，就反弹到最近的围栏内位置。</p>
+</blockquote>
+<h3 id="622-收敛性光滑凸--闭凸约束">6.2.2 收敛性（光滑凸 + 闭凸约束）
+</h3><p><strong>假设</strong>：$f$ 是 $L$-光滑凸；$C$ 非空闭凸；最优解 $x^* \in C$ 存在；取步长 $\alpha_k = 1/L$。</p>
+<p><strong>结论</strong>：PGD 与无约束 GD 的收敛率<strong>完全相同</strong>：
+</p>
+$$\boxed{f(x_k) - f(x^*) \le \frac{L\|x_0 - x^*\|^2}{2k} = O(1/k)}$$<p>投影的非扩张性（不放大误差）是这一结论的理论保障。</p>
+<h3 id="623-收敛性推导要点">6.2.3 收敛性推导要点
+</h3><p><strong>核心技巧</strong>：利用非扩张性，$|x_{k+1} - x^<em>| \le |\tilde{x}_{k+1} - x^</em>|$。将 $\tilde{x}_{k+1} = x_k - \frac{1}{L}\nabla f(x_k)$ 代入并展开范数平方，结合 $L$-光滑的二次上界和凸性的一阶条件，经代数整理得核心递推：
+</p>
+$$f(x_{k+1}) - f^* \le \frac{L}{2}(\|x_k - x^*\|^2 - \|x_{k+1} - x^*\|^2)$$<p>对 $i = 0, \dots, k-1$ 累加（Telescoping），利用 $f(x_{i+1}) \le f(x_i)$（光滑凸 PGD 下的单调递减），得 $k(f(x_k) - f^<em>) \le \frac{L}{2}|x_0 - x^</em>|^2$。移项即得结果。</p>
+<h3 id="624-投影次梯度法非光滑情形">6.2.4 投影次梯度法（非光滑情形）
+</h3><p>当 $f$ 不可微但 $G$-Lipschitz 凸时，用次梯度 $g_k \in \partial f(x_k)$ 替代：
+</p>
+$$\boxed{x_{k+1} = P_C(x_k - \alpha_k g_k)}$$<p>
+收敛率退化到与无约束次梯度法同阶：
+</p>
+$$f_{\text{best}}^K - f^* \le \frac{R^2 + G^2 \sum \alpha_k^2}{2\sum \alpha_k} = O(1/\sqrt{K})$$<hr>
+<h2 id="63-frank-wolfefw--条件梯度法">6.3 Frank-Wolfe（FW / 条件梯度法）
+</h2><h3 id="631-动机当投影变得昂贵">6.3.1 动机：当投影变得昂贵
+</h3><p>PGD 每步需要 $P_C(y)$。当 $C$ 的投影有便宜闭式（box、$\ell_2$ 球）时 PGD 是高效的。但很多重要的凸约束其投影<strong>没有便宜闭式</strong>：</p>
+<ul>
+<li>$\ell_1$ 球：投影需 $O(n \log n)$ 排序——高维时瓶颈显著。</li>
+<li>核范数球：投影需全量 SVD → $O(n^3)$——对大型矩阵不可接受。</li>
+<li>一般多面体 ${x: Ax \le b}$：投影本身是一轮二次规划。</li>
+</ul>
+<p><strong>FW 的核心创意</strong>：用<strong>线性极小化</strong>（LMO）取代投影——每步只需最小化一个<strong>线性函数</strong>在凸集 $C$ 上。</p>
+<h3 id="632-fw-的迭代格式">6.3.2 FW 的迭代格式
+</h3>$$\boxed{\begin{aligned}
+s_k &= \arg\min_{s \in C} \; \nabla f(x_k)^T s \quad \text{(LMO：线性极小化)} \\
+x_{k+1} &= (1 - \gamma_k) x_k + \gamma_k s_k \quad \text{(凸组合更新)}
+\end{aligned}}$$<p>符号逐一定义：</p>
+<ul>
+<li>$s_k$ 是使线性函数 $\nabla f(x_k)^T s$（$s$ 的线性函数，因 $\nabla f(x_k)$ 在本步是常数向量）在 $C$ 上取<strong>最小</strong>的那个点。由于线性函数在紧凸集上的最小值必定在<strong>极点</strong>（extreme point / vertex，集合的&quot;角&quot;）处取到，因此 $s_k$ 是 $C$ 的一个顶点。</li>
+<li>$\gamma_k \in [0, 1]$：步长（权重参数）。标准取法为 $\gamma_k = \frac{2}{k+2}$。</li>
+<li>$x_{k+1}$ 是 $x_k$ 和 $s_k$ 的凸组合——由于两者都在 $C$ 内且 $\gamma_k \in [0, 1]$，$x_{k+1}$ 自动落在 $C$ 内——<strong>完全不需要投影来修正可行性</strong>！</li>
+</ul>
+<p><strong>$k$ 步后迭代点的结构</strong>：$x_k$ 是初始点 $x_0$ 和 $k$ 个顶点 $s_0, \dots, s_{k-1}$ 的凸组合。这意味着 FW 天然产生<strong>稀疏/低秩</strong>表示——在大量应用中这是无价的附加值。</p>
+<h4 id="以-ell_1-球为例lmo-为何比投影便宜得多">以 $\ell_1$ 球为例：LMO 为何比投影便宜得多
+</h4><p>对于 $C = {x: |x|<em>1 \le 1}$：
+$$\min_{\|s\|_1 \le 1} \nabla f(x)^T s = -\max_{\|s\|_1 \le 1} (-\nabla f(x))^T s = -\|\nabla f(x)\|_\infty$$
+其中 $|v|</em>\infty = \max_i |v_i|$ 是无穷范数。这只需扫描 $\nabla f(x)$ 的 $n$ 个分量找到绝对值最大的那个 → <strong>$O(n)$ 时间</strong>。对比投影的 $O(n \log n)$。</p>
+<h3 id="633-收敛性分析o1k-的数学归纳法完整证明">6.3.3 收敛性分析：$O(1/k)$ 的数学归纳法完整证明
+</h3><p><strong>假设</strong>：$f$ 是 $L$-光滑凸；$C$ 为紧凸集，直径 $D = \max_{x,y \in C}|x-y| &lt; \infty$；$x^* \in C$；步长 $\gamma_k = 2/(k+2)$；定义最优性间隙 $\Delta_k = f(x_k) - f^*$。</p>
+<h4 id="step-1利用-l-光滑二次上界">Step 1：利用 $L$-光滑二次上界
+</h4>$$f(x_{k+1}) \le f(x_k) + \nabla f(x_k)^T(x_{k+1} - x_k) + \frac{L}{2}\|x_{k+1} - x_k\|^2$$<p>代入 $x_{k+1} - x_k = \gamma_k(s_k - x_k)$ 并利用 $|s_k - x_k| \le D$：
+</p>
+$$f(x_{k+1}) \le f(x_k) + \gamma_k \nabla f(x_k)^T(s_k - x_k) + \frac{L}{2}\gamma_k^2 D^2 \tag{1}$$<h4 id="step-2lmo-的最优性导出核心不等式">Step 2：LMO 的最优性导出核心不等式
+</h4><p>$s_k$ 使 $\nabla f(x_k)^T s$ 在 $C$ 上取最小值，因此对任意 $y \in C$（特别取 $y = x^*$）：
+</p>
+$$\nabla f(x_k)^T s_k \le \nabla f(x_k)^T x^*$$<p>所以：
+</p>
+$$\nabla f(x_k)^T(s_k - x_k) \le \nabla f(x_k)^T(x^* - x_k)$$<p>由 $f$ 的凸性（$f(x^<em>) \ge f(x_k) + \nabla f(x_k)^T(x^</em> - x_k)$）移项：
+</p>
+$$\nabla f(x_k)^T(x^* - x_k) \le -\Delta_k$$<p>合并得 <strong>FW 核心不等式</strong>：
+</p>
+$$\boxed{\nabla f(x_k)^T(s_k - x_k) \le -\Delta_k} \tag{2}$$<p>
+含义：LMO 给出的方向 $s_k - x_k$ 的线性近似，至少和直接指向 $x^*$ 的方向一样好。</p>
+<h4 id="step-3代入得核心递推">Step 3：代入得核心递推
+</h4><p>将 (2) 代入 (1) 并两边减去 $f^*$：
+</p>
+$$\Delta_{k+1} \le \Delta_k - \gamma_k \Delta_k + \frac{L}{2}\gamma_k^2 D^2$$<p>
+即：
+</p>
+$$\boxed{\Delta_{k+1} \le (1 - \gamma_k)\Delta_k + \frac{L}{2}\gamma_k^2 D^2} \tag{★}$$<p>这是 FW 收敛的<strong>核心递推不等式</strong>。</p>
+<h4 id="step-4数学归纳法">Step 4：数学归纳法
+</h4><p>取 $\gamma_k = 2/(k+2)$。<strong>归纳假设</strong>：$\Delta_k \le \frac{2LD^2}{k+2}$。</p>
+<p><strong>归纳奠基</strong>（$k=0$）：由光滑性可证 $\Delta_0 \le LD^2 \le \frac{2LD^2}{2}$。✓</p>
+<p><strong>归纳递推</strong>（设归纳假设对 $k$ 成立，证对 $k+1$ 成立）：</p>
+<p>将 $\gamma_k = 2/(k+2)$ 和归纳假设代入 (★)：
+</p>
+$$\begin{aligned}
+\Delta_{k+1} &\le \left(1 - \frac{2}{k+2}\right) \cdot \frac{2LD^2}{k+2} + \frac{L}{2} \cdot \left(\frac{2}{k+2}\right)^2 \cdot D^2 \\
+&= \frac{k}{k+2} \cdot \frac{2LD^2}{k+2} + \frac{L}{2} \cdot \frac{4}{(k+2)^2} \cdot D^2 \\
+&= \frac{2LD^2 k}{(k+2)^2} + \frac{2LD^2}{(k+2)^2} \\
+&= \frac{2LD^2 (k+1)}{(k+2)^2}
+\end{aligned}$$<p>需要验证 $\frac{2LD^2(k+1)}{(k+2)^2} \le \frac{2LD^2}{k+3}$。约去 $2LD^2$：
+</p>
+$$\frac{k+1}{(k+2)^2} \le \frac{1}{k+3}$$<p>交叉相乘（分母均为正）：
+</p>
+$$(k+1)(k+3) \le (k+2)^2$$<p>
+展开：
+</p>
+$$k^2 + 4k + 3 \le k^2 + 4k + 4 \iff 3 \le 4$$<p>恒成立！归纳完成。</p>
+$$\boxed{f(x_k) - f(x^*) \le \frac{2LD^2}{k+2} = O(1/k)}$$<p>此处取 $\gamma_k = 2/(k+2)$ 的原因：$\gamma_0 = 2/2 = 1$，意味着第一步完全跳到第一个 LMO 给出的顶点。</p>
+<h3 id="634-fw-与-pgd-的系统对比">6.3.4 FW 与 PGD 的系统对比
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>维度</th>
+					<th>投影梯度法 (PGD)</th>
+					<th>Frank-Wolfe (FW)</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>每步子问题</strong></td>
+					<td>投影 $P_C(\cdot)$</td>
+					<td>线性极小化 $\min_{s \in C} g^T s$</td>
+			</tr>
+			<tr>
+					<td>$\ell_1$ 球开销</td>
+					<td>$O(n \log n)$（排序）</td>
+					<td>$O(n)$（扫描）</td>
+			</tr>
+			<tr>
+					<td>核范数球开销</td>
+					<td>$O(n^3)$（满SVD）</td>
+					<td>$O(n^2)$（秩1幂迭代）</td>
+			</tr>
+			<tr>
+					<td><strong>可行性</strong></td>
+					<td>事后投影修正</td>
+					<td>自动（凸组合天然可行）</td>
+			</tr>
+			<tr>
+					<td><strong>收敛率</strong></td>
+					<td>$O(1/k)$</td>
+					<td>$O(1/k)$</td>
+			</tr>
+			<tr>
+					<td><strong>收敛常数</strong></td>
+					<td>$\frac{L}{2}|x_0 - x^*|^2$</td>
+					<td>$2LD^2$（$D \ge R$，常数偏大）</td>
+			</tr>
+			<tr>
+					<td><strong>迭代点结构</strong></td>
+					<td>密集向量</td>
+					<td><strong>稀疏/低秩</strong>（顶点凸组合）</td>
+			</tr>
+			<tr>
+					<td><strong>强凸下表现</strong></td>
+					<td>线性收敛</td>
+					<td>仅 $O(1/k)$（无加速）</td>
+			</tr>
+			<tr>
+					<td><strong>适用场景</strong></td>
+					<td>投影便宜时</td>
+					<td>投影贵但 LMO 便宜时</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>选型原则</strong>：</p>
+<ul>
+<li>投影有 $O(n)$ 闭式 → <strong>PGD</strong>（最快最直接）</li>
+<li>投影需 $O(n \log n)$ 或以上 → 考虑 <strong>FW</strong></li>
+<li>需要稀疏/低秩迭代点作为副产品 → <strong>FW</strong></li>
+<li>需要高精度（$\epsilon \le 10^{-7}$）→ <strong>PGD</strong>（FW 常数大 + 后期慢）</li>
+<li>目标函数强凸 → 必须 <strong>PGD</strong>（FW 无法利用强凸性加速）</li>
+</ul>
+<hr>
+<h2 id="64-典型例题">6.4 典型例题
+</h2><h3 id="例题1投影非扩张性完整证明">例题1：投影非扩张性完整证明
+</h3><p><strong>题目</strong>：$C$ 非空闭凸，证明 $|P_C(x) - P_C(y)| \le |x - y|$。</p>
+<p><strong>证明</strong>：已在上文 §6.1.4 给出逐行推演——写两条投影不等式 → 相加 → 合并 → 利用 $|u-v|^2$ 恒等式 → Cauchy-Schwarz → 消去因子得证。</p>
+<h3 id="例题2pgd-收敛性">例题2：PGD 收敛性
+</h3><p><strong>题目</strong>：$f$ 是 $L$-光滑凸，$C$ 非空闭凸，$\alpha = 1/L$。证明 $f(x_k) - f^* \le \frac{L|x_0 - x^*|^2}{2k}$。</p>
+<p><strong>证明</strong>：关键三步——光滑性展开 $f(x_{k+1})$ + 投影非扩张性控制 $|x_{k+1} - x^*|$ + Telescoping。投影不扩大距离，约束不损害收敛率。</p>
+<h3 id="例题3fw-收敛归纳法证明">例题3：FW 收敛归纳法证明
+</h3><p><strong>题目</strong>：补全 §6.3.3 的归纳步骤，验证 $\gamma_k = 2/(k+2)$ 时 $\Delta_k \le 2LD^2/(k+2)$。</p>
+<p><strong>解答</strong>：核心验证为 $(k+1)(k+3) \le (k+2)^2 \iff k^2+4k+3 \le k^2+4k+4 \iff 3 \le 4$ 恒成立。取 $\gamma_k = 2/(k+2)$ 确保 $\gamma_0 = 1$。</p>
+<h3 id="例题4ell_1-球-fw-vs-pgd-对比">例题4：$\ell_1$ 球 FW vs PGD 对比
+</h3><p><strong>题目</strong>：$C = {x: |x|_1 \le 1}$。对比 FW 和 PGD 每步的完整计算流程及复杂度。</p>
+<p><strong>解答</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>步骤</th>
+					<th>FW</th>
+					<th>PGD</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>子问题</td>
+					<td>找 $-|\nabla f(x_k)|_\infty$：$O(n)$</td>
+					<td>$\ell_1$ 球投影：$O(n \log n)$</td>
+			</tr>
+			<tr>
+					<td>更新</td>
+					<td>凸组合：$O(n)$</td>
+					<td>直接赋值：$O(n)$</td>
+			</tr>
+			<tr>
+					<td><strong>总步耗</strong></td>
+					<td>$\approx 2n$</td>
+					<td>$\approx n \log n + n$</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>$n = 10^6$ 时：FW ≈ 2ms，PGD ≈ 20ms → FW 约快 10 倍。</p>
+<h3 id="例题5核范数约束-fw">例题5：核范数约束 FW
+</h3><p><strong>题目</strong>：$C = {X: |X|_* \le \tau}$。写出 FW 的 LMO 解及开销分析。</p>
+<p><strong>解答</strong>：$\min_{|S|_* \le \tau} \langle G, S \rangle = -\tau |G|_2$。取 $G = \nabla f(X_k)$ 的最大奇异值对应的左右奇异向量 $u_1, v_1$，得 LMO 解 $S_k = -\tau u_1 v_1^T$（秩 1）。开销：幂迭代法 $O(mn)$，vs 满 SVD 的 $O(mn\min(m,n))$。且 FW 自动维护低秩——$k$ 步后 $\text{rank}(X_k) \le k$。</p>
+<h3 id="例题6半空间投影推导">例题6：半空间投影推导
+</h3><p><strong>题目</strong>：$C = {x: a^T x \le b}$，推导 $P_C(y)$ 的闭式。</p>
+<p><strong>解答</strong>：Lagrange 函数 → 导数为零 → $x = y - \lambda a$。分情况：若 $a^T y \le b$ 则 $\lambda = 0$；否则 $\lambda = (a^T y - b)/|a|^2$。合并公式：
+</p>
+$$\boxed{P_C(y) = y - \frac{\max(0, a^T y - b)}{\|a\|^2} a}$$<hr>
+<h2 id="核心要点">核心要点
+</h2><ol>
+<li><strong>投影</strong>：$P_C(y) = \arg\min_{x \in C} |x-y|^2$；$C$ 非空闭凸 → 存在唯一。</li>
+<li><strong>投影不等式</strong>：$\langle y - P_C(y), z - P_C(y) \rangle \le 0$，$\forall z \in C$。</li>
+<li><strong>非扩张性</strong>：$|P_C(x) - P_C(y)| \le |x - y|$ → PGD 不损失 GD 收敛率的根源。</li>
+<li><strong>PGD 收敛率</strong>：光滑凸 → $O(1/k)$，与无约束 GD 完全一致。</li>
+<li><strong>FW 动机</strong>：投影太贵时，用 $O(n)$ 的 LMO 替代（$\ell_1$ 球、核范数球的巨大差距）。</li>
+<li><strong>FW 收敛率</strong>：$O(1/k)$ 归纳证明；$\gamma_k = 2/(k+2)$；核心验证 $3 \le 4$。</li>
+<li><strong>选型原则</strong>：投影便宜 → PGD；投影贵 → FW；需稀疏/低秩 → FW。</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>交叉引用</strong>：无约束 GD 见第2章；次梯度定义见第3章；非光滑约束下见投影次梯度法（与第4章一脉相承）。FW 的进阶变体（Away-step FW, Pairwise FW）可在强凸下获得线性收敛，属进阶专题。</p>
+</blockquote>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第13章：Douglas-Rachford分裂法 核心思想：对于 $\\min_x f(x) + g(x)$（$f, g$ 都可能非光滑，但各自的邻近算子容易计算），DR分裂法通过交替使用两个邻近算子和反射-平均操作，将原问题转化为一个不动点迭代——无需任何函数光滑，仅需 $\\operatorname{prox}_f$ 和 $\\operatorname{prox}_g$ 可计算即可。\n前置知识回顾 概念 定义（简要） 首次出现 邻近算子 $\\operatorname{prox}$ $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$——找离 $v$ 近且使 $f$ 小的点 Ch7 邻近梯度法（ISTA） $x_{k+1} = \\operatorname{prox}_{\\alpha g}(x_k - \\alpha \\nabla f(x_k))$，要求 $f$ 光滑 Ch7 Moreau分解 $v = \\operatorname{prox}f(v) + \\operatorname{prox}{f^*}(v)$——原空间和对偶空间的互补分解 Ch9 乘子法 $\\lambda^{k+1} = \\lambda^k + \\rho(Ax^{k+1} - b)$，等价于对偶邻近点法 Ch12 极大单调算子 $T$ 满足 $\\langle u - v, x - y \\rangle \\geq 0$（&ldquo;决不反向&quot;的映射），$\\partial f$ 是最常见的例子 Ch9 不动点迭代 若 $T$ 非扩张（$|Tx - Ty| \\leq |x - y|$）且 $\\text{Fix}(T) \\neq \\varnothing$，则 $z_{k+1} = T(z_k)$ 收敛 本章详述 指示函数 $\\delta_C$ $\\delta_C(x) = \\begin{cases} 0, &amp; x \\in C \\ +\\infty, &amp; x \\notin C \\end{cases}$——进入 $C$ 外就&quot;惩罚到无穷&rdquo; Ch1 13.1 I型复合优化问题 13.1.1 问题形式 DR分裂法专攻以下结构（I型复合凸优化）：\n">
+<title>第13章：Douglas-Rachford分裂法</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/13-dr%E5%88%86%E8%A3%82%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第13章：Douglas-Rachford分裂法">
+<meta property='og:description' content="第13章：Douglas-Rachford分裂法 核心思想：对于 $\\min_x f(x) + g(x)$（$f, g$ 都可能非光滑，但各自的邻近算子容易计算），DR分裂法通过交替使用两个邻近算子和反射-平均操作，将原问题转化为一个不动点迭代——无需任何函数光滑，仅需 $\\operatorname{prox}_f$ 和 $\\operatorname{prox}_g$ 可计算即可。\n前置知识回顾 概念 定义（简要） 首次出现 邻近算子 $\\operatorname{prox}$ $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$——找离 $v$ 近且使 $f$ 小的点 Ch7 邻近梯度法（ISTA） $x_{k+1} = \\operatorname{prox}_{\\alpha g}(x_k - \\alpha \\nabla f(x_k))$，要求 $f$ 光滑 Ch7 Moreau分解 $v = \\operatorname{prox}f(v) + \\operatorname{prox}{f^*}(v)$——原空间和对偶空间的互补分解 Ch9 乘子法 $\\lambda^{k+1} = \\lambda^k + \\rho(Ax^{k+1} - b)$，等价于对偶邻近点法 Ch12 极大单调算子 $T$ 满足 $\\langle u - v, x - y \\rangle \\geq 0$（&ldquo;决不反向&quot;的映射），$\\partial f$ 是最常见的例子 Ch9 不动点迭代 若 $T$ 非扩张（$|Tx - Ty| \\leq |x - y|$）且 $\\text{Fix}(T) \\neq \\varnothing$，则 $z_{k+1} = T(z_k)$ 收敛 本章详述 指示函数 $\\delta_C$ $\\delta_C(x) = \\begin{cases} 0, &amp; x \\in C \\ +\\infty, &amp; x \\notin C \\end{cases}$——进入 $C$ 外就&quot;惩罚到无穷&rdquo; Ch1 13.1 I型复合优化问题 13.1.1 问题形式 DR分裂法专攻以下结构（I型复合凸优化）：\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/13-dr%E5%88%86%E8%A3%82%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第13章：Douglas-Rachford分裂法">
+<meta name="twitter:description" content="第13章：Douglas-Rachford分裂法 核心思想：对于 $\\min_x f(x) + g(x)$（$f, g$ 都可能非光滑，但各自的邻近算子容易计算），DR分裂法通过交替使用两个邻近算子和反射-平均操作，将原问题转化为一个不动点迭代——无需任何函数光滑，仅需 $\\operatorname{prox}_f$ 和 $\\operatorname{prox}_g$ 可计算即可。\n前置知识回顾 概念 定义（简要） 首次出现 邻近算子 $\\operatorname{prox}$ $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$——找离 $v$ 近且使 $f$ 小的点 Ch7 邻近梯度法（ISTA） $x_{k+1} = \\operatorname{prox}_{\\alpha g}(x_k - \\alpha \\nabla f(x_k))$，要求 $f$ 光滑 Ch7 Moreau分解 $v = \\operatorname{prox}f(v) + \\operatorname{prox}{f^*}(v)$——原空间和对偶空间的互补分解 Ch9 乘子法 $\\lambda^{k+1} = \\lambda^k + \\rho(Ax^{k+1} - b)$，等价于对偶邻近点法 Ch12 极大单调算子 $T$ 满足 $\\langle u - v, x - y \\rangle \\geq 0$（&ldquo;决不反向&quot;的映射），$\\partial f$ 是最常见的例子 Ch9 不动点迭代 若 $T$ 非扩张（$|Tx - Ty| \\leq |x - y|$）且 $\\text{Fix}(T) \\neq \\varnothing$，则 $z_{k+1} = T(z_k)$ 收敛 本章详述 指示函数 $\\delta_C$ $\\delta_C(x) = \\begin{cases} 0, &amp; x \\in C \\ +\\infty, &amp; x \\notin C \\end{cases}$——进入 $C$ 外就&quot;惩罚到无穷&rdquo; Ch1 13.1 I型复合优化问题 13.1.1 问题形式 DR分裂法专攻以下结构（I型复合凸优化）：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾">前置知识回顾</a></li>
+    <li><a href="#131-i型复合优化问题">13.1 I型复合优化问题</a>
+      <ol>
+        <li><a href="#1311-问题形式">13.1.1 问题形式</a></li>
+        <li><a href="#1312-与邻近梯度法ista-ch7的本质区别">13.1.2 与邻近梯度法（ISTA, Ch7）的本质区别</a></li>
+        <li><a href="#1313-重要特例两个凸集交集的投影">13.1.3 重要特例：两个凸集交集的投影</a></li>
+      </ol>
+    </li>
+    <li><a href="#132-不动点迭代视角">13.2 不动点迭代视角</a>
+      <ol>
+        <li><a href="#1321-反射算子reflection-operator">13.2.1 反射算子（Reflection Operator）</a></li>
+        <li><a href="#1322-dr分裂法的不动点形式">13.2.2 DR分裂法的不动点形式</a></li>
+        <li><a href="#1323-为什么需要平均">13.2.3 为什么需要&quot;平均&quot;？</a></li>
+      </ol>
+    </li>
+    <li><a href="#133-dr迭代的完整推导">13.3 DR迭代的完整推导</a>
+      <ol>
+        <li><a href="#1331-从最优性条件到不动点方程">13.3.1 从最优性条件到不动点方程</a></li>
+        <li><a href="#1332-算法流程原生形式">13.3.2 算法流程（原生形式）</a></li>
+        <li><a href="#1333-简化形式的推导">13.3.3 简化形式的推导</a></li>
+      </ol>
+    </li>
+    <li><a href="#134-松弛dr分裂法">13.4 松弛DR分裂法</a>
+      <ol>
+        <li><a href="#1341-引入松弛参数">13.4.1 引入松弛参数</a></li>
+        <li><a href="#1342-松弛dr的等价形式">13.4.2 松弛DR的等价形式</a></li>
+      </ol>
+    </li>
+    <li><a href="#135-图lasso应用graph-lasso--graphical-lasso">13.5 图LASSO应用（Graph LASSO / Graphical LASSO）</a>
+      <ol>
+        <li><a href="#1351-问题背景">13.5.1 问题背景</a></li>
+        <li><a href="#1352-数学形式">13.5.2 数学形式</a></li>
+        <li><a href="#1353-转化为dr分裂法可处理的形式">13.5.3 转化为DR分裂法可处理的形式</a></li>
+      </ol>
+    </li>
+    <li><a href="#136-dr分裂法与admm的内在关系">13.6 DR分裂法与ADMM的内在关系</a>
+      <ol>
+        <li><a href="#1361-从dr到admm的变换">13.6.1 从DR到ADMM的变换</a></li>
+      </ol>
+    </li>
+    <li><a href="#137-典型例题">13.7 典型例题</a>
+      <ol>
+        <li><a href="#例题131dr基础推导两个一维函数的复合">例题13.1（DR基础推导——两个一维函数的复合）</a></li>
+        <li><a href="#例题132两个凸集交集的dr分裂法">例题13.2（两个凸集交集的DR分裂法）</a></li>
+        <li><a href="#例题133dr-vs-ista的适用性对比">例题13.3（DR vs ISTA的适用性对比）</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a></li>
+    <li><a href="#138-补充例题">13.8 补充例题</a>
+      <ol>
+        <li><a href="#例题134dr分裂法的最大单调算子推导">例题13.4（DR分裂法的最大单调算子推导）</a></li>
+        <li><a href="#例题135非负最小二乘的dr解法">例题13.5（非负最小二乘的DR解法）</a></li>
+        <li><a href="#例题136dr分裂法的松弛参数调优实验设计">例题13.6（DR分裂法的松弛参数调优实验设计）</a></li>
+        <li><a href="#例题137dr与邻近梯度法的混合策略">例题13.7（DR与邻近梯度法的混合策略）</a></li>
+        <li><a href="#例题138dr分裂法求解稀疏逆协方差图lasso的dr实现">例题13.8（DR分裂法求解稀疏逆协方差——图LASSO的DR实现）</a></li>
+      </ol>
+    </li>
+    <li><a href="#139-dr分裂法的几何直觉深化">13.9 DR分裂法的几何直觉深化</a>
+      <ol>
+        <li><a href="#1391-反射-平均的折返跑比喻">13.9.1 反射-平均的&quot;折返跑&quot;比喻</a></li>
+        <li><a href="#1392-为什么krasnoselskii-mann平均保证收敛">13.9.2 为什么Krasnoselskii-Mann平均保证收敛</a></li>
+        <li><a href="#1393-反射算子的深层数学结构">13.9.3 反射算子的深层数学结构</a></li>
+      </ol>
+    </li>
+    <li><a href="#1310-dr分裂法的工程实践经验">13.10 DR分裂法的工程实践经验</a>
+      <ol>
+        <li><a href="#13101-计算邻近算子的数值技巧">13.10.1 计算邻近算子的数值技巧</a></li>
+        <li><a href="#13102-收敛监测与停机准则">13.10.2 收敛监测与停机准则</a></li>
+        <li><a href="#13103-常见陷阱与解决方案">13.10.3 常见陷阱与解决方案</a></li>
+        <li><a href="#例题137dr与邻近梯度法的混合策略-1">例题13.7（DR与邻近梯度法的混合策略）</a></li>
+      </ol>
+    </li>
+    <li><a href="#139-dr分裂法的几何直觉深化-1">13.9 DR分裂法的几何直觉深化</a>
+      <ol>
+        <li><a href="#1391-反射-平均的折返跑比喻-1">13.9.1 反射-平均的&quot;折返跑&quot;比喻</a></li>
+        <li><a href="#1392-为什么krasnoselskii-mann平均保证收敛-1">13.9.2 为什么Krasnoselskii-Mann平均保证收敛</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/13-dr%E5%88%86%E8%A3%82%E6%B3%95/">第13章：Douglas-Rachford分裂法</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 10 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第13章douglas-rachford分裂法">第13章：Douglas-Rachford分裂法
+</h1><blockquote>
+<p><strong>核心思想</strong>：对于 $\min_x f(x) + g(x)$（$f, g$ 都可能非光滑，但各自的邻近算子容易计算），DR分裂法通过<strong>交替使用两个邻近算子</strong>和<strong>反射-平均</strong>操作，将原问题转化为一个不动点迭代——无需任何函数光滑，仅需 $\operatorname{prox}_f$ 和 $\operatorname{prox}_g$ 可计算即可。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾">前置知识回顾
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>概念</th>
+					<th>定义（简要）</th>
+					<th>首次出现</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>邻近算子 $\operatorname{prox}$</td>
+					<td>$\operatorname{prox}_f(v) = \arg\min_x { f(x) + \frac{1}{2}|x - v|^2 }$——找离 $v$ 近且使 $f$ 小的点</td>
+					<td>Ch7</td>
+			</tr>
+			<tr>
+					<td>邻近梯度法（ISTA）</td>
+					<td>$x_{k+1} = \operatorname{prox}_{\alpha g}(x_k - \alpha \nabla f(x_k))$，<strong>要求 $f$ 光滑</strong></td>
+					<td>Ch7</td>
+			</tr>
+			<tr>
+					<td>Moreau分解</td>
+					<td>$v = \operatorname{prox}<em>f(v) + \operatorname{prox}</em>{f^*}(v)$——原空间和对偶空间的互补分解</td>
+					<td>Ch9</td>
+			</tr>
+			<tr>
+					<td>乘子法</td>
+					<td>$\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)$，等价于对偶邻近点法</td>
+					<td>Ch12</td>
+			</tr>
+			<tr>
+					<td>极大单调算子</td>
+					<td>$T$ 满足 $\langle u - v, x - y \rangle \geq 0$（&ldquo;决不反向&quot;的映射），$\partial f$ 是最常见的例子</td>
+					<td>Ch9</td>
+			</tr>
+			<tr>
+					<td>不动点迭代</td>
+					<td>若 $T$ 非扩张（$|Tx - Ty| \leq |x - y|$）且 $\text{Fix}(T) \neq \varnothing$，则 $z_{k+1} = T(z_k)$ 收敛</td>
+					<td>本章详述</td>
+			</tr>
+			<tr>
+					<td>指示函数 $\delta_C$</td>
+					<td>$\delta_C(x) = \begin{cases} 0, &amp; x \in C \ +\infty, &amp; x \notin C \end{cases}$——进入 $C$ 外就&quot;惩罚到无穷&rdquo;</td>
+					<td>Ch1</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="131-i型复合优化问题">13.1 I型复合优化问题
+</h2><h3 id="1311-问题形式">13.1.1 问题形式
+</h3><p>DR分裂法专攻以下结构（<strong>I型复合凸优化</strong>）：</p>
+$$\boxed{\min_{x \in \mathbb{R}^n} \; f(x) + g(x)}$$<p><strong>符号逐字解释</strong>：</p>
+<ul>
+<li>$x \in \mathbb{R}^n$：决策变量，$n$ 维列向量 $x = (x_1, \ldots, x_n)^T$。</li>
+<li>$f: \mathbb{R}^n \to \mathbb{R} \cup {+\infty}$：闭凸函数。<strong>可以任意非光滑</strong>——可以有折角、可以不可微！唯一要求：$\operatorname{prox}_f$ 有闭式解或容易计算。</li>
+<li>$g: \mathbb{R}^n \to \mathbb{R} \cup {+\infty}$：闭凸函数。同样<strong>可以任意非光滑</strong>，只要求 $\operatorname{prox}_g$ 好算。</li>
+<li>称为&quot;I型&quot;是因为 $f$ 和 $g$ 直接作用于<strong>同一个变量</strong> $x$，没有线性变换的嵌套。</li>
+</ul>
+<p><strong>核心假设</strong>：问题有解（$\arg\min_x {f(x) + g(x)} \neq \varnothing$）。</p>
+<h3 id="1312-与邻近梯度法ista-ch7的本质区别">13.1.2 与邻近梯度法（ISTA, Ch7）的本质区别
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>维度</th>
+					<th>邻近梯度法（ISTA, Ch7）</th>
+					<th>DR分裂法（Ch13）</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>适用问题</strong></td>
+					<td>$\min_x f(x) + g(x)$</td>
+					<td>$\min_x f(x) + g(x)$</td>
+			</tr>
+			<tr>
+					<td><strong>对 $f$ 的要求</strong></td>
+					<td><strong>必须光滑</strong>（$\nabla f$ 存在且Lipschitz连续）</td>
+					<td><strong>不需要光滑</strong>，仅需 $\operatorname{prox}_f$ 好算</td>
+			</tr>
+			<tr>
+					<td><strong>对 $g$ 的要求</strong></td>
+					<td>$\operatorname{prox}_g$ 好算</td>
+					<td>$\operatorname{prox}_g$ 好算</td>
+			</tr>
+			<tr>
+					<td><strong>每次迭代使用</strong></td>
+					<td>$\nabla f(x_k)$ + $\operatorname{prox}_{\alpha g}$</td>
+					<td>$\operatorname{prox}_f$ + $\operatorname{prox}_g$</td>
+			</tr>
+			<tr>
+					<td><strong>理论框架</strong></td>
+					<td>前向-后向分裂（Forward-Backward）</td>
+					<td><strong>反射-平均不动点迭代</strong></td>
+			</tr>
+			<tr>
+					<td><strong>特例包含</strong></td>
+					<td>LASSO（$f$ 光滑平方损失，$g = \lambda|\cdot|_1$）</td>
+					<td>两个凸集交集的投影（$f = \delta_{C_1}$，$g = \delta_{C_2}$）</td>
+			</tr>
+	</tbody>
+</table></div>
+<blockquote>
+<p>🔑 <strong>DR分裂法是ISTA的重大推广</strong>：ISTA要求&quot;$f$ 光滑, $g$ 非光滑&quot;；DR分裂法只要求&quot;两个函数的邻近算子都便宜&quot;——这在很多实际问题中更容易满足。</p>
+</blockquote>
+<h3 id="1313-重要特例两个凸集交集的投影">13.1.3 重要特例：两个凸集交集的投影
+</h3><p>当 $f = \delta_{C_1}$（集合 $C_1$ 的指示函数）且 $g = \delta_{C_2}$ 时：
+</p>
+$$\min_x \delta_{C_1}(x) + \delta_{C_2}(x) \quad \Longleftrightarrow \quad \text{找一点 } x \text{ 同时属于 } C_1 \text{ 和 } C_2$$<p>此时 $\operatorname{prox}_{\delta_C} = P_C$（投影到凸集 $C$ 上）。DR分裂法退化为寻找两个凸集交集的经典算法，比最朴素的交替投影法（Von Neumann交替投影）收敛更快、更稳定。</p>
+<hr>
+<h2 id="132-不动点迭代视角">13.2 不动点迭代视角
+</h2><h3 id="1321-反射算子reflection-operator">13.2.1 反射算子（Reflection Operator）
+</h3><p><strong>定义</strong>：对于闭凸函数 $f$，其<strong>邻近反射算子</strong> $R_f$ 定义为：</p>
+$$\boxed{R_f = 2\,\operatorname{prox}_f - I}$$<p>即对任意点 $z \in \mathbb{R}^n$：$R_f(z) = 2 \cdot \operatorname{prox}_f(z) - z$。</p>
+<p><strong>几何解释</strong>（以 $f = \delta_C$ 为例）：</p>
+<ul>
+<li>$\operatorname{prox}_f(z) = P_C(z)$：将 $z$ 投影到集合 $C$ 上</li>
+<li>$R_f(z) = 2P_C(z) - z = P_C(z) + (P_C(z) - z)$：从 $z$ 出发，穿过投影点 $P_C(z)$，再走同样距离，落到 $C$ 的另一侧——就像以 $P_C(z)$ 为镜面，$R_f(z)$ 是 $z$ 的&quot;镜像&quot;（反射）。</li>
+<li><strong>形象比喻</strong>：$P_C(z)$ 是镜子上的点，$z$ 是你自己，$R_f(z)$ 是你在镜子里的像。</li>
+</ul>
+<p><strong>反射算子的关键性质</strong>：</p>
+<ol>
+<li><strong>非扩张性</strong>（Nonexpansiveness）：$|R_f(x) - R_f(y)| \leq |x - y|$（反射不拉伸距离）。</li>
+<li><strong>不动点</strong>：$z = R_f(z) \iff z = \operatorname{prox}_f(z) \iff 0 \in \partial f(z)$——即 $z$ 是 $f$ 的极小点。</li>
+<li><strong>对合性</strong>：$R_f \circ R_f = I$（反射两次回到原位置）。</li>
+</ol>
+<h3 id="1322-dr分裂法的不动点形式">13.2.2 DR分裂法的不动点形式
+</h3><p>考虑 $\min_x f(x) + g(x)$ 的最优性条件：
+</p>
+$$0 \in \partial f(x^*) + \partial g(x^*)$$<p>引入次梯度的预解式（resolvent）——它恰好就是邻近算子：$J_{\partial f} = (I + \partial f)^{-1} = \operatorname{prox}_f$。</p>
+<p>DR分裂法的核心迭代作用在一个<strong>辅助变量</strong> $z$ 上：</p>
+$$\boxed{z_{k+1} = \left( \frac{R_f \circ R_g + I}{2} \right)(z_k) = \frac{1}{2}(R_f(R_g(z_k)) + z_k)}$$<p>这个算子 $T_{DR} = \frac{R_f \circ R_g + I}{2}$ 是两个反射的&quot;平均&quot;——先将两个反射<strong>复合</strong>（$R_f \circ R_g$），再与恒等映射<strong>平均</strong>（取中点），从而保证不动点迭代的稳定收敛。</p>
+<h3 id="1323-为什么需要平均">13.2.3 为什么需要&quot;平均&quot;？
+</h3><p>如果只用反射复合 $z_{k+1} = R_f(R_g(z_k))$：</p>
+<ul>
+<li>算子 $R_f \circ R_g$ 是<strong>非扩张</strong>的，但不动点迭代可能不收敛（环绕着不动点转圈而不靠近）。</li>
+<li>例子：$C_1 = {x \mid x_1 \geq 0}$，$C_2 = {x \mid x_2 \geq 0}$，它们的反射交替会在远离交点处无限循环。</li>
+</ul>
+<p><strong>平均操作</strong> $\frac{T + I}{2}$ 将非扩张算子转化为<strong>稳定非扩张</strong>（firmly nonexpansive），保证不动点迭代 $z_{k+1} = T_{DR}(z_k)$ 的收敛。</p>
+<hr>
+<h2 id="133-dr迭代的完整推导">13.3 DR迭代的完整推导
+</h2><h3 id="1331-从最优性条件到不动点方程">13.3.1 从最优性条件到不动点方程
+</h3><p><strong>步骤1</strong>——写出最优性条件。$x^*$ 是 $\min_x f(x) + g(x)$ 的解 $\iff$：
+</p>
+$$0 \in \partial f(x^*) + \partial g(x^*)$$<p><strong>步骤2</strong>——引入&quot;分裂&quot;变量。上式等价于：存在一个辅助变量 $y$，使得：
+</p>
+$$y \in \partial g(x^*), \quad -y \in \partial f(x^*)$$<p><strong>步骤3</strong>——用邻近算子重写。$y \in \partial g(x^<em>) \iff x^</em> = \operatorname{prox}_g(x^* + y)$（因为邻近算子是次梯度预解式）。
+类似地，$-y \in \partial f(x^<em>) \iff x^</em> = \operatorname{prox}_f(x^* - y)$。</p>
+<p><strong>步骤4</strong>——引入反射算子。令 $z = x^* + y$，则：
+</p>
+$$\begin{aligned} x^* &= \operatorname{prox}_g(z) \\ R_g(z) &= 2\operatorname{prox}_g(z) - z = 2x^* - (x^* + y) = x^* - y \end{aligned}$$<p>进一步：$R_f(R_g(z)) = R_f(x^* - y)$。由于 $-y \in \partial f(x^<em>)$，有 $\operatorname{prox}_f(x^</em> - y) = x^<em>$，因此 $R_f(x^</em> - y) = 2x^* - (x^* - y) = x^* + y = z$。</p>
+<p><strong>步骤5</strong>——不动点方程。因此：
+</p>
+$$\boxed{R_f(R_g(z)) = z}$$<p>即 $z$ 是 $R_f \circ R_g$ 的不动点。</p>
+<p><strong>步骤6</strong>——平均化保证收敛。使用稳定平均：
+</p>
+$$\boxed{z_{k+1} = \frac{1}{2}\left( R_f(R_g(z_k)) + z_k \right)}$$<p>这正是DR分裂法的核心不动点迭代。收敛后，从辅助变量恢复原始解：
+</p>
+$$\boxed{x^* = \operatorname{prox}_g(z^*)}$$<h3 id="1332-算法流程原生形式">13.3.2 算法流程（原生形式）
+</h3>$$\boxed{\begin{aligned} &\textbf{初始化：} z_0 \in \mathbb{R}^n, \; k = 0 \\ &\textbf{重复：} \\ &\quad \text{① 在 } g \text{ 上做邻近步：} x_{k+1} = \operatorname{prox}_g(z_k) \\ &\quad \text{② 反射：} y_{k+1} = 2x_{k+1} - z_k \quad \text{（即 } R_g(z_k)\text{）} \\ &\quad \text{③ 在 } f \text{ 上做邻近步：} w_{k+1} = \operatorname{prox}_f(y_{k+1}) \\ &\quad \text{④ 反射：} v_{k+1} = 2w_{k+1} - y_{k+1} \quad \text{（即 } R_f(R_g(z_k))\text{）} \\ &\quad \text{⑤ 平均：} z_{k+1} = \frac{1}{2}(v_{k+1} + z_k) \\ &\textbf{直到收敛} \end{aligned}}$$<p><strong>每次迭代的计算量</strong>：计算 $\operatorname{prox}_g$ 一次 + $\operatorname{prox}_f$ 一次。无需任何梯度计算。</p>
+<h3 id="1333-简化形式的推导">13.3.3 简化形式的推导
+</h3><p>将DR迭代的三个步骤合并，可以得到更紧凑的形式。</p>
+<p>从 $z_{k+1}$ 的定义出发：
+</p>
+$$z_{k+1} = z_k + \frac{1}{2}(v_{k+1} - z_k) = z_k + \frac{1}{2}(R_f(R_g(z_k)) - z_k)$$<p>展开 $R_f(R_g(z_k))$：
+</p>
+$$R_f(R_g(z_k)) = 2\operatorname{prox}_f(2\operatorname{prox}_g(z_k) - z_k) - (2\operatorname{prox}_g(z_k) - z_k)$$<p>代回并化简得：
+</p>
+$$z_{k+1} = z_k + \operatorname{prox}_f(2\operatorname{prox}_g(z_k) - z_k) - \operatorname{prox}_g(z_k)$$<p><strong>常见简化形式</strong>：
+</p>
+$$\boxed{\begin{aligned} x_{k+1} &= \operatorname{prox}_g(z_k) \\ y_{k+1} &= \operatorname{prox}_f(2x_{k+1} - z_k) \\ z_{k+1} &= z_k + y_{k+1} - x_{k+1} \end{aligned}}$$<p>这是DR分裂法最常用的三行实现形式，简洁而优雅。</p>
+<hr>
+<h2 id="134-松弛dr分裂法">13.4 松弛DR分裂法
+</h2><h3 id="1341-引入松弛参数">13.4.1 引入松弛参数
+</h3><p>在标准DR的平均步骤中引入松弛参数 $\gamma \in (0, 2)$：</p>
+$$\boxed{z_{k+1} = z_k + \gamma \left( \operatorname{prox}_f(2\operatorname{prox}_g(z_k) - z_k) - \operatorname{prox}_g(z_k) \right)}$$<p>当 $\gamma = 1$ 时退化为标准DR分裂法。</p>
+<p><strong>$\gamma$ 的作用</strong>：</p>
+<ul>
+<li>$\gamma = 1$：标准DR（平衡速度与稳定性）</li>
+<li>$\gamma &lt; 1$：更保守，更稳定但较慢</li>
+<li>$\gamma \in (1, 2)$：加速收敛（松弛/超松弛）</li>
+<li>$\gamma = 2$：退化回无平均的反射复合（可能不收敛）</li>
+<li>$\gamma \notin [0, 2]$：算法发散</li>
+</ul>
+<p><strong>收敛条件</strong>：对于任意 $\gamma \in (0, 2)$，松弛DR分裂法保证收敛。常取 $\gamma = 1.5 \sim 1.9$ 以获得加速效果。</p>
+<h3 id="1342-松弛dr的等价形式">13.4.2 松弛DR的等价形式
+</h3><p>等价于对辅助变量做外推：
+</p>
+$$z_{k+1} = (1 - \gamma) z_k + \gamma \cdot R_f(R_g(z_k))$$<p>当 $\gamma = 1$ 就是半平均 $z_{k+1} = \frac{1}{2}(R_f(R_g(z_k)) + z_k)$。</p>
+<hr>
+<h2 id="135-图lasso应用graph-lasso--graphical-lasso">13.5 图LASSO应用（Graph LASSO / Graphical LASSO）
+</h2><h3 id="1351-问题背景">13.5.1 问题背景
+</h3><p>图LASSO用于从高维数据中学习<strong>稀疏精度矩阵</strong>（协方差矩阵的逆 $\Theta = \Sigma^{-1}$）。若 $\Theta_{ij} = 0$，则变量 $i$ 和 $j$ 在给定其他变量下<strong>条件独立</strong>——这在基因调控网络、金融风险建模中至关重要。</p>
+<h3 id="1352-数学形式">13.5.2 数学形式
+</h3>$$\boxed{\min_{\Theta \succ 0} \; -\log\det \Theta + \langle S, \Theta \rangle + \lambda \|\Theta\|_{1, \text{off}}}$$<p>符号解释：</p>
+<ul>
+<li>$\Theta \in \mathbb{R}^{p \times p}$：精度矩阵（precision matrix），必须是正定的（$\Theta \succ 0$）。</li>
+<li>$S \in \mathbb{R}^{p \times p}$：样本协方差矩阵（已知数据计算）。</li>
+<li>$-\log\det \Theta$：多元高斯的负对数似然（光滑凸函数）。</li>
+<li>$\langle S, \Theta \rangle = \operatorname{tr}(S^T \Theta)$：Frobenius内积。</li>
+<li>$|\Theta|<em>{1, \text{off}} = \sum</em>{i \neq j} |\Theta_{ij}|$：非对角元素的 $\ell_1$ 范数（诱导稀疏性）。</li>
+</ul>
+<h3 id="1353-转化为dr分裂法可处理的形式">13.5.3 转化为DR分裂法可处理的形式
+</h3><p>令：
+</p>
+$$f(\Theta) = -\log\det \Theta + \langle S, \Theta \rangle \quad \text{（光滑凸，有解析邻近算子）}$$<p>
+</p>
+$$g(\Theta) = \lambda \|\Theta\|_{1, \text{off}} + \delta_{\{\Theta \succ 0\}}(\Theta) \quad \text{（非光滑，但在修改形式后邻近算子简单）}$$<p>实际常用DR分裂法的图LASSO解法：</p>
+<ul>
+<li>$\operatorname{prox}_f$：对光滑的 $- \log\det \Theta$ 部分的邻近算子 = 求解一个特征值分解（对角化后做标量邻近）</li>
+<li>$\operatorname{prox}_g$：$\ell_1$ 范数 + 正定锥约束 = 软阈值 + 谱投影</li>
+</ul>
+<p>每次迭代计算 $\operatorname{prox}_{\ell_1}$（分量级软阈值）和对正定锥的投影（把负特征值clip到0），$O(p^3)$ 来自特征值分解。</p>
+<hr>
+<h2 id="136-dr分裂法与admm的内在关系">13.6 DR分裂法与ADMM的内在关系
+</h2><h3 id="1361-从dr到admm的变换">13.6.1 从DR到ADMM的变换
+</h3><p><strong>关键定理</strong>：ADMM（Ch14）是DR分裂法应用在<strong>对偶问题</strong>上的等价形式。</p>
+<p>具体来说，考虑约束问题 $\min_{x,z} f(x) + g(z)$ s.t. $x = z$。其对偶问题为：
+</p>
+$$\max_\lambda \; -f^*(-\lambda) - g^*(\lambda)$$<p>即对偶问题是求 $\min_\lambda f^<em>(-\lambda) + g^</em>(\lambda)$——这正是I型复合优化！将DR分裂法应用于此对偶问题，得到的迭代恰好就是ADMM的迭代。</p>
+<p><strong>统一视角</strong>：</p>
+$$\boxed{\begin{array}{ccc} \text{DR分裂法（原空间）} & \longleftrightarrow & \text{ADMM（原空间）} \\ \min_x f(x) + g(x) & & \min_{x,z} f(x)+g(z) \text{ s.t. } x=z \\ \updownarrow \text{Moreau/共轭} & & \updownarrow \text{对偶} \\ \text{ADMM（对偶空间）} & \longleftrightarrow & \text{DR分裂法（对偶空间）} \\ \min_\lambda f^*(-\lambda) + g^*(\lambda) & & \min_\lambda f^*(-\lambda) + g^*(\lambda) + \text{约束} \end{array}}$$<p>这意味着ADMM和DR分裂法本质上是<strong>同一种算法</strong>在不同空间（原空间 vs 对偶空间）的表现。理解了DR不动点迭代的收敛性，就理解了ADMM的收敛性。</p>
+<hr>
+<h2 id="137-典型例题">13.7 典型例题
+</h2><h3 id="例题131dr基础推导两个一维函数的复合">例题13.1（DR基础推导——两个一维函数的复合）
+</h3><p><strong>题目</strong>：用DR分裂法求解 $\min_x |x| + \frac{1}{2}(x - 2)^2$。</p>
+<p><strong>解答</strong>：</p>
+<p>令 $f(x) = \frac{1}{2}(x - 2)^2$（光滑），$g(x) = |x|$（非光滑），$\operatorname{prox}$ 均已知。</p>
+<p><strong>$\operatorname{prox}_f(v)$</strong>：解 $\min_x \frac{1}{2}(x-2)^2 + \frac{1}{2}(x-v)^2 \implies x = \frac{v+2}{2}$。</p>
+<p><strong>$\operatorname{prox}_g(v)$</strong>：软阈值 $\operatorname{soft}(v, 1) = \operatorname{sign}(v) \max{|v|-1, 0}$。</p>
+<p><strong>DR迭代</strong>（$\gamma = 1$）：</p>
+<p>取 $z_0 = 0$：</p>
+<ul>
+<li>
+<p>$x_1 = \operatorname{prox}_g(z_0) = \operatorname{soft}(0, 1) = 0$</p>
+</li>
+<li>
+<p>$y_1 = \operatorname{prox}_f(2x_1 - z_0) = \operatorname{prox}_f(0) = \frac{0+2}{2} = 1$</p>
+</li>
+<li>
+<p>$z_1 = z_0 + y_1 - x_1 = 0 + 1 - 0 = 1$</p>
+</li>
+<li>
+<p>$x_2 = \operatorname{prox}_g(z_1) = \operatorname{soft}(1, 1) = 0$</p>
+</li>
+<li>
+<p>$y_2 = \operatorname{prox}_f(2x_2 - z_1) = \operatorname{prox}_f(-1) = \frac{-1+2}{2} = 0.5$</p>
+</li>
+<li>
+<p>$z_2 = 1 + 0.5 - 0 = 1.5$</p>
+</li>
+<li>
+<p>$x_3 = \operatorname{prox}_g(z_2) = \operatorname{soft}(1.5, 1) = 0.5$</p>
+</li>
+<li>
+<p>$y_3 = \operatorname{prox}_f(2 \cdot 0.5 - 1.5) = \operatorname{prox}_f(-0.5) = \frac{-0.5+2}{2} = 0.75$</p>
+</li>
+<li>
+<p>$z_3 = 1.5 + 0.75 - 0.5 = 1.75$</p>
+</li>
+</ul>
+<p><strong>解析验证</strong>：原问题 $\min_x \frac{1}{2}(x-2)^2 + |x|$。分析 $x=0$ 处次梯度：$x &lt; 0$ 时导数为 $x-2-1 = x-3$；$x \geq 0$ 时导数为 $x-2+1 = x-1$。令 $x-1 = 0 \implies x=1$（此时 $x \geq 0$，在定义域内）。故 $x^* = 1$。</p>
+<p>DR迭代的 $x_k$ 序列：$0 \to 0 \to 0.5 \to 0.75 \to 0.875 \to \cdots \to 1$，向最优解单调递增收敛。</p>
+<hr>
+<h3 id="例题132两个凸集交集的dr分裂法">例题13.2（两个凸集交集的DR分裂法）
+</h3><p><strong>题目</strong>：用DR分裂法求点 $a = (3, 3)^T$ 到集合 $C_1 = {x \mid |x|_2 \leq 2}$（圆盘）与 $C_2 = {x \mid x_1 \geq 0, x_2 \geq 0}$（第一象限）交集的投影。</p>
+<p><strong>解答</strong>：</p>
+<p>问题形式：$\min_x \frac{1}{2}|x - a|^2 + \delta_{C_1 \cap C_2}(x)$。</p>
+<p>转化为I型复合：$f(x) = \delta_{C_1}(x)$，$g(x) = \delta_{C_2}(x) + \frac{1}{2}|x - a|^2$。</p>
+<p>$\operatorname{prox}<em>f = P</em>{C_1}$（投影到圆盘）：$P_{C_1}(x) = \begin{cases} x, &amp; |x|_2 \leq 2 \ 2\cdot \frac{x}{|x|_2}, &amp; |x|_2 &gt; 2 \end{cases}$</p>
+<p>$\operatorname{prox}<em>g(v)$：解 $\min</em>{x \in C_2} \frac{1}{2}|x - v|^2 + \frac{1}{2}|x - a|^2 = \min_{x \in C_2} |x - \frac{v+a}{2}|^2$。即 $\operatorname{prox}<em>g(v) = P</em>{C_2}\left(\frac{v + a}{2}\right)$（投影到第一象限，取各分量与0的最大值）。</p>
+<p><strong>DR迭代</strong>：$x_{k+1} = P_{C_2}(\frac{z_k + a}{2})$，$y_{k+1} = P_{C_1}(2x_{k+1} - z_k)$，$z_{k+1} = z_k + y_{k+1} - x_{k+1}$。</p>
+<p>取 $z_0 = a = (3, 3)^T$：</p>
+<ul>
+<li>$x_1 = P_{C_2}(\frac{(3,3)+(3,3)}{2}) = P_{C_2}((3,3)) = (3,3)$</li>
+<li>$y_1 = P_{C_1}(2(3,3) - (3,3)) = P_{C_1}((3,3)) = 2\cdot \frac{(3,3)}{\sqrt{18}} = (\frac{6}{\sqrt{18}}, \frac{6}{\sqrt{18}}) \approx (1.414, 1.414)$</li>
+<li>$z_1 = (3,3) + (1.414,1.414) - (3,3) = (1.414, 1.414)$</li>
+</ul>
+<p>DR迭代逐步将 $z_k$ 和 $x_k$ 推向交集的最优点 $(1.414, 1.414)^T$——这恰好是距离 $(3,3)$ 最近的、在半径2的圆内、且在第一象限的点。</p>
+<hr>
+<h3 id="例题133dr-vs-ista的适用性对比">例题13.3（DR vs ISTA的适用性对比）
+</h3><p><strong>题目</strong>：说明下列问题分别适用ISTA还是DR分裂法，并写出各自迭代的第一步。</p>
+<p><strong>(a)</strong> $\min_x \frac{1}{2}|Ax - b|^2 + \lambda|x|_1$（LASSO，$A$ 任意）</p>
+<p><strong>(b)</strong> $\min_x |x|_1 + \lambda|x|_2$（弹性网的无平方项版本）</p>
+<p><strong>(c)</strong> $\min_x |Ax - b|_1 + \lambda|x|_1$</p>
+<p><strong>解答</strong>：</p>
+<p><strong>(a) LASSO</strong>：$f(x) = \frac{1}{2}|Ax - b|^2$ 光滑（$\nabla f = A^T(Ax - b)$，Lipschitz常数 $L = |A^T A|$），$g = \lambda|\cdot|_1$ 非光滑但 $\operatorname{prox}$ 为软阈值。</p>
+<p><strong>ISTA适用</strong>：$x_{k+1} = \operatorname{soft}(x_k - \alpha A^T(Ax_k - b), \alpha\lambda)$。</p>
+<p>DR也可用但不必要（ISTA更简单高效）。</p>
+<p><strong>(b) 各项范数之和</strong>：$f = |\cdot|_1$，$g = \lambda|\cdot|_2$，两者都非光滑！</p>
+<p><strong>ISTA不适用</strong>（缺少光滑项），<strong>DR适用</strong>：$\operatorname{prox}<em>{\ell_1}$ = 软阈值，$\operatorname{prox}</em>{\ell_2}$ = 群软阈值（group soft-thresholding）。</p>
+<p><strong>(c) 双$\ell_1$</strong>：$f(x) = |Ax - b|_1$（非光滑！），$g = \lambda|x|_1$（非光滑）。</p>
+<p><strong>ISTA不适用</strong>（$f$ 非光滑），<strong>DR适用</strong>，但需要计算 $\operatorname{prox}<em>f$。而 $\operatorname{prox}</em>{|A\cdot - b|_1}$ 通常没有闭式——这时需要内层迭代或转化为ADMM形式。</p>
+<p><strong>结论</strong>：DR的适用范围比ISTA广得多，代价是每次迭代可能需要更复杂的邻近算子计算。</p>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><ol>
+<li>
+<p><strong>DR分裂法的核心算子</strong>：$T_{DR} = \frac{R_f \circ R_g + I}{2}$（两个反射的平均），其不动点 $z^* = T_{DR}(z^*)$ 提供了一种通过邻近算子间接求解 $\min f + g$ 的途径。</p>
+</li>
+<li>
+<p><strong>反射算子的定义</strong>：$R_f = 2\operatorname{prox}_f - I$，几何上是以 $\operatorname{prox}_f(z)$ 为镜面，$R_f(z)$ 是 $z$ 的&quot;镜像&quot;。</p>
+</li>
+<li>
+<p><strong>平均操作的必须性</strong>：纯反射复合 $R_f \circ R_g$ 是非扩张的但可能不收敛；加上与 $I$ 的半平均（稳定非扩张）才保证不动点迭代的收敛。</p>
+</li>
+<li>
+<p><strong>DR分裂法 = 无需梯度的邻近梯度法</strong>：ISTA要求 $f$ 光滑 → DR只需 $\operatorname{prox}_f$ 好算，对 $f$ 的微分性无要求。</p>
+</li>
+<li>
+<p><strong>松弛参数</strong>：$\gamma \in (0, 2)$ 调节收敛速度，$\gamma &gt; 1$ 时加速，$\gamma = 1$ 是标准形式。</p>
+</li>
+<li>
+<p><strong>DR → ADMM的统一桥梁</strong>：ADMM是DR分裂法应用在对偶问题上的等价形式。理解DR的不动点收敛 = 理解ADMM的收敛。</p>
+</li>
+<li>
+<p><strong>适用场景</strong>：$\ell_1$ 范数 + 核范数（RPCA）、$\ell_1$ + 指示函数（$\ell_1$ 约束去噪）、图LASSO（$\ell_1$ + $-\log\det$）、全变分去噪（TV + $\ell_2$ 拟合）等任意 $\operatorname{prox}$ 好算的两项和问题。</p>
+</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>一句话总结</strong>：DR分裂法用&quot;反射 + 平均&quot;的不动点迭代，将两个非光滑函数的邻近算子编织在一起，优雅地求解 $\min f + g$ 而无需求导——它是ISTA从&quot;光滑+非光滑&quot;到&quot;全非光滑&quot;的飞跃，也是理解ADMM收敛性的理论基石。</p>
+</blockquote>
+<hr>
+<h2 id="138-补充例题">13.8 补充例题
+</h2><h3 id="例题134dr分裂法的最大单调算子推导">例题13.4（DR分裂法的最大单调算子推导）
+</h3><p><strong>题目</strong>：用极大单调算子理论重新推导DR分裂法的不动点形式。</p>
+<p><strong>解答</strong>：</p>
+<p>求解 $\min_x f(x) + g(x)$ 等价于求 $0 \in \partial f(x) + \partial g(x)$。</p>
+<p>令 $A = \partial f$，$B = \partial g$（两者都是极大单调算子）。问题化为 $0 \in (A + B)(x)$。</p>
+<p>引入辅助变量 $z$，令 $x = J_B(z) = (I + B)^{-1}(z) = \operatorname{prox}_g(z)$。</p>
+<p>等价条件：$z - x \in B(x)$ 且 $x - z \in A(x)$。这给出不动点条件：
+</p>
+$$z = R_A(R_B(z))$$<p>
+其中 $R_A = 2J_A - I = 2\operatorname{prox}_f - I$。</p>
+<p>由于 $R_A \circ R_B$ 是非扩张的但可能不稳定，使用Krasnoselskii-Mann平均：
+</p>
+$$T_{DR} = (1 - \gamma)I + \gamma(R_A \circ R_B), \quad \gamma \in (0, 1)$$<p>取 $\gamma = 1/2$ 就是标准DR。这就从单调算子理论完整解释了DR迭代的由来和收敛性。</p>
+<hr>
+<h3 id="例题135非负最小二乘的dr解法">例题13.5（非负最小二乘的DR解法）
+</h3><p><strong>题目</strong>：$\min_{x \geq 0} \frac{1}{2}|Ax - b|^2$（非负最小二乘）。写出DR分裂法的迭代。</p>
+<p><strong>解答</strong>：</p>
+<p>令 $f(x) = \frac{1}{2}|Ax - b|^2$，$g(x) = \delta_{\mathbb{R}^n_+}(x)$（非负锥的指示函数）。</p>
+<p>$\operatorname{prox}_f(v)$：解 $\min_x \frac{1}{2}|Ax - b|^2 + \frac{1}{2}|x - v|^2$。
+梯度：$A^T(Ax - b) + (x - v) = 0 \implies (A^T A + I)x = A^T b + v$。
+</p>
+$$\operatorname{prox}_f(v) = (A^T A + I)^{-1}(A^T b + v)$$<p>$\operatorname{prox}<em>g(v) = P</em>{\mathbb{R}^n_+}(v) = \max{v, 0}$（逐分量取正部）。</p>
+<p><strong>DR迭代</strong>：
+</p>
+$$\boxed{\begin{aligned} x_{k+1} &= \max\{z_k, 0\} \\ y_{k+1} &= (A^T A + I)^{-1}(A^T b + 2x_{k+1} - z_k) \\ z_{k+1} &= z_k + y_{k+1} - x_{k+1} \end{aligned}}$$<p><strong>计算特点</strong>：$(A^T A + I)^{-1}$ 可预计算（Cholesky分解一次），每次迭代只需矩阵向量乘 + 逐分量max。记忆点：$x$ 步 = 投影到非负锥（简单），$y$ 步 = 岭回归求解（但可利用预计算加速）。</p>
+<hr>
+<h3 id="例题136dr分裂法的松弛参数调优实验设计">例题13.6（DR分裂法的松弛参数调优实验设计）
+</h3><p><strong>题目</strong>：设计实验说明松弛参数 $\gamma$ 对DR分裂法收敛的影响。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>实验设置</strong>：$\min_x \frac{1}{2}|Ax - b|^2 + \lambda|x|_1$，取 $n = 200, p = 50$，$A$ 随机生成。</p>
+<p>测试 $\gamma \in {0.5, 1.0, 1.5, 1.8, 1.9, 1.99}$。</p>
+<p><strong>预期结果</strong>：</p>
+<ul>
+<li>$\gamma = 0.5$：保守，收敛慢但单调稳定</li>
+<li>$\gamma = 1.0$：标准DR，稳定收敛</li>
+<li>$\gamma = 1.5$：加速效果明显（~30% 更快达到相同精度）</li>
+<li>$\gamma = 1.8, 1.9$：进一步加速，但出现轻微振荡</li>
+<li>$\gamma = 1.99$：极快的前几个迭代，但后期可能振荡（$\gamma$ 太接近发散边界2）</li>
+</ul>
+<p><strong>实践建议</strong>：$\gamma = 1.5 \sim 1.8$ 通常是&quot;加速不振荡&quot;的最优区间。</p>
+<hr>
+<h3 id="例题137dr与邻近梯度法的混合策略">例题13.7（DR与邻近梯度法的混合策略）
+</h3><p><strong>题目</strong>：若 $f$ 光滑且 $\operatorname{prox}_g$ 好算，应该用ISTA还是DR？给出决策准则。</p>
+<p><strong>解答</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>场景</th>
+					<th>推荐算法</th>
+					<th>理由</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>$\nabla f$ 计算代价 &laquo; $\operatorname{prox}_f$</td>
+					<td>ISTA</td>
+					<td>梯度步比邻近步便宜</td>
+			</tr>
+			<tr>
+					<td>$\operatorname{prox}_f$ 有闭式解但 $\nabla f$ 昂贵</td>
+					<td>DR</td>
+					<td>避免梯度计算</td>
+			</tr>
+			<tr>
+					<td>$f$ 和 $g$ 的维数都很高</td>
+					<td>看 $\operatorname{prox}$ 复杂度</td>
+					<td>两者中的便宜者优先</td>
+			</tr>
+			<tr>
+					<td>$f$ 非光滑</td>
+					<td><strong>只能用DR</strong></td>
+					<td>ISTA要求光滑</td>
+			</tr>
+			<tr>
+					<td>需调步长</td>
+					<td>DR优势（无需调步长）</td>
+					<td>DR仅需 $\gamma \in (0,2)$</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h3 id="例题138dr分裂法求解稀疏逆协方差图lasso的dr实现">例题13.8（DR分裂法求解稀疏逆协方差——图LASSO的DR实现）
+</h3><p><strong>题目</strong>：将图LASSO $\min_{\Theta \succ 0} -\log\det\Theta + \langle S, \Theta \rangle + \lambda|\Theta|_{1,\text{off}}$ 转化适合DR分裂法的形式。</p>
+<p><strong>解答</strong>：</p>
+<p>令 $f(\Theta) = -\log\det\Theta + \frac{\mu}{2}|\Theta|<em>F^2$（强凸化），$g(\Theta) = \langle S, \Theta \rangle + \lambda|\Theta|</em>{1,\text{off}} - \frac{\mu}{2}|\Theta|<em>F^2 + \delta</em>{{\Theta \succ 0}}(\Theta)$。</p>
+<p><strong>$\operatorname{prox}_f$</strong>：求解 $\min_\Theta -\log\det\Theta + \frac{\mu}{2}|\Theta|_F^2 + \frac{1}{2}|\Theta - V|_F^2$。</p>
+<p>梯度条件：$-\Theta^{-1} + \mu\Theta + (\Theta - V) = 0 \implies -\Theta^{-1} + (\mu + 1)\Theta = V$。</p>
+<p>对 $V$ 做特征分解 $V = Q\Lambda Q^T$，各特征值 $\lambda_i$ 对应解 $\theta_i$ 满足：
+</p>
+$$-\frac{1}{\theta_i} + (\mu+1)\theta_i = \lambda_i \implies \theta_i = \frac{\lambda_i + \sqrt{\lambda_i^2 + 4(\mu+1)}}{2(\mu+1)}$$<p>$\operatorname{prox}_f(V) = Q \operatorname{diag}(\theta_1, \ldots, \theta_p) Q^T$。</p>
+<p><strong>$\operatorname{prox}_g$</strong>：$\ell_1$ 软阈值（非对角元素）+ 对角元素直接传递 + 投影到正定锥（clip 负特征值到 $\epsilon$）。</p>
+<p><strong>DR迭代</strong>：每次做一次特征值分解（$O(p^3)$）和一次软阈值（$O(p^2)$），迭代次数通常为几十到几百次。</p>
+<hr>
+<h2 id="139-dr分裂法的几何直觉深化">13.9 DR分裂法的几何直觉深化
+</h2><h3 id="1391-反射-平均的折返跑比喻">13.9.1 反射-平均的&quot;折返跑&quot;比喻
+</h3><p>想象你在一根绳子（可行集）的两端之间来回跑：</p>
+<ol>
+<li>从当前位置 $z_k$ 出发，跑到 $g$-镜面，记下镜中像 $R_g(z_k)$</li>
+<li>从 $R_g(z_k)$ 出发，跑到 $f$-镜面，记下第二次反射 $R_f(R_g(z_k))$</li>
+<li>将这次&quot;折返跑&quot;的终点与原位置平均：$z_{k+1} = \frac{1}{2}(R_f(R_g(z_k)) + z_k)$</li>
+</ol>
+<h3 id="1392-为什么krasnoselskii-mann平均保证收敛">13.9.2 为什么Krasnoselskii-Mann平均保证收敛
+</h3><p>非扩张算子 $T$（满足 $|Tx - Ty| \leq |x - y|$）的不动点迭代 $z_{k+1} = T(z_k)$ 可能不收敛——旋转映射就是反例（绕不动点转圈）。但松弛平均算子 $T_\gamma = (1-\gamma)I + \gamma T$（$\gamma \in (0,1)$）是<strong>稳定非扩张</strong>（firmly nonexpansive）的。对于稳定非扩张算子，只要存在不动点，平凡迭代必然收敛。这就是DR取 $\gamma = 1/2$ 的数学根基。</p>
+<h3 id="1393-反射算子的深层数学结构">13.9.3 反射算子的深层数学结构
+</h3><p>反射算子 $R_f = 2\operatorname{prox}_f - I$ 不只是邻近算子的简单代数变换。它与次梯度有深刻的联系：
+</p>
+$$R_f(x) = x - 2\operatorname{prox}_{f^*}(x) = (I + \partial f) \circ (I - \partial f)^{-1}(x)$$<p>这表明 $R_f$ 是将 $\partial f$ 通过 Cayley 变换映射到反射算子——建立了邻近算子与极大单调算子反射表示之间的桥梁。</p>
+<hr>
+<h2 id="1310-dr分裂法的工程实践经验">13.10 DR分裂法的工程实践经验
+</h2><h3 id="13101-计算邻近算子的数值技巧">13.10.1 计算邻近算子的数值技巧
+</h3><ol>
+<li><strong>利用结构</strong>：$\operatorname{prox}<em>{\lambda|\cdot|<em>1} = \operatorname{soft}$（$O(n)$ 时间），$\operatorname{prox}</em>{|\cdot|</em>*} = \operatorname{SVT}$（$O(n^3)$ 的SVD，但对稀疏矩阵可用随机算法加速）。</li>
+<li><strong>预计算</strong>：$\operatorname{prox}_{\frac{1}{2}|A\cdot - b|^2} = (A^T A + I)^{-1}(A^T b + v)$ 中的矩阵逆可预计算并缓存。</li>
+<li><strong>近似邻近</strong>：当精确邻近算子昂贵时，可用迭代法近似（如用几步共轭梯度近似岭回归的邻近算子）。</li>
+</ol>
+<h3 id="13102-收敛监测与停机准则">13.10.2 收敛监测与停机准则
+</h3><p><strong>原始残差</strong>：$r^k = |x_{k+1} - x_k|$（相邻迭代的变化）
+<strong>不动点残差</strong>：$d^k = |z_k - R_f(R_g(z_k))|$（距不动点的距离）
+<strong>目标下降</strong>：$\Delta F^k = |f(x_{k+1}) + g(x_{k+1}) - f(x_k) - g(x_k)|$</p>
+<p>停机条件：$r^k &lt; 10^{-6}$ 和 $d^k &lt; 10^{-6}$ 同时满足。</p>
+<h3 id="13103-常见陷阱与解决方案">13.10.3 常见陷阱与解决方案
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>陷阱</th>
+					<th>症状</th>
+					<th>解决</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>$\operatorname{prox}_f$ 无闭式</td>
+					<td>子问题无法精确求解</td>
+					<td>换用ADMM或使用内层迭代近似</td>
+			</tr>
+			<tr>
+					<td>收敛极慢</td>
+					<td>残差下降缓慢</td>
+					<td>调大 $\gamma \to 1.8$ 或检查问题是否病态</td>
+			</tr>
+			<tr>
+					<td>数值振荡</td>
+					<td>目标值上下波动</td>
+					<td>减小 $\gamma$ 或检查邻近算子的数值精度</td>
+			</tr>
+			<tr>
+					<td>不动点不存在</td>
+					<td>算法发散</td>
+					<td>检查 $f$ 和 $g$ 是否都是闭凸函数</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h3 id="例题137dr与邻近梯度法的混合策略-1">例题13.7（DR与邻近梯度法的混合策略）
+</h3><p><strong>题目</strong>：若 $f$ 光滑且 $\operatorname{prox}_g$ 好算，应该用ISTA还是DR？给出决策准则。</p>
+<p><strong>解答</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>场景</th>
+					<th>推荐算法</th>
+					<th>理由</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>$\nabla f$ 计算代价 &laquo; $\operatorname{prox}_f$</td>
+					<td>ISTA</td>
+					<td>梯度步比邻近步便宜</td>
+			</tr>
+			<tr>
+					<td>$\operatorname{prox}_f$ 有闭式解但 $\nabla f$ 昂贵</td>
+					<td>DR</td>
+					<td>避免梯度计算</td>
+			</tr>
+			<tr>
+					<td>$f$ 和 $g$ 的维数都很高</td>
+					<td>看 $\operatorname{prox}$ 复杂度</td>
+					<td>两者中的便宜者优先</td>
+			</tr>
+			<tr>
+					<td>$f$ 非光滑</td>
+					<td><strong>只能用DR</strong></td>
+					<td>ISTA要求光滑</td>
+			</tr>
+			<tr>
+					<td>需调步长</td>
+					<td>DR优势（无步长）</td>
+					<td>DR仅需 $\gamma \in (0,2)$</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>混合策略</strong>：若 $f$ 的光滑程度随时间变化（如前几个迭代高度非光滑，后面趋于光滑），可先用DR分裂法的稳健性度过初始阶段，再切换到ISTA以利用其较低的每步代价。</p>
+<hr>
+<h2 id="139-dr分裂法的几何直觉深化-1">13.9 DR分裂法的几何直觉深化
+</h2><h3 id="1391-反射-平均的折返跑比喻-1">13.9.1 反射-平均的&quot;折返跑&quot;比喻
+</h3><p>想象你在一根绳子（可行集）的两端之间来回跑：</p>
+<ol>
+<li>从当前位置 $z_k$ 出发，跑到 $g$-镜面，记下镜中像 $R_g(z_k)$</li>
+<li>从 $R_g(z_k)$ 出发，跑到 $f$-镜面，记下第二次反射 $R_f(R_g(z_k))$</li>
+<li>将这次&quot;折返跑&quot;的终点与原位置平均：$z_{k+1} = \frac{1}{2}(R_f(R_g(z_k)) + z_k)$</li>
+</ol>
+<p>随着迭代，$z_k$ 逐渐接近两个镜面的交点（即不动点），同时 $x_k = \operatorname{prox}_g(z_k)$ 则接近 $\min(f+g)$ 的最优解。</p>
+<h3 id="1392-为什么krasnoselskii-mann平均保证收敛-1">13.9.2 为什么Krasnoselskii-Mann平均保证收敛
+</h3><p>非扩张算子 $T$（满足 $|Tx - Ty| \leq |x - y|$）的不动点迭代 $z_{k+1} = T(z_k)$ 可能不收敛。但&quot;松弛平均&quot;算子 $T_\gamma = (1-\gamma)I + \gamma T$（$\gamma \in (0,1)$）是<strong>稳定非扩张</strong>（firmly nonexpansive）的，对于稳定非扩张算子，只要存在不动点，迭代必然收敛。这就是DR分裂法取半平均（$\gamma = 1/2$）的深层数学原因。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

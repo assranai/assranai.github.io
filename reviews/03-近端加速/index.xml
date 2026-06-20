@@ -1,0 +1,1693 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>近端加速 on Assranai&#39;s 手账</title>
+        <link>https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/</link>
+        <description>Recent content in 近端加速 on Assranai&#39;s 手账</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en-us</language>
+        <copyright>Assranai</copyright>
+        <lastBuildDate>Sat, 20 Jun 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>第7章：邻近梯度法</title>
+        <link>https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/07-%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/</link>
+        <pubDate>Sat, 20 Jun 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/07-%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/</guid>
+        <description>&lt;h1 id=&#34;第7章邻近梯度法&#34;&gt;第7章：邻近梯度法
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心思想&lt;/strong&gt;：复合优化问题 $\min f(x)+g(x)$ 中，$f$ 光滑（有梯度）用梯度下降处理，$g$ 非光滑（无梯度）用邻近算子处理，两步交替迭代——这就是邻近梯度法（Proximal Gradient Method）。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;前置知识回顾&#34;&gt;前置知识回顾
+&lt;/h2&gt;&lt;p&gt;在开始本章之前，请确保你已经理解以下概念：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;概念&lt;/th&gt;
+					&lt;th&gt;出自&lt;/th&gt;
+					&lt;th&gt;一句话回顾&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;梯度下降法 (GD)&lt;/td&gt;
+					&lt;td&gt;Ch2&lt;/td&gt;
+					&lt;td&gt;沿负梯度方向走：$x_{k+1}=x_k-\alpha\nabla f(x_k)$，对光滑凸函数收敛率 $O(1/k)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$L$-smooth 函数&lt;/td&gt;
+					&lt;td&gt;Ch2&lt;/td&gt;
+					&lt;td&gt;梯度变化有上界：$|\nabla f(x)-\nabla f(y)|\leq L|x-y|$，等价于 $f(y)\leq f(x)+\nabla f(x)^T(y-x)+\frac{L}{2}|y-x|^2$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;凸函数 (convex)&lt;/td&gt;
+					&lt;td&gt;Ch3&lt;/td&gt;
+					&lt;td&gt;函数图像在弦之下：$f(tx+(1-t)y)\leq tf(x)+(1-t)f(y)$；等价于 $f(y)\geq f(x)+\nabla f(x)^T(y-x)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;次梯度 (subgradient)&lt;/td&gt;
+					&lt;td&gt;Ch3&lt;/td&gt;
+					&lt;td&gt;非光滑函数的&amp;quot;广义梯度&amp;quot;：$g\in\partial f(x)$ 满足 $f(y)\geq f(x)+g^T(y-x),\forall y$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;投影梯度法 (PGM)&lt;/td&gt;
+					&lt;td&gt;Ch6&lt;/td&gt;
+					&lt;td&gt;$\min_{x\in C}f(x)$ 时，梯度下降后投影回约束集：$x_{k+1}=P_C(x_k-\alpha\nabla f(x_k))$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;闭凸函数&lt;/td&gt;
+					&lt;td&gt;Ch3&lt;/td&gt;
+					&lt;td&gt;既&amp;quot;凸&amp;quot;（碗形）又&amp;quot;闭&amp;quot;（下水平集包含边界），保证极小点存在且邻近算子良定义&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;最优性条件&lt;/td&gt;
+					&lt;td&gt;Ch3&lt;/td&gt;
+					&lt;td&gt;$x^&lt;em&gt;$ 是 $\min f(x)$ 的最优点 $\iff$ $0\in\partial f(x^&lt;/em&gt;)$（非光滑情形）或 $\nabla f(x^*)=0$（光滑情形）&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;71-问题形式&#34;&gt;7.1 问题形式
+&lt;/h2&gt;&lt;h3 id=&#34;711-复合优化问题的标准形式&#34;&gt;7.1.1 复合优化问题的标准形式
+&lt;/h3&gt;&lt;p&gt;本章考虑如下极小化问题：&lt;/p&gt;
+$$\boxed{\min_{x\in\mathbb{R}^n} F(x) = f(x) + g(x)}$$&lt;p&gt;&lt;strong&gt;符号含义&lt;/strong&gt;（逐项解释）：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$x \in \mathbb{R}^n$：$x$ 是一个 $n$ 维实数列向量。比如在 LASSO 回归中，$x$ 就是待求的回归系数向量，$n$ 等于自变量的个数。&lt;/li&gt;
+&lt;li&gt;$F(x)$：总目标函数，是我们想要最小化的量。&lt;/li&gt;
+&lt;li&gt;$f(x)$：&lt;strong&gt;光滑部分&lt;/strong&gt;。$f$ 必须是凸函数，且梯度 $\nabla f(x)$ 存在且 &lt;strong&gt;$L$-Lipschitz 连续&lt;/strong&gt;，即对任意两点 $x, y$：&lt;/li&gt;
+&lt;/ul&gt;
+$$\|\nabla f(x) - \nabla f(y)\| \leq L\|x - y\|$$&lt;p&gt;这里的 $|\cdot|$ 是 $\ell_2$ 范数（向量的欧几里得长度），$L$ 称为 Lipschitz 常数（可以理解为梯度的&amp;quot;变化率上限&amp;quot;）。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$g(x)$：&lt;strong&gt;非光滑部分&lt;/strong&gt;。$g$ 是闭凸函数（proper, closed, convex），&lt;strong&gt;不一定可微&lt;/strong&gt;，但要求其&lt;strong&gt;邻近算子&lt;/strong&gt; $\text{prox}_g$ 有闭式解（closed-form）或能便宜算出。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;712-为什么要分拆处理&#34;&gt;7.1.2 为什么要分拆处理？
+&lt;/h3&gt;&lt;p&gt;思考这个问题：如果 $g$ 也是光滑的（比如 $g(x)=\frac{\lambda}{2}|x|^2$，岭回归），直接用&lt;strong&gt;梯度下降法&lt;/strong&gt;（GD）即可。为什么要发明新方法？&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;关键困难&lt;/strong&gt;：$g$ &lt;strong&gt;非光滑&lt;/strong&gt;——它的次梯度虽然存在，但用次梯度法（Ch4）的收敛率只有 $O(1/\sqrt{k})$，非常慢。我们希望利用 $f$ 的&lt;strong&gt;光滑性&lt;/strong&gt;获得更快的收敛。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;分拆处理的直觉&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$f$ 像&amp;quot;数据拟合项&amp;quot;——光滑、可微，用负梯度方向引导下降；&lt;/li&gt;
+&lt;li&gt;$g$ 像&amp;quot;结构正则项&amp;quot;——诱导稀疏性、低秩性等结构，虽不可微但具有&lt;strong&gt;便宜可算的邻近算子&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;713-典型例子必背&#34;&gt;7.1.3 典型例子（必背）
+&lt;/h3&gt;&lt;p&gt;复合优化问题 $f(x)+g(x)$ 的经典实例：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;问题名称&lt;/th&gt;
+					&lt;th&gt;光滑部分 $f(x)$&lt;/th&gt;
+					&lt;th&gt;非光滑部分 $g(x)$&lt;/th&gt;
+					&lt;th&gt;应用场景&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;LASSO&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$\frac{1}{2}|Ax-b|^2$（最小二乘损失）&lt;/td&gt;
+					&lt;td&gt;$\lambda|x|_1$（$\ell_1$ 范数）&lt;/td&gt;
+					&lt;td&gt;稀疏线性回归，变量选择&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;岭回归 (Ridge)&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$\frac{1}{2}|Ax-b|^2$&lt;/td&gt;
+					&lt;td&gt;$\frac{\lambda}{2}|x|^2$（$\ell_2^2$，光滑的！）&lt;/td&gt;
+					&lt;td&gt;共线性处理，参数收缩&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;弹性网 (Elastic Net)&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$\frac{1}{2}|Ax-b|^2$&lt;/td&gt;
+					&lt;td&gt;$\lambda_1|x|_1 + \frac{\lambda_2}{2}|x|^2$&lt;/td&gt;
+					&lt;td&gt;兼具稀疏和组效应的回归&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;约束优化&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$f(x)$（任意光滑凸函数）&lt;/td&gt;
+					&lt;td&gt;$\delta_C(x)$（集合 $C$ 的指示函数）&lt;/td&gt;
+					&lt;td&gt;带约束的各类优化&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;矩阵补全&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$\frac{1}{2}|P_\Omega(X-M)|_F^2$&lt;/td&gt;
+					&lt;td&gt;$\lambda|X|_*$（核范数）&lt;/td&gt;
+					&lt;td&gt;推荐系统、图像修复&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;组 LASSO&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$\frac{1}{2}|Ax-b|^2$&lt;/td&gt;
+					&lt;td&gt;$\lambda\sum_g |x_g|_2$（组 $\ell_2$ 和）&lt;/td&gt;
+					&lt;td&gt;结构化特征选择&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;指示函数 $\delta_C(x)$ 的定义&lt;/strong&gt;（回顾）：$\delta_C(x)=0$ 当 $x\in C$，否则 $\delta_C(x)=+\infty$。它是&amp;quot;禁止出界&amp;quot;的数学表达——任何使 $x$ 落在 $C$ 外的点都会被目标函数 $+\infty$ 无情拒绝。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&#34;714-为什么梯度下降法搞不定&#34;&gt;7.1.4 为什么梯度下降法搞不定？
+&lt;/h3&gt;&lt;p&gt;以 LASSO 的标量版本为例：$\min_x \frac{1}{2}(x-a)^2 + \lambda|x|$。取 $a=2$，$\lambda=1$。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;当 $x&amp;gt;0$ 时，$|x|$ 的导数为 $+1$，梯度是 $x-a+\lambda = x-2+1 = x-1$&lt;/li&gt;
+&lt;li&gt;当 $x&amp;lt;0$ 时，$|x|$ 的导数为 $-1$，梯度是 $x-a-\lambda = x-2-1 = x-3$&lt;/li&gt;
+&lt;li&gt;当 $x=0$ 时，$|x|$ 的&lt;strong&gt;梯度不存在&lt;/strong&gt;（这是一个尖角！）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;梯度下降法在 $x=0$ 处不知道该往哪走。即使 $x\neq 0$，当 $x$ 接近 $0$ 时，$|x|$ 的梯度在 $+1$ 和 $-1$ 之间跳变（不连续），导致 GD 在原点附近震荡。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;要点&lt;/strong&gt;：问题不在于&amp;quot;不可微&amp;quot;本身——次梯度法可以处理不可微。问题在于 GD/次梯度法的收敛率太慢。邻近梯度法利用了 $f$ 的光滑性，达到了 $O(1/k)$，而次梯度法只有 $O(1/\sqrt{k})$。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：复合优化问题 $\min f+g$ 中，$f$ 负责光滑拟合（有梯度可用），$g$ 负责结构正则化（虽不可微但 prox 好算）。邻近梯度法将两者分开处理，利用了 $f$ 的光滑性获得了优于次梯度法的收敛率。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;72-邻近算子proximal-operator本章灵魂&#34;&gt;7.2 邻近算子（Proximal Operator）——本章灵魂
+&lt;/h2&gt;&lt;h3 id=&#34;721-定义&#34;&gt;7.2.1 定义
+&lt;/h3&gt;&lt;p&gt;对于闭凸函数 $g:\mathbb{R}^n\to\mathbb{R}\cup{+\infty}$，其在点 $x$ 处的&lt;strong&gt;邻近算子&lt;/strong&gt;定义为：&lt;/p&gt;
+$$\boxed{\text{prox}_g(x) = \arg\min_{z\in\mathbb{R}^n} \left\{g(z) + \frac{1}{2}\|z - x\|^2\right\}}$$&lt;p&gt;&lt;strong&gt;读作&lt;/strong&gt;：&amp;ldquo;函数 $g$ 在点 $x$ 处的邻近算子&amp;rdquo;。它的意思是：从当前位置 $x$ 出发，找一个&amp;quot;折中点&amp;quot; $z$，使得 $g(z)$ 尽量小，同时又不能离 $x$ 太远（$\frac{1}{2}|z-x|^2$ 是惩罚项）。&lt;/p&gt;
+&lt;p&gt;带步长的参数化版本（$\alpha &amp;gt; 0$ 控制&amp;quot;可以走多远&amp;quot;）：&lt;/p&gt;
+$$\text{prox}_{\alpha g}(x) = \arg\min_{z} \left\{g(z) + \frac{1}{2\alpha}\|z - x\|^2\right\}$$&lt;h3 id=&#34;722-为什么加-frac12z-x2三个理由&#34;&gt;7.2.2 为什么加 $\frac{1}{2}|z-x|^2$？——三个理由
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;理由一：保证解的存在唯一性（强凸化作用）&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;$g(z)$ 可能只是凸的（如 $\ell_1$ 范数：$|\cdot|_1$ 不是强凸的——沿着坐标轴方向它是平的）。但 $g(z)+\frac{1}{2}|z-x|^2$ 中的二次项 $\frac{1}{2}|z-x|^2$ 是 &lt;strong&gt;1-强凸&lt;/strong&gt;的（它的 Hessian 是单位矩阵 $I$，最小特征值为 1）。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;强凸函数&lt;/strong&gt;（Strictly Convex 的强化版）的直观：一个 $\mu$-强凸函数 $h$ 满足 $h(y)\geq h(x)+\nabla h(x)^T(y-x)+\frac{\mu}{2}|y-x|^2$，即它被一个二次函数从下面&amp;quot;托住&amp;quot;。强凸函数在有下界的闭函数上必有&lt;strong&gt;唯一的&lt;/strong&gt;全局极小点。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;因此 $\arg\min_z{g(z)+\frac{1}{2}|z-x|^2}$ 永远存在且唯一。邻近算子是&lt;strong&gt;良定义的&lt;/strong&gt;（well-defined）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;理由二：防止&amp;quot;跑太远&amp;quot;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;如果不加二次项，邻近算子退化为 $\arg\min_z g(z)$——直接找 $g$ 的全局最小值，这等于回到了原问题。二次惩罚 $\frac{1}{2}|z-x|^2$ 强迫解只能待在 $x$ 的&amp;quot;邻近&amp;quot;。步长 $\alpha$ 控制&amp;quot;邻近&amp;quot;的程度：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;当 $\alpha \to 0$（步长极小）：惩罚项主导，$\text{prox}_{\alpha g}(x) \approx x$（几乎不移动）&lt;/li&gt;
+&lt;li&gt;当 $\alpha \to \infty$（步长极大）：$g$ 主导，$\text{prox}_{\alpha g}(x) \to \arg\min_z g(z)$（直奔 $g$ 的最小化点）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;理由三：与 Moreau 包络的桥梁关系&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Moreau 包络（将在 Ch9 详细展开）定义为 $M_g(x)=\min_z{g(z)+\frac{1}{2}|z-x|^2}$，并且它有一个极优美的性质：&lt;/p&gt;
+$$\nabla M_g(x) = x - \text{prox}_g(x)$$&lt;p&gt;这意味着：邻近算子将&lt;strong&gt;非光滑函数&lt;/strong&gt; $g$ 变为了&lt;strong&gt;光滑函数&lt;/strong&gt; $M_g$ 的梯度计算工具——邻近算子是连接非光滑优化和光滑优化的桥梁。&lt;/p&gt;
+&lt;h3 id=&#34;723-刻画不等式必背必须会推导&#34;&gt;7.2.3 刻画不等式（必背，必须会推导）
+&lt;/h3&gt;&lt;p&gt;设 $z^* = \text{prox}_g(x)$ 是上述极小化问题的最优解。由凸优化的&lt;strong&gt;一阶最优性条件&lt;/strong&gt;：$0 \in \partial h(z^*)$（其中 $h(z) = g(z) + \frac{1}{2}|z-x|^2$）。&lt;/p&gt;
+&lt;p&gt;计算次梯度：
+&lt;/p&gt;
+$$\partial h(z) = \partial g(z) + (z - x)$$&lt;p&gt;在最优解 $z^&lt;em&gt;$ 处，$0 \in \partial g(z^&lt;/em&gt;) + (z^* - x)$。移项即得：&lt;/p&gt;
+$$\boxed{x - \text{prox}_g(x) \in \partial g(\text{prox}_g(x))}$$&lt;p&gt;&lt;strong&gt;用大白话说&lt;/strong&gt;：从 prox 点指向原点的向量 $x-\text{prox}_g(x)$，恰好是函数 $g$ 在 prox 点处的&lt;strong&gt;一个次梯度&lt;/strong&gt;。这好比：如果你从最低点往上走一格，你走过的方向就是函数的&amp;quot;上升方向&amp;quot;。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;等价写法&lt;/strong&gt;：
+&lt;/p&gt;
+$$z^* = \text{prox}_g(x) \iff x \in z^* + \partial g(z^*) \iff x \in (\text{id} + \partial g)(z^*)$$&lt;p&gt;两边取逆映射：$\text{prox}_g = (\text{id} + \partial g)^{-1}$。邻近算子在数学上又称为&lt;strong&gt;预解式（resolvent）&lt;/strong&gt;——这是它在单调算子理论中的标准名称。&lt;/p&gt;
+&lt;h3 id=&#34;724-常见邻近算子闭式解必背考试高频&#34;&gt;7.2.4 常见邻近算子闭式解（必背，考试高频）
+&lt;/h3&gt;&lt;h4 id=&#34;1-ell_1-范数--软阈值算子soft-thresholding&#34;&gt;(1) $\ell_1$ 范数 → 软阈值算子（Soft-Thresholding）
+&lt;/h4&gt;$$g(x) = \lambda\|x\|_1 = \lambda\sum_{i=1}^n |x_i|$$$$\boxed{\text{prox}_{\lambda\|\cdot\|_1}(x) = S_\lambda(x)}$$&lt;p&gt;其中软阈值算子的分量形式：
+&lt;/p&gt;
+$$\boxed{[S_\lambda(x)]_i = \text{sign}(x_i) \cdot \max\{|x_i| - \lambda,\; 0\}}$$&lt;p&gt;&lt;strong&gt;完整推导&lt;/strong&gt;（务必掌握）：&lt;/p&gt;
+&lt;p&gt;问题等价于对每个分量独立求解（因为 $|x|_1$ 和 $|x|^2$ 都是分量可分的）：
+&lt;/p&gt;
+$$\min_z \left\{\lambda|z| + \frac{1}{2}(z - x)^2\right\}$$&lt;p&gt;这里 $z, x \in \mathbb{R}$ 是标量（一个分量）。对 $z\neq 0$，上述目标函数可导。但 $z=0$ 处 $|z|$ 不可导，需要用次梯度的最优性条件：&lt;/p&gt;
+$$0 \in \lambda \cdot \partial|z| + (z - x)$$&lt;p&gt;其中 $|z|$ 的次梯度为：
+&lt;/p&gt;
+$$\partial|z| = \begin{cases} \{1\}, &amp; z &gt; 0 \\ [-1, 1], &amp; z = 0 \\ \{-1\}, &amp; z &lt; 0 \end{cases}$$&lt;p&gt;&lt;strong&gt;分三种情况讨论&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;情况一&lt;/strong&gt;：$z &amp;gt; 0$。此时 $\partial|z| = {1}$，代入最优性条件：
+&lt;/p&gt;
+$$0 = \lambda \cdot 1 + (z - x) = z + \lambda - x$$&lt;p&gt;解得 $z = x - \lambda$。但这要求 $z &amp;gt; 0$，即 $x &amp;gt; \lambda$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;情况二&lt;/strong&gt;：$z &amp;lt; 0$。此时 $\partial|z| = {-1}$，代入：
+&lt;/p&gt;
+$$0 = \lambda \cdot (-1) + (z - x) = z - \lambda - x$$&lt;p&gt;解得 $z = x + \lambda$。但这要求 $z &amp;lt; 0$，即 $x &amp;lt; -\lambda$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;情况三&lt;/strong&gt;：$z = 0$。此时 $0 \in \lambda[-1, 1] - x$，即 $x \in [-\lambda, \lambda]$。这意味着当 $|x| \leq \lambda$ 时，最优解就是 $z^* = 0$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;汇总&lt;/strong&gt;：
+&lt;/p&gt;
+$$z^* = \begin{cases} x - \lambda, &amp; x &gt; \lambda \\ 0, &amp; |x| \leq \lambda \\ x + \lambda, &amp; x &lt; -\lambda \end{cases}$$&lt;p&gt;用符号函数简洁地写为：$z^* = \text{sign}(x) \cdot \max{|x| - \lambda, 0}$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;几何直觉&lt;/strong&gt;：软阈值将绝对值小于阈值 $\lambda$ 的数&amp;quot;压扁&amp;quot;为零（这就是 LASSO 产生&lt;strong&gt;稀疏解&lt;/strong&gt;的原因！），大于 $\lambda$ 的数则向零收缩 $\lambda$。&lt;/p&gt;
+&lt;h4 id=&#34;2-ell_2-范数--缩水算子&#34;&gt;(2) $\ell_2$ 范数 → 缩水算子
+&lt;/h4&gt;$$g(x) = \lambda\|x\|_2$$$$\boxed{\text{prox}_{\lambda\|\cdot\|_2}(x) = \begin{cases} \left(1 - \dfrac{\lambda}{\|x\|_2}\right)x, &amp; \|x\|_2 &gt; \lambda \\[8pt] 0, &amp; \|x\|_2 \leq \lambda \end{cases}}$$&lt;p&gt;&lt;strong&gt;推导&lt;/strong&gt;：当 $z \neq 0$ 时，$\ell_2$ 范数可微，$\nabla_z|z|_2 = \frac{z}{|z|_2}$。最优性条件：
+&lt;/p&gt;
+$$\lambda \frac{z}{\|z\|_2} + (z - x) = 0$$&lt;p&gt;整理：$z(1 + \frac{\lambda}{|z|_2}) = x$。由此可得 $z$ 与 $x$ 同方向（共线），即 $z = c \cdot x$ 对某个常数 $c \geq 0$。代入：
+&lt;/p&gt;
+$$\lambda \frac{cx}{\|cx\|_2} + (cx - x) = \lambda \frac{x}{\|x\|_2} + (c-1)x = 0$$&lt;p&gt;推得 $c = 1 - \frac{\lambda}{|x|_2}$。当 $|x|_2 \leq \lambda$ 时 $c \leq 0$，但 $c$ 应为非负，此时 $z^* = 0$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;几何直觉&lt;/strong&gt;：将整个向量的长度向零缩小 $\lambda$——如果原长度不到 $\lambda$，直接变成零向量。&lt;/p&gt;
+&lt;h4 id=&#34;3-指示函数--投影算子&#34;&gt;(3) 指示函数 → 投影算子
+&lt;/h4&gt;$$g(x) = \delta_C(x) = \begin{cases} 0, &amp; x \in C \\ +\infty, &amp; x \notin C \end{cases}$$$$\boxed{\text{prox}_{\delta_C}(x) = P_C(x) = \arg\min_{z \in C} \|z - x\|^2}$$&lt;p&gt;&lt;strong&gt;解释&lt;/strong&gt;：指示函数的邻近算子就是到集合 $C$ 的&lt;strong&gt;欧几里得投影&lt;/strong&gt;——在集合内找一个离 $x$ 最近的点。此时邻近梯度法&lt;strong&gt;退化为投影梯度法&lt;/strong&gt;（Ch6）。&lt;/p&gt;
+&lt;h4 id=&#34;4-核范数nuclear-norm-svd-软阈值&#34;&gt;(4) 核范数（Nuclear Norm）→ SVD 软阈值
+&lt;/h4&gt;$$g(X) = \lambda\|X\|_* = \lambda\sum_{i=1}^r \sigma_i(X)$$&lt;p&gt;其中 $\sigma_i(X)$ 是矩阵 $X$ 的&lt;strong&gt;奇异值&lt;/strong&gt;（Singular Values），$r = \text{rank}(X)$。&lt;/p&gt;
+&lt;p&gt;设 $X = U\Sigma V^T$ 为 SVD 分解（$\Sigma = \text{diag}(\sigma_1, \sigma_2, \ldots)$）：
+&lt;/p&gt;
+$$\boxed{\text{prox}_{\lambda\|\cdot\|_*}(X) = U \cdot \text{diag}\big(S_\lambda(\sigma_1), S_\lambda(\sigma_2), \ldots\big) \cdot V^T}$$&lt;p&gt;&lt;strong&gt;核心操作&lt;/strong&gt;：保持奇异向量 $U, V$ 不变，&lt;strong&gt;只对奇异值做软阈值&lt;/strong&gt;！这意味着小的奇异值被压缩为 0，从而降低矩阵的秩。&lt;/p&gt;
+&lt;h4 id=&#34;5-二次正则化ell_22-范数&#34;&gt;(5) 二次正则化（$\ell_2^2$ 范数）
+&lt;/h4&gt;$$g(x) = \frac{\lambda}{2}\|x\|^2$$$$\boxed{\text{prox}_{\frac{\lambda}{2}\|\cdot\|^2}(x) = \frac{1}{1 + \lambda}x}$$&lt;p&gt;&lt;strong&gt;推导&lt;/strong&gt;：$\min_z {\frac{\lambda}{2}|z|^2 + \frac{1}{2}|z-x|^2}$。这是光滑的，直接对 $z$ 求导：
+&lt;/p&gt;
+$$\lambda z + (z - x) = 0 \implies (1+\lambda)z = x \implies z = \frac{x}{1+\lambda}$$&lt;p&gt;正是对 $x$ 做了一个缩放收缩。&lt;/p&gt;
+&lt;h4 id=&#34;6-组-lassogroup-lasso&#34;&gt;(6) 组 LASSO（Group LASSO）
+&lt;/h4&gt;$$g(x) = \lambda\sum_{g \in \mathcal{G}} \|x_g\|_2$$&lt;p&gt;其中 $\mathcal{G}$ 是变量分组的索引集，$x_g$ 是第 $g$ 组变量拼成的子向量。&lt;/p&gt;
+&lt;p&gt;各组之间是&lt;strong&gt;可分离&lt;/strong&gt;的，每组独立做 $\ell_2$ 范数的邻近算子：
+&lt;/p&gt;
+$$\boxed{[\text{prox}_{\lambda\sum_g \|\cdot\|_2}(x)]_g = \max\left\{1 - \frac{\lambda}{\|x_g\|_2},\; 0\right\} \cdot x_g}$$&lt;h3 id=&#34;725-邻近算子的基本性质&#34;&gt;7.2.5 邻近算子的基本性质
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;1. 非扩张性（Firm Nonexpansiveness）&lt;/strong&gt;：
+&lt;/p&gt;
+$$\|\text{prox}_g(x) - \text{prox}_g(y)\|^2 \leq \langle \text{prox}_g(x) - \text{prox}_g(y),\; x - y \rangle$$&lt;p&gt;由 Cauchy-Schwarz 不等式 $\langle a,b\rangle \leq |a||b|$ 可得更弱但更好记的形式：
+&lt;/p&gt;
+$$\boxed{\|\text{prox}_g(x) - \text{prox}_g(y)\| \leq \|x - y\|}$$&lt;p&gt;&lt;strong&gt;大白话&lt;/strong&gt;：邻近算子不会把两个点&amp;quot;拉开&amp;quot;——两个输入点 $x, y$ 之间的距离，经过邻近算子映射后只会变小或不变，&lt;strong&gt;绝不放大&lt;/strong&gt;。这是一切邻近算子收敛性分析的基石。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;2. 不动点性质&lt;/strong&gt;：$x^&lt;em&gt;$ 是 $\min g(x)$ 的最优解 $\iff$ $x^&lt;/em&gt; = \text{prox}_g(x^*)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：由刻画不等式，$x^* = \text{prox}_g(x^&lt;em&gt;)$ 等价于 $x^&lt;/em&gt; - x^* = 0 \in \partial g(x^*)$，这正是 $\min g$ 的最优性条件。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;3. 可分性&lt;/strong&gt;：若 $g(x) = \sum_{i} g_i(x_i)$（各分量独立），则：
+&lt;/p&gt;
+$$[\text{prox}_g(x)]_i = \text{prox}_{g_i}(x_i)$$&lt;p&gt;这意味着各分量可以分头计算——这正好是并行计算的基础。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：邻近算子 $\text{prox}_g(x)$ 是函数 $g$ 的&amp;quot;局部优化映射&amp;quot;——在 $x$ 附近找一个使 $g$ 尽可能小的点，由 $\frac{1}{2}|z-x|^2$ 惩罚项约束不要走太远。它的刻画不等式 $x-\text{prox}_g(x) \in \partial g(\text{prox}_g(x))$ 和常见闭式解（软阈值、投影、SVD 软阈值）是本章和后继章节的所有推导基础。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;73-ista-迭代与收敛&#34;&gt;7.3 ISTA 迭代与收敛
+&lt;/h2&gt;&lt;h3 id=&#34;731-迭代格式推导从零开始&#34;&gt;7.3.1 迭代格式推导（从零开始）
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;目标&lt;/strong&gt;：$\min_x F(x) = f(x) + g(x)$，$f$ 为 $L$-smooth 凸函数，$g$ 为闭凸函数。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;推导思路&lt;/strong&gt;：我们不能直接在 $F$ 上做梯度下降（因为 $g$ 不可微）。但我们可以&lt;strong&gt;在 $f$ 上做梯度下降，在 $g$ 上做邻近步&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;具体地，在第 $k$ 步，我们在当前点 $x_k$ 处构造 $f$ 的二次上界近似。由 $L$-smooth 性质（Ch2 的核心不等式）：
+&lt;/p&gt;
+$$f(y) \leq f(x) + \nabla f(x)^T(y - x) + \frac{L}{2}\|y - x\|^2$$&lt;p&gt;这就好比：虽然真实的 $f$ 可能弯曲复杂，但在 $x_k$ 附近，我们用一个开口向上的二次碗来&amp;quot;从上方盖住&amp;quot;它——在这个碗之下的 $f$ 值一定更低。&lt;/p&gt;
+&lt;p&gt;用这个二次上界加上 $g$ 构造一个&lt;strong&gt;代理函数&lt;/strong&gt;（更容易极小化）：
+&lt;/p&gt;
+$$\begin{aligned}
+F(x) &amp;= f(x) + g(x) \\
+&amp;\leq f(x_k) + \nabla f(x_k)^T(x - x_k) + \frac{L}{2}\|x - x_k\|^2 + g(x) \\
+&amp;= Q(x; x_k)
+\end{aligned}$$&lt;p&gt;极小化这个上界（而不是原函数）：
+&lt;/p&gt;
+$$\begin{aligned}
+x_{k+1} &amp;= \arg\min_x Q(x; x_k) \\
+&amp;= \arg\min_x \left\{f(x_k) + \nabla f(x_k)^T(x - x_k) + \frac{1}{2\alpha}\|x - x_k\|^2 + g(x)\right\}
+\end{aligned}$$&lt;p&gt;其中 $\alpha = 1/L$。&lt;strong&gt;配平方消去与 $x$ 无关的常数项&lt;/strong&gt;：
+&lt;/p&gt;
+$$\begin{aligned}
+&amp;\nabla f(x_k)^T(x - x_k) + \frac{1}{2\alpha}\|x - x_k\|^2 \\
+&amp;= \frac{1}{2\alpha}\left(2\alpha\nabla f(x_k)^T(x - x_k) + \|x - x_k\|^2\right) \\
+&amp;= \frac{1}{2\alpha}\|x - x_k + \alpha\nabla f(x_k)\|^2 - \frac{\alpha}{2}\|\nabla f(x_k)\|^2
+\end{aligned}$$&lt;p&gt;常数项 $f(x_k)$ 和 $-\frac{\alpha}{2}|\nabla f(x_k)|^2$ 不影响 $\arg\min$，可以扔掉。因此：
+&lt;/p&gt;
+$$\begin{aligned}
+x_{k+1} &amp;= \arg\min_x \left\{g(x) + \frac{1}{2\alpha}\|x - (x_k - \alpha\nabla f(x_k))\|^2\right\} \\
+&amp;= \text{prox}_{\alpha g}\big(x_k - \alpha \nabla f(x_k)\big)
+\end{aligned}$$&lt;p&gt;&lt;strong&gt;这就是邻近梯度法的核心迭代公式&lt;/strong&gt;：&lt;/p&gt;
+$$\boxed{x_{k+1} = \text{prox}_{\alpha g}\big(x_k - \alpha \nabla f(x_k)\big)}$$&lt;p&gt;&lt;strong&gt;两步操作的直觉&lt;/strong&gt;：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;前向步（Forward Step）&lt;/strong&gt;：$x_k - \alpha\nabla f(x_k)$ → 沿着光滑部分 $f$ 的负梯度方向走一步。你&amp;quot;看&amp;quot;的是 $f$ 的下坡方向。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;后向步（Backward Step）&lt;/strong&gt;：$\text{prox}_{\alpha g}(\cdot)$ → 在走到的位置附近，找一个使 $g$ 小且不跑太远的点。你&amp;quot;停&amp;quot;在了 $g$ 的合理区域内。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;因此也称为&lt;strong&gt;前向后向分裂法（Forward-Backward Splitting）&lt;/strong&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;732-特例的统一一个框架包含一切&#34;&gt;7.3.2 特例的统一——一个框架包含一切
+&lt;/h3&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;$g(x)$&lt;/th&gt;
+					&lt;th&gt;$\text{prox}_{\alpha g}$&lt;/th&gt;
+					&lt;th&gt;退化成的算法&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$0$&lt;/td&gt;
+					&lt;td&gt;恒等映射 $z \mapsto z$&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;梯度下降法&lt;/strong&gt;（GD, Ch2）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\delta_C(x)$&lt;/td&gt;
+					&lt;td&gt;投影 $P_C$&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;投影梯度法&lt;/strong&gt;（PGM, Ch6）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\lambda|x|_1$&lt;/td&gt;
+					&lt;td&gt;软阈值 $S_{\alpha\lambda}$&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;ISTA&lt;/strong&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\lambda|X|_*$&lt;/td&gt;
+					&lt;td&gt;SVD 软阈值&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;Soft-Impute&lt;/strong&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\frac{\lambda}{2}|x|^2$&lt;/td&gt;
+					&lt;td&gt;$\frac{x}{1+\alpha\lambda}$&lt;/td&gt;
+					&lt;td&gt;收缩梯度法&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;邻近梯度法是最一般的框架&lt;/strong&gt;——通过选择不同的 $g$ 和对应的邻近算子，它&lt;strong&gt;统一了所有一阶方法&lt;/strong&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;733-梯度映射gradient-mapping&#34;&gt;7.3.3 梯度映射（Gradient Mapping）
+&lt;/h3&gt;&lt;p&gt;为了判定邻近梯度法的收敛，需要定义一个类似于&amp;quot;梯度&amp;quot;的量来衡量收敛进度。&lt;/p&gt;
+$$\boxed{G_\alpha(x) = \frac{1}{\alpha}\big(x - \text{prox}_{\alpha g}(x - \alpha\nabla f(x))\big)}$$&lt;p&gt;&lt;strong&gt;关键性质&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;当 $g = 0$（没有非光滑部分）时：$G_\alpha(x) = \frac{1}{\alpha}(x - (x - \alpha\nabla f(x))) = \nabla f(x)$，&lt;strong&gt;退化为普通梯度&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;最优性判据&lt;/strong&gt;：$G_\alpha(x^&lt;em&gt;) = 0 \iff x^&lt;/em&gt;$ 是 $\min f+g$ 的最优解。（证明：$G_\alpha(x^&lt;em&gt;) = 0$ 意味着 $x^&lt;/em&gt; = \text{prox}_{\alpha g}(x^* - \alpha\nabla f(x^*))$，这正是 7.3.4 节证明的复合优化不动点条件。）&lt;/li&gt;
+&lt;li&gt;$G_\alpha(x)$ 是复合优化问题的&amp;quot;&lt;strong&gt;有效梯度&lt;/strong&gt;&amp;quot;——当 $G_\alpha(x) \to 0$，算法收敛。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;734-o1k-收敛率证明核心证明必须完整掌握&#34;&gt;7.3.4 $O(1/k)$ 收敛率证明（核心证明，必须完整掌握）
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;定理&lt;/strong&gt;：设 $f$ 为 $L$-smooth 凸函数，$g$ 为闭凸函数，取固定步长 $\alpha = 1/L$，则 ISTA 满足：&lt;/p&gt;
+$$\boxed{F(x_k) - F^* \leq \frac{L\|x_0 - x^*\|^2}{2k}}$$&lt;p&gt;其中 $F^* = \min_x F(x) = F(x^*)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;（分四步，考试标准完整写法）：&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;Step 1：利用邻近算子定义建立不等式&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;记 $x^+ = \text{prox}_{\alpha g}(x - \alpha\nabla f(x))$（从 $x$ 做一步迭代得到 $x^+$）。由邻近算子的定义（它以 $z$ 为极小化变量）：
+&lt;/p&gt;
+$$x^+ = \arg\min_z \left\{g(z) + \frac{1}{2\alpha}\|z - (x - \alpha\nabla f(x))\|^2\right\}$$&lt;p&gt;这意味着对任意 $z$（特别地取 $z = x$）：
+&lt;/p&gt;
+$$g(x^+) + \frac{1}{2\alpha}\|x^+ - (x - \alpha\nabla f(x))\|^2 \leq g(x) + \frac{1}{2\alpha}\|x - (x - \alpha\nabla f(x))\|^2$$&lt;p&gt;右端化简（$x - (x - \alpha\nabla f(x)) = \alpha\nabla f(x)$）：
+&lt;/p&gt;
+$$g(x^+) + \frac{1}{2\alpha}\|x^+ - x + \alpha\nabla f(x)\|^2 \leq g(x) + \frac{\alpha}{2}\|\nabla f(x)\|^2$$&lt;p&gt;将左端范数平方展开：
+&lt;/p&gt;
+$$\begin{aligned}
+&amp;\|x^+ - x + \alpha\nabla f(x)\|^2 \\
+&amp;= \|x^+ - x\|^2 + 2\alpha\langle \nabla f(x), x^+ - x \rangle + \alpha^2\|\nabla f(x)\|^2
+\end{aligned}$$&lt;p&gt;代入不等式并整理：
+&lt;/p&gt;
+$$g(x^+) \leq g(x) - \langle \nabla f(x), x^+ - x \rangle - \frac{1}{2\alpha}\|x^+ - x\|^2 \tag{1}$$&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;Step 2：利用 $f$ 的 $L$-smooth 性&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;由 $L$-smooth 的二次上界不等式（取 $y = x^+$）：
+&lt;/p&gt;
+$$f(x^+) \leq f(x) + \langle \nabla f(x), x^+ - x \rangle + \frac{L}{2}\|x^+ - x\|^2 \tag{2}$$&lt;p&gt;（回顾：这个不等式的含义是——$f$ 在 $x$ 处的二阶导数被 $L$ 控制，所以真实的 $f(x^+)$ 不超过在 $x$ 处做泰勒展开到一阶再加一个二次修正项。）&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;Step 3：合并 (1) 和 (2)&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;将 (1) 和 (2) 左右分别相加：
+&lt;/p&gt;
+$$\begin{aligned}
+F(x^+) &amp;= f(x^+) + g(x^+) \\
+&amp;\leq f(x) + g(x) + \left(\frac{L}{2} - \frac{1}{2\alpha}\right)\|x^+ - x\|^2
+\end{aligned}$$&lt;p&gt;取 $\alpha = 1/L$，上式中 $\frac{L}{2} - \frac{1}{2\alpha} = \frac{L}{2} - \frac{L}{2} = 0$。因此：&lt;/p&gt;
+$$\boxed{F(x_{k+1}) \leq F(x_k) - \frac{L}{2}\|x_{k+1} - x_k\|^2}$$&lt;p&gt;这就是&lt;strong&gt;充分下降性&lt;/strong&gt;（Sufficient Decrease Property）。它告诉我们：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$F(x_k)$ &lt;strong&gt;单调不增&lt;/strong&gt;（每步要么严格下降，要么不动）&lt;/li&gt;
+&lt;li&gt;$|x_{k+1} - x_k| \to 0$（相邻迭代的距离趋于零）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;Step 4：从梯度映射推导 $O(1/k)$ 速率&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;引入 Lyapunov 函数（一个每步不增的&amp;quot;能量函数&amp;quot;）：
+&lt;/p&gt;
+$$\Phi_k = k(F(x_k) - F^*) + \frac{L}{2}\|x_k - x^*\|^2$$&lt;p&gt;其中 $x^*$ 是任意一个最优解。目标：证明 $\Phi_{k+1} \leq \Phi_k$（能量不增）。&lt;/p&gt;
+&lt;p&gt;由凸性：$f(x_k) - f(x^&lt;em&gt;) \leq \langle \nabla f(x_k), x_k - x^&lt;/em&gt; \rangle$（凸函数的一阶下界不等式）。&lt;/p&gt;
+&lt;p&gt;由 $g$ 的凸性和 $x_{k+1}$ 的邻近算子刻画（需要更精细的推导，此处省略递推细节），可以证明：
+&lt;/p&gt;
+$$\Phi_{k+1} \leq \Phi_k + \text{（非正项）} \leq \Phi_k$$&lt;p&gt;由于 $\Phi_k$ 非增且非负，有：
+&lt;/p&gt;
+$$k(F(x_k) - F^*) \leq \Phi_k \leq \Phi_0 = 0 \cdot (F(x_0) - F^*) + \frac{L}{2}\|x_0 - x^*\|^2 = \frac{L}{2}\|x_0 - x^*\|^2$$&lt;p&gt;因此：
+&lt;/p&gt;
+$$F(x_k) - F^* \leq \frac{L\|x_0 - x^*\|^2}{2k}$$&lt;p&gt;这就是 $O(1/k)$ 收敛率——迭代 100 次，误差缩小到原来的 $1/100$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;与次梯度法的对比&lt;/strong&gt;：次梯度法（Ch4）只有 $O(1/\sqrt{k})$——迭代 100 次误差才缩小到 $1/10$。邻近梯度法快得多的根本原因是它&lt;strong&gt;利用了 $f$ 的光滑性&lt;/strong&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;735-ista-for-lasso-实现&#34;&gt;7.3.5 ISTA for LASSO 实现
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;LASSO 问题&lt;/strong&gt;：$\min_x \frac{1}{2}|Ax - b|^2 + \lambda|x|_1$&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;ISTA 迭代&lt;/strong&gt;：
+&lt;/p&gt;
+$$\boxed{x_{k+1} = S_{\lambda/L}\left(x_k - \frac{1}{L}A^T(Ax_k - b)\right)}$$&lt;p&gt;其中 $L = \lambda_{\max}(A^T A)$（$A^T A$ 的最大特征值，是 $\frac{1}{2}|Ax-b|^2$ 的梯度 Lipschitz 常数），$S_{\lambda/L}$ 是阈值为 $\lambda/L$ 的软阈值算子。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;每步计算量分解&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;计算残差 $Ax_k - b$：矩阵-向量乘，$O(mn)$（$A$ 是 $m \times n$ 矩阵）&lt;/li&gt;
+&lt;li&gt;计算 $A^T(Ax_k - b)$：$O(mn)$&lt;/li&gt;
+&lt;li&gt;软阈值 $S_{\lambda/L}(\cdot)$：$O(n)$（每个分量独立操作）&lt;/li&gt;
+&lt;li&gt;总计：$O(mn)$ / 迭代&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;停机准则&lt;/strong&gt;：$|x_{k+1} - x_k| \leq \varepsilon$（迭代点不再显著移动）或 $|F(x_{k+1}) - F(x_k)| \leq \varepsilon$（目标函数值不再显著变化）。&lt;/p&gt;
+&lt;h3 id=&#34;736-线搜索版本当-l-未知时&#34;&gt;7.3.6 线搜索版本（当 $L$ 未知时）
+&lt;/h3&gt;&lt;p&gt;当 $L$ 未知时，使用&lt;strong&gt;回溯线搜索&lt;/strong&gt;（Backtracking Line Search）：&lt;/p&gt;
+&lt;p&gt;初始化 $\alpha = \alpha_0$（尝试步长），重复 $\alpha \leftarrow \beta\alpha$（$\beta \in (0,1)$，如 $\beta=0.5$）直到满足：
+&lt;/p&gt;
+$$f(x^+) \leq f(x) + \langle \nabla f(x), x^+ - x \rangle + \frac{1}{2\alpha}\|x^+ - x\|^2$$&lt;p&gt;其中 $x^+ = \text{prox}_{\alpha g}(x - \alpha\nabla f(x))$。这个不等式确保我们用&amp;quot;安全&amp;quot;的步长走进了 $f$ 的二次上界之内。线搜索版本仍然保持 $O(1/k)$ 收敛率。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：邻近梯度法的迭代 $x_{k+1} = \text{prox}_{\alpha g}(x_k - \alpha\nabla f(x_k))$ 分两步：前向梯度步（处理光滑的 $f$），后向邻近步（处理非光滑的 $g$）。收敛率为 $O(1/k)$，利用了 $f$ 的光滑性，远优于次梯度法的 $O(1/\sqrt{k})$。LASSO 的 ISTA 实现中，每步的计算量主要是一个矩阵-向量乘。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;74-矩阵补全soft-impute-算法&#34;&gt;7.4 矩阵补全：Soft-Impute 算法
+&lt;/h2&gt;&lt;h3 id=&#34;741-问题建模&#34;&gt;7.4.1 问题建模
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;矩阵补全&lt;/strong&gt;（Matrix Completion）：给定部分观测的矩阵 $M$（只有索引集 $\Omega$ 中的位置有数值），希望恢复完整的&lt;strong&gt;低秩&lt;/strong&gt;矩阵。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;凸松弛形式&lt;/strong&gt;（秩最小化可松弛为核范数最小化）：
+&lt;/p&gt;
+$$\boxed{\min_{X \in \mathbb{R}^{m \times n}} \frac{1}{2}\|P_\Omega(X - M)\|_F^2 + \lambda\|X\|_*}$$&lt;p&gt;&lt;strong&gt;符号解释&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$P_\Omega$：投影到观测索引集上。$[P_\Omega(X)]&lt;em&gt;{ij} = X&lt;/em&gt;{ij}$ 若 $(i,j) \in \Omega$，否则为 $0$（即只在观测位置保留 $X$ 的值，缺失位置填 0）。&lt;/li&gt;
+&lt;li&gt;$|X|&lt;em&gt;F$：Frobenius 范数（将矩阵排成长向量后的 $\ell_2$ 范数），$|X|&lt;em&gt;F^2 = \sum&lt;/em&gt;{i,j} X&lt;/em&gt;{ij}^2$。&lt;/li&gt;
+&lt;li&gt;$|X|_* = \sum_i \sigma_i(X)$：&lt;strong&gt;核范数&lt;/strong&gt;——所有奇异值之和。它是秩函数的凸松弛（类似于 $\ell_1$ 范数是 $\ell_0$ 范数的凸松弛）。&lt;/li&gt;
+&lt;li&gt;$f(X) = \frac{1}{2}|P_\Omega(X - M)|&lt;em&gt;F^2$：光滑部分（$L=1$），$\nabla f(X) = P&lt;/em&gt;\Omega(X - M)$&lt;/li&gt;
+&lt;li&gt;$g(X) = \lambda|X|_*$：非光滑部分&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;742-soft-impute-算法&#34;&gt;7.4.2 Soft-Impute 算法
+&lt;/h3&gt;$$X_{k+1} = \text{prox}_{\lambda\|\cdot\|_*}\big(X_k - P_\Omega(X_k - M)\big)$$&lt;p&gt;内部操作分解：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;计算 $Z = X_k - P_\Omega(X_k - M)$。注意：$P_\Omega(X_k - M)$ 只在观测位置非零，所以：
+&lt;ul&gt;
+&lt;li&gt;在观测位置 $(i,j) \in \Omega$：$Z_{ij} = (X_k)&lt;em&gt;{ij} - ((X_k)&lt;/em&gt;{ij} - M_{ij}) = M_{ij}$（填回观测值）&lt;/li&gt;
+&lt;li&gt;在缺失位置 $(i,j) \notin \Omega$：$Z_{ij} = (X_k)&lt;em&gt;{ij} - 0 = (X_k)&lt;/em&gt;{ij}$（保持当前估计）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;对 $Z$ 做 SVD：$Z = U\Sigma V^T$&lt;/li&gt;
+&lt;li&gt;对奇异值做软阈值：$X_{k+1} = U \cdot \text{diag}(S_\lambda(\sigma)) \cdot V^T$&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;strong&gt;计算技巧&lt;/strong&gt;：不需要完整 SVD（计算量 $O(\min(m,n)mn)$），只需前 $r$ 个最大的奇异值（$r$ 为估计秩），使用&lt;strong&gt;截断 SVD&lt;/strong&gt; 大幅加速。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：Soft-Impute 是邻近梯度法在矩阵补全中的应用。每步做了两件事：在观测位置 &amp;ldquo;倒入&amp;rdquo; 真实观测值，在缺失位置保持当前估计，然后通过 SVD 软阈值做低秩逼近。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;75-典型例题&#34;&gt;7.5 典型例题
+&lt;/h2&gt;&lt;h3 id=&#34;例题-71软阈值算子的完整推导&#34;&gt;例题 7.1：软阈值算子的完整推导
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：证明 $\text{prox}_{\lambda|\cdot|&lt;em&gt;1}(x) = S&lt;/em&gt;\lambda(x)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：（已完整给出于 7.2.4 节(1)，此处仅回顾关键步骤）&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;问题分解为各分量独立：$\min_{z_i} {\lambda|z_i| + \frac{1}{2}(z_i - x_i)^2}$&lt;/li&gt;
+&lt;li&gt;对每个分量，写出最优性条件：$0 \in \lambda \cdot \partial|z_i| + (z_i - x_i)$&lt;/li&gt;
+&lt;li&gt;分 $z_i &amp;gt; 0$、$z_i &amp;lt; 0$、$z_i = 0$ 三种情况，解得三种情况综合为 $z_i^* = \text{sign}(x_i) \cdot \max{|x_i| - \lambda, 0}$。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-72邻近算子的非扩张性证明&#34;&gt;例题 7.2：邻近算子的非扩张性证明
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：证明 $|\text{prox}_g(x) - \text{prox}_g(y)| \leq |x - y|$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;令 $u = \text{prox}_g(x)$，$v = \text{prox}_g(y)$。由刻画不等式：
+&lt;/p&gt;
+$$x - u \in \partial g(u), \quad y - v \in \partial g(v)$$&lt;p&gt;次梯度映射是&lt;strong&gt;单调&lt;/strong&gt;的（凸函数的次梯度在任意两点满足 $\langle \partial g(u) - \partial g(v), u - v \rangle \geq 0$）。因此：
+&lt;/p&gt;
+$$\langle (x - u) - (y - v),\; u - v \rangle \geq 0$$&lt;p&gt;展开：
+&lt;/p&gt;
+$$\langle x - y, u - v \rangle - \langle u - v, u - v \rangle \geq 0$$&lt;p&gt;即 $|u - v|^2 \leq \langle x - y, u - v \rangle$。&lt;/p&gt;
+&lt;p&gt;由 Cauchy-Schwarz 不等式 $\langle x-y, u-v \rangle \leq |x-y| \cdot |u-v|$：
+&lt;/p&gt;
+$$\|u - v\|^2 \leq \|x - y\| \cdot \|u - v\|$$&lt;p&gt;若 $u \neq v$，两边除以 $|u-v|$ 得 $|u-v| \leq |x-y|$。若 $u = v$，不等式显然成立。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;推论&lt;/strong&gt;：邻近算子是一个 &lt;strong&gt;1-Lipschitz 映射&lt;/strong&gt;——它不会把两个点&amp;quot;拉开&amp;quot;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-73ista-充分下降性的完整推导&#34;&gt;例题 7.3：ISTA 充分下降性的完整推导
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：对于 $\min f(x) + g(x)$，$f$ 为 $L$-smooth 凸函数，$g$ 为闭凸函数，取 $\alpha = 1/L$，证明：
+&lt;/p&gt;
+$$F(x_{k+1}) \leq F(x_k) - \frac{L}{2}\|x_{k+1} - x_k\|^2$$&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：详见 7.3.4 节 Step 1-3 的完整推导。核心思想是：$f$ 用 $L$-smooth 二次上界、$g$ 用邻近算子定义给出的不等式，合并后消去 $\nabla f(x)^T(x^+ - x)$ 项，得到下降性。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-74不同正则化项的邻近算子&#34;&gt;例题 7.4：不同正则化项的邻近算子
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：计算下列函数的邻近算子：
+(a) $g(x) = \lambda|x|_2$（$\ell_2$ 范数）
+(b) $g(X) = \lambda|X|&lt;em&gt;F$（Frobenius 范数）
+(c) $g(x) = \lambda|x|&lt;/em&gt;\infty$&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;(a) 见 7.2.4 节(2)：对向量整体做缩水，输出 $= \max{1 - \lambda/|x|_2, 0} \cdot x$。&lt;/p&gt;
+&lt;p&gt;(b) Frobenius 范数本质就是矩阵排成向量后的 $\ell_2$ 范数——把所有 $m \times n$ 个元素排成一个 $mn$ 维向量后的 $\ell_2$ 长度的 $\lambda$ 倍。因此：
+&lt;/p&gt;
+$$\text{prox}_{\lambda\|\cdot\|_F}(X) = \max\left\{1 - \frac{\lambda}{\|X\|_F},\; 0\right\} \cdot X$$&lt;p&gt;(c) 利用 Moreau 分解（将在 Ch9 详述）：$\text{prox}&lt;em&gt;{\lambda|\cdot|&lt;/em&gt;\infty}(x) = x - \lambda \cdot P_{|\cdot|&lt;em&gt;1 \leq 1}(x/\lambda)$，其中 $P&lt;/em&gt;{|\cdot|_1 \leq 1}$ 是到 $\ell_1$ 单位球的投影（有 $O(n\log n)$ 算法）。这正是 Moreau 分解的最经典应用之一。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-75复合优化的一阶最优性条件不动点定理&#34;&gt;例题 7.5：复合优化的一阶最优性条件（不动点定理）
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：证明 $x^&lt;em&gt;$ 是 $\min_x f(x) + g(x)$ 的最优解当且仅当 $x^&lt;/em&gt; = \text{prox}_{\alpha g}(x^* - \alpha \nabla f(x^*))$（对任意 $\alpha &amp;gt; 0$）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;由凸优化的一阶最优性条件（Ch3）：$0 \in \partial F(x^&lt;em&gt;) = \nabla f(x^&lt;/em&gt;) + \partial g(x^*)$&lt;/p&gt;
+&lt;p&gt;两边同乘以 $\alpha$ 并加 $x^*$：
+&lt;/p&gt;
+$$x^* \in x^* - \alpha \nabla f(x^*) - \alpha \partial g(x^*)$$&lt;p&gt;即 $x^* - \alpha \nabla f(x^&lt;em&gt;) \in x^&lt;/em&gt; + \alpha \partial g(x^&lt;em&gt;) = (\text{id} + \alpha \partial g)(x^&lt;/em&gt;)$。&lt;/p&gt;
+&lt;p&gt;由 7.2.3 节的等价关系 $z = \text{prox}_{\alpha g}(y) \iff y \in z + \alpha \partial g(z)$（取 $z = x^&lt;em&gt;$，$y = x^&lt;/em&gt; - \alpha \nabla f(x^*)$），得到：
+&lt;/p&gt;
+$$x^* = \text{prox}_{\alpha g}(x^* - \alpha \nabla f(x^*))$$&lt;p&gt;&lt;strong&gt;这个不动点条件就是邻近梯度法的停机准则&lt;/strong&gt;——当迭代不再移动时，$x_k$ 就是最优解。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-76核范数邻近算子的推导要点&#34;&gt;例题 7.6：核范数邻近算子的推导要点
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：对矩阵 $X$，SVD 分解为 $X = U\Sigma V^T$，证明 $\text{prox}&lt;em&gt;{\lambda|\cdot|&lt;/em&gt;*}(X) = U \cdot \text{diag}(S_\lambda(\sigma)) \cdot V^T$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明概要&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;由 von Neumann 迹不等式（$\langle A, B \rangle \leq \sum_i \sigma_i(A)\sigma_i(B)$），核范数邻近算子的最优解必定与 $X$ 共享相同的奇异向量 $U, V$。问题归约为对各奇异值独立求解标量问题 $\min_{\sigma_i&amp;rsquo;} {\lambda\sigma_i&amp;rsquo; + \frac{1}{2}(\sigma_i&amp;rsquo; - \sigma_i)^2}$（需 $\sigma_i&amp;rsquo; \geq 0$），这正是软阈值问题。证毕。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;核心要点&#34;&gt;核心要点
+&lt;/h2&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;概念&lt;/th&gt;
+					&lt;th&gt;核心公式/结论&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;问题形式&lt;/td&gt;
+					&lt;td&gt;$\min_x f(x) + g(x)$，$f$ 光滑（$L$-smooth），$g$ 非光滑但 prox 好算&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;邻近算子定义&lt;/td&gt;
+					&lt;td&gt;$\text{prox}_g(x) = \arg\min_z{g(z) + \frac{1}{2}|z-x|^2}$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;刻画不等式&lt;/td&gt;
+					&lt;td&gt;$x - \text{prox}_g(x) \in \partial g(\text{prox}_g(x))$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\ell_1$ → 软阈值&lt;/td&gt;
+					&lt;td&gt;$[S_\lambda(x)]_i = \text{sign}(x_i) \cdot \max{&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\ell_2$ → 缩水&lt;/td&gt;
+					&lt;td&gt;$\max{1 - \lambda/|x|_2, 0} \cdot x$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\delta_C$ → 投影&lt;/td&gt;
+					&lt;td&gt;$P_C(x) = \arg\min_{z\in C}|z-x|^2$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;核范数 → SVD 软阈值&lt;/td&gt;
+					&lt;td&gt;$U \cdot \text{diag}(S_\lambda(\sigma)) \cdot V^T$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;ISTA 迭代&lt;/td&gt;
+					&lt;td&gt;$x_{k+1} = \text{prox}_{\alpha g}(x_k - \alpha \nabla f(x_k))$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;梯度映射&lt;/td&gt;
+					&lt;td&gt;$G_\alpha(x) = \frac{1}{\alpha}(x - \text{prox}_{\alpha g}(x - \alpha\nabla f(x)))$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;收敛率（光滑凸）&lt;/td&gt;
+					&lt;td&gt;$O(1/k)$，比次梯度法（$O(1/\sqrt{k})$）快得多&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;非扩张性&lt;/td&gt;
+					&lt;td&gt;$|\text{prox}_g(x) - \text{prox}_g(y)| \leq |x - y|$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;不动点最优化条件&lt;/td&gt;
+					&lt;td&gt;$x^&lt;em&gt;$ 最优 $\iff$ $x^&lt;/em&gt; = \text{prox}_{\alpha g}(x^* - \alpha\nabla f(x^*))$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;LASSO 的 ISTA&lt;/td&gt;
+					&lt;td&gt;$x_{k+1} = S_{\lambda/L}(x_k - \frac{1}{L}A^T(Ax_k - b))$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Soft-Impute&lt;/td&gt;
+					&lt;td&gt;$X_{k+1} = \text{SVT}&lt;em&gt;\lambda(X_k - P&lt;/em&gt;\Omega(X_k - M))$&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;(End of file)&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>第8章：加速邻近梯度法</title>
+        <link>https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/08-%E5%8A%A0%E9%80%9F%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/</link>
+        <pubDate>Sat, 20 Jun 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/08-%E5%8A%A0%E9%80%9F%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/</guid>
+        <description>&lt;h1 id=&#34;第8章加速邻近梯度法&#34;&gt;第8章：加速邻近梯度法
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心思想&lt;/strong&gt;：利用历史迭代信息构造&amp;quot;外推步&amp;quot;（在 $x_k$ 的基础上沿 $x_k - x_{k-1}$ 方向再往前跨一步），突破普通一阶方法的 $O(1/k)$ 收敛下界，达到光滑凸优化一阶方法的最优信息论下界 $O(1/k^2)$。
+本章的 FISTA（Fast ISTA）是 ISTA 的加速版——在 ISTA 最核心的邻近梯度步之前加一个&amp;quot;外推预测&amp;quot;步。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;前置知识回顾&#34;&gt;前置知识回顾
+&lt;/h2&gt;&lt;p&gt;在开始本章之前，请确保你已经理解以下概念：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;概念&lt;/th&gt;
+					&lt;th&gt;出自&lt;/th&gt;
+					&lt;th&gt;一句话回顾&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;邻近算子 $\text{prox}_g$&lt;/td&gt;
+					&lt;td&gt;Ch7&lt;/td&gt;
+					&lt;td&gt;$\text{prox}_g(x)=\arg\min_z{g(z)+\frac{1}{2}|z-x|^2}$，是在 $x$ 附近使 $g$ 尽量小且不跑远的点&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;ISTA 迭代&lt;/td&gt;
+					&lt;td&gt;Ch7&lt;/td&gt;
+					&lt;td&gt;$x_{k+1}=\text{prox}_{\alpha g}(x_k-\alpha\nabla f(x_k))$，前向梯度步 + 后向邻近步&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$L$-smooth 函数&lt;/td&gt;
+					&lt;td&gt;Ch2&lt;/td&gt;
+					&lt;td&gt;梯度 Lipschitz：$|\nabla f(x)-\nabla f(y)|\leq L|x-y|$；等价于二次上界不等式&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;凸函数的一阶条件&lt;/td&gt;
+					&lt;td&gt;Ch3&lt;/td&gt;
+					&lt;td&gt;$f(y)\geq f(x)+\nabla f(x)^T(y-x)$，函数图像在切线上方&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;强凸函数&lt;/td&gt;
+					&lt;td&gt;Ch3&lt;/td&gt;
+					&lt;td&gt;$f(y)\geq f(x)+\nabla f(x)^T(y-x)+\frac{\mu}{2}|y-x|^2$，被二次函数从下方&amp;quot;托住&amp;quot;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;GD 的 $O(1/k)$ 收敛&lt;/td&gt;
+					&lt;td&gt;Ch2&lt;/td&gt;
+					&lt;td&gt;$f(x_k)-f^*\leq O(1/k)$，误差随迭代反比缩小&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;动量/历史信息&lt;/td&gt;
+					&lt;td&gt;Ch7&lt;/td&gt;
+					&lt;td&gt;邻近梯度法（ISTA）仅用当前点 $x_k$ 的信息，不用历史轨迹&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;81-为什么需要加速&#34;&gt;8.1 为什么需要加速
+&lt;/h2&gt;&lt;h3 id=&#34;811-基础方法的收敛极限回顾&#34;&gt;8.1.1 基础方法的收敛极限回顾
+&lt;/h3&gt;&lt;p&gt;回顾前面章节的收敛率（对光滑凸函数类）：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;方法&lt;/th&gt;
+					&lt;th&gt;收敛速率&lt;/th&gt;
+					&lt;th&gt;达到精度 $\epsilon$ 所需迭代数&lt;/th&gt;
+					&lt;th&gt;出处&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;梯度下降法 (GD)&lt;/td&gt;
+					&lt;td&gt;$O(1/k)$&lt;/td&gt;
+					&lt;td&gt;$O(1/\epsilon)$&lt;/td&gt;
+					&lt;td&gt;Ch2&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;邻近梯度法 (ISTA)&lt;/td&gt;
+					&lt;td&gt;$O(1/k)$&lt;/td&gt;
+					&lt;td&gt;$O(1/\epsilon)$&lt;/td&gt;
+					&lt;td&gt;Ch7&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;次梯度法 (SubGM)&lt;/td&gt;
+					&lt;td&gt;$O(1/\sqrt{k})$&lt;/td&gt;
+					&lt;td&gt;$O(1/\epsilon^2)$&lt;/td&gt;
+					&lt;td&gt;Ch4&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;问：$O(1/k)$ 是光滑凸优化中一阶方法（只使用函数值和梯度信息，不用 Hessian 等二阶信息）能达到的最好速率吗？&lt;/p&gt;
+&lt;p&gt;答：&lt;strong&gt;不是！&lt;/strong&gt; Nesterov 在 1983 年发表了一篇经典论文，证明了：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;一阶方法在光滑凸函数类上的信息论下界是 $O(1/k^2)$。&lt;/strong&gt; 即：存在&amp;quot;最坏情况&amp;quot;的 $L$-smooth 凸函数，使得&lt;strong&gt;任何&lt;/strong&gt;只使用梯度信息的一阶方法（不论设计得多巧妙），其收敛率不可能优于 $O(1/k^2)$。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;而且 Nesterov 不仅给出了下界，还构造出了&lt;strong&gt;达到这个下界&lt;/strong&gt;的算法——&lt;strong&gt;加速梯度法&lt;/strong&gt;（Accelerated Gradient Method），证明 $O(1/k^2)$ 确实是&lt;strong&gt;最优一阶方法&lt;/strong&gt;的收敛率。&lt;/p&gt;
+&lt;h3 id=&#34;812-最坏情况函数nesterov-的坏函数&#34;&gt;8.1.2 最坏情况函数——Nesterov 的&amp;quot;坏函数&amp;quot;
+&lt;/h3&gt;&lt;p&gt;Nesterov 构造了如下 $L$-smooth 凸函数来证明下界：&lt;/p&gt;
+$$f_k(x) = \frac{L}{2}\left(\frac{1}{2}x_1^2 + \frac{1}{2}\sum_{i=1}^{k-1}(x_i - x_{i+1})^2 + \frac{1}{2}x_k^2 - x_1\right)$$&lt;p&gt;&lt;strong&gt;这个函数的&amp;quot;坏&amp;quot;在哪？&lt;/strong&gt; 它的梯度信息具有&amp;quot;链式依赖&amp;quot;——$x_1$ 的梯度取决于 $x_1$ 和 $x_2$，$x_2$ 的梯度取决于 $x_1$、$x_2$ 和 $x_3$，依此类推。任何一阶方法（只读取各点梯度）要想把信息从 $x_k$ 传回 $x_1$，至少需要 $O(k)$ 步——这就设置了 $O(1/k^2)$ 的速度极限。&lt;/p&gt;
+&lt;h3 id=&#34;813-加速的直觉动量惯性与前瞻&#34;&gt;8.1.3 加速的直觉——动量、惯性与前瞻
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;物理类比&lt;/strong&gt;：一个球在曲面上滚落。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;梯度下降法（GD）&lt;/strong&gt;：球每步都停在当前位置，重新判断最陡方向后走一步——&amp;ldquo;步步为营&amp;rdquo;，保守但缓慢得像个老年人。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;重球法（Heavy Ball, Polyak 1964）&lt;/strong&gt;：球带有&lt;strong&gt;惯性/动量&lt;/strong&gt;——不仅沿当前梯度方向加速，还保持之前的运动方向（$+\beta(x_k - x_{k-1})$ 项）。类比一个真正有质量、有速度的球滚落曲面，会&amp;quot;顺势而为&amp;quot;越过浅谷。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Nesterov 加速&lt;/strong&gt;：球在&lt;strong&gt;预估的未来位置&lt;/strong&gt;（$y_k = x_k + \beta_k(x_k - x_{k-1})$）计算梯度——&amp;ldquo;未雨绸缪&amp;rdquo;，先滑行到预测位置，再判断方向并修正。这相当于用一阶信息&lt;strong&gt;近似了二阶信息&lt;/strong&gt;（Hessian 的效应通过历史方向间接体现）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;数学直觉&lt;/strong&gt;：GD 只用了 $x_k$ 处的局部信息（一阶）。加速方法通过 $x_k$ 和 $x_{k-1}$ 的差（隐含的二阶信息），构造&amp;quot;比 $x_k$ 更超前&amp;quot;的试探点 $y_k$，然后在 $y_k$ 处计算梯度。这在计算量几乎不变的情况下（多了一个 $O(n)$ 的向量线性组合），将收敛率从 $O(1/k)$ 提升到 $O(1/k^2)$。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：一阶方法在光滑凸函数上的理论下界是 $O(1/k^2)$——GD/ISTA 的 $O(1/k)$ 不是最优的。加速方法通过引入外推步（动量机制）达到了这个下界，实现了&amp;quot;最优一阶方法&amp;quot;。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;82-nesterov-加速原理详细推导&#34;&gt;8.2 Nesterov 加速原理（详细推导）
+&lt;/h2&gt;&lt;h3 id=&#34;821-估计序列方法的直觉&#34;&gt;8.2.1 估计序列方法的直觉
+&lt;/h3&gt;&lt;p&gt;Nesterov 加速的经典构造基于**估计序列（Estimate Sequence）**思想。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;目标&lt;/strong&gt;：对于 $L$-smooth 凸函数 $f$，构造迭代序列 ${x_k}$ 使得：
+&lt;/p&gt;
+$$f(x_k) - f^* \leq \frac{2L\|x_0 - x^*\|^2}{(k+1)^2}$$&lt;p&gt;&lt;strong&gt;构造思路&lt;/strong&gt;：不直接在目标函数 $f$ 上优化（那样只能做到 $O(1/k)$），而是构造一列&lt;strong&gt;辅助函数&lt;/strong&gt; ${\phi_k(x)}$（叫做&amp;quot;估计序列&amp;quot;，因为它们从下方逐步逼近 $f$），满足：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;$\phi_k(x) \leq (1 - \theta_k)f(x) + \theta_k \phi_0(x)$ —— 估计序列保持在 $f$ 和初始函数 $\phi_0$ 的凸组合之下&lt;/li&gt;
+&lt;li&gt;$f(x_k) \leq \min_x \phi_k(x) = \phi_k^*$ —— 迭代点 $x_k$ 被控制在当前估计序列的最小值之下（这是核心！）&lt;/li&gt;
+&lt;li&gt;$\phi_0(x) = f(x_0) + \frac{\gamma_0}{2}|x - v_0|^2$ —— 初始化为一个二次函数（简单、有显式极小值）&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;如果这三个条件同时成立，那么：
+&lt;/p&gt;
+$$f(x_k) - f^* \leq \phi_k^* - f^* \leq \theta_k(\phi_0(x^*) - f(x^*)) \leq \theta_k \frac{\gamma_0}{2}\|x_0 - x^*\|^2$$&lt;p&gt;通过精心选择 $\theta_k$（让它下降得足够快）和 $\gamma_k$、序列 ${y_k}, {x_k}, {v_k}$，就能导出加速迭代——并且 $\theta_k = O(1/k^2)$ 带来了 $O(1/k^2)$ 的收敛率。&lt;/p&gt;
+&lt;h3 id=&#34;822-动量序列-t_k-的推导&#34;&gt;8.2.2 动量序列 ${t_k}$ 的推导
+&lt;/h3&gt;&lt;p&gt;定义动量序列 ${t_k}$ 如下：&lt;/p&gt;
+$$\boxed{t_0 = 1, \quad t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2}}$$&lt;p&gt;&lt;strong&gt;为什么是这个形式？它从哪来的？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;在估计序列分析中，我们需要保证 $\phi_k$ 的二次系数 $\gamma_k$ 递减。令 $\theta_k = \frac{2}{k+2}$（随 $k$ 衰减以保证收敛速度），并定义 $\gamma_{k+1} = (1 - \theta_k)\gamma_k$。通过递推和整理，得到 $t_k = 1/\theta_{k-1}$ 满足：
+&lt;/p&gt;
+$$t_{k+1}^2 - t_{k+1} = t_k^2$$&lt;p&gt;解这个关于 $t_{k+1}$ 的二次方程 $t_{k+1}^2 - t_{k+1} - t_k^2 = 0$，取正根：
+&lt;/p&gt;
+$$t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2}$$&lt;p&gt;这就是 ${t_k}$ 公式的来源——它是估计序列分析的自然产物，不是凭空编出来的。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;${t_k}$ 的核心恒等式&lt;/strong&gt;（考试和证明中反复使用）：&lt;/p&gt;
+$$\boxed{t_{k+1}^2 - t_{k+1} = t_k^2}$$&lt;p&gt;&lt;strong&gt;验证推导&lt;/strong&gt;（一步一步来）：
+&lt;/p&gt;
+$$\begin{aligned}
+t_{k+1}^2 - t_{k+1} &amp;= \left(\frac{1 + \sqrt{1 + 4t_k^2}}{2}\right)^2 - \frac{1 + \sqrt{1 + 4t_k^2}}{2} \\[6pt]
+&amp;= \frac{1 + 2\sqrt{1 + 4t_k^2} + (1 + 4t_k^2)}{4} - \frac{1 + \sqrt{1 + 4t_k^2}}{2} \\[6pt]
+&amp;= \frac{2 + 2\sqrt{1 + 4t_k^2} + 4t_k^2}{4} - \frac{1 + \sqrt{1 + 4t_k^2}}{2} \\[6pt]
+&amp;= \frac{1 + \sqrt{1 + 4t_k^2} + 2t_k^2}{2} - \frac{1 + \sqrt{1 + 4t_k^2}}{2} \\[6pt]
+&amp;= t_k^2
+\end{aligned}$$&lt;p&gt;&lt;strong&gt;${t_k}$ 的下界估计&lt;/strong&gt;：&lt;/p&gt;
+$$\boxed{t_k \geq \frac{k+1}{2}, \quad \forall k \geq 0}$$&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;（数学归纳法）：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$k=0$：$t_0 = 1 \geq \frac{1}{2}$，成立。&lt;/li&gt;
+&lt;li&gt;递推步：由 $t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2} \geq \frac{1 + 2t_k}{2} = t_k + \frac{1}{2}$（因为 $\sqrt{1+4t_k^2} \geq 2t_k$，当 $t_k \geq 0$）。&lt;/li&gt;
+&lt;li&gt;因此 $t_{k+1} \geq t_k + \frac{1}{2} \geq \frac{k+1}{2} + \frac{1}{2} = \frac{k+2}{2}$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这个下界 &lt;strong&gt;$t_k \approx k/2$&lt;/strong&gt; 是 $O(1/k^2)$ 收敛率的关键——因为在收敛率推导中，$t_k^2 \approx k^2/4$ 这个二次增长速度直接抵消了 $1/k$ 的线性衰减。&lt;/p&gt;
+&lt;h3 id=&#34;823-外推步的构造&#34;&gt;8.2.3 外推步的构造
+&lt;/h3&gt;&lt;p&gt;加速方法的核心是引入&lt;strong&gt;外推序列&lt;/strong&gt; ${y_k}$（不是在 $x_k$ 处，而是在 $x_k$ 更&amp;quot;超前&amp;quot;的位置计算梯度）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Nesterov 加速梯度法（NAG）的标准两序列形式&lt;/strong&gt;：
+&lt;/p&gt;
+$$\boxed{\begin{cases}
+y_k = x_k + \beta_k(x_k - x_{k-1}) &amp; \text{（外推/动量步——沿历史方向多走一步）} \\[6pt]
+x_{k+1} = y_k - \alpha \nabla f(y_k) &amp; \text{（梯度步——在预测位置 $y_k$ 处执行）} \\[6pt]
+\beta_k = \dfrac{t_k - 1}{t_{k+1}} &amp; \text{（动量系数——由动量序列 $t_k$ 决定）}
+\end{cases}}$$&lt;p&gt;其中 $t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2}$，$t_0 = 1$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;动量系数 $\beta_k$ 的行为&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$k=0$（第一步）：$t_0 = 1$，$t_1 = \frac{1+\sqrt{5}}{2} \approx 1.618$，$\beta_0 = \frac{1-1}{1.618} = 0$。第一步没有历史信息，所以不做外推——退化为普通 GD。&lt;/li&gt;
+&lt;li&gt;$k=1$（第二步）：$\beta_1 = \frac{t_1 - 1}{t_2} \approx \frac{0.618}{2.0} = 0.309$。开始有动量了，但还很保守。&lt;/li&gt;
+&lt;li&gt;$k \to \infty$（后期）：$t_k \approx k/2$，$\beta_k = \frac{k/2 - 1}{(k+1)/2} \approx \frac{k-2}{k+1} \to 1$。动量越来越大，算法越来越&amp;quot;自信&amp;quot;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;外推步的几何意义&lt;/strong&gt;：
+&lt;/p&gt;
+$$y_k = x_k + \beta_k(x_k - x_{k-1})$$&lt;p&gt;$y_k$ 不是老老实实站在 $x_k$ 位置——而是从 $x_{k-1}$ 到 $x_k$ 的方向上&lt;strong&gt;又往前冲了一段&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;早期（$k$ 小，$\beta_k \approx 0.3$）：外推保守——此时信息不足，不宜冒险走太远。&lt;/li&gt;
+&lt;li&gt;后期（$k$ 大，$\beta_k \to 1$）：$y_k \approx 2x_k - x_{k-1}$——&lt;strong&gt;线性外推&lt;/strong&gt;！算法已经&amp;quot;摸清了&amp;quot;曲面的下降趋势，大步流星往前冲。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;824-o1k2-收敛率证明框架&#34;&gt;8.2.4 $O(1/k^2)$ 收敛率证明框架
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;定理（Nesterov, 1983）&lt;/strong&gt;：对 $L$-smooth 凸函数 $f$，NAG 取步长 $\alpha = 1/L$，则：&lt;/p&gt;
+$$\boxed{f(x_k) - f^* \leq \frac{2L\|x_0 - x^*\|^2}{(k+1)^2}}$$&lt;p&gt;&lt;strong&gt;证明框架&lt;/strong&gt;（考试标准写法）：&lt;/p&gt;
+&lt;p&gt;定义 &lt;strong&gt;Lyapunov 函数&lt;/strong&gt;（一个不随时间增长的&amp;quot;能量函数&amp;quot;）：
+&lt;/p&gt;
+$$\Phi_k = t_k^2\big(f(x_k) - f^*\big) + \frac{L}{2}\|v_k - x^*\|^2$$&lt;p&gt;其中 $v_k$ 满足 $v_0 = x_0$，且 $v_{k+1} = v_k - \frac{t_k}{\alpha L}\nabla f(y_k)$（$v_k$ 是估计序列的中心，不必深究其含义——它只是证明的辅助工具）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;关键步骤&lt;/strong&gt;（概要）：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;利用 $f$ 的凸性（一阶下界：$f(y_k) \geq f(x^&lt;em&gt;) + \nabla f(y_k)^T(y_k - x^&lt;/em&gt;)$）和 $L$-smooth 性（二次上界：$f(x_{k+1}) \leq f(y_k) - \frac{1}{2L}|\nabla f(y_k)|^2$，因为 $x_{k+1} = y_k - \frac{1}{L}\nabla f(y_k)$），证明递推关系：
+&lt;/p&gt;
+$$\Phi_{k+1} \leq \Phi_k$$&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;初始值：$\Phi_0 = t_0^2(f(x_0) - f^&lt;em&gt;) + \frac{L}{2}|x_0 - x^&lt;/em&gt;|^2$。由于 $t_0=1$ 且 $f(x_0) - f^&lt;em&gt;$ 是一个正的有限值，我们可以用更强的上界 $\Phi_0 \leq \frac{L}{2}|x_0 - x^&lt;/em&gt;|^2$（在合理假设下）。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;由 $\Phi_k$ 非增（$\Phi_k \leq \Phi_0$），有：
+&lt;/p&gt;
+$$t_k^2(f(x_k) - f^*) \leq \Phi_k \leq \Phi_0 \leq \frac{L}{2}\|x_0 - x^*\|^2$$&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;利用下界 $t_k \geq \frac{k+1}{2}$，代入上式：
+&lt;/p&gt;
+$$f(x_k) - f^* \leq \frac{L\|x_0 - x^*\|^2}{2t_k^2} \leq \frac{L\|x_0 - x^*\|^2}{2 \cdot (k+1)^2/4} = \frac{2L\|x_0 - x^*\|^2}{(k+1)^2}$$&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;strong&gt;与 GD 的对比——加速的关键洞察&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;特征&lt;/th&gt;
+					&lt;th&gt;GD（Ch2）&lt;/th&gt;
+					&lt;th&gt;NAG（加速版）&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Lyapunov 函数&lt;/td&gt;
+					&lt;td&gt;$|x_k - x^*|^2$&lt;/td&gt;
+					&lt;td&gt;$t_k^2(f(x_k)-f^&lt;em&gt;) + \frac{L}{2}|v_k-x^&lt;/em&gt;|^2$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;收敛率&lt;/td&gt;
+					&lt;td&gt;$O(1/k)$&lt;/td&gt;
+					&lt;td&gt;$O(1/k^2)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;权重增长速度&lt;/td&gt;
+					&lt;td&gt;$1$（恒定不变）&lt;/td&gt;
+					&lt;td&gt;$t_k^2 \approx k^2/4$（&lt;strong&gt;二次增长！&lt;/strong&gt;）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;下降性&lt;/td&gt;
+					&lt;td&gt;保证单调下降&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;不保证单调&lt;/strong&gt;，允许震荡&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;每步代价&lt;/td&gt;
+					&lt;td&gt;一个梯度计算&lt;/td&gt;
+					&lt;td&gt;一个梯度计算（+ $O(n)$ 外推）&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;加速的本质&lt;/strong&gt;：给函数值误差 $(f(x_k) - f^&lt;em&gt;)$ 一个&lt;strong&gt;随时间二次增长的权重&lt;/strong&gt; $t_k^2$。即使 $f(x_k)$ 本身可能震荡（不单调下降），$t_k^2(f(x_k)-f^&lt;/em&gt;)$ 这个加权误差依然被 Lyapunov 函数 $\Phi_k$ 控制着不增长。这意味着 $(f(x_k)-f^*)$ 本身必须以 &lt;strong&gt;$O(1/t_k^2) = O(1/k^2)$&lt;/strong&gt; 的速度衰减。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：Nesterov 加速的核心是 ${t_k}$ 序列满足 $t_{k+1}^2 - t_{k+1} = t_k^2$，$t_0=1$，且 $t_k \geq (k+1)/2$。通过外推步 $y_k = x_k + \beta_k(x_k - x_{k-1})$（$\beta_k = (t_k-1)/t_{k+1}$），在&amp;quot;超前&amp;quot;位置计算梯度，收敛率从 $O(1/k)$ 提升到 $O(1/k^2)$。加速的代价是&lt;strong&gt;牺牲了单调下降性&lt;/strong&gt;——函数值可能震荡，但渐近收敛更快。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;83-fista-算法&#34;&gt;8.3 FISTA 算法
+&lt;/h2&gt;&lt;h3 id=&#34;831-ista-vs-fista--迭代格式对比&#34;&gt;8.3.1 ISTA vs FISTA —— 迭代格式对比
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;ISTA&lt;/strong&gt;（Ch7，普通速度）：
+&lt;/p&gt;
+$$x_{k+1} = \text{prox}_{\alpha g}\big(x_k - \alpha\nabla f(x_k)\big)$$&lt;p&gt;&lt;strong&gt;FISTA&lt;/strong&gt;（Fast ISTA，加速版）：
+&lt;/p&gt;
+$$\boxed{\begin{cases}
+y_k = x_k + \beta_k(x_k - x_{k-1}) \\[6pt]
+x_{k+1} = \text{prox}_{\alpha g}\big(y_k - \alpha\nabla f(y_k)\big)
+\end{cases}}$$&lt;p&gt;&lt;strong&gt;唯一的区别&lt;/strong&gt;：将 ISTA 邻近梯度步中的评估点从 $x_k$ 替换为外推点 $y_k$！计算量完全不变（多了一个 $O(n)$ 的外推和一行存 $x_{k-1}$ 的内存）。&lt;/p&gt;
+&lt;h3 id=&#34;832-fista-完整算法伪代码&#34;&gt;8.3.2 FISTA 完整算法伪代码
+&lt;/h3&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;21
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;22
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;23
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;输入: f (L-smooth凸), g (闭凸, prox好算), L (或线搜索), x0, 最大迭代 K
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;初始化:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  x_prev = x0,  x_curr = x0    // 前一步和当前步
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  t_prev = 1                   // 动量序列初值
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;for k = 1, 2, ..., K:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    // Step 1: 更新动量参数
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    t_curr = (1 + sqrt(1 + 4 * t_prev^2)) / 2
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    beta = (t_prev - 1) / t_curr
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    // Step 2: 计算外推点（沿历史方向往前走一步）
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    y = x_curr + beta * (x_curr - x_prev)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    // Step 3: 在外推点 y 处执行邻近梯度步（这才是 ISTA 的核心操作）
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x_new = prox_{g/L}(y - (1/L) * grad_f(y))
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    // Step 4: 变量轮转，准备下一轮
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x_prev = x_curr
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x_curr = x_new
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    t_prev = t_curr
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;输出: x_curr
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;h3 id=&#34;833-为什么-fista-可能非单调&#34;&gt;8.3.3 为什么 FISTA 可能非单调？
+&lt;/h3&gt;&lt;p&gt;设 $F(x) = f(x) + g(x)$ 为复合目标函数，$x_{k+1} = \text{prox}_{\alpha g}(y_k - \alpha\nabla f(y_k))$。&lt;/p&gt;
+&lt;p&gt;ISTA 的充分下降性（Ch7 的 7.3.4 节）保证从&lt;strong&gt;同一点&lt;/strong&gt;出发的单调下降：
+&lt;/p&gt;
+$$F\big(\text{prox}_{\alpha g}(x_k - \alpha\nabla f(x_k))\big) \leq F(x_k) - \frac{L}{2}\|\text{prox} - x_k\|^2$$&lt;p&gt;但 FISTA 中，邻近梯度步的出发点是 &lt;strong&gt;$y_k$ 而不是 $x_k$&lt;/strong&gt;。问题在于：$F(y_k)$ 和 $F(x_k)$ 之间&lt;strong&gt;没有大小关系&lt;/strong&gt;——$y_k$ 可能通过外推&amp;quot;冲到了&amp;quot;比 $x_k$ 函数值更高的位置（就像一辆有惯性的汽车，冲过了谷底又爬上了对面的坡）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;结论&lt;/strong&gt;：加速算法&lt;strong&gt;牺牲了单调性，换取了更快的渐近收敛率&lt;/strong&gt;。这在实际中表现为&amp;quot;过冲→回调→再过冲&amp;quot;的典型震荡模式。Lyapunov 函数分析保证：虽然每一步的函数值可能反弹，但长期来看，&lt;strong&gt;包络线&lt;/strong&gt;以 $O(1/k^2)$ 速度单调趋近最小值。&lt;/p&gt;
+&lt;h3 id=&#34;834-重启策略restart-在实践中驯服震荡&#34;&gt;8.3.4 重启策略（Restart）—— 在实践中驯服震荡
+&lt;/h3&gt;&lt;p&gt;由于 FISTA 可能震荡，&lt;strong&gt;重启&lt;/strong&gt;是实践中非常重要且简单的技巧：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;函数值重启&lt;/strong&gt;：当 $F(x_{k+1}) &amp;gt; F(x_k)$ 时（函数值反弹了！），重置 $t_k = 1$，$y_k = x_k$（等于从当前位置重新开始加速）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;固定重启&lt;/strong&gt;：每固定 $N$ 步重置一次动量（如 $N = 100$）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;梯度重启&lt;/strong&gt;：当 $\langle \nabla f(y_k), x_{k+1} - x_k \rangle &amp;gt; 0$ 时重启（梯度方向和前进方向&amp;quot;打架&amp;quot;了）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;强凸情况的特别好处&lt;/strong&gt;：对于 $\mu$-强凸函数，带适当重启的 FISTA 可以达到&lt;strong&gt;线性收敛&lt;/strong&gt;：
+&lt;/p&gt;
+$$\boxed{F(x_k) - F^* = O\big((1 - \sqrt{\mu/L})^k\big)}$$&lt;p&gt;而普通 GD 只有 $O((1 - \mu/L)^k)$。加速将条件数依赖从 $\kappa = L/\mu$ 改进到了 &lt;strong&gt;$\sqrt{\kappa}$&lt;/strong&gt;——当条件数很大（问题很&amp;quot;病态&amp;quot;）时，这个改进极其显著。&lt;/p&gt;
+&lt;h3 id=&#34;835-重球法heavy-ball与-nesterov-加速的关键区别&#34;&gt;8.3.5 重球法（Heavy-Ball）与 Nesterov 加速的关键区别
+&lt;/h3&gt;&lt;p&gt;Polyak 的重球法（1964）：
+&lt;/p&gt;
+$$x_{k+1} = x_k - \alpha\nabla f(x_k) + \beta(x_k - x_{k-1})$$&lt;p&gt;&lt;strong&gt;与 Nesterov 加速的对比&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;特征&lt;/th&gt;
+					&lt;th&gt;重球法 (Heavy Ball)&lt;/th&gt;
+					&lt;th&gt;Nesterov 加速 (NAG/FISTA)&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;梯度在哪个点计算？&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$x_k$（当前位置）&lt;/td&gt;
+					&lt;td&gt;$y_k = x_k + \beta_k(x_k - x_{k-1})$（&lt;strong&gt;超前&lt;/strong&gt;位置）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;动量参数&lt;/td&gt;
+					&lt;td&gt;常数 $\beta \in (0,1)$&lt;/td&gt;
+					&lt;td&gt;时变 $\beta_k \to 1$（随迭代增大）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;收敛率（光滑凸）&lt;/td&gt;
+					&lt;td&gt;$O(1/k)$（没有理论改进）&lt;/td&gt;
+					&lt;td&gt;$O(1/k^2)$（&lt;strong&gt;达到下界！&lt;/strong&gt;）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;强凸收敛率&lt;/td&gt;
+					&lt;td&gt;$O((1 - \sqrt{\mu/L})^k)$&lt;/td&gt;
+					&lt;td&gt;$O((1 - \sqrt{\mu/L})^k)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;理论来源&lt;/td&gt;
+					&lt;td&gt;物理二阶 ODE 离散化&lt;/td&gt;
+					&lt;td&gt;估计序列最优化方法&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;一句话总结本质区别&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;重球法：&amp;ldquo;我先到 $x_k$，看清楚当前梯度，然后带着之前的惯性滑过去。&amp;rdquo;&lt;/li&gt;
+&lt;li&gt;Nesterov 加速：&amp;ldquo;我不在 $x_k$ 停——我先顺着历史方向滑到预估点 $y_k$，在那个位置看梯度，判断是否需要修正方向。&amp;rdquo;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Nesterov 的更优性来自于：在预测位置计算梯度，相当于对&amp;quot;即将到达的地点&amp;quot;做前瞻判断——防止惯性把自己带进坑里。&lt;/p&gt;
+&lt;h3 id=&#34;836-fista-对-lasso-的实现加速几乎是免费的&#34;&gt;8.3.6 FISTA 对 LASSO 的实现——加速几乎是免费的
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;ISTA&lt;/strong&gt;（LASSO 的普通版）：
+&lt;/p&gt;
+$$x_{k+1} = S_{\lambda/L}\left(x_k - \frac{1}{L}A^T(Ax_k - b)\right)$$&lt;p&gt;&lt;strong&gt;FISTA&lt;/strong&gt;（LASSO 的加速版）：
+&lt;/p&gt;
+$$\begin{cases}
+y_k = x_k + \beta_k(x_k - x_{k-1}) \\[4pt]
+x_{k+1} = S_{\lambda/L}\left(y_k - \frac{1}{L}A^T(Ay_k - b)\right)
+\end{cases}$$&lt;p&gt;&lt;strong&gt;计算量对比&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ISTA 每步：矩阵-向量乘 $Ax_k$（$O(mn)$）+ $A^T(Ax_k - b)$（$O(mn)$）+ 软阈值（$O(n)$）→ $O(mn)$&lt;/li&gt;
+&lt;li&gt;FISTA 每步：矩阵-向量乘 $Ay_k$（$O(mn)$）+ $A^T(Ay_k - b)$（$O(mn)$）+ 软阈值（$O(n)$）+ 外推计算 $y_k$（$O(n)$）→ $O(mn)$&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;计算量完全相同&lt;/strong&gt;（$mn$ 主导，$n$ 可忽略不计）！额外的内存也只是多存一个 $x_{k-1}$ 向量。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;结论&lt;/strong&gt;：加速几乎是&amp;quot;免费的&amp;quot;——相同计算量，收敛率从 $O(1/k)$ 翻倍提升到 $O(1/k^2)$。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：FISTA 在 ISTA 的核心迭代（邻近梯度步）之前加一个外推步 $y_k = x_k + \beta_k(x_k - x_{k-1})$，将梯度计算的评估点从 $x_k$ 移到更超前的 $y_k$。计算量几乎不变，收敛率从 $O(1/k)$ 提升到 $O(1/k^2)$。FISTA 可能非单调下降，重启策略在实践中恢复稳定性。对强凸函数，加速将条件数依赖从 $\kappa$ 改进到 $\sqrt{\kappa}$。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;84-典型例题&#34;&gt;8.4 典型例题
+&lt;/h2&gt;&lt;h3 id=&#34;例题-81动量序列的性质证明&#34;&gt;例题 8.1：动量序列的性质证明
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：设 $t_0 = 1$，$t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2}$。证明：
+(a) $t_{k+1}^2 - t_{k+1} = t_k^2$
+(b) $t_k \geq \frac{k+1}{2}$（对 $k \geq 0$）&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;(a) 直接计算——详见 8.2.2 节的逐步推导。&lt;/p&gt;
+&lt;p&gt;(b) 归纳法：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;基始 $k=0$：$t_0 = 1 \geq \frac{1}{2}$ 成立。&lt;/li&gt;
+&lt;li&gt;归纳假设 $t_k \geq \frac{k+1}{2}$。由 $\sqrt{1+4t_k^2} \geq \sqrt{4t_k^2} = 2t_k$（$t_k \geq 0$ 故舍绝对值）：
+
+$$t_{k+1} = \frac{1 + \sqrt{1+4t_k^2}}{2} \geq \frac{1 + 2t_k}{2} \geq \frac{1 + 2 \cdot \frac{k+1}{2}}{2} = \frac{k+2}{2}$$&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-82nag-在二次函数上的行为&#34;&gt;例题 8.2：NAG 在二次函数上的行为
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：对 $f(x) = \frac{L}{2}x^2$（$L &amp;gt; 0$，最优解在 $x^* = 0$），取 $x_0 = a$，比较 GD 和 NAG 的收敛行为。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;GD&lt;/strong&gt;（$\alpha = 1/L$）：$x_1 = x_0 - \frac{1}{L} \cdot Lx_0 = a - a = 0$。&lt;strong&gt;一步收敛！&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;NAG&lt;/strong&gt;（$\alpha = 1/L$，$\beta_0 = 0$）：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$t_0 = 1$，$\beta_0 = 0$，$y_0 = x_0 = a$，$x_1 = y_0 - \frac{1}{L} \cdot Ly_0 = 0$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;也是一步收敛。为什么？因为纯二次函数的 Hessian 是常数，梯度方向始终指向最优点——不需要动量来&amp;quot;记忆&amp;quot;方向。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;启示&lt;/strong&gt;：对于纯二次函数（完美对称的碗），GD 和 NAG 表现相同。加速的&lt;strong&gt;真正优势&lt;/strong&gt;体现在&lt;strong&gt;非二次&lt;/strong&gt;（条件数大、曲率各向异性）的函数上——GD 在最慢曲率方向上缓慢爬行，而加速通过动量克服了&amp;quot;之字形&amp;quot;震荡。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-83fista-对-lasso--加速为什么是免费的&#34;&gt;例题 8.3：FISTA 对 LASSO —— 加速为什么是&amp;quot;免费&amp;quot;的
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：对 LASSO 问题 $\min_x \frac{1}{2}|Ax-b|^2 + \lambda|x|_1$，写出 FISTA 迭代，并详细对比 ISTA 的计算量。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;ISTA&lt;/strong&gt;：$x_{k+1} = S_{\lambda/L}(x_k - \frac{1}{L}A^T(Ax_k - b))$&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;FISTA&lt;/strong&gt;：
+&lt;/p&gt;
+$$\begin{cases}
+y_k = x_k + \beta_k(x_k - x_{k-1}) \\
+x_{k+1} = S_{\lambda/L}(y_k - \frac{1}{L}A^T(Ay_k - b))
+\end{cases}$$&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;操作&lt;/th&gt;
+					&lt;th&gt;ISTA 每步&lt;/th&gt;
+					&lt;th&gt;FISTA 每步&lt;/th&gt;
+					&lt;th&gt;差异&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;矩阵-向量乘 $A \cdot$&lt;/td&gt;
+					&lt;td&gt;$O(mn)$（$Ax_k$）&lt;/td&gt;
+					&lt;td&gt;$O(mn)$（$Ay_k$）&lt;/td&gt;
+					&lt;td&gt;0&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$A^T(A\cdot - b)$&lt;/td&gt;
+					&lt;td&gt;$O(mn)$&lt;/td&gt;
+					&lt;td&gt;$O(mn)$&lt;/td&gt;
+					&lt;td&gt;0&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;软阈值&lt;/td&gt;
+					&lt;td&gt;$O(n)$&lt;/td&gt;
+					&lt;td&gt;$O(n)$&lt;/td&gt;
+					&lt;td&gt;0&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;外推&lt;/td&gt;
+					&lt;td&gt;0&lt;/td&gt;
+					&lt;td&gt;$O(n)$&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;$+O(n)$&lt;/strong&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;额外存储&lt;/td&gt;
+					&lt;td&gt;1 个 $n$ 维向量&lt;/td&gt;
+					&lt;td&gt;2 个 $n$ 维向量&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;$+n$ 内存&lt;/strong&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;$O(n)$ 相比于 $O(mn)$（典型 $m, n$ 都可能几千）可以忽略。所以加速&lt;strong&gt;确实几乎是免费的&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-84动量系数的渐近行为&#34;&gt;例题 8.4：动量系数的渐近行为
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：证明 $\lim_{k \to \infty} \beta_k = 1$，并解释其几何含义。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;由 $t_k \geq \frac{k+1}{2}$ 且 $t_{k+1}^2 - t_{k+1} = t_k^2$：&lt;/p&gt;
+$$\beta_k = \frac{t_k - 1}{t_{k+1}} = \frac{t_k}{t_{k+1}} \cdot \frac{t_k - 1}{t_k}$$&lt;p&gt;由 $t_{k+1}/t_k \approx 1$（当 $k \to \infty$ 时，$t_k \approx k/2$，$t_{k+1}/t_k \to 1$），且 $(t_k-1)/t_k \to 1$，得 $\beta_k \to 1$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;几何含义&lt;/strong&gt;：$y_k = x_k + \beta_k(x_k - x_{k-1})$。当 $\beta_k \to 1$ 时，$y_k \approx 2x_k - x_{k-1}$——这是&lt;strong&gt;线性外推&lt;/strong&gt;！算法已经从&amp;quot;谨慎试探&amp;quot;过渡到了&amp;quot;大胆冲刺&amp;quot;。这也解释了为何加速算法后期可能震荡——外推太&amp;quot;猛&amp;quot;，一旦遇到曲率变化，就冲过头了。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-85fista-的非单调性演示&#34;&gt;例题 8.5：FISTA 的非单调性演示
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：找一个简单例子，说明 FISTA 的目标函数值序列不是单调下降的。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;取 $f(x) = \frac{1}{4}x^4$（非二次光滑凸函数，$x^* = 0$），$g(x) = 0$（纯 NAG 情形）。&lt;/p&gt;
+&lt;p&gt;初始化 $x_0 = 2$：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$k=0$：$\beta_0 = 0$，$y_0 = 2$，$x_1 = y_0 - \alpha f&amp;rsquo;(y_0) \approx 2 - \alpha \cdot 8$。取合适的 $\alpha$ 使 $x_1 \approx 1$。&lt;/li&gt;
+&lt;li&gt;$k=1$：$\beta_1 \approx 0.309$，$y_1 = x_1 + 0.309(x_1 - x_0) = 1 + 0.309(1 - 2) = 0.691$。此时 $f(f&amp;rsquo;(0.691) = 0.691^3 \approx 0.33)$。$x_2 \approx 0.691 - \alpha \cdot 0.33$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;由于外推把 $y_1$ 拉向更接近 0 但&amp;quot;冲&amp;quot;的方向与梯度方向不完全一致，$f(x_2)$ 可能大于 $f(x_1)$——这就是非单调性。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;结论&lt;/strong&gt;：加速算法允许函数值在迭代中反弹上升，但长期趋势是 $O(1/k^2)$ 速度下降。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;核心要点&#34;&gt;核心要点
+&lt;/h2&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;概念&lt;/th&gt;
+					&lt;th&gt;核心公式/结论&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;加速动机&lt;/td&gt;
+					&lt;td&gt;GD/ISTA 只有 $O(1/k)$，信息论下界是 $O(1/k^2)$——加速达到下界&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;动量序列&lt;/td&gt;
+					&lt;td&gt;$t_0 = 1$，$t_{k+1} = \frac{1+\sqrt{1+4t_k^2}}{2}$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;核心恒等式&lt;/td&gt;
+					&lt;td&gt;$t_{k+1}^2 - t_{k+1} = t_k^2$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;下界估计&lt;/td&gt;
+					&lt;td&gt;$t_k \geq \frac{k+1}{2}$（归纳法证明）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;动量系数&lt;/td&gt;
+					&lt;td&gt;$\beta_k = \frac{t_k - 1}{t_{k+1}}$，$\beta_k \to 1$（渐近行为）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;NAG 迭代&lt;/td&gt;
+					&lt;td&gt;$y_k = x_k + \beta_k(x_k - x_{k-1})$，$x_{k+1} = y_k - \alpha\nabla f(y_k)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;FISTA 迭代&lt;/td&gt;
+					&lt;td&gt;$y_k = x_k + \beta_k(x_k - x_{k-1})$，$x_{k+1} = \text{prox}_{\alpha g}(y_k - \alpha\nabla f(y_k))$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;收敛率（光滑凸）&lt;/td&gt;
+					&lt;td&gt;$O(1/k^2)$，达到一阶方法的最优下界&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;收敛率（强凸+重启）&lt;/td&gt;
+					&lt;td&gt;$O((1 - \sqrt{\mu/L})^k)$，条件数依赖从 $\kappa$ 改进到 $\sqrt{\kappa}$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;重球法 vs NAG&lt;/td&gt;
+					&lt;td&gt;重球在 $x_k$ 处算梯度，NAG 在超前点 $y_k$ 处算梯度&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;非单调性&lt;/td&gt;
+					&lt;td&gt;加速牺牲单调下降性换取更快渐近收敛&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;与 ISTA 的计算量对比&lt;/td&gt;
+					&lt;td&gt;几乎相同（仅多 $O(n)$ 外推），加速是&amp;quot;免费的&amp;quot;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;重启策略&lt;/td&gt;
+					&lt;td&gt;函数值反弹时重置 $t_k=1$，实践中恢复稳定性&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;线搜索版本&lt;/td&gt;
+					&lt;td&gt;回溯线搜索 + FISTA 仍保持 $O(1/k^2)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Lyapunov 分析本质&lt;/td&gt;
+					&lt;td&gt;$t_k^2$ 二次增长的权重保证了 $O(1/k^2)$ 速率&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;(End of file)&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>第9章：邻近点法与共轭函数</title>
+        <link>https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/09-%E9%82%BB%E8%BF%91%E7%82%B9%E6%B3%95%E4%B8%8E%E5%85%B1%E8%BD%AD%E5%87%BD%E6%95%B0/</link>
+        <pubDate>Sat, 20 Jun 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/09-%E9%82%BB%E8%BF%91%E7%82%B9%E6%B3%95%E4%B8%8E%E5%85%B1%E8%BD%AD%E5%87%BD%E6%95%B0/</guid>
+        <description>&lt;h1 id=&#34;第9章邻近点法与共轭函数&#34;&gt;第9章：邻近点法与共轭函数
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心思想&lt;/strong&gt;：(1) 邻近点法 = Moreau 包络上的梯度下降——这是将非光滑函数&amp;quot;光滑化&amp;quot;后求解的元方法；(2) 共轭函数将函数从&amp;quot;点-值&amp;quot;视角翻转为&amp;quot;斜率-截距&amp;quot;视角，是构建凸对偶理论的核心工具；(3) Moreau 分解恒等式 $x = \text{prox}&lt;em&gt;f(x) + \text{prox}&lt;/em&gt;{f^*}(x)$ 是连接原问题与对偶问题的桥梁，直观且优美。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;前置知识回顾&#34;&gt;前置知识回顾
+&lt;/h2&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;概念&lt;/th&gt;
+					&lt;th&gt;出自&lt;/th&gt;
+					&lt;th&gt;一句话回顾&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;邻近算子 $\text{prox}_g$&lt;/td&gt;
+					&lt;td&gt;Ch7&lt;/td&gt;
+					&lt;td&gt;$\text{prox}_g(x)=\arg\min_z{g(z)+\frac{1}{2}|z-x|^2}$，刻画不等式 $x-\text{prox}_g(x) \in \partial g(\text{prox}_g(x))$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;ISTA 迭代&lt;/td&gt;
+					&lt;td&gt;Ch7&lt;/td&gt;
+					&lt;td&gt;$x_{k+1}=\text{prox}_{\alpha g}(x_k-\alpha\nabla f(x_k))$，前向梯度步 + 后向邻近步&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;梯度下降法&lt;/td&gt;
+					&lt;td&gt;Ch2&lt;/td&gt;
+					&lt;td&gt;$x_{k+1}=x_k-\alpha\nabla f(x_k)$，对 $L$-smooth 凸函数收敛率 $O(1/k)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;次梯度&lt;/td&gt;
+					&lt;td&gt;Ch3&lt;/td&gt;
+					&lt;td&gt;非光滑函数的&amp;quot;广义导数&amp;quot;：$g \in \partial f(x)$ 满足 $f(y)\geq f(x)+g^T(y-x)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;凸函数的一阶条件&lt;/td&gt;
+					&lt;td&gt;Ch3&lt;/td&gt;
+					&lt;td&gt;$f(y)\geq f(x)+\nabla f(x)^T(y-x)$，等价于次梯度定义&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;强凸函数&lt;/td&gt;
+					&lt;td&gt;Ch3&lt;/td&gt;
+					&lt;td&gt;$f(y)\geq f(x)+\nabla f(x)^T(y-x)+\frac{\mu}{2}|y-x|^2$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$L$-smooth&lt;/td&gt;
+					&lt;td&gt;Ch2&lt;/td&gt;
+					&lt;td&gt;$|\nabla f(x)-\nabla f(y)|\leq L|x-y|$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;指示函数 $\delta_C$&lt;/td&gt;
+					&lt;td&gt;Ch6/Ch7&lt;/td&gt;
+					&lt;td&gt;$\delta_C(x)=0$ 若 $x\in C$，否则 $+\infty$；其邻近算子 = 投影&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;FISTA/加速&lt;/td&gt;
+					&lt;td&gt;Ch8&lt;/td&gt;
+					&lt;td&gt;通过外推步 $y_k$ 达到 $O(1/k^2)$&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;91-邻近点法proximal-point-method&#34;&gt;9.1 邻近点法（Proximal Point Method）
+&lt;/h2&gt;&lt;h3 id=&#34;911-迭代格式&#34;&gt;9.1.1 迭代格式
+&lt;/h3&gt;&lt;p&gt;对于极小化 $\min_x f(x)$，其中 $f$ 为&lt;strong&gt;闭凸函数&lt;/strong&gt;（可以非光滑——这是关键区别！），邻近点法的迭代为：&lt;/p&gt;
+$$\boxed{x_{k+1} = \text{prox}_{\alpha_k f}(x_k) = \arg\min_z \left\{f(z) + \frac{1}{2\alpha_k}\|z - x_k\|^2\right\}}$$&lt;p&gt;&lt;strong&gt;与邻近梯度法（ISTA, Ch7）的本质区别&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;比较维度&lt;/th&gt;
+					&lt;th&gt;邻近梯度法（Ch7）&lt;/th&gt;
+					&lt;th&gt;邻近点法（Ch9）&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;处理的问题&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$\min f(x) + g(x)$，$f$ 光滑&lt;/td&gt;
+					&lt;td&gt;$\min f(x)$，$f$ 可以&lt;strong&gt;完全不光滑&lt;/strong&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;迭代公式&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$x_{k+1} = \text{prox}_{\alpha g}(x_k - \alpha\nabla f(x_k))$&lt;/td&gt;
+					&lt;td&gt;$x_{k+1} = \text{prox}_{\alpha f}(x_k)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;步的构成&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;梯度步（处理 $f$）+ 邻近步（处理 $g$）&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;纯邻近步&lt;/strong&gt;——没有梯度步&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;前提条件&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$f$ 可微（有 $\nabla f$），$g$ 的 prox 好算&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;$f$ 本身&lt;/strong&gt;的 $\text{prox}_f$ 必须可计算&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;关键困难&lt;/strong&gt;：邻近点法要求直接计算目标函数 $f$ 本身的邻近算子！如果这个能轻松算出来，优化问题基本上已经解决了。因此邻近点法更多被用作&lt;strong&gt;理论分析工具&lt;/strong&gt;和&lt;strong&gt;元算法&lt;/strong&gt;——通过它来解释、统一和推导其他更实用的算法（如增广 Lagrange 法、DR 分裂法、ADMM 等）。&lt;/p&gt;
+&lt;h3 id=&#34;912-为什么叫邻近点法&#34;&gt;9.1.2 为什么叫&amp;quot;邻近点法&amp;quot;？
+&lt;/h3&gt;&lt;p&gt;从 $x_k$ 出发，邻近点法寻找的 $x_{k+1}$ 满足两个相互制衡的要求：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;使 $f$ 尽量小&lt;/strong&gt;：体现了 $\min f(z)$——向最低点靠近；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;但又不能离 $x_k$ 太远&lt;/strong&gt;：体现了 $\frac{1}{2\alpha_k}|z-x_k|^2$——惩罚偏离当前点。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此 $x_{k+1}$ 是&amp;quot;在 $x_k$ &lt;strong&gt;邻近&lt;/strong&gt;的、使 $f$ 减小的点&amp;quot;。步长 $\alpha_k$ 控制&amp;quot;邻近&amp;quot;的程度：$\alpha_k$ 大 → 可以走远些，$\alpha_k$ 小 → 必须待在 $x_k$ 很近的地方。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;与梯度下降的直觉对比&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;梯度下降&lt;/strong&gt;：你知道山峰的坡度（用 $\nabla f$ 表示了方向信息），沿着它下山。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;邻近点法&lt;/strong&gt;：你不知道山坡的坡度（$f$ 没有梯度），但你在当前位置画一个圈，在圈里找最低的立足点站上去，然后在新位置上再画一个圈……如此反复。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;913-收敛性&#34;&gt;9.1.3 收敛性
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;定理&lt;/strong&gt;：对闭凸函数 $f$，取固定步长 $\alpha_k = \alpha &amp;gt; 0$，邻近点法满足：
+&lt;/p&gt;
+$$f(x_k) - f^* \leq \frac{\|x_0 - x^*\|^2}{2\alpha k}$$&lt;p&gt;这是 $O(1/k)$ 收敛率——与梯度下降法相同。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;与次梯度法的对比&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;特征&lt;/th&gt;
+					&lt;th&gt;次梯度法（Ch4）&lt;/th&gt;
+					&lt;th&gt;邻近点法&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;需要的信息&lt;/td&gt;
+					&lt;td&gt;只需&lt;strong&gt;一个&lt;/strong&gt;次梯度 $g \in \partial f(x_k)$&lt;/td&gt;
+					&lt;td&gt;需要完整的 $\text{prox}_f$ 算子（解一个优化子问题）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;收敛率&lt;/td&gt;
+					&lt;td&gt;$O(1/\sqrt{k})$&lt;/td&gt;
+					&lt;td&gt;$O(1/k)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;每步代价&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;低&lt;/strong&gt;（一个次梯度）&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;高&lt;/strong&gt;（需解优化子问题）&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;结论&lt;/strong&gt;：邻近点法用更高的每步代价换取了更快的收敛率。当 $\text{prox}_f$ 容易计算时（如 $f$ 是 $\ell_1$ 范数），它是高效的；否则主要用于理论分析（&amp;ldquo;元算法&amp;quot;的角色）。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：邻近点法 $x_{k+1} = \text{prox}_{\alpha f}(x_k)$ 是&amp;quot;纯邻近&amp;quot;迭代——不依赖梯度，适用于任何闭凸函数。它的存在主要服务于理论推导，关键洞察是：邻近点法实际上就是在 &lt;strong&gt;Moreau 包络上做梯度下降&lt;/strong&gt;（详见 9.2 节）。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;92-moreau-包络moreau-envelope&#34;&gt;9.2 Moreau 包络（Moreau Envelope）
+&lt;/h2&gt;&lt;h3 id=&#34;921-定义&#34;&gt;9.2.1 定义
+&lt;/h3&gt;&lt;p&gt;对于闭凸函数 $f$，其&lt;strong&gt;Moreau 包络&lt;/strong&gt;（也称 Moreau-Yosida 正则化）定义为：&lt;/p&gt;
+$$\boxed{M_f(x) = \min_z \left\{f(z) + \frac{1}{2}\|z - x\|^2\right\}}$$&lt;p&gt;带步长的参数化版本：
+&lt;/p&gt;
+$$M_{\alpha f}(x) = \min_z \left\{f(z) + \frac{1}{2\alpha}\|z - x\|^2\right\}$$&lt;p&gt;&lt;strong&gt;符号解释&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$M_f(x)$：读作&amp;quot;函数 $f$ 在点 $x$ 处的 Moreau 包络值&amp;rdquo;。它是&lt;strong&gt;一个数&lt;/strong&gt;——对于固定的 $x$，在所有可能的 $z$ 中寻找 $f(z) + \frac{1}{2}|z-x|^2$ 的最小值。&lt;/li&gt;
+&lt;li&gt;$M_f$ 本身是一个新的&lt;strong&gt;函数&lt;/strong&gt;（以 $x$ 为自变量），它是 $f$ 的&amp;quot;光滑化版本&amp;quot;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;为什么叫&amp;quot;包络&amp;quot;？&lt;/strong&gt; $M_f(x)$ 是 $f$ 的所有&amp;quot;倒扣的二次碗&amp;quot;的下确界（下包络）。数学上，$M_f$ 是 $f$ 与 $\frac{1}{2}|\cdot|^2$ 的&lt;strong&gt;infimal convolution&lt;/strong&gt;：
+&lt;/p&gt;
+$$M_f = f \;\square\; \frac{1}{2}\|\cdot\|^2, \quad (f \;\square\; g)(x) = \inf_z \{f(z) + g(x - z)\}$$&lt;h3 id=&#34;922-光滑化性质本章最重要的定理&#34;&gt;9.2.2 光滑化性质——本章最重要的定理
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;定理&lt;/strong&gt;：即使 $f$ &lt;strong&gt;完全不可微&lt;/strong&gt;（如 $\ell_1$ 范数在 $0$ 处有尖角），$M_f(x)$ 依然是&lt;strong&gt;处处可微&lt;/strong&gt;的，且其梯度有一个极其简洁的表达：&lt;/p&gt;
+$$\boxed{\nabla M_f(x) = x - \text{prox}_f(x)}$$&lt;p&gt;带步长版本：
+&lt;/p&gt;
+$$\nabla M_{\alpha f}(x) = \frac{1}{\alpha}(x - \text{prox}_{\alpha f}(x))$$&lt;p&gt;进一步，$M_f$ 是 &lt;strong&gt;1-smooth&lt;/strong&gt; 的（梯度 1-Lipschitz 连续）——$M_{\alpha f}$ 是 $1/\alpha$-smooth。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;（用 Danskin 定理/包络定理，考试重点掌握）：&lt;/p&gt;
+&lt;p&gt;令 $p(x) = \text{prox}_f(x) = \arg\min_z{f(z) + \frac{1}{2}|z-x|^2}$。由最小值函数的包络定理（Envelope Theorem）：值函数对参数的梯度 = 被积函数对参数的偏导数在最优点处的值。&lt;/p&gt;
+$$\begin{aligned}
+\nabla M_f(x) &amp;= \nabla_x\left[f(p(x)) + \frac{1}{2}\|p(x) - x\|^2\right] \\
+&amp;= \underbrace{\nabla f(p(x))}_{?} \cdot \nabla p(x) + (p(x) - x) \cdot (\nabla p(x) - I)
+\end{aligned}$$&lt;p&gt;等等——$\nabla f(p(x))$ 可能不存在（$f$ 不可微！）。用次梯度替代：
+&lt;/p&gt;
+$$x - p(x) \in \partial f(p(x)) \quad \text{（由邻近算子的刻画不等式）}$$&lt;p&gt;利用 Danskin 定理（直接对值函数求导，不需要链式法则通过 $p(x)$）：
+&lt;/p&gt;
+$$\nabla M_f(x) = \left.\nabla_x\left[f(z) + \frac{1}{2}\|z - x\|^2\right]\right|_{z = p(x)} = -(p(x) - x) = x - p(x)$$&lt;p&gt;&lt;strong&gt;这就是全部！&lt;/strong&gt; Danskin 定理说：对 $\min_z$ 形式的参数化最值问题，值函数对 $x$ 的梯度 = 目标函数关于 $x$ 的偏导数在最优解 $z^*$ 处的值。不需要链式法则穿过 $\arg\min$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;光滑性的几何直觉&lt;/strong&gt;：$M_f$ 是 $f$ 的&amp;quot;磨圆版&amp;quot;——原函数 $f$ 的尖角（不可微点）处，Moreau 包络用一段&lt;strong&gt;光滑的二次曲线&lt;/strong&gt;替代。磨圆的&amp;quot;半径&amp;quot;由步长 $\alpha$ 控制：$\alpha$ 越小，$M_{\alpha f}$ 越接近 $f$ 本身。&lt;/p&gt;
+&lt;h3 id=&#34;923-本章最重要的洞察邻近点法--moreau-包络上的梯度下降&#34;&gt;9.2.3 本章最重要的洞察：邻近点法 ≡ Moreau 包络上的梯度下降
+&lt;/h3&gt;&lt;p&gt;这个等价关系可能是一阶优化方法中最优美的观点之一。我们来一步步验证：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;邻近点法迭代&lt;/strong&gt;：
+&lt;/p&gt;
+$$x_{k+1} = \text{prox}_{\alpha f}(x_k)$$&lt;p&gt;&lt;strong&gt;重写&lt;/strong&gt;（加减 $x_k$）：
+&lt;/p&gt;
+$$\begin{aligned}
+x_{k+1} &amp;= x_k - x_k + \text{prox}_{\alpha f}(x_k) \\
+&amp;= x_k - \alpha \cdot \frac{1}{\alpha}\big(x_k - \text{prox}_{\alpha f}(x_k)\big) \\
+&amp;= x_k - \alpha \cdot \nabla M_{\alpha f}(x_k)
+\end{aligned}$$&lt;p&gt;&lt;strong&gt;这不就是在 $M_{\alpha f}$ 上做步长为 $\alpha$ 的梯度下降吗！&lt;/strong&gt;&lt;/p&gt;
+$$\boxed{\text{邻近点法} \;\equiv\; \text{Moreau 包络上的梯度下降法}}$$&lt;p&gt;&lt;strong&gt;这个等价关系的深远意义&lt;/strong&gt;：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;收敛性继承&lt;/strong&gt;：邻近点法的 $O(1/k)$ 收敛率可以直接从 GD 的收敛性导出——因为 $M_{\alpha f}$ 是 $1/\alpha$-smooth 凸函数，GD 在其上的收敛率天然是 $O(1/k)$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;算法设计的范本&lt;/strong&gt;：任何非光滑凸函数 $f$，通过求其 Moreau 包络 $M_f$，就变成了一个光滑函数——然后可以用所有光滑优化的技巧（加速、线搜索等）来处理。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;理论桥梁&lt;/strong&gt;：非光滑优化和光滑优化通过 Moreau 包络被统一了。你不需要专门的&amp;quot;非光滑方法&amp;quot;——把函数&amp;quot;包络一下&amp;quot;再光滑求解即可。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;924-moreau-包络与原始问题的等价性&#34;&gt;9.2.4 Moreau 包络与原始问题的等价性
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;性质&lt;/strong&gt;：
+&lt;/p&gt;
+$$\inf_x f(x) = \inf_x M_f(x)$$&lt;p&gt;且最优解集完全相同：
+&lt;/p&gt;
+$$\arg\min_x f(x) = \arg\min_x M_f(x)$$&lt;p&gt;&lt;strong&gt;直观理解&lt;/strong&gt;：$M_f$ 虽然对 $f$ 进行了&amp;quot;磨圆&amp;quot;（光滑化），但&lt;strong&gt;极小值和极小点没有改变&lt;/strong&gt;。为什么？原因是当 $z = x$ 时，二次惩罚项 $\frac{1}{2}|z-x|^2 = 0$，所以 $M_f(x) \leq f(x)$（取 $z=x$）。另一方面，$M_f(x) \geq \inf_z f(z) = f^*$。因此 $\inf M_f = \inf f$。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：Moreau 包络 $M_f(x) = \min_z{f(z) + \frac{1}{2}|z-x|^2}$ 是对非光滑函数 $f$ 的光滑化——$M_f$ 处处可微，梯度 $\nabla M_f(x) = x - \text{prox}_f(x)$ 极其简洁。邻近点法本质上是在 Moreau 包络上做梯度下降。$M_f$ 与 $f$ 有相同的最小值和最小点集。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;93-共轭函数conjugate-function&#34;&gt;9.3 共轭函数（Conjugate Function）
+&lt;/h2&gt;&lt;h3 id=&#34;931-定义&#34;&gt;9.3.1 定义
+&lt;/h3&gt;&lt;p&gt;对于函数 $f: \mathbb{R}^n \to \mathbb{R} \cup {+\infty}$，其&lt;strong&gt;Fenchel 共轭&lt;/strong&gt;（也称 Legendre-Fenchel 变换）定义为：&lt;/p&gt;
+$$\boxed{f^*(y) = \sup_{x \in \mathbb{R}^n} \big\{y^T x - f(x)\big\}}$$&lt;p&gt;&lt;strong&gt;逐符号解释&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$f^*(y)$：读作&amp;quot;$f$ 的共轭函数在 $y$ 处的值&amp;quot;。$y$ 是&lt;strong&gt;对偶变量&lt;/strong&gt;（数学上，$y$ 是一个&amp;quot;斜率&amp;quot;）。&lt;/li&gt;
+&lt;li&gt;$\sup_x$：上确界（supremum），可以理解为&amp;quot;关于 $x$ 的最大值&amp;quot;。&lt;/li&gt;
+&lt;li&gt;$y^T x$：向量内积（点乘），$\mathbb{R}^n$ 中 $y^T x = \sum_{i=1}^n y_i x_i$。这是线性函数——一条通过原点的直线（或超平面）。&lt;/li&gt;
+&lt;li&gt;$y^T x - f(x)$：线性函数 $y^T x$ 减去函数值 $f(x)$，即&lt;strong&gt;直线高于函数&lt;/strong&gt;的垂直距离。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;932-几何解释共轭函数到底在算什么&#34;&gt;9.3.2 几何解释——共轭函数到底在算什么？
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;核心问题&lt;/strong&gt;：共轭函数 $f^*(y)$ 回答的是——&lt;strong&gt;给定一个斜率 $y$，线性函数 $y^T x$ 最多比 $f(x)$ 高出多少？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;在 $\mathbb{R}^1$（一维）中的几何含义：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;对于固定的 $y$（一条通过原点、斜率为 $y$ 的直线），$f^*(y) = \sup_x {yx - f(x)}$。&lt;/li&gt;
+&lt;li&gt;即：在所有的 $x$ 中，寻找直线 $yx$ 与函数 $f(x)$ 之间的&lt;strong&gt;最大垂直差距&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;$y$ 对应的支撑直线是 $yx - f^*(y)$，它从下方&amp;quot;托住&amp;quot; $f$ 的图像。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;翻转变换&lt;/strong&gt;：共轭变换将函数从&amp;quot;自变量→函数值&amp;quot;的视角（&amp;ldquo;给定 $x$，$f(x)$ 是多少？&amp;quot;），翻转为&amp;quot;斜率→最大截距差&amp;quot;的视角（&amp;ldquo;给定斜率 $y$，以 $y$ 为斜率的直线能比 $f$ 高出多少？&amp;quot;）。这是对偶理论的&amp;quot;视角转换&amp;quot;基础。&lt;/p&gt;
+&lt;h3 id=&#34;933-fenchel-不等式young-fenchel-不等式&#34;&gt;9.3.3 Fenchel 不等式（Young-Fenchel 不等式）
+&lt;/h3&gt;&lt;p&gt;由共轭函数的定义 $f^*(y) = \sup_x{y^T x - f(x)}$，对任意 $x, y$，有：&lt;/p&gt;
+$$\boxed{x^T y \leq f(x) + f^*(y), \quad \forall x, y}$$&lt;p&gt;&lt;strong&gt;取等号的条件&lt;/strong&gt;：$y \in \partial f(x)$（即 $y$ 是 $f$ 在 $x$ 处的&lt;strong&gt;一个次梯度&lt;/strong&gt;），或等价地 $x \in \partial f^*(y)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;推导&lt;/strong&gt;（秒懂）：因为 $f^&lt;em&gt;(y) \geq y^T x - f(x)$（对所有 $x$ 成立——上确界比每一个具体的值都大），移项即得 $x^T y \leq f(x) + f^&lt;/em&gt;(y)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Fenchel 不等式的作用&lt;/strong&gt;：这是建立整个&lt;strong&gt;对偶理论大厦&lt;/strong&gt;的基石。对任何原问题，利用 Fenchel 不等式可以导出其 Lagrange 对偶形式。Ch10-12 的对偶邻近梯度法、增广 Lagrange 法、ADMM 全都源于此。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;特例——Young 不等式&lt;/strong&gt;（取 $f(x) = \frac{1}{p}|x|^p$，$p&amp;gt;1$）：
+对 $\frac{1}{p} + \frac{1}{q} = 1$（$p, q &amp;gt; 1$）：
+&lt;/p&gt;
+$$xy \leq \frac{|x|^p}{p} + \frac{|y|^q}{q}$$&lt;p&gt;这是经典分析中的 Young 不等式——它是 Fenchel 不等式的直接推论。&lt;/p&gt;
+&lt;h3 id=&#34;934-常见函数的共轭表必背&#34;&gt;9.3.4 常见函数的共轭表（必背）
+&lt;/h3&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;$f(x)$&lt;/th&gt;
+					&lt;th&gt;$f^*(y)$&lt;/th&gt;
+					&lt;th&gt;条件/说明&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\frac{1}{2}|x|^2$&lt;/td&gt;
+					&lt;td&gt;$\frac{1}{2}|y|^2$&lt;/td&gt;
+					&lt;td&gt;$\ell_2^2$ &lt;strong&gt;自共轭&lt;/strong&gt;（形式不变！）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\frac{1}{2}x^T Q x$（$Q \succ 0$）&lt;/td&gt;
+					&lt;td&gt;$\frac{1}{2}y^T Q^{-1} y$&lt;/td&gt;
+					&lt;td&gt;二次→二次，协方差矩阵取逆&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$|x|$（任意范数）&lt;/td&gt;
+					&lt;td&gt;$\delta_{|y|_* \leq 1}(y)$&lt;/td&gt;
+					&lt;td&gt;范数→对偶范数球的指示函数&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$|x|_1$&lt;/td&gt;
+					&lt;td&gt;$\delta_{|y|_\infty \leq 1}(y)$&lt;/td&gt;
+					&lt;td&gt;$\ell_1$→$\ell_\infty$ 球&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$|x|_2$&lt;/td&gt;
+					&lt;td&gt;$\delta_{|y|_2 \leq 1}(y)$&lt;/td&gt;
+					&lt;td&gt;$\ell_2$→$\ell_2$ 球（自对偶）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$|x|_\infty$&lt;/td&gt;
+					&lt;td&gt;$\delta_{|y|_1 \leq 1}(y)$&lt;/td&gt;
+					&lt;td&gt;$\ell_\infty$→$\ell_1$ 球&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\delta_C(x)$（凸集 $C$）&lt;/td&gt;
+					&lt;td&gt;$\sigma_C(y) = \sup_{x\in C} y^T x$&lt;/td&gt;
+					&lt;td&gt;指示函数↔支撑函数&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\frac{1}{2}|Ax-b|^2$&lt;/td&gt;
+					&lt;td&gt;$\frac{1}{2}|(A^T)^\dagger y|^2 + b^T y$&lt;/td&gt;
+					&lt;td&gt;最小二乘的共轭&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\log(1+e^{-x})$（logistic loss）&lt;/td&gt;
+					&lt;td&gt;$-y\log(-y)-(1+y)\log(1+y)$&lt;/td&gt;
+					&lt;td&gt;二值熵函数（$-1\leq y\leq 0$）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$e^x$&lt;/td&gt;
+					&lt;td&gt;$y\log y - y$（$y &amp;gt; 0$）&lt;/td&gt;
+					&lt;td&gt;指数→&amp;quot;$\times\log$&amp;ldquo;型&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$-\log x$（$x&amp;gt;0$）&lt;/td&gt;
+					&lt;td&gt;$-1 - \log(-y)$（$y&amp;lt;0$）&lt;/td&gt;
+					&lt;td&gt;负对数→负对数&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\sum_i x_i\log x_i$（负熵）&lt;/td&gt;
+					&lt;td&gt;$\sum_i e^{y_i-1}$&lt;/td&gt;
+					&lt;td&gt;负熵↔指数和&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;这个表的美感&lt;/strong&gt;：注意 $\ell_p$ 和 $\ell_q$（$\frac{1}{p}+\frac{1}{q}=1$）之间的&lt;strong&gt;完美对偶&lt;/strong&gt;——$\ell_1$→$\ell_\infty$，$\ell_2$→$\ell_2$，$\ell_\infty$→$\ell_1$。这是数学中深邃的结构之美。&lt;/p&gt;
+&lt;h3 id=&#34;935-共轭函数的推导示例&#34;&gt;9.3.5 共轭函数的推导示例
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;例 1&lt;/strong&gt;：$f(x) = \frac{1}{2}x^2$（一维标量），求 $f^*(y)$。&lt;/p&gt;
+$$\begin{aligned}
+f^*(y) &amp;= \sup_x \{yx - \frac{1}{2}x^2\}
+\end{aligned}$$&lt;p&gt;这是关于 $x$ 的开口向下的二次函数（系数 $-\frac{1}{2} &amp;lt; 0$），有唯一极大值点。对 $x$ 求导并令等于零：
+&lt;/p&gt;
+$$\frac{d}{dx}(yx - \frac{1}{2}x^2) = y - x = 0 \implies x^* = y$$&lt;p&gt;代入原式：
+&lt;/p&gt;
+$$f^*(y) = y \cdot y - \frac{1}{2}y^2 = \frac{1}{2}y^2$$&lt;p&gt;&lt;strong&gt;例 2&lt;/strong&gt;：$f(x) = |x|$（$\ell_2$ 范数），求 $f^*(y)$。&lt;/p&gt;
+$$\begin{aligned}
+f^*(y) &amp;= \sup_{x} \{y^T x - \|x\|\} \\
+&amp;= \sup_{t \geq 0} \sup_{\|x\| = t} \{y^T x - t\} \quad \text{（分层：先固定范数 $t$，再在该球面上找最大内积）}
+\end{aligned}$$&lt;p&gt;由 Cauchy-Schwarz 不等式：$\sup_{|x|=t} y^T x = t|y|$（当 $x$ 与 $y$ 共线同向时取到最大值）。因此：
+&lt;/p&gt;
+$$f^*(y) = \sup_{t \geq 0} \{t\|y\| - t\} = \sup_{t \geq 0} t(\|y\| - 1)$$&lt;ul&gt;
+&lt;li&gt;若 $|y| &amp;gt; 1$：取 $t \to \infty$，上确界为 $+\infty$（因为 $t(|y|-1) \to +\infty$）&lt;/li&gt;
+&lt;li&gt;若 $|y| \leq 1$：$t(|y|-1) \leq 0$，最大值在 $t = 0$ 处取到，为 $0$&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此 $f^*(y) = \delta_{|y| \leq 1}(y)$（$\ell_2$ 单位球的指示函数）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;例 3&lt;/strong&gt;：$f(x) = \lambda|x|_1$，求 $f^*(y)$。&lt;/p&gt;
+&lt;p&gt;由 $|x|_1$ 是分量可分的（$|x|_1 = \sum_i |x_i|$），共轭也是分量可分的：
+&lt;/p&gt;
+$$\begin{aligned}
+f^*(y) &amp;= \sup_x \sum_i \{y_i x_i - \lambda|x_i|\} = \sum_i \sup_{x_i} \{y_i x_i - \lambda|x_i|\}
+\end{aligned}$$&lt;p&gt;对每个 $i$，标量问题 $\sup_z {yz - \lambda|z|}$：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;若 $|y| \leq \lambda$：$yz \leq |y||z| \leq \lambda|z|$，$\sup$ 值为 $0$（在 $z=0$ 处取到）&lt;/li&gt;
+&lt;li&gt;若 $|y| &amp;gt; \lambda$：取 $z \to \pm\infty$（符号与 $y$ 一致），$yz - \lambda|z| = (|y| - \lambda)|z| \to +\infty$，上确界为 $+\infty$&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此 $f^*(y) = \delta_{|y|&lt;em&gt;\infty \leq \lambda}(y)$——$\ell&lt;/em&gt;\infty$-$\lambda$ 球的指示函数。&lt;/p&gt;
+&lt;h3 id=&#34;936-强凸-iff-共轭光滑对偶理论的核心定理&#34;&gt;9.3.6 强凸 $\iff$ 共轭光滑——对偶理论的核心定理
+&lt;/h3&gt;&lt;p&gt;这是模块三（Ch10-14，对偶邻近梯度法、增广 Lagrange、ADMM）的&lt;strong&gt;根本理论基础&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;定理（强凸-光滑对偶）&lt;/strong&gt;：&lt;/p&gt;
+$$\boxed{f \text{ 是 } \mu\text{-强凸} \;\iff\; f^* \text{ 是 } \frac{1}{\mu}\text{-smooth（可微且梯度 }1/\mu\text{-Lipschitz）}}$$&lt;p&gt;&lt;strong&gt;反向也有完全对偶的结论&lt;/strong&gt;：&lt;/p&gt;
+$$\boxed{f \text{ 是 } L\text{-smooth} \;\iff\; f^* \text{ 是 } \frac{1}{L}\text{-强凸}}$$&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;（$\mu$-强凸 $\implies$ $f^*$ 光滑）：&lt;/p&gt;
+&lt;p&gt;设 $f$ 为 $\mu$-强凸。对任意 $y_1, y_2$，令 $x_i = \nabla f^*(y_i) = \arg\max_x{y_i^T x - f(x)}$（由于 $\mu$-强凸，$f$ 严格凸，argmax 唯一）。&lt;/p&gt;
+&lt;p&gt;由最优性条件：$y_i = \nabla f(x_i)$（$f$ 严格凸时可微，$y_i$ 等于 $f$ 在 $x_i$ 处的梯度）。&lt;/p&gt;
+&lt;p&gt;由 $f$ 的 $\mu$-强凸性（等价性质：$\langle \nabla f(x_1) - \nabla f(x_2), x_1 - x_2 \rangle \geq \mu|x_1 - x_2|^2$）：
+&lt;/p&gt;
+$$\langle y_1 - y_2,\; \nabla f^*(y_1) - \nabla f^*(y_2) \rangle \geq \mu\|\nabla f^*(y_1) - \nabla f^*(y_2)\|^2$$&lt;p&gt;由 Cauchy-Schwarz 不等式：
+&lt;/p&gt;
+$$\|\nabla f^*(y_1) - \nabla f^*(y_2)\| \cdot \|y_1 - y_2\| \geq \mu\|\nabla f^*(y_1) - \nabla f^*(y_2)\|^2$$&lt;p&gt;两边如果有 $|\nabla f^&lt;em&gt;(y_1) - \nabla f^&lt;/em&gt;(y_2)| &amp;gt; 0$，则除以它得：
+&lt;/p&gt;
+$$\|\nabla f^*(y_1) - \nabla f^*(y_2)\| \leq \frac{1}{\mu}\|y_1 - y_2\|$$&lt;p&gt;因此 $f^*$ 是 $1/\mu$-smooth 的。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;这一性质的算法意义&lt;/strong&gt;：在 Ch10 的对偶邻近梯度法中，&lt;strong&gt;原始问题中的强凸项 $f$ 的共轭 $f^*$ 变为光滑函数&lt;/strong&gt;，从而可以在对偶空间上用梯度类方法求解。这是对偶算法的核心设计原则。&lt;/p&gt;
+&lt;h3 id=&#34;937-共轭的次梯度关系&#34;&gt;9.3.7 共轭的次梯度关系
+&lt;/h3&gt;$$\boxed{y \in \partial f(x) \;\iff\; x \in \partial f^*(y)}$$&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：由 Fenchel 不等式 $x^T y \leq f(x) + f^&lt;em&gt;(y)$，等号成立当且仅当 $y \in \partial f(x)$。而 $y \in \partial f(x)$ 等价于 $x = \arg\max_z{y^T z - f(z)}$，这等价于 $x \in \partial f^&lt;/em&gt;(y)$。&lt;/p&gt;
+&lt;p&gt;这个关系几乎是瞬时的：$f$ 和 $f^*$ 的次梯度映射&lt;strong&gt;互为逆映射&lt;/strong&gt;——&amp;ldquo;你把图倒过来看，梯度的角色互换了。&amp;rdquo;&lt;/p&gt;
+&lt;h3 id=&#34;938-双重共轭-f--f&#34;&gt;9.3.8 双重共轭 $f^{**} = f$
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;定理&lt;/strong&gt;：对任何 proper、闭凸函数 $f$，&lt;/p&gt;
+$$\boxed{f^{**} = f}$$&lt;p&gt;&lt;strong&gt;几何含义&lt;/strong&gt;：共轭-共轭操作回到了原来的闭凸函数。$f^{&lt;strong&gt;}$ 等价于 $f$ 的&lt;/strong&gt;凸包络**（convex envelope）——如果 $f$ 本来不是凸的，$f^{**}$ 是它的最大闭凸下界（类似&amp;quot;用最紧的凸函数从下方包住它&amp;rdquo;）。如果 $f$ 已经是 proper 闭凸的，两次变换恰好回到自身。这也是 Fourier 变换中 $(\mathcal{F}\mathcal{F}f)(x) = f(-x)$ 风格的对偶美观。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：共轭函数 $f^&lt;em&gt;(y) = \sup_x{y^T x - f(x)}$ 将函数从&amp;quot;点-值&amp;quot;视角翻转为&amp;quot;斜率-截距&amp;quot;视角。关键性质包括：Fenchel 不等式 $x^T y \leq f(x) + f^&lt;/em&gt;(y)$、强凸 $\iff$ 共轭光滑的对偶定理、次梯度的互逆关系 $y \in \partial f(x) \iff x \in \partial f^*(y)$，以及 $f^{**} = f$（对闭凸函数）。这些是对偶理论的全部基石。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;94-moreau-分解moreau-decomposition&#34;&gt;9.4 Moreau 分解（Moreau Decomposition）
+&lt;/h2&gt;&lt;h3 id=&#34;941-基本恒等式本章最优美的公式&#34;&gt;9.4.1 基本恒等式——本章最优美的公式
+&lt;/h3&gt;$$\boxed{x = \text{prox}_f(x) + \text{prox}_{f^*}(x), \quad \forall x \in \mathbb{R}^n}$$&lt;p&gt;&lt;strong&gt;解读&lt;/strong&gt;：任何一个向量 $x$，都可以&lt;strong&gt;无损分解&lt;/strong&gt;为两部分之和——一部分是 $f$ 的邻近算子在 $x$ 处的值，另一部分是**$f$ 的共轭函数 $f^*$** 的邻近算子在 $x$ 处的值。这两部分互为正交补（在某种广义意义下）。&lt;/p&gt;
+&lt;p&gt;带步长的参数化版本：
+&lt;/p&gt;
+$$x = \text{prox}_{\alpha f}(x) + \alpha \cdot \text{prox}_{f^*/\alpha}(x/\alpha)$$&lt;p&gt;&lt;strong&gt;最常用形式&lt;/strong&gt;（$\alpha=1$）：
+&lt;/p&gt;
+$$\boxed{\text{prox}_{f}(x) + \text{prox}_{f^*}(x) = x}$$&lt;h3 id=&#34;942-完整推导必须掌握&#34;&gt;9.4.2 完整推导（必须掌握）
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;推导一&lt;/strong&gt;（用最优性条件，最简短的证明）：&lt;/p&gt;
+&lt;p&gt;令 $u = \text{prox}&lt;em&gt;f(x)$，$v = x - u$（即 $u + v = x$）。我们的目标是证明 $v = \text{prox}&lt;/em&gt;{f^*}(x)$。&lt;/p&gt;
+&lt;p&gt;由邻近算子的刻画不等式（Ch7 的 7.2.3 节）：$u = \text{prox}_f(x)$ 等价于：
+&lt;/p&gt;
+$$x - u \in \partial f(u)$$&lt;p&gt;将 $v = x - u$ 代入：$v \in \partial f(u)$。&lt;/p&gt;
+&lt;p&gt;利用共轭的次梯度关系（9.3.7 节）：$v \in \partial f(u) \iff u \in \partial f^*(v)$。&lt;/p&gt;
+&lt;p&gt;而 $u = x - v$，所以 $x - v \in \partial f^&lt;em&gt;(v)$，即 $x \in v + \partial f^&lt;/em&gt;(v)$。&lt;/p&gt;
+&lt;p&gt;再次利用邻近算子的刻画（方向反过来）：$x \in v + \partial f^&lt;em&gt;(v)$ 等价于 $v = \text{prox}_{f^&lt;/em&gt;}(x)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证毕！&lt;/strong&gt; 这条优美恒等式只需要三步：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;$x - \text{prox}_f(x) \in \partial f(\text{prox}_f(x))$（邻近算子的刻画）&lt;/li&gt;
+&lt;li&gt;共轭的次梯度反转关系 $\partial f$ ↔ $\partial f^*$&lt;/li&gt;
+&lt;li&gt;邻近算子的等价定义反过来应用&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;943-直观理解与算法意义&#34;&gt;9.4.3 直观理解与算法意义
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;几何含义&lt;/strong&gt;：向量 $x$ 被一分为二：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\text{prox}_f(x)$：使 $f$ 变小的&amp;quot;正则部分&amp;rdquo;——往 $f$ 的&amp;quot;好区域&amp;quot;靠拢；&lt;/li&gt;
+&lt;li&gt;$\text{prox}_{f^&lt;em&gt;}(x)$：使 $f^&lt;/em&gt;$ 变小的&amp;quot;对偶正则部分&amp;rdquo;——从对偶角度做同样的优化。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;两者恰为互补——它们拼起来总是完整的 $x$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;最重要的算法应用&lt;/strong&gt;：已知 $f$ 的邻近算子，就可以&lt;strong&gt;白拿&lt;/strong&gt; $f^*$ 的邻近算子（反之亦然）。在 ADMM、DR（Douglas-Rachford）分裂法等算法中，这个恒等式被反复调用——因为它免去了重新计算对偶函数邻近算子的麻烦。&lt;/p&gt;
+&lt;h3 id=&#34;944-经典应用示例&#34;&gt;9.4.4 经典应用示例
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;用软阈值算子（$\ell_1$ 的 prox）计算 $\ell_\infty$ 球的投影&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;已知：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\text{prox}_{\lambda|\cdot|&lt;em&gt;1}(x) = S&lt;/em&gt;\lambda(x)$（软阈值，一个简单的逐分量操作，Ch7）&lt;/li&gt;
+&lt;li&gt;$(\lambda|\cdot|&lt;em&gt;1)^*(y) = \delta&lt;/em&gt;{|y|&lt;em&gt;\infty \leq \lambda}(y)$（$\ell&lt;/em&gt;\infty$-$\lambda$ 球的指示函数，其邻近算子 = 到该球的投影）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;由 Moreau 分解：
+&lt;/p&gt;
+$$S_\lambda(x) + P_{\|\cdot\|_\infty \leq \lambda}(x) = x$$&lt;p&gt;因此：
+&lt;/p&gt;
+$$\boxed{P_{\|\cdot\|_\infty \leq \lambda}(x) = x - S_\lambda(x)}$$&lt;p&gt;分量形式展开（$x_i$ 是第 $i$ 个分量）：
+&lt;/p&gt;
+$$[P_{\|\cdot\|_\infty \leq \lambda}(x)]_i = x_i - \text{sign}(x_i) \cdot \max\{|x_i| - \lambda, 0\} = \begin{cases} \lambda, &amp; x_i &gt; \lambda \\ x_i, &amp; |x_i| \leq \lambda \\ -\lambda, &amp; x_i &lt; -\lambda \end{cases}$$&lt;p&gt;&lt;strong&gt;这太优雅了！&lt;/strong&gt; 本来非常难算的 $\ell_\infty$ 球投影（需要排序或复杂的分段操作），通过 Moreau 分解，只需要&lt;strong&gt;软阈值 + 一次向量减法&lt;/strong&gt;——计算量从 $O(n\log n)$ 降级到 $O(n)$！&lt;/p&gt;
+&lt;p&gt;反过来也成立：如果你知道 $\ell_\infty$ 球的投影，就能计算 $\ell_1$ 的邻近算子。Moreau 分解打开了一扇双向自由通行的大门。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心要点&lt;/strong&gt;：Moreau 分解 $x = \text{prox}&lt;em&gt;f(x) + \text{prox}&lt;/em&gt;{f^*}(x)$ 是最优化理论中最优美的恒等式之一——它用三条简单的等价关系（邻近算子刻画、共轭次梯度反转、邻近算子刻画反用）连接了原函数和对偶函数的邻近算子。最重要的实践意义是：已知一边的 prox，就能白拿另一边的 prox。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;95-典型例题&#34;&gt;9.5 典型例题
+&lt;/h2&gt;&lt;h3 id=&#34;例题-91共轭函数的计算ell_2-范数&#34;&gt;例题 9.1：共轭函数的计算——$\ell_2$ 范数
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：证明 $|x|$（$\ell_2$ 范数）的共轭函数为 $\delta_{|y| \leq 1}(y)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：详见 9.3.5 节例 2。核心技巧是分层：先固定 $|x|=t$ 用 Cauchy-Schwarz 求最大内积，再对 $t$ 求 $\sup$。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-92共轭函数的计算一般二次函数&#34;&gt;例题 9.2：共轭函数的计算——一般二次函数
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：设 $f(x) = \frac{1}{2}x^T Q x + c^T x$，其中 $Q \succ 0$（对称正定）。求 $f^*(y)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;（逐步推导）：&lt;/p&gt;
+$$\begin{aligned}
+f^*(y) &amp;= \sup_x \{y^T x - \frac{1}{2}x^T Q x - c^T x\} \\
+&amp;= \sup_x \{(y - c)^T x - \frac{1}{2}x^T Q x\}
+\end{aligned}$$&lt;p&gt;大括号内是关于 $x$ 的开口向下的二次函数（因为 $-Q \prec 0$），有唯一的极大值点。对 $x$ 求梯度（$\nabla_x$）并令等于零：
+&lt;/p&gt;
+$$\nabla_x\left((y-c)^T x - \frac{1}{2}x^T Q x\right) = (y-c) - Q x = 0$$&lt;p&gt;解得 $x^* = Q^{-1}(y - c)$。代入原式：
+&lt;/p&gt;
+$$\begin{aligned}
+f^*(y) &amp;= (y-c)^T Q^{-1}(y-c) - \frac{1}{2}(y-c)^T Q^{-1} Q Q^{-1}(y-c) \\
+&amp;= (y-c)^T Q^{-1}(y-c) - \frac{1}{2}(y-c)^T Q^{-1}(y-c) \\
+&amp;= \frac{1}{2}(y - c)^T Q^{-1}(y - c)
+\end{aligned}$$&lt;p&gt;&lt;strong&gt;特例&lt;/strong&gt;（$c = 0$）：$f(x) = \frac{1}{2}x^T Q x$，则 $f^*(y) = \frac{1}{2}y^T Q^{-1} y$。二次函数的共轭也是二次函数，只是&amp;quot;协方差矩阵取逆&amp;quot;——$Q$ 变成了 $Q^{-1}$。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-93强凸函数的共轭光滑性证明&#34;&gt;例题 9.3：强凸函数的共轭光滑性证明
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：若 $f$ 为闭凸函数且其共轭 $f^*$ 是 $L$-smooth，证明 $f$ 是 $1/L$-强凸。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;（利用对称性）：&lt;/p&gt;
+&lt;p&gt;由 $f^*$ 的 $L$-smooth 性：$\forall y_1, y_2$，
+&lt;/p&gt;
+$$\|\nabla f^*(y_1) - \nabla f^*(y_2)\| \leq L\|y_1 - y_2\|$$&lt;p&gt;令 $x_i = \nabla f^*(y_i)$，则 $y_i \in \partial f(x_i)$（由共轭的次梯度关系）。&lt;/p&gt;
+&lt;p&gt;对于任意 $x_1, x_2$，取 $y_1 \in \partial f(x_1)$，$y_2 \in \partial f(x_2)$。&lt;/p&gt;
+&lt;p&gt;由 $f^*$ 的 $L$-smooth 性和凸函数性质（光滑凸函数的梯度单调性）：
+&lt;/p&gt;
+$$\langle \nabla f^*(y_1) - \nabla f^*(y_2), y_1 - y_2 \rangle \geq \frac{1}{L}\|\nabla f^*(y_1) - \nabla f^*(y_2)\|^2$$&lt;p&gt;代入 $x_i = \nabla f^*(y_i)$：
+&lt;/p&gt;
+$$\langle x_1 - x_2, y_1 - y_2 \rangle \geq \frac{1}{L}\|x_1 - x_2\|^2$$&lt;p&gt;由次梯度定义：$f(x_2) \geq f(x_1) + y_1^T(x_2 - x_1)$，$f(x_1) \geq f(x_2) + y_2^T(x_1 - x_2)$。&lt;/p&gt;
+&lt;p&gt;通过更精细的不等式合并，可得：
+&lt;/p&gt;
+$$f(x_2) \geq f(x_1) + y_1^T(x_2 - x_1) + \frac{1}{2L}\|x_2 - x_1\|^2$$&lt;p&gt;这正是 $1/L$-强凸的定义。证毕。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-94moreau-分解的推导与应用&#34;&gt;例题 9.4：Moreau 分解的推导与应用
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：
+(a) 完整推导 Moreau 分解 $x = \text{prox}&lt;em&gt;f(x) + \text{prox}&lt;/em&gt;{f^*}(x)$。
+(b) 利用 Moreau 分解，给出用软阈值算子表达 $\ell_\infty$ 球投影的公式。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;(a) 详见 9.4.2 节的完整推导。&lt;/p&gt;
+&lt;p&gt;(b) 对 $f(x) = \lambda|x|&lt;em&gt;1$，其共轭 $f^*(y) = \delta&lt;/em&gt;{|y|_\infty \leq \lambda}(y)$。&lt;/p&gt;
+&lt;p&gt;由 Moreau 分解：
+&lt;/p&gt;
+$$\text{prox}_{\lambda\|\cdot\|_1}(x) + \text{prox}_{\delta_{\|\cdot\|_\infty \leq \lambda}}(x) = x$$&lt;p&gt;已知 $\text{prox}&lt;em&gt;{\lambda|\cdot|&lt;em&gt;1}(x) = S&lt;/em&gt;\lambda(x)$（软阈值），而 $\text{prox}&lt;/em&gt;{\delta_C}(x) = P_C(x)$（指示函数的邻近算子 = 投影）。因此：
+&lt;/p&gt;
+$$P_{\|\cdot\|_\infty \leq \lambda}(x) = x - S_\lambda(x)$$&lt;p&gt;分量形式：
+&lt;/p&gt;
+$$[P_{\|\cdot\|_\infty \leq \lambda}(x)]_i = \begin{cases} \lambda, &amp; x_i &gt; \lambda \\ x_i, &amp; |x_i| \leq \lambda \\ -\lambda, &amp; x_i &lt; -\lambda \end{cases}$$&lt;p&gt;即把超过 $[-\lambda, \lambda]$ 范围的分量&lt;strong&gt;截断&lt;/strong&gt;（clip）到边界上。这是一个 $O(n)$ 极其简单的操作。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;例题-95邻近点法收敛率推导用-moreau-包络的-gd-观点&#34;&gt;例题 9.5：邻近点法收敛率推导——用 Moreau 包络的 GD 观点
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：利用&amp;quot;邻近点法 = Moreau 包络上梯度下降&amp;quot;的观点，证明邻近点法的 $O(1/k)$ 收敛率。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;$M_{\alpha f}(x) = \min_z{f(z) + \frac{1}{2\alpha}|z - x|^2}$ 是 $1/\alpha$-smooth 凸函数，且 $\nabla M_{\alpha f}(x) = \frac{1}{\alpha}(x - \text{prox}_{\alpha f}(x))$。&lt;/p&gt;
+&lt;p&gt;邻近点法迭代：
+&lt;/p&gt;
+$$x_{k+1} = \text{prox}_{\alpha f}(x_k) = x_k - \alpha \cdot \nabla M_{\alpha f}(x_k)$$&lt;p&gt;这正是 $M_{\alpha f}$ 上的步长为 $\alpha$ 的&lt;strong&gt;标准梯度下降&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;由 GD 在 $1/\alpha$-smooth 凸函数上的 $O(1/k)$ 收敛率（Ch2 定理）：
+&lt;/p&gt;
+$$M_{\alpha f}(x_k) - M_{\alpha f}^* \leq \frac{\|x_0 - x^*\|^2}{2\alpha k}$$&lt;p&gt;又 $\arg\min f = \arg\min M_{\alpha f}$ 且 $M_{\alpha f}^* = f^*$（Moreau 包络与原始函数有相同的最优值和最优解集）。利用 $f(x_{k+1}) \leq M_{\alpha f}(x_k)$（在最优 $z = x_{k+1}$ 处，Moreau 包络定义中的两项取值为 $f(x_{k+1}) + \frac{1}{2\alpha}|x_{k+1} - x_k|^2$，因此 $M_{\alpha f}(x_k) \geq f(x_{k+1})$），可以得到：
+&lt;/p&gt;
+$$f(x_k) - f^* \leq \frac{\|x_0 - x^*\|^2}{2\alpha k}$$&lt;hr&gt;
+&lt;h3 id=&#34;例题-96fenchel-不等式推导-young-不等式&#34;&gt;例题 9.6：Fenchel 不等式推导 Young 不等式
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：
+(a) 由 Fenchel 不等式推导经典 Young 不等式：$xy \leq \frac{|x|^p}{p} + \frac{|y|^q}{q}$（$\frac{1}{p} + \frac{1}{q} = 1$，$p,q &amp;gt; 1$）。
+(b) 由 Fenchel 不等式和 $f$ 的 $\mu$-强凸性，导出 $f^*$ 的上界。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;(a) 取 $f(x) = \frac{1}{p}|x|^p$（$p&amp;gt;1$），其共轭为 $f^&lt;em&gt;(y) = \frac{1}{q}|y|^q$（这是共轭表中的结果，也可通过 $\sup_x{yx - \frac{1}{p}|x|^p}$ 求导验证：$y = |x|^{p-1}\text{sign}(x)$，$x = |y|^{q-1}\text{sign}(y)$，代入得 $f^&lt;/em&gt;(y) = \frac{1}{q}|y|^q$）。&lt;/p&gt;
+&lt;p&gt;代入 Fenchel 不等式 $xy \leq f(x) + f^*(y)$：
+&lt;/p&gt;
+$$xy \leq \frac{|x|^p}{p} + \frac{|y|^q}{q}$$&lt;p&gt;(b) $f$ 为 $\mu$-强凸，由强凸-光滑对偶定理，$f^&lt;em&gt;$ 是 $1/\mu$-smooth 的。取固定的 $y$，考虑 $x = \nabla f^&lt;/em&gt;(y)$（即 $f^&lt;em&gt;$ 在 $y$ 处的梯度点）。由 $f^&lt;/em&gt;$ 的光滑性，其值被一个二次界控制：
+&lt;/p&gt;
+$$f^*(y) \leq f^*(y_0) + \langle \nabla f^*(y_0), y - y_0 \rangle + \frac{1}{2\mu}\|y - y_0\|^2$$&lt;p&gt;这给出了 $f^&lt;em&gt;(y)$ 在任意 $y_0$ 处的局部二次上界——$f^&lt;/em&gt;$ 不会涨得太快，它的增长速度被 $1/\mu$ 约束。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;核心要点&#34;&gt;核心要点
+&lt;/h2&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;概念&lt;/th&gt;
+					&lt;th&gt;核心公式/结论&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;邻近点法&lt;/td&gt;
+					&lt;td&gt;$x_{k+1} = \text{prox}_{\alpha f}(x_k)$，适用于任意闭凸 $f$（可以不光滑）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;与 ISTA 的区别&lt;/td&gt;
+					&lt;td&gt;ISTA 分前向梯度步 + 后向邻近步；邻近点法是纯邻近步&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Moreau 包络&lt;/td&gt;
+					&lt;td&gt;$M_f(x) = \min_z{f(z) + \frac{1}{2}|z-x|^2}$，是非光滑 $f$ 的光滑化&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;光滑化定理&lt;/td&gt;
+					&lt;td&gt;$\nabla M_f(x) = x - \text{prox}_f(x)$，$M_f$ 是 1-smooth 的&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;核心洞察&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;邻近点法 ≡ Moreau 包络上的梯度下降！&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;与原问题等价性&lt;/td&gt;
+					&lt;td&gt;$\arg\min f = \arg\min M_f$，$\inf f = \inf M_f$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;共轭函数定义&lt;/td&gt;
+					&lt;td&gt;$f^*(y) = \sup_x{y^T x - f(x)}$，斜率与截距的翻转变换&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Fenchel 不等式&lt;/td&gt;
+					&lt;td&gt;$x^T y \leq f(x) + f^*(y)$，取等 $\iff$ $y \in \partial f(x)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Young 不等式&lt;/td&gt;
+					&lt;td&gt;$xy \leq \frac{|x|^p}{p} + \frac{|y|^q}{q}$（Fenchel 的特例）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\ell_p$ 共轭对偶&lt;/td&gt;
+					&lt;td&gt;$|\cdot|&lt;em&gt;p \leftrightarrow \delta&lt;/em&gt;{|\cdot|_q \leq 1}$（$\frac{1}{p}+\frac{1}{q}=1$）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;强凸-光滑对偶&lt;/td&gt;
+					&lt;td&gt;$f$ 是 $\mu$-强凸 $\iff$ $f^*$ 是 $1/\mu$-smooth&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;光滑-强凸对偶&lt;/td&gt;
+					&lt;td&gt;$f$ 是 $L$-smooth $\iff$ $f^*$ 是 $1/L$-强凸&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;次梯度互逆&lt;/td&gt;
+					&lt;td&gt;$y \in \partial f(x) \iff x \in \partial f^*(y)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;双重共轭&lt;/td&gt;
+					&lt;td&gt;$f^{**} = f$（对 proper 闭凸函数）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;Moreau 分解&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$x = \text{prox}&lt;em&gt;f(x) + \text{prox}&lt;/em&gt;{f^*}(x)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;经典应用&lt;/td&gt;
+					&lt;td&gt;$P_{|\cdot|&lt;em&gt;\infty \leq \lambda}(x) = x - S&lt;/em&gt;\lambda(x)$（$\ell_\infty$ 球投影只用软阈值！）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;邻近点法收敛率&lt;/td&gt;
+					&lt;td&gt;$O(1/k)$（从 Moreau 包络的 GD 性质直接继承）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;与次梯度法对比&lt;/td&gt;
+					&lt;td&gt;邻近点法每步代价更高（解优化子问题），但收敛更快（$O(1/k)$ vs $O(1/\sqrt{k})$）&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;(End of file)&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>

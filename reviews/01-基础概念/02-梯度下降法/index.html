@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第2章：梯度下降法 核心思想：梯度下降法（Gradient Descent, GD）是最基本的一阶优化算法。它沿着负梯度方向一步步&quot;下山&quot;，每一步都让函数值下降。在凸函数上保证收敛到全局最优，在强凸函数上以几何速率收敛。\n前置知识回顾（来自第1章） 概念 符号 快速回忆 梯度 $\\nabla f(x)$ 函数 $f$ 在点 $x$ 处的所有一阶偏导数组成的 $n$ 维列向量，指向函数值上升最快的方向 凸函数一阶条件 $f(y) \\geq f(x) + \\nabla f(x)^T (y-x)$ &ldquo;切线托住函数图形&rdquo;，是凸函数最核心的等价刻画 Hessian 半正定 $\\nabla^2 f(x) \\succeq 0$ 沿任意方向 $d$ 的二阶方向导数 $d^T \\nabla^2 f d \\geq 0$（&ldquo;处处弯曲向上&rdquo;），等价于凸性 驻点 $\\nabla f(x^*) = 0$ 梯度为零的点。对凸函数，驻点自动是全局极小点 2.1 动机：为什么需要梯度下降？ 现实中的优化问题往往维度极高（$n$ 可达百万甚至十亿级），无法通过解析求解（如直接求解 $\\nabla f(x) = 0$ 方程组，当 $n$ 很大时矩阵求逆的代价是 $O(n^3)$ 不可承受）。梯度下降法提供了一种迭代逼近的思路——每次只需要计算一次梯度（代价 $O(n)$ 或按问题结构更低），通过足够多次的迭代逐步逼近最优解。\n下山类比（帮助建立直觉）：想象你蒙着眼睛站在一座山的某个位置，目标是走到山谷最低点。你只能感知脚下一小片区域的坡度（即梯度）。最自然的策略是：用脚试探哪个方向最陡（计算梯度），然后向最陡的下降方向迈一小步。重复这个&quot;试探 → 迈步&quot;的过程，你最终会到达谷底。步幅（学习率）的选择至关重要——太小则进展缓慢，太大可能一步跨过谷底甚至走上对面的山坡。\n2.2 梯度下降法的迭代格式 2.2.1 基本公式 $$\\boxed{x_{k+1} = x_k - \\alpha_k \\nabla f(x_k), \\quad k = 0, 1, 2, \\ldots}$$逐字解释：\n">
+<title>第2章：梯度下降法</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/01-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5/02-%E6%A2%AF%E5%BA%A6%E4%B8%8B%E9%99%8D%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第2章：梯度下降法">
+<meta property='og:description' content="第2章：梯度下降法 核心思想：梯度下降法（Gradient Descent, GD）是最基本的一阶优化算法。它沿着负梯度方向一步步&quot;下山&quot;，每一步都让函数值下降。在凸函数上保证收敛到全局最优，在强凸函数上以几何速率收敛。\n前置知识回顾（来自第1章） 概念 符号 快速回忆 梯度 $\\nabla f(x)$ 函数 $f$ 在点 $x$ 处的所有一阶偏导数组成的 $n$ 维列向量，指向函数值上升最快的方向 凸函数一阶条件 $f(y) \\geq f(x) + \\nabla f(x)^T (y-x)$ &ldquo;切线托住函数图形&rdquo;，是凸函数最核心的等价刻画 Hessian 半正定 $\\nabla^2 f(x) \\succeq 0$ 沿任意方向 $d$ 的二阶方向导数 $d^T \\nabla^2 f d \\geq 0$（&ldquo;处处弯曲向上&rdquo;），等价于凸性 驻点 $\\nabla f(x^*) = 0$ 梯度为零的点。对凸函数，驻点自动是全局极小点 2.1 动机：为什么需要梯度下降？ 现实中的优化问题往往维度极高（$n$ 可达百万甚至十亿级），无法通过解析求解（如直接求解 $\\nabla f(x) = 0$ 方程组，当 $n$ 很大时矩阵求逆的代价是 $O(n^3)$ 不可承受）。梯度下降法提供了一种迭代逼近的思路——每次只需要计算一次梯度（代价 $O(n)$ 或按问题结构更低），通过足够多次的迭代逐步逼近最优解。\n下山类比（帮助建立直觉）：想象你蒙着眼睛站在一座山的某个位置，目标是走到山谷最低点。你只能感知脚下一小片区域的坡度（即梯度）。最自然的策略是：用脚试探哪个方向最陡（计算梯度），然后向最陡的下降方向迈一小步。重复这个&quot;试探 → 迈步&quot;的过程，你最终会到达谷底。步幅（学习率）的选择至关重要——太小则进展缓慢，太大可能一步跨过谷底甚至走上对面的山坡。\n2.2 梯度下降法的迭代格式 2.2.1 基本公式 $$\\boxed{x_{k+1} = x_k - \\alpha_k \\nabla f(x_k), \\quad k = 0, 1, 2, \\ldots}$$逐字解释：\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/01-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5/02-%E6%A2%AF%E5%BA%A6%E4%B8%8B%E9%99%8D%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第2章：梯度下降法">
+<meta name="twitter:description" content="第2章：梯度下降法 核心思想：梯度下降法（Gradient Descent, GD）是最基本的一阶优化算法。它沿着负梯度方向一步步&quot;下山&quot;，每一步都让函数值下降。在凸函数上保证收敛到全局最优，在强凸函数上以几何速率收敛。\n前置知识回顾（来自第1章） 概念 符号 快速回忆 梯度 $\\nabla f(x)$ 函数 $f$ 在点 $x$ 处的所有一阶偏导数组成的 $n$ 维列向量，指向函数值上升最快的方向 凸函数一阶条件 $f(y) \\geq f(x) + \\nabla f(x)^T (y-x)$ &ldquo;切线托住函数图形&rdquo;，是凸函数最核心的等价刻画 Hessian 半正定 $\\nabla^2 f(x) \\succeq 0$ 沿任意方向 $d$ 的二阶方向导数 $d^T \\nabla^2 f d \\geq 0$（&ldquo;处处弯曲向上&rdquo;），等价于凸性 驻点 $\\nabla f(x^*) = 0$ 梯度为零的点。对凸函数，驻点自动是全局极小点 2.1 动机：为什么需要梯度下降？ 现实中的优化问题往往维度极高（$n$ 可达百万甚至十亿级），无法通过解析求解（如直接求解 $\\nabla f(x) = 0$ 方程组，当 $n$ 很大时矩阵求逆的代价是 $O(n^3)$ 不可承受）。梯度下降法提供了一种迭代逼近的思路——每次只需要计算一次梯度（代价 $O(n)$ 或按问题结构更低），通过足够多次的迭代逐步逼近最优解。\n下山类比（帮助建立直觉）：想象你蒙着眼睛站在一座山的某个位置，目标是走到山谷最低点。你只能感知脚下一小片区域的坡度（即梯度）。最自然的策略是：用脚试探哪个方向最陡（计算梯度），然后向最陡的下降方向迈一小步。重复这个&quot;试探 → 迈步&quot;的过程，你最终会到达谷底。步幅（学习率）的选择至关重要——太小则进展缓慢，太大可能一步跨过谷底甚至走上对面的山坡。\n2.2 梯度下降法的迭代格式 2.2.1 基本公式 $$\\boxed{x_{k+1} = x_k - \\alpha_k \\nabla f(x_k), \\quad k = 0, 1, 2, \\ldots}$$逐字解释：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾来自第1章">前置知识回顾（来自第1章）</a></li>
+    <li><a href="#21-动机为什么需要梯度下降">2.1 动机：为什么需要梯度下降？</a></li>
+    <li><a href="#22-梯度下降法的迭代格式">2.2 梯度下降法的迭代格式</a>
+      <ol>
+        <li><a href="#221-基本公式">2.2.1 基本公式</a></li>
+        <li><a href="#222-为什么负梯度是最速下降方向">2.2.2 为什么负梯度是&quot;最速下降方向&quot;？</a></li>
+      </ol>
+    </li>
+    <li><a href="#23-l-smooth-条件光滑性">2.3 L-smooth 条件（光滑性）</a>
+      <ol>
+        <li><a href="#231-定义">2.3.1 定义</a></li>
+        <li><a href="#232-等价二次上界核心性质">2.3.2 等价二次上界（核心性质）</a></li>
+        <li><a href="#233-二次上界的完整推导">2.3.3 二次上界的完整推导</a></li>
+      </ol>
+    </li>
+    <li><a href="#24-下降引理descent-lemma">2.4 下降引理（Descent Lemma）</a>
+      <ol>
+        <li><a href="#241-定理陈述与重要性">2.4.1 定理陈述与重要性</a></li>
+        <li><a href="#242-逐行证明">2.4.2 逐行证明</a></li>
+      </ol>
+    </li>
+    <li><a href="#25-收敛性分析三种情形">2.5 收敛性分析（三种情形）</a>
+      <ol>
+        <li><a href="#251-情形一非凸光滑函数--梯度范数收敛率-o1sqrtk">2.5.1 情形一：非凸光滑函数 —— 梯度范数收敛率 $O(1/\sqrt{K})$</a></li>
+        <li><a href="#252-情形二光滑凸函数--函数值收敛率-o1k">2.5.2 情形二：光滑凸函数 —— 函数值收敛率 $O(1/K)$</a></li>
+        <li><a href="#253-情形三光滑强凸函数--线性收敛率-orhok">2.5.3 情形三：光滑强凸函数 —— 线性收敛率 $O(\rho^K)$</a></li>
+      </ol>
+    </li>
+    <li><a href="#26-步长选择策略对比">2.6 步长选择策略对比</a>
+      <ol>
+        <li><a href="#armijo-线搜索详细说明">Armijo 线搜索详细说明</a></li>
+      </ol>
+    </li>
+    <li><a href="#27-典型例题精讲">2.7 典型例题精讲</a>
+      <ol>
+        <li><a href="#例题-1计算梯度和-hessian--验证-l-光滑性">例题 1：计算梯度和 Hessian + 验证 $L$-光滑性</a></li>
+        <li><a href="#例题-2二次函数上-gd-的显式收敛分析">例题 2：二次函数上 GD 的显式收敛分析</a></li>
+        <li><a href="#例题-3armijo-线搜索的步长下界">例题 3：Armijo 线搜索的步长下界</a></li>
+        <li><a href="#例题-4非凸-gd-收敛的完整证明考试级">例题 4：非凸 GD 收敛的完整证明（考试级）</a></li>
+      </ol>
+    </li>
+    <li><a href="#28-算法演进图谱">2.8 算法演进图谱</a></li>
+    <li><a href="#核心要点">核心要点</a>
+      <ol>
+        <li><a href="#l-光滑与下降引理">$L$-光滑与下降引理</a></li>
+        <li><a href="#三种收敛率">三种收敛率</a></li>
+        <li><a href="#步长策略">步长策略</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/01-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5/02-%E6%A2%AF%E5%BA%A6%E4%B8%8B%E9%99%8D%E6%B3%95/">第2章：梯度下降法</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 11 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第2章梯度下降法">第2章：梯度下降法
+</h1><blockquote>
+<p><strong>核心思想</strong>：梯度下降法（Gradient Descent, GD）是最基本的一阶优化算法。它沿着负梯度方向一步步&quot;下山&quot;，每一步都让函数值下降。在凸函数上保证收敛到全局最优，在强凸函数上以几何速率收敛。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾来自第1章">前置知识回顾（来自第1章）
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>概念</th>
+					<th>符号</th>
+					<th>快速回忆</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>梯度</td>
+					<td>$\nabla f(x)$</td>
+					<td>函数 $f$ 在点 $x$ 处的所有一阶偏导数组成的 $n$ 维列向量，指向函数值上升最快的方向</td>
+			</tr>
+			<tr>
+					<td>凸函数一阶条件</td>
+					<td>$f(y) \geq f(x) + \nabla f(x)^T (y-x)$</td>
+					<td>&ldquo;切线托住函数图形&rdquo;，是凸函数最核心的等价刻画</td>
+			</tr>
+			<tr>
+					<td>Hessian 半正定</td>
+					<td>$\nabla^2 f(x) \succeq 0$</td>
+					<td>沿任意方向 $d$ 的二阶方向导数 $d^T \nabla^2 f d \geq 0$（&ldquo;处处弯曲向上&rdquo;），等价于凸性</td>
+			</tr>
+			<tr>
+					<td>驻点</td>
+					<td>$\nabla f(x^*) = 0$</td>
+					<td>梯度为零的点。对凸函数，驻点自动是全局极小点</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="21-动机为什么需要梯度下降">2.1 动机：为什么需要梯度下降？
+</h2><p>现实中的优化问题往往维度极高（$n$ 可达百万甚至十亿级），无法通过解析求解（如直接求解 $\nabla f(x) = 0$ 方程组，当 $n$ 很大时矩阵求逆的代价是 $O(n^3)$ 不可承受）。梯度下降法提供了一种<strong>迭代逼近</strong>的思路——每次只需要计算一次梯度（代价 $O(n)$ 或按问题结构更低），通过足够多次的迭代逐步逼近最优解。</p>
+<p><strong>下山类比（帮助建立直觉）</strong>：想象你蒙着眼睛站在一座山的某个位置，目标是走到山谷最低点。你只能感知脚下一小片区域的坡度（即梯度）。最自然的策略是：用脚试探哪个方向最陡（计算梯度），然后向最陡的<strong>下降方向</strong>迈一小步。重复这个&quot;试探 → 迈步&quot;的过程，你最终会到达谷底。步幅（学习率）的选择至关重要——太小则进展缓慢，太大可能一步跨过谷底甚至走上对面的山坡。</p>
+<hr>
+<h2 id="22-梯度下降法的迭代格式">2.2 梯度下降法的迭代格式
+</h2><h3 id="221-基本公式">2.2.1 基本公式
+</h3>$$\boxed{x_{k+1} = x_k - \alpha_k \nabla f(x_k), \quad k = 0, 1, 2, \ldots}$$<p><strong>逐字解释</strong>：</p>
+<ul>
+<li>$x_k \in \mathbb{R}^n$：第 $k$ 步的决策变量值，是一个 $n$ 维列向量。</li>
+<li>$\nabla f(x_k) \in \mathbb{R}^n$：函数 $f$ 在 $x_k$ 处的梯度（$n$ 维列向量），指向 $f$ 增长最快的方向。</li>
+<li>$-\nabla f(x_k)$：<strong>负梯度方向</strong>，指向 $f$ 下降最快的方向（局部意义上）。</li>
+<li>$\alpha_k &gt; 0$：<strong>步长</strong>（step size，也称学习率 learning rate），控制每一步沿负梯度方向前进的距离。它是一个正标量。</li>
+<li>$x_{k+1}$：更新后的新位置，也是 $n$ 维列向量。</li>
+</ul>
+<h3 id="222-为什么负梯度是最速下降方向">2.2.2 为什么负梯度是&quot;最速下降方向&quot;？
+</h3><p><strong>推导</strong>：在点 $x$ 处，考虑在约束 $|d| = 1$（步长为 1）的条件下，沿方向 $d$ 移动时的局部函数值变化。由一阶 Taylor 展开：
+</p>
+$$f(x + d) \approx f(x) + \nabla f(x)^T d$$<p>要使下降最大化，我们需要选择 $d$ 让 $\nabla f(x)^T d$ 尽可能小（负得越多，$f(x+d) - f(x)$ 越负，下降越多）。即求解：</p>
+$$\boxed{\min_{\|d\|=1} \nabla f(x)^T d}$$<p><strong>详细求解</strong>：由 Cauchy-Schwarz 不等式（$|u^T v| \leq |u| \cdot |v|$，取 $u = \nabla f(x)$，$v = d$，$|d| = 1$）：
+</p>
+$$|\nabla f(x)^T d| \leq \|\nabla f(x)\| \cdot \|d\| = \|\nabla f(x)\|$$<p>所以 $\nabla f(x)^T d \geq -|\nabla f(x)|$。最小值在下界达到：
+</p>
+$$\nabla f(x)^T d = -\|\nabla f(x)\| \iff d = -\frac{\nabla f(x)}{\|\nabla f(x)\|}$$<p>即取 $d$ 为<strong>单位负梯度方向</strong>。结论：在 $\ell_2$ 范数（欧氏距离）约束下，负梯度方向是局部最速下降方向。</p>
+<blockquote>
+<p><strong>⚠ 注意</strong>：&ldquo;最速下降&quot;依赖于范数的选择。若改用 $\ell_1$ 范数或 $\ell_\infty$ 范数，最速下降方向会改变（对应坐标下降法等方法）。</p>
+</blockquote>
+<hr>
+<h2 id="23-l-smooth-条件光滑性">2.3 L-smooth 条件（光滑性）
+</h2><h3 id="231-定义">2.3.1 定义
+</h3><p>梯度下降法需要函数&quot;不太崎岖&quot;才能保证收敛。<strong>$L$-光滑条件</strong>（$L$-smoothness）是对函数光滑程度的基本假设：</p>
+$$\boxed{\|\nabla f(x) - \nabla f(y)\| \leq L \|x - y\|, \quad \forall x, y \in \text{dom} f}$$<p><strong>逐字解释</strong>：</p>
+<ul>
+<li>$\nabla f(x) \in \mathbb{R}^n$ 和 $\nabla f(y) \in \mathbb{R}^n$ 分别是 $f$ 在 $x$ 和 $y$ 处的梯度。</li>
+<li>$|\nabla f(x) - \nabla f(y)|$：两个梯度向量之差的欧氏长度（即 $\sqrt{\sum_{i=1}^n (\frac{\partial f}{\partial x_i}(x) - \frac{\partial f}{\partial x_i}(y))^2}$）。</li>
+<li>$|x - y|$：两点 $x$ 和 $y$ 之间的欧氏距离。</li>
+<li>$L$：<strong>光滑常数</strong>（光滑模数），刻画梯度变化速率的上限。$L$ 越小表示函数越&quot;平滑&rdquo;。</li>
+</ul>
+<p><strong>物理直觉</strong>：想象梯度像是路面的&quot;坡度&quot;。$L$-光滑意味着路面坡度的变化率有限——不能从平坦路面瞬间变成悬崖。$L$ 就是&quot;最大曲率&quot;。</p>
+<h3 id="232-等价二次上界核心性质">2.3.2 等价二次上界（核心性质）
+</h3><p>$L$-光滑条件有一个极其重要的等价刻画——<strong>二次上界</strong>：</p>
+$$\boxed{f(y) \leq f(x) + \nabla f(x)^T (y-x) + \frac{L}{2}\|y - x\|^2, \quad \forall x, y}$$<p>意思是：函数图形被一个以 $x$ 为顶点、开口宽度由 $L$ 决定的二次函数&quot;管束&quot;在下方。右边前两项 $f(x) + \nabla f(x)^T (y-x)$ 是 $f$ 在 $x$ 处的一阶 Taylor 近似（切线），第三项 $\frac{L}{2}|y-x|^2$ 是额外的向上修正。</p>
+<h3 id="233-二次上界的完整推导">2.3.3 二次上界的完整推导
+</h3><p>这是理解 $L$-光滑的核心证明，每一步都必须清晰。</p>
+<p><strong>Step 1（线积分表示）</strong>：由微积分基本定理（沿线段 $x \to y$ 的线积分形式）：
+</p>
+$$f(y) - f(x) = \int_0^1 \nabla f(x + t(y-x))^T (y-x) \, dt$$<blockquote>
+<p><strong>解释</strong>：设 $\phi(t) = f(x + t(y-x))$（标量函数，$t \in [0,1]$）。由链式法则 $\phi&rsquo;(t) = \nabla f(x + t(y-x))^T (y-x)$。由 Newton-Leibniz 公式：$\phi(1) - \phi(0) = \int_0^1 \phi&rsquo;(t) dt$，即 $f(y) - f(x) = \int_0^1 \nabla f(x + t(y-x))^T (y-x) dt$。</p>
+</blockquote>
+<p><strong>Step 2（加入并减去 $\nabla f(x)$）</strong>：在积分号内插入 $\nabla f(x)$（加零技巧）：
+</p>
+$$f(y) - f(x) = \int_0^1 \nabla f(x)^T (y-x) \, dt + \int_0^1 \big[\nabla f(x + t(y-x)) - \nabla f(x)\big]^T (y-x) \, dt$$<p>第一项中 $\nabla f(x)^T (y-x)$ 与 $t$ 无关，$\int_0^1 dt = 1$，故：
+</p>
+$$= \nabla f(x)^T (y-x) + \int_0^1 \big[\nabla f(x + t(y-x)) - \nabla f(x)\big]^T (y-x) \, dt$$<p><strong>Step 3（对积分放缩）</strong>：对积分号内的内积用 Cauchy-Schwarz 不等式：
+</p>
+$$\big[\nabla f(x + t(y-x)) - \nabla f(x)\big]^T (y-x) \leq \|\nabla f(x + t(y-x)) - \nabla f(x)\| \cdot \|y-x\|$$<p><strong>Step 4（利用 L-光滑条件）</strong>：由光滑条件 $|\nabla f(u) - \nabla f(v)| \leq L |u - v|$，取 $u = x + t(y-x)$，$v = x$：
+</p>
+$$\|\nabla f(x + t(y-x)) - \nabla f(x)\| \leq L \|x + t(y-x) - x\| = L \cdot t \cdot \|y-x\|$$<p>代入 Step 3：
+</p>
+$$\int_0^1 \|\nabla f(x + t(y-x)) - \nabla f(x)\| \cdot \|y-x\| \, dt \leq \int_0^1 L \cdot t \cdot \|y-x\|^2 \, dt$$<p><strong>Step 5（计算积分）</strong>：</p>
+$$\int_0^1 L \cdot t \cdot \|y-x\|^2 \, dt = L \|y-x\|^2 \cdot \int_0^1 t \, dt = L \|y-x\|^2 \cdot \frac{1}{2} = \frac{L}{2}\|y-x\|^2$$<p><strong>Step 6（汇总）</strong>：将以上各步串联：
+</p>
+$$f(y) - f(x) = \nabla f(x)^T (y-x) + \int_0^1 \big[\nabla f(x + t(y-x)) - \nabla f(x)\big]^T (y-x) \, dt$$<p>
+</p>
+$$\leq \nabla f(x)^T (y-x) + \frac{L}{2}\|y-x\|^2$$<p>移项得 $f(y) \leq f(x) + \nabla f(x)^T (y-x) + \frac{L}{2}|y-x|^2$，证毕。</p>
+<blockquote>
+<p><strong>反例</strong>：$f(x) = x^3$（$x \in \mathbb{R}$）不是 $L$-光滑的，因为 $|f&rsquo;(x) - f&rsquo;(y)| = |3x^2 - 3y^2| = 3|x+y| \cdot |x-y|$。当 $x, y$ 都很大时，比值 $\frac{|f&rsquo;(x)-f&rsquo;(y)|}{|x-y|} = 3|x+y|$ 无界，不存在全局的 $L$。</p>
+</blockquote>
+<hr>
+<h2 id="24-下降引理descent-lemma">2.4 下降引理（Descent Lemma）
+</h2><h3 id="241-定理陈述与重要性">2.4.1 定理陈述与重要性
+</h3><p><strong>下降引理</strong>是梯度下降法所有收敛分析的基石。它精确描述了取步长 $\alpha_k = 1/L$ 时，每次迭代的<strong>保证下降量</strong>：</p>
+$$\boxed{f(x_{k+1}) \leq f(x_k) - \frac{1}{2L}\|\nabla f(x_k)\|^2}$$<p><strong>意义</strong>：每一步至少将函数值降低 $\frac{1}{2L}|\nabla f(x_k)|^2$。梯度范数越大，下降越多；当梯度接近零时（即接近驻点），下降量趋近于零——此时算法趋于停止。</p>
+<h3 id="242-逐行证明">2.4.2 逐行证明
+</h3><p><strong>Step 1</strong>：由 $L$-光滑的二次上界（2.3.2 节），取 $x = x_k$，$y = x_{k+1} = x_k - \frac{1}{L}\nabla f(x_k)$：
+</p>
+$$f(x_{k+1}) \leq f(x_k) + \nabla f(x_k)^T \underbrace{(x_{k+1} - x_k)}_{= -\frac{1}{L}\nabla f(x_k)} + \frac{L}{2} \underbrace{\|x_{k+1} - x_k\|^2}_{= \frac{1}{L^2}\|\nabla f(x_k)\|^2}$$<p><strong>Step 2</strong>：代入并计算各项：
+</p>
+$$\nabla f(x_k)^T (-\frac{1}{L}\nabla f(x_k)) = -\frac{1}{L} \nabla f(x_k)^T \nabla f(x_k) = -\frac{1}{L}\|\nabla f(x_k)\|^2$$<p>（因为 $v^T v = |v|^2$，即向量自身内积等于其长度平方）</p>
+$$\frac{L}{2} \cdot \frac{1}{L^2}\|\nabla f(x_k)\|^2 = \frac{1}{2L}\|\nabla f(x_k)\|^2$$<p><strong>Step 3</strong>：两项合并：
+</p>
+$$f(x_{k+1}) \leq f(x_k) - \frac{1}{L}\|\nabla f(x_k)\|^2 + \frac{1}{2L}\|\nabla f(x_k)\|^2$$<p><strong>Step 4</strong>：合并梯度范数项：$-\frac{1}{L} + \frac{1}{2L} = -\frac{2}{2L} + \frac{1}{2L} = -\frac{1}{2L}$，故：
+</p>
+$$f(x_{k+1}) \leq f(x_k) - \frac{1}{2L}\|\nabla f(x_k)\|^2$$<p><strong>Step 5（推论）</strong>：若 $\nabla f(x_k) \neq 0$，则 $f(x_{k+1}) &lt; f(x_k)$，即函数值严格下降（单调非增）。</p>
+<hr>
+<h2 id="25-收敛性分析三种情形">2.5 收敛性分析（三种情形）
+</h2><h3 id="251-情形一非凸光滑函数--梯度范数收敛率-o1sqrtk">2.5.1 情形一：非凸光滑函数 —— 梯度范数收敛率 $O(1/\sqrt{K})$
+</h3><p><strong>假设</strong>：</p>
+<ul>
+<li>$f$ 是 $L$-光滑函数（梯度 Lipschitz，$L$ 为光滑常数）</li>
+<li>$f$ 下有界：$f^* = \inf_x f(x) &gt; -\infty$（函数值不会趋向负无穷）</li>
+<li>运行 GD 步长 $\alpha_k = 1/L$，共 $K$ 步</li>
+</ul>
+<p><strong>结论</strong>——$K$ 步中至少有一点的梯度范数很小：
+</p>
+$$\boxed{\min_{0 \leq k < K} \|\nabla f(x_k)\|^2 \leq \frac{2L(f(x_0) - f^*)}{K}}$$<p>等价写法：$\min_{0 \leq k &lt; K} |\nabla f(x_k)| \leq \sqrt{\frac{2L(f(x_0) - f^*)}{K}} = O(1/\sqrt{K})$</p>
+<p><strong>完整推导（6 步）</strong>：</p>
+<p><strong>Step 1（下降引理）</strong>：对每一步 $k = 0, 1, \ldots, K-1$，由下降引理：
+</p>
+$$f(x_{k+1}) \leq f(x_k) - \frac{1}{2L}\|\nabla f(x_k)\|^2$$<p><strong>Step 2（移项）</strong>：将梯度范数项移到左边：
+</p>
+$$\frac{1}{2L}\|\nabla f(x_k)\|^2 \leq f(x_k) - f(x_{k+1})$$<p><strong>Step 3（对 $k$ 求和）</strong>：将 $k = 0$ 到 $K-1$ 的所有不等式累加：
+</p>
+$$\frac{1}{2L}\sum_{k=0}^{K-1} \|\nabla f(x_k)\|^2 \leq \sum_{k=0}^{K-1} [f(x_k) - f(x_{k+1})]$$<p><strong>Step 4（识别望远镜和）</strong>：右边展开：
+</p>
+$$[f(x_0) - f(x_1)] + [f(x_1) - f(x_2)] + \cdots + [f(x_{K-1}) - f(x_K)]$$<p>中间所有 $f(x_1), f(x_2), \ldots, f(x_{K-1})$ 全部消去，只剩下首尾两项：
+</p>
+$$= f(x_0) - f(x_K)$$<p><strong>Step 5（用 $f^*$ 做下界替换）</strong>：因为 $f(x_K) \geq f^<em>$（$f^</em>$ 是下确界），所以：
+</p>
+$$f(x_0) - f(x_K) \leq f(x_0) - f^*$$<p>代入得：
+</p>
+$$\frac{1}{2L}\sum_{k=0}^{K-1} \|\nabla f(x_k)\|^2 \leq f(x_0) - f^*$$<p><strong>Step 6（最小值 ≤ 平均值）</strong>：$\sum_{k=0}^{K-1} |\nabla f(x_k)|^2$ 是 $K$ 个非负数的和，最小值不超过平均值：
+</p>
+$$K \cdot \min_{0 \leq k < K} \|\nabla f(x_k)\|^2 \leq \sum_{k=0}^{K-1} \|\nabla f(x_k)\|^2$$<p>代入 Step 5：
+</p>
+$$\frac{K}{2L} \cdot \min_{0 \leq k < K} \|\nabla f(x_k)\|^2 \leq f(x_0) - f^*$$<p>整理即得结论。</p>
+<blockquote>
+<p><strong>为什么用 $\min$ 而非 $f(x_K) - f^*$？</strong> 在非凸情形，$|\nabla f|$ 小只能说明到了<strong>驻点</strong>，可能是局部极小、局部极大或鞍点。因此不能用函数值差距来衡量收敛，只能用梯度范数。</p>
+</blockquote>
+<hr>
+<h3 id="252-情形二光滑凸函数--函数值收敛率-o1k">2.5.2 情形二：光滑凸函数 —— 函数值收敛率 $O(1/K)$
+</h3><p><strong>假设</strong>：</p>
+<ul>
+<li>$f$ 是 $L$-光滑的<strong>凸函数</strong>（比情形一多加了凸性假设）</li>
+<li>存在全局极小点 $x^<em>$（即 $f(x^</em>) = f^*$ 是最小值）</li>
+<li>取固定步长 $\alpha_k = 1/L$</li>
+</ul>
+<p><strong>结论</strong>：
+</p>
+$$\boxed{f(x_K) - f^* \leq \frac{L\|x_0 - x^*\|^2}{2K} = O\left(\frac{1}{K}\right)}$$<p>即函数值误差以 $1/K$ 的速率衰减——运行 $K=100$ 步，误差缩小约 100 倍。</p>
+<p><strong>完整推导（Lyapunov 方法）</strong>：</p>
+<p><strong>Step 1（选择 Lyapunov 函数）</strong>：定义 $\Phi_k = |x_k - x^*|^2$（当前点到最优点的欧氏距离平方）。这是最常用的 Lyapunov 函数，我们想证明它不增或受控。</p>
+<p><strong>Step 2（展开 $\Phi_{k+1}$）</strong>：代入 GD 迭代 $x_{k+1} = x_k - \frac{1}{L}\nabla f(x_k)$：
+</p>
+$$\Phi_{k+1} = \|x_{k+1} - x^*\|^2 = \|x_k - \frac{1}{L}\nabla f(x_k) - x^*\|^2$$<p><strong>Step 3（展开范数平方）</strong>：利用 $|a - b|^2 = |a|^2 - 2a^T b + |b|^2$，取 $a = x_k - x^*$，$b = \frac{1}{L}\nabla f(x_k)$：
+</p>
+$$\Phi_{k+1} = \|x_k - x^*\|^2 - \frac{2}{L}\nabla f(x_k)^T (x_k - x^*) + \frac{1}{L^2}\|\nabla f(x_k)\|^2$$<p>即：
+</p>
+$$\Phi_{k+1} = \Phi_k - \frac{2}{L}\nabla f(x_k)^T (x_k - x^*) + \frac{1}{L^2}\|\nabla f(x_k)\|^2$$<p><strong>Step 4（使用凸性一阶条件）</strong>：因为 $f$ 是凸函数，由第1章的一阶条件，对 $x = x_k$ 和 $y = x^*$：
+</p>
+$$f(x^*) \geq f(x_k) + \nabla f(x_k)^T (x^* - x_k)$$<p>移项得：
+</p>
+$$f(x_k) - f(x^*) \leq \nabla f(x_k)^T (x_k - x^*)$$<p>两边同乘 $-\frac{2}{L}$（注意翻转不等号）：
+</p>
+$$-\frac{2}{L}\nabla f(x_k)^T (x_k - x^*) \leq -\frac{2}{L}(f(x_k) - f^*)$$<p><strong>Step 5（代入 Step 3）</strong>：
+</p>
+$$\Phi_{k+1} \leq \Phi_k - \frac{2}{L}(f(x_k) - f^*) + \frac{1}{L^2}\|\nabla f(x_k)\|^2$$<p><strong>Step 6（用下降引理消除梯度项）</strong>：由下降引理（2.4 节），$|\nabla f(x_k)|^2 \leq 2L(f(x_k) - f(x_{k+1}))$。代入：
+</p>
+$$\Phi_{k+1} \leq \Phi_k - \frac{2}{L}(f(x_k) - f^*) + \frac{2}{L}(f(x_k) - f(x_{k+1}))$$<p><strong>Step 7（整理）</strong>：
+</p>
+$$\Phi_{k+1} \leq \Phi_k + \frac{2}{L}[(f(x_{k+1}) - f^*) - (f(x_k) - f^*)] + \frac{2}{L}(f(x_k) - f(x_{k+1}))$$<p>实际上让我们回到 Step 6 重新整理。令 $\Delta_k = f(x_k) - f^*$：
+</p>
+$$\Phi_{k+1} \leq \Phi_k - \frac{2}{L}\Delta_k + \frac{2}{L}(\Delta_k - \Delta_{k+1}) = \Phi_k - \frac{2}{L}\Delta_{k+1}$$<p>其中我们还有下降引理保证 $\Delta_k \geq \Delta_{k+1}$。</p>
+<p><strong>Step 8&rsquo;（更直接的路线）</strong>：从下降引理有 $\Delta_{k+1} \leq \Delta_k - \frac{1}{2L}|\nabla f(x_k)|^2$。从凸性有 $\Delta_k \leq \nabla f(x_k)^T (x_k - x^*)$。联立这两个不等式，再做一次巧妙的代数处理（这里省略更技术的推导步骤，保留最重要的结论）。</p>
+<p>标准结果（通过更细致的推导）得到的最终形式为：
+</p>
+$$\frac{1}{\Delta_{k+1}} - \frac{1}{\Delta_k} \geq \frac{1}{2L\|x_0 - x^*\|^2}$$<p>对 $k$ 求和得：
+</p>
+$$\frac{1}{\Delta_K} - \frac{1}{\Delta_0} \geq \frac{K}{2L\|x_0 - x^*\|^2}$$<p>由于 $\Delta_0 &gt; 0$，得 $\frac{1}{\Delta_K} \geq \frac{K}{2L|x_0 - x^*|^2}$，即：
+</p>
+$$\Delta_K = f(x_K) - f^* \leq \frac{2L\|x_0 - x^*\|^2}{K}$$<blockquote>
+<p>标准教材中还有一个更紧的界 $f(x_K) - f^* \leq \frac{L|x_0 - x^*|^2}{2K}$（差一个常因子 4），此处使用了更保守的估计。核心信息不变：凸函数上 GD 的收敛率是 $O(1/K)$。</p>
+</blockquote>
+<hr>
+<h3 id="253-情形三光滑强凸函数--线性收敛率-orhok">2.5.3 情形三：光滑强凸函数 —— 线性收敛率 $O(\rho^K)$
+</h3><p><strong>假设</strong>：</p>
+<ul>
+<li>$f$ 是 $L$-光滑且 $\mu$-强凸函数。$\mu$-强凸定义（回忆第1章）：
+
+$$\boxed{f(y) \geq f(x) + \nabla f(x)^T (y-x) + \frac{\mu}{2}\|y-x\|^2, \quad \forall x, y}$$</li>
+</ul>
+<p><strong>结论</strong>（取最优步长 $\alpha = \frac{2}{\mu + L}$ 时）：
+</p>
+$$\boxed{\|x_K - x^*\|^2 \leq \left(\frac{\kappa - 1}{\kappa + 1}\right)^{2K} \|x_0 - x^*\|^2}$$<p>其中 $\kappa = L/\mu \geq 1$ 称为<strong>条件数</strong>（condition number）。</p>
+<p><strong>逐字解释</strong>：</p>
+<ul>
+<li>收缩因子 $\rho = (\frac{\kappa-1}{\kappa+1})^2 &lt; 1$：每步将到最优点的距离平方缩小 $\rho$ 倍。</li>
+<li>$\kappa$ 越接近 1（强凸性 $\mu$ 接近光滑性 $L$），$\rho$ 越接近 0，收敛极快。</li>
+<li>$\kappa$ 很大（函数在一个方向上非常平坦，在另一个方向上非常陡峭），$\rho \approx 1$，收敛极慢。</li>
+</ul>
+<p><strong>推导框架</strong>（核心步骤）：</p>
+<p><strong>Step 1</strong>：展开 $|x_{k+1} - x^*|^2$（设步长为 $\alpha$）：
+</p>
+$$\|x_{k+1} - x^*\|^2 = \|x_k - \alpha\nabla f(x_k) - x^*\|^2$$<p>
+</p>
+$$= \|x_k - x^*\|^2 - 2\alpha \nabla f(x_k)^T (x_k - x^*) + \alpha^2\|\nabla f(x_k)\|^2$$<p><strong>Step 2</strong>：利用强凸性（梯度单调形式）：$\nabla f(x_k)^T (x_k - x^<em>) \geq \mu|x_k - x^</em>|^2$（将 $y = x^<em>$ 代入强凸的一阶条件，并利用 $\nabla f(x^</em>) = 0$ 推导出此不等式）。</p>
+<p><strong>Step 3</strong>：利用 $L$-光滑的 co-coercivity：$|\nabla f(x_k)|^2 \leq L \cdot \nabla f(x_k)^T (x_k - x^*)$（利用 $f$ 为凸 + $L$-光滑时的一个辅助性质）。</p>
+<p><strong>Step 4</strong>：代入并整理，得到：
+</p>
+$$\|x_{k+1} - x^*\|^2 \leq (1 - 2\alpha\mu + \alpha^2 L\mu)\|x_k - x^*\|^2$$<p>（此处细节涉及配对 $\nabla f(x_k)^T (x_k - x^*)$ 和 $|\nabla f(x_k)|^2$ 的精细估计）</p>
+<p><strong>Step 5</strong>：最优步长 $\alpha^*$ 使收缩因子 $1 - 2\alpha\mu + \alpha^2 L\mu$ 最小。求导：
+</p>
+$$\frac{d}{d\alpha}(1 - 2\alpha\mu + \alpha^2 L\mu) = -2\mu + 2\alpha L\mu = 0 \implies \alpha^* = \frac{1}{L}$$<p>但 $\alpha = 1/L$ 给收缩因子 $1 - 2\mu/L + \mu/L = 1 - \mu/L$。</p>
+<p>取 $\alpha = \frac{2}{\mu+L}$ 时（非平凡推导），收缩因子达到最优 $(\frac{\kappa-1}{\kappa+1})^2$。</p>
+<hr>
+<h2 id="26-步长选择策略对比">2.6 步长选择策略对比
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>步长策略</th>
+					<th>公式</th>
+					<th>需要的信息</th>
+					<th>优缺点</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>固定步长（理论）</strong></td>
+					<td>$\alpha_k = 1/L$</td>
+					<td>光滑常数 $L$</td>
+					<td>保证收敛，简单，但需预知 $L$，且常偏保守</td>
+			</tr>
+			<tr>
+					<td><strong>最优固定（强凸）</strong></td>
+					<td>$\alpha = \frac{2}{\mu+L}$</td>
+					<td>$\mu$（强凸模数）和 $L$</td>
+					<td>收缩最快，但需同时知道两个参数</td>
+			</tr>
+			<tr>
+					<td><strong>Armijo 线搜索</strong></td>
+					<td>$\alpha_k$ 回溯试，每次缩小 $\beta$ 倍</td>
+					<td>无（只需计算函数值）</td>
+					<td>自适应，实用首选，每步可能需要多次函数评估</td>
+			</tr>
+			<tr>
+					<td><strong>精确线搜索</strong></td>
+					<td>$\arg\min_{\alpha&gt;0} f(x_k - \alpha\nabla f(x_k))$</td>
+					<td>无</td>
+					<td>理论上最优下降，实际代价太高</td>
+			</tr>
+	</tbody>
+</table></div>
+<h3 id="armijo-线搜索详细说明">Armijo 线搜索详细说明
+</h3><p><strong>Armijo 条件</strong>：步长 $\alpha$ 必须满足&quot;充分下降&quot;：
+</p>
+$$\boxed{f(x_k - \alpha\nabla f(x_k)) \leq f(x_k) - c \cdot \alpha \cdot \|\nabla f(x_k)\|^2}$$<p>其中 $c \in (0, 1)$（典型值 $c = 10^{-4}$）。</p>
+<p><strong>逐字解释</strong>：实际下降量 $f(x_k) - f(x_{k+1})$ 必须至少是一阶 Taylor 近似预测下降量 $\alpha|\nabla f|^2$ 的 $c$ 倍。如果步长太大，一阶近似不再准确，条件就不会满足。</p>
+<p><strong>回溯法（Backtracking）算法</strong>：</p>
+<ol>
+<li>初始化 $\alpha = \alpha_0$（通常 $\alpha_0 = 1$）</li>
+<li>检查 Armijo 条件：若成立，返回 $\alpha$ 作为步长</li>
+<li>若不成立：$\alpha \leftarrow \beta \cdot \alpha$（$\beta \in (0, 1)$，典型值 $\beta = 0.5$），回到步骤 2</li>
+</ol>
+<blockquote>
+<p><strong>为什么先试大步再缩？</strong> 大步意味着更快收敛；只有当大步&quot;不划算&quot;（实际下降远少于预期）时才缩小。这保证了每次迭代的下降量与计算代价之比合理。</p>
+</blockquote>
+<p><strong>步长下界定理</strong>：对 $L$-光滑函数，Armijo 回溯法产生的步长满足 $\alpha_k \geq \min{\alpha_0, \frac{2\beta(1-c)}{L}}$。这意味着步长不会无限缩小到零。</p>
+<hr>
+<h2 id="27-典型例题精讲">2.7 典型例题精讲
+</h2><h3 id="例题-1计算梯度和-hessian--验证-l-光滑性">例题 1：计算梯度和 Hessian + 验证 $L$-光滑性
+</h3><p><strong>题目</strong>：设 $f(x) = \frac{1}{2}x^T Q x - b^T x$，其中 $Q \in \mathbb{S}^n_{++}$（$Q$ 是对称正定矩阵，即 $n \times n$ 矩阵，所有特征值 &gt; 0）。求 (1) $\nabla f(x)$ 和 $\nabla^2 f(x)$；(2) 证明 $f$ 是 $\lambda_{\max}(Q)$-光滑的。</p>
+<p><strong>考点标签</strong>：<code>#梯度</code> <code>#Hessian</code> <code>#L-smooth</code> <code>#二次函数</code></p>
+<p><strong>解答</strong>：</p>
+<p><strong>(1)</strong> $\nabla f(x) = Qx - b$（二次型的梯度为 $Qx + Q^T x$ 的一半 = $Qx$ 因为 $Q$ 对称，线性项 $-b^T x$ 的梯度为 $-b$）。$\nabla^2 f(x) = Q$。</p>
+<p><strong>(2) 验证 $L$-光滑</strong>：对任意 $x, y \in \mathbb{R}^n$：
+</p>
+$$\|\nabla f(x) - \nabla f(y)\| = \|(Qx - b) - (Qy - b)\| = \|Q(x - y)\|$$<p>由矩阵算子范数的定义：$|Qv| \leq |Q|_2 \cdot |v|$，其中 $|Q|<em>2 = \sigma</em>{\max}(Q)$（最大奇异值）。对对称正定矩阵 $Q$，奇异值 = 特征值，故 $|Q|<em>2 = \lambda</em>{\max}(Q)$。</p>
+$$\|Q(x-y)\| \leq \lambda_{\max}(Q) \cdot \|x - y\|$$<p>因此 $f$ 是 $\lambda_{\max}(Q)$-光滑的。</p>
+<blockquote>
+<p><strong>若 $Q \succ 0$，$f$ 也是 $\mu$-强凸的</strong>，其中 $\mu = \lambda_{\min}(Q) &gt; 0$。条件数 $\kappa = \lambda_{\max}(Q)/\lambda_{\min}(Q)$ 直接决定 GD 在 $f$ 上的线性收敛速率。</p>
+</blockquote>
+<hr>
+<h3 id="例题-2二次函数上-gd-的显式收敛分析">例题 2：二次函数上 GD 的显式收敛分析
+</h3><p><strong>题目</strong>：对 $f(x) = \frac{1}{2}x^T Q x - b^T x$（$Q \succ 0$），取固定步长 $\alpha = 1/\lambda_{\max}(Q)$。证明：
+</p>
+$$\boxed{f(x_k) - f^* \leq \left(1 - \frac{1}{\kappa}\right)^{2k} (f(x_0) - f^*)}$$<p>
+其中 $\kappa = \lambda_{\max}(Q)/\lambda_{\min}(Q)$。</p>
+<p><strong>考点标签</strong>：<code>#GD收敛</code> <code>#二次函数</code> <code>#线性收敛</code> <code>#条件数</code></p>
+<p><strong>解答</strong>：</p>
+<p><strong>Step 1</strong>：求全局极小点。$\nabla f(x^<em>) = Qx^</em> - b = 0 \implies x^* = Q^{-1}b$。</p>
+<p><strong>Step 2</strong>：写出 GD 迭代：
+</p>
+$$x_{k+1} = x_k - \alpha(Qx_k - b) = x_k - \alpha Qx_k + \alpha b = (I - \alpha Q)x_k + \alpha b$$<p><strong>Step 3</strong>：两边减 $x^* = Q^{-1}b$：
+</p>
+$$x_{k+1} - x^* = (I - \alpha Q)x_k + \alpha b - x^*$$<p>
+</p>
+$$= (I - \alpha Q)x_k + \alpha Q x^* - x^* \quad (\text{因 } b = Qx^*)$$<p>
+</p>
+$$= (I - \alpha Q)x_k - (I - \alpha Q)x^* = (I - \alpha Q)(x_k - x^*)$$<p><strong>Step 4</strong>：递推 $k$ 步：
+</p>
+$$x_k - x^* = (I - \alpha Q)^k (x_0 - x^*)$$<p><strong>Step 5</strong>：分析收缩因子。取 $\alpha = 1/\lambda_{\max}$（记 $\lambda_{\max} = \lambda_{\max}(Q)$，$\lambda_{\min} = \lambda_{\min}(Q)$）：
+矩阵 $I - \alpha Q$ 的特征值为 $1 - \alpha \lambda_i$，其中 $\lambda_i$ 是 $Q$ 的特征值。</p>
+$$\|I - \alpha Q\|_2 = \max_i |1 - \alpha \lambda_i|$$<p>由于 $\alpha = 1/\lambda_{\max}$：</p>
+<ul>
+<li>对 $\lambda_{\max}$：$|1 - 1| = 0$</li>
+<li>对 $\lambda_{\min}$：$|1 - \lambda_{\min}/\lambda_{\max}| = 1 - 1/\kappa$</li>
+</ul>
+<p>所以 $|I - \alpha Q|_2 = 1 - 1/\kappa$（其他特征值介于两者之间）。</p>
+<p><strong>Step 6</strong>：
+</p>
+$$\|x_k - x^*\| \leq \|I - \alpha Q\|_2^k \cdot \|x_0 - x^*\| = \left(1 - \frac{1}{\kappa}\right)^k \|x_0 - x^*\|$$<p>由 $L$-光滑（$L = \lambda_{\max}$）和 $\nabla f(x^*) = 0$：
+</p>
+$$f(x_k) - f^* \leq \frac{L}{2}\|x_k - x^*\|^2 \leq \frac{\lambda_{\max}}{2}\left(1 - \frac{1}{\kappa}\right)^{2k} \|x_0 - x^*\|^2$$<p>加上强凸性 $|x_0 - x^<em>|^2 \leq \frac{2}{\mu}(f(x_0) - f^</em>)$ 即得所需界。</p>
+<blockquote>
+<p><strong>条件数 $\kappa$ 的作用</strong>：$\kappa$ 越大，$1 - 1/\kappa$ 越接近 1，收敛越慢。当 $\kappa = 100$，$1 - 1/100 = 0.99$，每次只缩小 1%，需要约 700 步才能将距离缩小 1000 倍。</p>
+</blockquote>
+<hr>
+<h3 id="例题-3armijo-线搜索的步长下界">例题 3：Armijo 线搜索的步长下界
+</h3><p><strong>题目</strong>：对 $L$-光滑函数，证明 Armijo 回溯法产生的步长满足 $\alpha_k \geq \min{\alpha_0, \frac{2\beta(1-c)}{L}}$。</p>
+<p><strong>考点标签</strong>：<code>#Armijo</code> <code>#步长下界</code> <code>#L-smooth</code></p>
+<p><strong>解答</strong>：</p>
+<p><strong>Step 1</strong>：若 $\alpha_0$ 本身满足 Armijo 条件，则 $\alpha_k = \alpha_0$，下界显然成立。</p>
+<p><strong>Step 2</strong>：若 $\alpha_0$ 不满足，设经过 $m$ 次缩小后 $\alpha_k = \alpha_0\beta^m$ 首次满足条件。则前一次尝试的步长 $\alpha_k/\beta$ 不满足条件：
+</p>
+$$f(x_k - \frac{\alpha_k}{\beta}\nabla f_k) > f(x_k) - c \cdot \frac{\alpha_k}{\beta} \cdot \|\nabla f_k\|^2$$<p><strong>Step 3</strong>：同时对左边应用 $L$-光滑二次上界：
+</p>
+$$f(x_k - \frac{\alpha_k}{\beta}\nabla f_k) \leq f(x_k) - \frac{\alpha_k}{\beta}\|\nabla f_k\|^2 + \frac{L}{2}\frac{\alpha_k^2}{\beta^2}\|\nabla f_k\|^2$$<p><strong>Step 4</strong>：联立 Step 2 和 Step 3（左边大于某个值，又 ≤ 另一个值，所以下界 &lt; 上界）：
+</p>
+$$f(x_k) - c \cdot \frac{\alpha_k}{\beta}\|\nabla f_k\|^2 < f(x_k) - \frac{\alpha_k}{\beta}\|\nabla f_k\|^2 + \frac{L\alpha_k^2}{2\beta^2}\|\nabla f_k\|^2$$<p><strong>Step 5</strong>：消去 $f(x_k)$ 和 $|\nabla f_k|^2 &gt; 0$：
+</p>
+$$-c \cdot \frac{\alpha_k}{\beta} < -\frac{\alpha_k}{\beta} + \frac{L\alpha_k^2}{2\beta^2}$$<p><strong>Step 6</strong>：整理：$\frac{L\alpha_k}{2\beta} &gt; 1 - c \implies \alpha_k &gt; \frac{2\beta(1-c)}{L}$。因此步长至少为 $\min{\alpha_0, \frac{2\beta(1-c)}{L}}$。</p>
+<blockquote>
+<p><strong>这个结论的意义</strong>：Armijo 步长有正下界，避免了无限缩小导致的&quot;原地踏步&quot;。</p>
+</blockquote>
+<hr>
+<h3 id="例题-4非凸-gd-收敛的完整证明考试级">例题 4：非凸 GD 收敛的完整证明（考试级）
+</h3><p><strong>题目</strong>：设 $f$ 为 $L$-光滑且下有界（$f^* &gt; -\infty$）。GD 步长 $\alpha_k = 1/L$ 运行 $K$ 步。证明：
+</p>
+$$\min_{0 \leq k < K} \|\nabla f(x_k)\| \leq \sqrt{\frac{2L(f(x_0) - f^*)}{K}}$$<p><strong>考点标签</strong>：<code>#非凸收敛</code> <code>#梯度范数</code> <code>#完整证明</code></p>
+<p><strong>解答</strong>：完整推导见 2.5.1 节（6 步详细推导）。这里给出每步的&quot;为什么&quot;表格，帮助理解证明逻辑：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>步骤</th>
+					<th>核心公式</th>
+					<th>为什么这一步行得通</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>1</td>
+					<td>$f(x_{k+1}) \leq f(x_k) - \frac{1}{2L}|\nabla f(x_k)|^2$</td>
+					<td>下降引理：$L$-光滑保证每个 GD 步的下降量可量化</td>
+			</tr>
+			<tr>
+					<td>2</td>
+					<td>$\frac{1}{2L}|\nabla f(x_k)|^2 \leq f(x_k) - f(x_{k+1})$</td>
+					<td>移项，揭示&quot;梯度大 → 下降多&quot;的因果关系</td>
+			</tr>
+			<tr>
+					<td>3</td>
+					<td>对 $k=0$ 到 $K-1$ 求和</td>
+					<td>累加所有 $K$ 步的下降量</td>
+			</tr>
+			<tr>
+					<td>4</td>
+					<td>求和化简为 $f(x_0) - f(x_K)$</td>
+					<td>望远镜和（telescoping sum）：中间项全部抵消</td>
+			</tr>
+			<tr>
+					<td>5</td>
+					<td>$f(x_0) - f(x_K) \leq f(x_0) - f^*$</td>
+					<td>$f^<em>$ 是全局下界，用 $f^</em>$ 替换 $f(x_K)$ 得到最坏情况上界</td>
+			</tr>
+			<tr>
+					<td>6</td>
+					<td>$K \cdot \min_k |\nabla f(x_k)|^2 \leq \sum_k |\nabla f(x_k)|^2$</td>
+					<td>最小值 ≤ 平均值（数学恒等式）</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="28-算法演进图谱">2.8 算法演进图谱
+</h2><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">梯度下降法 (GD) ─── 假设: f可微且L-光滑, α_k = 1/L
+</span></span><span class="line"><span class="cl">    │                  收敛: O(1/K) [光滑凸], O(ρ^K) [光滑强凸]
+</span></span><span class="line"><span class="cl">    │                  局限: 不能处理不可微函数
+</span></span><span class="line"><span class="cl">    │
+</span></span><span class="line"><span class="cl">    ├──→ 次梯度法 (Ch3-4) ─── 动机: f不可微但凸
+</span></span><span class="line"><span class="cl">    │         g_k ∈ ∂f(x_k), 收敛降至 O(1/√K)
+</span></span><span class="line"><span class="cl">    │         代价: 非单调, 函数值可能上升
+</span></span><span class="line"><span class="cl">    │
+</span></span><span class="line"><span class="cl">    ├──→ 投影梯度法 (Ch6) ─── 动机: 约束优化 min_{x∈C} f(x)
+</span></span><span class="line"><span class="cl">    │         x_{k+1} = P_C(x_k - α∇f(x_k))
+</span></span><span class="line"><span class="cl">    │         需要: 投影算子 P_C 可高效计算
+</span></span><span class="line"><span class="cl">    │
+</span></span><span class="line"><span class="cl">    ├──→ 邻近梯度法 (Ch7) ─── 动机: 复合目标 min f(x) + g(x)
+</span></span><span class="line"><span class="cl">    │         x_{k+1} = prox_{αg}(x_k - α∇f(x_k))
+</span></span><span class="line"><span class="cl">    │         关键: prox_g 将非光滑项 g 封装为&#34;广义投影&#34;
+</span></span><span class="line"><span class="cl">    │
+</span></span><span class="line"><span class="cl">    └──→ FISTA 加速 (Ch8) ─── 动机: 提升收敛率
+</span></span><span class="line"><span class="cl">              O(1/K) → O(1/K²) (Nesterov 动量)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>演进的主线</strong>：</p>
+<ol>
+<li><strong>可微 → 不可微</strong>：GD 需要梯度，次梯度法将适用范围扩展到所有凸函数</li>
+<li><strong>无约束 → 有约束</strong>：投影梯度添加投影步骤将点&quot;拉回&quot;可行集</li>
+<li><strong>单目标 → 复合目标</strong>：邻近梯度法通过邻近算子处理&quot;光滑 + 非光滑&quot;的复合结构</li>
+<li><strong>慢速 → 加速</strong>：FISTA 通过 Nesterov 动量将 $O(1/K)$ 提升到 $O(1/K^2)$</li>
+</ol>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><h3 id="l-光滑与下降引理">$L$-光滑与下降引理
+</h3><ol>
+<li><strong>$L$-光滑的定义</strong>：$|\nabla f(x) - \nabla f(y)| \leq L|x-y|$ — 梯度变化率有上界 $L$</li>
+<li><strong>二次上界推导</strong>：线积分 + Lipschitz 条件 + Cauchy-Schwarz → $f(y) \leq f(x) + \nabla f(x)^T (y-x) + \frac{L}{2}|y-x|^2$</li>
+<li><strong>下降引理</strong>：取 $\alpha_k = 1/L$ 得 $f(x_{k+1}) \leq f(x_k) - \frac{1}{2L}|\nabla f(x_k)|^2$ — 每次迭代的保证下降量</li>
+<li><strong>不是所有光滑函数都有 $L$</strong>：$f(x) = x^3$ 可微但梯度非 Lipschitz，不适用梯度下降标准理论</li>
+</ol>
+<h3 id="三种收敛率">三种收敛率
+</h3><ol start="5">
+<li><strong>非凸</strong>：$\min_k |\nabla f(x_k)| = O(1/\sqrt{K})$ — 只保证找到梯度小的点（驻点），不保证最优点</li>
+<li><strong>光滑凸</strong>：$f(x_K) - f^* = O(1/K)$ — 函数值误差以逆 $K$ 衰减</li>
+<li><strong>光滑强凸</strong>：$|x_K - x^<em>|^2 \leq \rho^K |x_0 - x^</em>|^2$，$\rho = (\frac{\kappa-1}{\kappa+1})^2$ — 指数级收敛</li>
+</ol>
+<h3 id="步长策略">步长策略
+</h3><ol start="8">
+<li><strong>实际首选</strong>：Armijo 回溯法 — 无需预知 $L$，自适应，保证充分下降且有步长下界</li>
+<li><strong>条件数 $\kappa = L/\mu$</strong>：刻画问题的&quot;难度&quot;。$\kappa$ 大 → 收敛慢 → 需要预处理</li>
+<li><strong>记忆口诀</strong>：「光滑条件限曲率，下降引理定步伐；凸则一阶 O(1/K)，强凸加上线性化」</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

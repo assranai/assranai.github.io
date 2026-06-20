@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第10章：对偶邻近梯度法 核心思想：利用Fenchel对偶将原始问题转化为对偶问题，在对偶空间用邻近梯度法求解——往往对偶问题结构更简单（无约束或约束更少），且对偶函数天然光滑（或至少比原问题更光滑），从而使得邻近梯度法（Ch7）发挥出更强的威力。\n前置知识回顾 在对偶邻近梯度法中，我们需要频繁使用Ch1凸优化、Ch7邻近梯度法和Ch9共轭函数的核心概念。下面逐一回顾。\nCh1：凸函数与凸优化基础 凸函数定义：对任意 $x, y \\in \\operatorname{dom} f$ 和 $\\theta \\in [0, 1]$，有： $$f(\\theta x + (1-\\theta)y) \\leq \\theta f(x) + (1-\\theta) f(y)$$ 直观理解：函数图像上任意两点连成的线段，都位于函数图像上方。这等价于说图像像一个&quot;碗&quot;。\n凸函数一阶条件：若 $f$ 可微，则 $f$ 是凸函数 $\\iff$ 对任意 $x,y$： $$\\boxed{f(y) \\geq f(x) + \\nabla f(x)^T (y - x)}$$ 物理含义：函数图像在任何一点处的切平面都位于函数图像下方。\n强凸函数：若存在 $\\mu &gt; 0$，使得对任意 $x, y$： $$f(y) \\geq f(x) + \\nabla f(x)^T(y-x) + \\frac{\\mu}{2}\\|y-x\\|^2$$ 强凸函数不仅有&quot;碗形&quot;，而且碗壁非常陡峭（二阶导数恒大于 $\\mu$），保证极小值点绝对唯一。\nCh7：邻近梯度法（ISTA） 适用问题：$\\min_x f(x) + g(x)$，其中 $f$ 光滑凸，$g$ 非光滑凸。\n">
+<title>第10章：对偶邻近梯度法</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/10-%E5%AF%B9%E5%81%B6%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第10章：对偶邻近梯度法">
+<meta property='og:description' content="第10章：对偶邻近梯度法 核心思想：利用Fenchel对偶将原始问题转化为对偶问题，在对偶空间用邻近梯度法求解——往往对偶问题结构更简单（无约束或约束更少），且对偶函数天然光滑（或至少比原问题更光滑），从而使得邻近梯度法（Ch7）发挥出更强的威力。\n前置知识回顾 在对偶邻近梯度法中，我们需要频繁使用Ch1凸优化、Ch7邻近梯度法和Ch9共轭函数的核心概念。下面逐一回顾。\nCh1：凸函数与凸优化基础 凸函数定义：对任意 $x, y \\in \\operatorname{dom} f$ 和 $\\theta \\in [0, 1]$，有： $$f(\\theta x + (1-\\theta)y) \\leq \\theta f(x) + (1-\\theta) f(y)$$ 直观理解：函数图像上任意两点连成的线段，都位于函数图像上方。这等价于说图像像一个&quot;碗&quot;。\n凸函数一阶条件：若 $f$ 可微，则 $f$ 是凸函数 $\\iff$ 对任意 $x,y$： $$\\boxed{f(y) \\geq f(x) + \\nabla f(x)^T (y - x)}$$ 物理含义：函数图像在任何一点处的切平面都位于函数图像下方。\n强凸函数：若存在 $\\mu &gt; 0$，使得对任意 $x, y$： $$f(y) \\geq f(x) + \\nabla f(x)^T(y-x) + \\frac{\\mu}{2}\\|y-x\\|^2$$ 强凸函数不仅有&quot;碗形&quot;，而且碗壁非常陡峭（二阶导数恒大于 $\\mu$），保证极小值点绝对唯一。\nCh7：邻近梯度法（ISTA） 适用问题：$\\min_x f(x) + g(x)$，其中 $f$ 光滑凸，$g$ 非光滑凸。\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/10-%E5%AF%B9%E5%81%B6%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第10章：对偶邻近梯度法">
+<meta name="twitter:description" content="第10章：对偶邻近梯度法 核心思想：利用Fenchel对偶将原始问题转化为对偶问题，在对偶空间用邻近梯度法求解——往往对偶问题结构更简单（无约束或约束更少），且对偶函数天然光滑（或至少比原问题更光滑），从而使得邻近梯度法（Ch7）发挥出更强的威力。\n前置知识回顾 在对偶邻近梯度法中，我们需要频繁使用Ch1凸优化、Ch7邻近梯度法和Ch9共轭函数的核心概念。下面逐一回顾。\nCh1：凸函数与凸优化基础 凸函数定义：对任意 $x, y \\in \\operatorname{dom} f$ 和 $\\theta \\in [0, 1]$，有： $$f(\\theta x + (1-\\theta)y) \\leq \\theta f(x) + (1-\\theta) f(y)$$ 直观理解：函数图像上任意两点连成的线段，都位于函数图像上方。这等价于说图像像一个&quot;碗&quot;。\n凸函数一阶条件：若 $f$ 可微，则 $f$ 是凸函数 $\\iff$ 对任意 $x,y$： $$\\boxed{f(y) \\geq f(x) + \\nabla f(x)^T (y - x)}$$ 物理含义：函数图像在任何一点处的切平面都位于函数图像下方。\n强凸函数：若存在 $\\mu &gt; 0$，使得对任意 $x, y$： $$f(y) \\geq f(x) + \\nabla f(x)^T(y-x) + \\frac{\\mu}{2}\\|y-x\\|^2$$ 强凸函数不仅有&quot;碗形&quot;，而且碗壁非常陡峭（二阶导数恒大于 $\\mu$），保证极小值点绝对唯一。\nCh7：邻近梯度法（ISTA） 适用问题：$\\min_x f(x) + g(x)$，其中 $f$ 光滑凸，$g$ 非光滑凸。\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾">前置知识回顾</a>
+      <ol>
+        <li><a href="#ch1凸函数与凸优化基础">Ch1：凸函数与凸优化基础</a></li>
+        <li><a href="#ch7邻近梯度法ista">Ch7：邻近梯度法（ISTA）</a></li>
+        <li><a href="#ch9共轭函数convex-conjugate--legendre-fenchel变换">Ch9：共轭函数（Convex Conjugate / Legendre-Fenchel变换）</a></li>
+      </ol>
+    </li>
+    <li><a href="#101-lagrange对偶理论回顾">10.1 Lagrange对偶理论回顾</a>
+      <ol>
+        <li><a href="#1011-从原问题到lagrange函数的5步完整推导">10.1.1 从原问题到Lagrange函数的5步完整推导</a></li>
+      </ol>
+    </li>
+    <li><a href="#102-ii型复合优化与fenchel对偶">10.2 II型复合优化与Fenchel对偶</a>
+      <ol>
+        <li><a href="#1021-ii型复合凸优化问题">10.2.1 II型复合凸优化问题</a></li>
+        <li><a href="#1022-fenchel对偶的构造">10.2.2 Fenchel对偶的构造</a></li>
+        <li><a href="#1023-对偶问题导出完整推导">10.2.3 对偶问题导出（完整推导）</a></li>
+        <li><a href="#1024-对偶问题的结构优势">10.2.4 对偶问题的结构优势</a></li>
+      </ol>
+    </li>
+    <li><a href="#103-对偶邻近梯度算法">10.3 对偶邻近梯度算法</a>
+      <ol>
+        <li><a href="#1031-光滑性分析">10.3.1 光滑性分析</a></li>
+        <li><a href="#1032-迭代公式的完整推导">10.3.2 迭代公式的完整推导</a></li>
+        <li><a href="#1033-与原始ista的对称关系">10.3.3 与原始ISTA的对称关系</a></li>
+        <li><a href="#1034-算法流程图">10.3.4 算法流程图</a></li>
+      </ol>
+    </li>
+    <li><a href="#104-svm求解应用完整推导">10.4 SVM求解应用（完整推导）</a>
+      <ol>
+        <li><a href="#1041-svm问题的原始形式">10.4.1 SVM问题的原始形式</a></li>
+        <li><a href="#1042-转化为ii型复合优化">10.4.2 转化为II型复合优化</a></li>
+        <li><a href="#1043-对偶问题构造">10.4.3 对偶问题构造</a></li>
+        <li><a href="#1044-对偶邻近梯度法求解svm对偶问题">10.4.4 对偶邻近梯度法求解SVM对偶问题</a></li>
+      </ol>
+    </li>
+    <li><a href="#105-典型例题">10.5 典型例题</a>
+      <ol>
+        <li><a href="#例题101对偶函数构造基础">例题10.1（对偶函数构造基础）</a></li>
+        <li><a href="#例题102对偶邻近梯度迭代推导">例题10.2（对偶邻近梯度迭代推导）</a></li>
+        <li><a href="#例题103svm对偶的邻近梯度求解">例题10.3（SVM对偶的邻近梯度求解）</a></li>
+        <li><a href="#例题104tv-l1去噪的对偶邻近梯度法">例题10.4（TV-L1去噪的对偶邻近梯度法）</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a></li>
+    <li><a href="#106-补充例题">10.6 补充例题</a>
+      <ol>
+        <li><a href="#例题105矩阵补全的对偶邻近梯度法">例题10.5（矩阵补全的对偶邻近梯度法）</a></li>
+        <li><a href="#例题106对偶邻近梯度法的收敛性数值验证">例题10.6（对偶邻近梯度法的收敛性数值验证）</a></li>
+        <li><a href="#例题107强凸性丢失时的补救更多光滑化技术">例题10.7（强凸性丢失时的补救——更多光滑化技术）</a></li>
+      </ol>
+    </li>
+    <li><a href="#107-算法对比总结">10.7 算法对比总结</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/10-%E5%AF%B9%E5%81%B6%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/">第10章：对偶邻近梯度法</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 13 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第10章对偶邻近梯度法">第10章：对偶邻近梯度法
+</h1><blockquote>
+<p><strong>核心思想</strong>：利用Fenchel对偶将原始问题转化为对偶问题，在对偶空间用邻近梯度法求解——往往对偶问题结构更简单（无约束或约束更少），且对偶函数天然光滑（或至少比原问题更光滑），从而使得邻近梯度法（Ch7）发挥出更强的威力。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾">前置知识回顾
+</h2><p>在对偶邻近梯度法中，我们需要频繁使用Ch1凸优化、Ch7邻近梯度法和Ch9共轭函数的核心概念。下面逐一回顾。</p>
+<h3 id="ch1凸函数与凸优化基础">Ch1：凸函数与凸优化基础
+</h3><p><strong>凸函数定义</strong>：对任意 $x, y \in \operatorname{dom} f$ 和 $\theta \in [0, 1]$，有：
+</p>
+$$f(\theta x + (1-\theta)y) \leq \theta f(x) + (1-\theta) f(y)$$<p>
+直观理解：函数图像上任意两点连成的线段，都位于函数图像<strong>上方</strong>。这等价于说图像像一个&quot;碗&quot;。</p>
+<p><strong>凸函数一阶条件</strong>：若 $f$ 可微，则 $f$ 是凸函数 $\iff$ 对任意 $x,y$：
+</p>
+$$\boxed{f(y) \geq f(x) + \nabla f(x)^T (y - x)}$$<p>
+物理含义：函数图像在任何一点处的切平面都位于函数图像<strong>下方</strong>。</p>
+<p><strong>强凸函数</strong>：若存在 $\mu &gt; 0$，使得对任意 $x, y$：
+</p>
+$$f(y) \geq f(x) + \nabla f(x)^T(y-x) + \frac{\mu}{2}\|y-x\|^2$$<p>
+强凸函数不仅有&quot;碗形&quot;，而且碗壁非常陡峭（二阶导数恒大于 $\mu$），保证极小值点绝对唯一。</p>
+<h3 id="ch7邻近梯度法ista">Ch7：邻近梯度法（ISTA）
+</h3><p><strong>适用问题</strong>：$\min_x f(x) + g(x)$，其中 $f$ 光滑凸，$g$ 非光滑凸。</p>
+<p><strong>邻近算子</strong>：
+</p>
+$$\boxed{\operatorname{prox}_{g}(v) = \arg\min_x \left\{ g(x) + \frac{1}{2}\|x - v\|^2 \right\}}$$<p>
+含义：在点 $v$ 附近找一个点 $x$，既要让 $g(x)$ 小（非光滑惩罚），又不能离 $v$ 太远（2范数正则化）。</p>
+<p><strong>ISTA迭代</strong>：
+</p>
+$$\boxed{x_{k+1} = \operatorname{prox}_{\alpha g}\left( x_k - \alpha \nabla f(x_k) \right)}$$<p>
+步长 $\alpha &gt; 0$ 需满足 $\alpha \leq 1/L$，其中 $L$ 为 $\nabla f$ 的Lipschitz常数。</p>
+<p><strong>物理含义</strong>：先沿 $f$ 的梯度方向下降一步（前向步），再通过邻近算子施加 $g$ 的结构（后向步）。</p>
+<h3 id="ch9共轭函数convex-conjugate--legendre-fenchel变换">Ch9：共轭函数（Convex Conjugate / Legendre-Fenchel变换）
+</h3><p><strong>定义</strong>：对于任意函数 $f: \mathbb{R}^n \to \mathbb{R} \cup {+\infty}$，其共轭函数为：
+</p>
+$$\boxed{f^*(y) = \sup_{x} \left\{ y^T x - f(x) \right\}}$$<p>
+这是 $f$ 的&quot;对偶表示&quot;——把函数从原空间 $x$ 翻转到对偶空间 $y$。</p>
+<p><strong>关键性质</strong>：</p>
+<ol>
+<li><strong>$f^*$ 永远是凸函数</strong>（无论 $f$ 是否凸），因为 $\sup$ 一系列仿射函数，结果必然是凸的。</li>
+<li><strong>Fenchel-Young不等式</strong>：$f(x) + f^*(y) \geq x^T y$，恒成立。</li>
+<li><strong>双共轭</strong>：若 $f$ 为闭凸函数，则 $f^{**} = f$（Fenchel-Moreau定理——共轭两次回到原函数）。</li>
+<li><strong>Moreau分解</strong>：$x = \operatorname{prox}<em>f(x) + \operatorname{prox}</em>{f^*}(x)$（原空间和对偶空间互相补足）。</li>
+</ol>
+<p><strong>常用共轭对照表</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>原函数 $f(x)$</th>
+					<th>共轭函数 $f^*(y)$</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>$\frac{1}{2}|x|^2$</td>
+					<td>$\frac{1}{2}|y|^2$</td>
+			</tr>
+			<tr>
+					<td>$|x|_1$</td>
+					<td>$\delta_{{|\cdot|_\infty \leq 1}}(y)$（无穷范数球的指示函数）</td>
+			</tr>
+			<tr>
+					<td>$|x|_2$</td>
+					<td>$\delta_{{|\cdot|_2 \leq 1}}(y)$（2范数球的指示函数）</td>
+			</tr>
+			<tr>
+					<td>$\delta_C(x)$（凸集 $C$ 的指示函数）</td>
+					<td>$\sigma_C(y) = \sup_{x \in C} y^T x$（$C$ 的支撑函数）</td>
+			</tr>
+			<tr>
+					<td>$\frac{1}{p}|x|^p$（$p&gt;1$）</td>
+					<td>$\frac{1}{q}|y|^q$，其中 $\frac{1}{p} + \frac{1}{q} = 1$</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="101-lagrange对偶理论回顾">10.1 Lagrange对偶理论回顾
+</h2><h3 id="1011-从原问题到lagrange函数的5步完整推导">10.1.1 从原问题到Lagrange函数的5步完整推导
+</h3><p><strong>第1步——写出原问题（Primal Problem）</strong>：</p>
+<p>考虑一般的约束优化问题：
+</p>
+$$\boxed{\begin{aligned} p^* = \min_{x \in \mathbb{R}^n} \quad & f(x) \\ \text{s.t.} \quad & h_i(x) \leq 0, \quad i = 1, \ldots, m \\ & \ell_j(x) = 0, \quad j = 1, \ldots, p \end{aligned}}$$<p>符号解释：</p>
+<ul>
+<li>$x \in \mathbb{R}^n$：决策变量，一个 $n$ 维列向量 $x = (x_1, \ldots, x_n)^T$。</li>
+<li>$f(x)$：目标函数。我们想让它尽可能小（找最小值）。</li>
+<li>$h_i(x) \leq 0$：第 $i$ 个不等式约束。$h_i(x)$ 的值必须 ≤ 0 才算&quot;合法&quot;。</li>
+<li>$\ell_j(x) = 0$：第 $j$ 个等式约束。$h_i$ 和 $\ell_j$ 都要求是凸的。</li>
+<li>$p^*$：原问题的最优值（我们最终想找到的那个最小的数）。</li>
+</ul>
+<p><strong>第2步——引入乘子，构造Lagrange函数</strong>：</p>
+<p>把约束条件吸收到目标函数里，作为&quot;惩罚项&quot;。惩罚力度由乘子 $\lambda_i \geq 0$（不等式）和 $\nu_j$（等式，无符号限制）控制：</p>
+$$\boxed{L(x, \lambda, \nu) = f(x) + \sum_{i=1}^{m} \lambda_i h_i(x) + \sum_{j=1}^{p} \nu_j \ell_j(x)}$$<p>逐项解释：</p>
+<ul>
+<li>$f(x)$：原目标函数，越小越好。</li>
+<li>$\lambda_i h_i(x)$：对第 $i$ 个不等式约束的惩罚。$\lambda_i \geq 0$ 保证违反约束（$h_i(x) &gt; 0$）时惩罚为正；满足约束（$h_i(x) \leq 0$）时惩罚为负或零，不会&quot;奖励&quot;。</li>
+<li>$\nu_j \ell_j(x)$：对第 $j$ 个等式约束的惩罚。$\nu_j$ 可正可负——因为等式约束两边都不能偏。</li>
+<li>$\lambda = (\lambda_1, \ldots, \lambda_m)^T \in \mathbb{R}^m$：不等式的Lagrange乘子向量。</li>
+<li>$\nu = (\nu_1, \ldots, \nu_p)^T \in \mathbb{R}^p$：等式的Lagrange乘子向量。</li>
+</ul>
+<p><strong>第3步——构造对偶函数（Dual Function）</strong>：</p>
+<p>对偶函数定义为：在给定乘子 $(\lambda, \nu)$ 下，Lagrange函数关于 $x$ 能取到的<strong>下确界（infimum）</strong>：</p>
+$$\boxed{q(\lambda, \nu) = \inf_{x \in \mathbb{R}^n} L(x, \lambda, \nu) = \inf_{x} \left\{ f(x) + \sum_{i=1}^{m} \lambda_i h_i(x) + \sum_{j=1}^{p} \nu_j \ell_j(x) \right\}}$$<p><strong>关键</strong>：$\inf$ 表示&quot;下确界&quot;，即能无限逼近的最小值。如果最小值确实能取到，则 $\inf = \min$。</p>
+<p>对偶函数的两个关键性质：</p>
+<p><strong>性质1——永久凹性</strong>：</p>
+<blockquote>
+<p>无论原问题 $f, h_i, \ell_j$ 是什么形状，$q(\lambda, \nu)$ 恒为<strong>凹函数</strong>。</p>
+</blockquote>
+<p>原因：对于每个固定的 $x$，$L(x, \lambda, \nu) = f(x) + \sum \lambda_i h_i(x) + \sum \nu_j \ell_j(x)$ 关于 $(\lambda, \nu)$ 是<strong>仿射函数</strong>（即线性函数 + 常数项）。而一堆仿射函数的逐点下确界，在几何上等于&quot;从下方取包络&quot;，结果必然是一个开口向下的碗形——即凹函数。</p>
+<p><strong>性质2——弱对偶性</strong>：</p>
+<blockquote>
+<p>对于任意 $\lambda \succeq 0$ 和任意 $\nu$，有 $q(\lambda, \nu) \leq p^*$（对偶函数值永远 ≤ 原问题最优值）。</p>
+</blockquote>
+<p><strong>证明（弱对偶定理）</strong>：
+设 $\tilde{x}$ 是原问题的任意可行解（即满足 $h_i(\tilde{x}) \leq 0$ 和 $\ell_j(\tilde{x}) = 0$）。则：
+</p>
+$$\begin{aligned} L(\tilde{x}, \lambda, \nu) &= f(\tilde{x}) + \underbrace{\sum_i \lambda_i h_i(\tilde{x})}_{\leq 0 \text{（因为 } \lambda_i \geq 0, h_i(\tilde{x}) \leq 0\text{）}} + \underbrace{\sum_j \nu_j \ell_j(\tilde{x})}_{= 0 \text{（因为 } \ell_j(\tilde{x}) = 0\text{）}} \\ &\leq f(\tilde{x}) \end{aligned}$$<p>因此，对任意可行解 $\tilde{x}$：
+</p>
+$$q(\lambda, \nu) = \inf_x L(x, \lambda, \nu) \leq L(\tilde{x}, \lambda, \nu) \leq f(\tilde{x})$$<p>对所有的可行解 $\tilde{x}$ 取下确界：
+</p>
+$$q(\lambda, \nu) \leq \inf_{\tilde{x} \text{ 可行}} f(\tilde{x}) = p^*$$<p>$\square$</p>
+<p>直观解释：$q(\lambda, \nu)$ 给出的值是一个<strong>下界</strong>（lower bound）——原问题的最小值不可能比它还低。对偶问题就是要找最大的下界。</p>
+<p><strong>第4步——写出对偶问题（Dual Problem）</strong>：</p>
+<p>既然 $q(\lambda, \nu)$ 是原问题的下界估计，那么最&quot;紧&quot;（最大）的下界就是最好的：
+</p>
+$$\boxed{d^* = \max_{\lambda \succeq 0, \; \nu} \; q(\lambda, \nu) = \max_{\lambda \succeq 0, \; \nu} \; \inf_{x} L(x, \lambda, \nu)}$$<p>其中 $\lambda \succeq 0$ 等价于 $\lambda_i \geq 0$ 对每个 $i=1,\ldots,m$。</p>
+<p><strong>第5步——对偶间隙与强对偶</strong>：</p>
+<p>定义<strong>对偶间隙（Duality Gap）</strong>：$\Delta = p^* - d^* \geq 0$（由弱对偶性保证非负）。</p>
+<p><strong>强对偶</strong>：当对偶间隙为零，即 $p^* = d^*$ 时，称强对偶成立。此时我们可以通过求解（可能更简单的）对偶问题来精确得到原始问题的最优值。</p>
+<p><strong>Slater条件（强对偶的充分条件）</strong>：</p>
+<blockquote>
+<p>如果原问题是凸的（即 $f$ 和 $h_i$ 是凸函数，$\ell_j$ 是仿射函数），且存在一个<strong>严格可行点</strong> $\tilde{x}$ 满足：
+</p>
+$$h_i(\tilde{x}) < 0 \quad (\forall i), \qquad \ell_j(\tilde{x}) = 0 \quad (\forall j)$$<p>
+那么强对偶成立：$p^* = d^*$。</p>
+</blockquote>
+<p>直观理解：Slater条件要求至少有一个点能&quot;宽松地&quot;满足所有不等式约束（不是勉强卡在边界上等于0，而是严格小于0）。这就像说——问题的可行域内部不是空的，至少有一个内点。</p>
+<p><strong>反例</strong>：考虑以下非凸问题：
+</p>
+$$\min_{x} \; e^{-x} \quad \text{s.t.} \quad x^2 / y \leq 0$$<p>
+其中可行集不是一个凸集。即使存在严格可行点，强对偶也可能不成立。Slater条件中的<strong>凸性假设</strong>是必不可少的。</p>
+<p><strong>弱对偶永远成立，强对偶需要额外条件。Slater条件是其中最重要的一条。</strong></p>
+<hr>
+<h2 id="102-ii型复合优化与fenchel对偶">10.2 II型复合优化与Fenchel对偶
+</h2><h3 id="1021-ii型复合凸优化问题">10.2.1 II型复合凸优化问题
+</h3><p>本章和后续章节重点研究以下特殊结构：
+</p>
+$$\boxed{\min_{x \in \mathbb{R}^n} \; f(x) + g(Kx)}$$<p>其中：</p>
+<ul>
+<li>$f: \mathbb{R}^n \to \mathbb{R} \cup {+\infty}$：闭凸函数（可非光滑，但要求 $\operatorname{prox}_f$ 好算）</li>
+<li>$g: \mathbb{R}^m \to \mathbb{R} \cup {+\infty}$：闭凸函数（可非光滑）</li>
+<li>$K \in \mathbb{R}^{m \times n}$：线性算子（矩阵）</li>
+</ul>
+<p><strong>与I型的区别</strong>：</p>
+<ul>
+<li><strong>I型复合</strong>（Ch13 DR分裂法）：$\min_x f(x) + g(x)$，$g$ 直接作用于 $x$</li>
+<li><strong>II型复合</strong>（本章）：$\min_x f(x) + g(Kx)$，$g$ 套在线性算子 $K$ 内部</li>
+</ul>
+<p>典型的例子包括：TV正则化（$g = |\cdot|<em>1$，$K$ = 差分矩阵）、核范数正则化（$g = |\cdot|</em>*$）、结构化稀疏等。</p>
+<h3 id="1022-fenchel对偶的构造">10.2.2 Fenchel对偶的构造
+</h3><p>利用共轭函数的性质，将 $g(Kx)$ 表达为对偶形式。由 Fenchel-Moreau 定理：对闭凸函数 $g$，有 $g^{**} = g$：
+</p>
+$$g(Kx) = g^{**}(Kx) = \sup_{y \in \mathbb{R}^m} \left\{ (Kx)^T y - g^*(y) \right\}$$<p>含义：函数值 $g(Kx)$ 等于在所有可能的对偶变量 $y$ 中，找使 $y^T(Kx) - g^*(y)$ 最大的那个值。</p>
+<h3 id="1023-对偶问题导出完整推导">10.2.3 对偶问题导出（完整推导）
+</h3><p>将 $g(Kx)$ 的共轭表达代入原目标，得到鞍点形式：
+</p>
+$$\begin{aligned} \min_x \left[ f(x) + g(Kx) \right] &= \min_x \left[ f(x) + \sup_y \left\{ (Kx)^T y - g^*(y) \right\} \right] \\ &= \min_x \sup_y \left[ f(x) + \langle Kx, y \rangle - g^*(y) \right] \end{aligned}$$<p>其中 $\langle Kx, y \rangle = (Kx)^T y = x^T(K^T y)$ 是内积。</p>
+<p>假设强对偶成立（Slater条件满足），可交换 $\min$ 和 $\sup$：
+</p>
+$$\min_x \sup_y \Phi(x, y) = \sup_y \min_x \Phi(x, y)$$<p>其中 $\Phi(x, y) = f(x) + \langle Kx, y \rangle - g^*(y)$。</p>
+<p>先对 $x$ 取下确界：
+</p>
+$$\begin{aligned} \min_x \Phi(x, y) &= \min_x \left[ f(x) + \langle Kx, y \rangle \right] - g^*(y) \\ &= \min_x \left[ f(x) + x^T(K^T y) \right] - g^*(y) \\ &= -\max_x \left[ -x^T(K^T y) - f(x) \right] - g^*(y) \\ &= -f^*(-K^T y) - g^*(y) \end{aligned}$$<p>此处关键一步：$\max_x { -x^T(K^T y) - f(x) } = \max_x { (-K^T y)^T x - f(x) } = f^*(-K^T y)$。</p>
+<p>因此，II型复合优化问题的<strong>Fenchel对偶问题</strong>为：
+</p>
+$$\boxed{\max_{y \in \mathbb{R}^m} \; \Phi_D(y) = -f^*(-K^T y) - g^*(y)}$$<p>等价地，转换为极小化形式：
+</p>
+$$\boxed{\min_{y \in \mathbb{R}^m} \; h(y) = f^*(-K^T y) + g^*(y)}$$<p><strong>这就是本章的核心方程。对偶邻近梯度法就是在对偶空间求解 $\min_y f^<em>(-K^T y) + g^</em>(y)$。</strong></p>
+<h3 id="1024-对偶问题的结构优势">10.2.4 对偶问题的结构优势
+</h3><p>对比原问题 $\min_x f(x) + g(Kx)$ 和对偶问题 $\min_y f^<em>(-K^T y) + g^</em>(y)$：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>维度</th>
+					<th>原问题</th>
+					<th>对偶问题</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>变量</td>
+					<td>$x \in \mathbb{R}^n$</td>
+					<td>$y \in \mathbb{R}^m$</td>
+			</tr>
+			<tr>
+					<td>维数</td>
+					<td>$n$</td>
+					<td>$m$（通常 $m \ll n$）</td>
+			</tr>
+			<tr>
+					<td>光滑性</td>
+					<td>$g \circ K$ 一般非光滑</td>
+					<td>若 $f$ 强凸，则 $f^*$ 光滑</td>
+			</tr>
+			<tr>
+					<td>约束</td>
+					<td>可直接含约束</td>
+					<td>通常无约束</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>核心优势</strong>：当 $f$ 强凸时，$f^*$ 会自动变成光滑函数（梯度Lipschitz连续），此时对偶问题是&quot;光滑 + 非光滑&quot;的结构，正好适用邻近梯度法！</p>
+<hr>
+<h2 id="103-对偶邻近梯度算法">10.3 对偶邻近梯度算法
+</h2><h3 id="1031-光滑性分析">10.3.1 光滑性分析
+</h3><p>记 $\phi(y) = f^<em>(-K^T y)$，$\psi(y) = g^</em>(y)$，则对偶问题为 $\min_y \phi(y) + \psi(y)$。</p>
+<p><strong>引理</strong>（强凸 $\Rightarrow$ 共轭光滑）：若 $f$ 是 $\mu$-强凸函数（$\mu &gt; 0$），则 $f^<em>$ 是 $C^1$ 光滑函数，且 $\nabla f^</em>$ 是 $\frac{1}{\mu}$-Lipschitz连续的。</p>
+<p><strong>证明概要</strong>：由强凸性的定义，$f(x) - \frac{\mu}{2}|x|^2$ 仍为凸函数。其共轭 $f^<em>$ 满足：$\nabla f^</em>(y) = \arg\max_x { y^T x - f(x) }$。强凸性保证 $\arg\max$ 唯一且对 $y$ Lipschitz连续，Lipschitz常数恰好为 $1/\mu$。</p>
+<p>因此：
+</p>
+$$\phi(y) = f^*(-K^T y) \implies \nabla \phi(y) = -K \cdot \nabla f^*(-K^T y)$$<p>且 $\nabla \phi$ 的Lipschitz常数 $L_\phi = \frac{|K|^2}{\mu}$，其中 $|K|$ 是矩阵 $K$ 的谱范数（最大奇异值）。</p>
+<p>完整计算 $\nabla \phi(y)$ 的步骤：</p>
+<ol>
+<li>计算 $w = -K^T y$（将 $y$ 映射回原空间）</li>
+<li>计算 $x^<em>(y) = \nabla f^</em>(w) = \arg\max_x { w^T x - f(x) }$（$f^*$ 的梯度就是那个取到 $\sup$ 的 $x$）</li>
+<li>返回 $\nabla \phi(y) = -K \cdot x^*(y)$</li>
+</ol>
+<h3 id="1032-迭代公式的完整推导">10.3.2 迭代公式的完整推导
+</h3><p>应用邻近梯度法（ISTA，Ch7）于对偶问题 $\min_y \phi(y) + \psi(y)$：</p>
+<p><strong>标准ISTA公式</strong>：
+</p>
+$$y_{k+1} = \operatorname{prox}_{\alpha \psi} \left( y_k - \alpha \nabla \phi(y_k) \right)$$<p>其中步长 $\alpha$ 需满足 $\alpha \leq 1/L_\phi = \frac{\mu}{|K|^2}$。</p>
+<p>代入 $\phi(y) = f^<em>(-K^T y)$ 和 $\psi(y) = g^</em>(y)$：</p>
+$$\boxed{\begin{aligned} x_{k+1} &= \arg\max_x \left\{ (-K^T y_k)^T x - f(x) \right\} \quad \text{（原空间步：计算 } \nabla f^* \text{ 的支撑点）} \\ y_{k+1} &= \operatorname{prox}_{\alpha g^*} \left( y_k + \alpha K x_{k+1} \right) \quad \text{（对偶空间步：邻近梯度更新）} \end{aligned}}$$<p><strong>推导细节</strong>：</p>
+<ul>
+<li>$\nabla \phi(y_k) = -K \cdot \nabla f^*(-K^T y_k) = -K \cdot x_{k+1}$，其中 $x_{k+1}$ 是使 $-y_k^T Kx - f(x)$ 最小的点（等价于使 $(-K^T y_k)^T x - f(x)$ 最大的点）。</li>
+<li>因此 $y_k - \alpha \nabla \phi(y_k) = y_k - \alpha(-K x_{k+1}) = y_k + \alpha K x_{k+1}$。</li>
+<li>最后施加 $\operatorname{prox}_{\alpha g^*}$ 以处理非光滑项。</li>
+</ul>
+<h3 id="1033-与原始ista的对称关系">10.3.3 与原始ISTA的对称关系
+</h3><p>对偶邻近梯度法展现了优雅的<strong>原始-对偶对称性</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>步骤</th>
+					<th>原始ISTA（解 $\min_x f(x) + g(x)$）</th>
+					<th>对偶邻近梯度法（解 $\min_y \phi(y) + \psi(y)$）</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>前向步（梯度下降）</td>
+					<td>$v_k = x_k - \alpha \nabla f(x_k)$</td>
+					<td>$v_k = y_k - \alpha \nabla \phi(y_k) = y_k + \alpha K x_{k+1}$</td>
+			</tr>
+			<tr>
+					<td>后向步（邻近算子）</td>
+					<td>$x_{k+1} = \operatorname{prox}_{\alpha g}(v_k)$</td>
+					<td>$y_{k+1} = \operatorname{prox}_{\alpha g^*}(v_k)$</td>
+			</tr>
+			<tr>
+					<td>光滑性要求</td>
+					<td>$f$ 光滑</td>
+					<td>$f^*$ 光滑 $\iff$ $f$ 强凸</td>
+			</tr>
+			<tr>
+					<td>邻近算子</td>
+					<td>作用于 $g$</td>
+					<td>作用于 $g^*$（共轭函数）</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>核心对称关系</strong>：</p>
+<ul>
+<li>原问题中 $f$ 的强凸性 → 对偶问题中 $\phi$ 的光滑性</li>
+<li>原问题中 $g$ 的邻近算子 → 对偶问题中 $g^*$ 的邻近算子（可通过Moreau分解互换）</li>
+</ul>
+<h3 id="1034-算法流程图">10.3.4 算法流程图
+</h3>$$\boxed{\begin{aligned} &\textbf{初始化：} y_0 \in \mathbb{R}^m, \; k = 0 \\ &\textbf{选择步长：} \alpha \in (0, \frac{\mu}{\|K\|^2}) \\ &\textbf{迭代：} \\ &\quad \text{① 原空间步：} x_{k+1} = \nabla f^*(-K^T y_k) = \arg\max_x \{ (-K^T y_k)^T x - f(x) \} \\ &\quad \text{② 梯度映射步：} v_{k+1} = y_k + \alpha K x_{k+1} \\ &\quad \text{③ 对偶邻近步：} y_{k+1} = \operatorname{prox}_{\alpha g^*}(v_{k+1}) \\ &\textbf{直到收敛} \end{aligned}}$$<p><strong>收敛条件</strong>：若 $f$ 是 $\mu$-强凸，取 $\alpha \in (0, 2\mu / |K|^2)$，则算法以 $O(1/k)$ 速率收敛。</p>
+<hr>
+<h2 id="104-svm求解应用完整推导">10.4 SVM求解应用（完整推导）
+</h2><h3 id="1041-svm问题的原始形式">10.4.1 SVM问题的原始形式
+</h3><p>软间隔SVM的原始问题（$\ell_2$ 正则化铰链损失）：
+</p>
+$$\boxed{\min_{w \in \mathbb{R}^d, \; b \in \mathbb{R}} \; \frac{\lambda}{2}\|w\|^2 + \sum_{i=1}^{n} \max\{0, \; 1 - y_i (w^T \phi(x_i) + b)\}}$$<p>符号解释：</p>
+<ul>
+<li>$w$：分类超平面的法向量（$d$ 维）</li>
+<li>$b$：偏置项（标量）</li>
+<li>$\lambda &gt; 0$：正则化参数（越大 → 模型越简单 → 越防止过拟合）</li>
+<li>$y_i \in {-1, +1}$：第 $i$ 个样本的标签</li>
+<li>$\phi(x_i)$：特征映射后的向量</li>
+<li>$\max{0, 1 - y_i(w^T \phi(x_i) + b)} = (1 - y_i(w^T \phi(x_i) + b))_+$：铰链损失（hinge loss）</li>
+</ul>
+<p><strong>铰链损失的几何解释</strong>：如果一个点 $x_i$ 正确分类且距离超平面 &ldquo;足够远&rdquo;（间隔 ≥ 1），则惩罚为0。如果分类错误或落在间隔内部，则惩罚 &gt; 0。</p>
+<h3 id="1042-转化为ii型复合优化">10.4.2 转化为II型复合优化
+</h3><p>引入变量 $z_i = 1 - y_i(w^T \phi(x_i) + b)$，目标重写为：
+</p>
+$$\min_{w,b} \; \underbrace{\frac{\lambda}{2}\|w\|^2}_{f(w,b)} + \underbrace{\sum_{i=1}^{n} \max\{0, z_i\}}_{g(z)} \quad \text{s.t.} \quad z_i = 1 - y_i(w^T \phi(x_i) + b)$$<p>这里：</p>
+<ul>
+<li>$f(w,b) = \frac{\lambda}{2}|w|^2$：关于 $w$ 的 $\lambda$-强凸函数（不依赖 $b$）</li>
+<li>$g(z) = \sum_{i=1}^n \max{0, z_i} = \sum_{i=1}^n (z_i)_+$：各分量独立的正部函数之和</li>
+</ul>
+<p>设 $X$ 为 $n \times d$ 特征矩阵，$Y = \operatorname{diag}(y_1, \ldots, y_n)$。记 $\beta = (w; b) \in \mathbb{R}^{d+1}$。则约束写为：
+</p>
+$$z = \mathbf{1}_n - Y X w - Y b \mathbf{1}_n = \mathbf{1}_n - K\beta$$<p>其中 $K = [YX, Y\mathbf{1}_n]$ 是 $n \times (d+1)$ 矩阵。</p>
+<p>这转化为标准的II型复合：$\min_\beta f(\beta) + g(\mathbf{1}_n - K\beta)$。</p>
+<h3 id="1043-对偶问题构造">10.4.3 对偶问题构造
+</h3><p>$f(w,b) = \frac{\lambda}{2}|w|^2$（关于 $w$ 强凸），其共轭：
+</p>
+$$f^*(u, v) = \sup_{w,b} \{ u^T w + v b - \frac{\lambda}{2}\|w\|^2 \}$$<p>对 $w$ 配方法：$u^T w - \frac{\lambda}{2}|w|^2 = -\frac{\lambda}{2}|w - \frac{u}{\lambda}|^2 + \frac{|u|^2}{2\lambda}$。取 $\sup_w$ 得 $\frac{|u|^2}{2\lambda}$。
+对 $b$：若 $v \neq 0$，$\sup_b v b = +\infty$；若 $v = 0$，为 $0$。因此：
+</p>
+$$f^*(u, v) = \begin{cases} \frac{\|u\|^2}{2\lambda}, & v = 0 \\ +\infty, & v \neq 0 \end{cases}$$<p>这说明偏置项 $b$ 不在对偶问题中出现（对应约束 $\sum_i y_i \alpha_i = 0$）。</p>
+<p>$g(z) = \sum_i (z_i)_+$ 的共轭：每个分量 $g_i(z_i) = \max{0, z_i}$ 的共轭为：
+</p>
+$$g_i^*(\alpha_i) = \begin{cases} 0, & 0 \leq \alpha_i \leq 1 \\ +\infty, & \text{否则} \end{cases}$$<p>因此 $g^*(\alpha) = \delta_{[0,1]^n}(\alpha)$，即要求每个 $\alpha_i \in [0, 1]$。</p>
+<p>代入对偶公式 $\min_\alpha f^<em>(-K^T \alpha) + g^</em>(\alpha)$。其中 $K^T \alpha = [X^T Y \alpha; \mathbf{1}_n^T Y \alpha]$：
+</p>
+$$\min_{\alpha \in [0,1]^n} \; \frac{1}{2\lambda}\|X^T Y \alpha\|^2 - \mathbf{1}_n^T \alpha \quad \text{s.t.} \quad \mathbf{1}_n^T Y \alpha = 0$$<p>即经典的 <strong>SVM对偶问题</strong>：
+</p>
+$$\boxed{\min_{\alpha \in [0,1]^n} \; \frac{1}{2\lambda} \alpha^T Q \alpha - \sum_{i=1}^n \alpha_i \quad \text{s.t.} \quad \sum_{i=1}^n y_i \alpha_i = 0}$$<p>其中 $Q_{ij} = y_i y_j \phi(x_i)^T \phi(x_j) = y_i y_j K(x_i, x_j)$（核矩阵）。</p>
+<h3 id="1044-对偶邻近梯度法求解svm对偶问题">10.4.4 对偶邻近梯度法求解SVM对偶问题
+</h3><p>令 $\phi(\alpha) = \frac{1}{2\lambda}\alpha^T Q \alpha - \mathbf{1}^T \alpha$（光滑凸），$\psi(\alpha) = \delta_{[0,1]^n}(\alpha) + \delta_{{\alpha: y^T \alpha = 0}}(\alpha)$（非光滑，但邻近算子简单）。</p>
+<p><strong>计算 $\nabla \phi(\alpha)$</strong>：
+</p>
+$$\nabla \phi(\alpha) = \frac{1}{\lambda} Q \alpha - \mathbf{1}$$<p>Lipschitz常数：$L_\phi = |Q| / \lambda$（其中 $|Q|$ 为核矩阵的谱范数）。</p>
+<p><strong>计算 $\operatorname{prox}_{\psi}$</strong>（邻近算子）：
+</p>
+$$\operatorname{prox}_{\psi}(v) = \arg\min_{\alpha \in [0,1]^n, \; y^T \alpha = 0} \frac{1}{2}\|\alpha - v\|^2$$<p>这等价于先把 $v$ 投影到超平面 $y^T \alpha = 0$，再投影到盒子 $[0,1]^n$。由于约束 $y^T \alpha = 0$ 的存在，这通常是一个正交投影子问题，可通过求解一个标量对偶变量来高效计算。</p>
+<p><strong>对偶邻近梯度SVM迭代</strong>：
+</p>
+$$\boxed{\begin{aligned} \alpha_{k+1} &= \operatorname{prox}_{\alpha_k \psi} \left( \alpha_k - \alpha_k \left( \frac{1}{\lambda} Q \alpha_k - \mathbf{1} \right) \right) \\ &= P_{[0,1]^n \cap \{\alpha: y^T \alpha=0\}} \left( \alpha_k - \frac{\alpha_k}{\lambda} Q \alpha_k + \alpha_k \mathbf{1} \right) \end{aligned}}$$<p>收敛后恢复原始分类器：
+</p>
+$$w^* = \frac{1}{\lambda} \sum_{i=1}^n \alpha_i^* y_i \phi(x_i)$$<p>这就是著名的<strong>对偶坐标下降/SMO</strong>思想的邻近梯度版本——在对偶空间求解，每个迭代只需计算梯度（向量内积）和简单的盒子投影，完全避开了原始空间中的铰链损失非光滑性。</p>
+<hr>
+<h2 id="105-典型例题">10.5 典型例题
+</h2><h3 id="例题101对偶函数构造基础">例题10.1（对偶函数构造基础）
+</h3><p><strong>题目</strong>：考虑 $\min_x \frac{1}{2}|x|^2 + |Kx - b|_1$，其中 $K \in \mathbb{R}^{m \times n}$。写出其II型复合形式和对偶问题。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>步骤1</strong>——识别II型结构：令
+</p>
+$$f(x) = \frac{1}{2}\|x\|^2 \quad \text{（1-强凸函数）}, \qquad g(z) = \|z - b\|_1$$<p>
+则原问题为 $\min_x f(x) + g(Kx)$。</p>
+<p><strong>步骤2</strong>——计算共轭：</p>
+<ul>
+<li>$f^*(y) = \frac{1}{2}|y|^2$（$\frac{1}{2}|\cdot|^2$ 的自共轭性）</li>
+<li>$g^<em>(y)$：$|z - b|<em>1$ 的共轭 = $|y|</em>\infty + b^T y$ 的指示计算：
+$$g^*(y) = \sup_z \{ y^T z - \|z - b\|_1 \} = b^T y + \sup_u \{ y^T u - \|u\|_1 \}$$
+其中令 $u = z - b$。而 $\sup_u { y^T u - |u|<em>1 } = \begin{cases} 0, &amp; |y|</em>\infty \leq 1 \ +\infty, &amp; \text{否则} \end{cases}$
+因此 $g^</em>(y) = b^T y + \delta_{{|\cdot|_\infty \leq 1}}(y)$。</li>
+</ul>
+<p><strong>步骤3</strong>——写出对偶问题：
+</p>
+$$\boxed{\min_{y: \|y\|_\infty \leq 1} \; \frac{1}{2}\|K^T y\|^2 - b^T y}$$<p><strong>分析</strong>：对偶问题在 $m$ 维空间（$y \in \mathbb{R}^m$），约束为 $|y|_\infty \leq 1$（即每个分量 $|y_i| \leq 1$），目标是一个光滑的二次函数加线性项——比原问题简单得多！</p>
+<hr>
+<h3 id="例题102对偶邻近梯度迭代推导">例题10.2（对偶邻近梯度迭代推导）
+</h3><p><strong>题目</strong>：对例题10.1的对偶问题，写出对偶邻近梯度法的完整迭代公式。</p>
+<p><strong>解答</strong>：</p>
+<p>令 $\phi(y) = \frac{1}{2}|K^T y|^2$（光滑），$\psi(y) = \delta_{{|\cdot|_\infty \leq 1}}(y) - b^T y$（这里我们把线性项放入 $\psi$ 以便于施加邻近算子）。</p>
+<p>① 计算 $\nabla \phi(y)$：
+</p>
+$$\nabla \phi(y) = K K^T y$$<p>Lipschitz常数 $L_\phi = |K K^T| = |K|^2$。</p>
+<p>② 选择步长 $\alpha \in (0, 1/|K|^2)$（由 $f$ 的强凸常数 $\mu = 1$）。</p>
+<p>③ 邻近算子：$\operatorname{prox}<em>{\alpha \psi}(v) = \arg\min_y { \alpha \delta</em>{{|\cdot|_\infty \leq 1}}(y) - \alpha b^T y + \frac{1}{2}|y - v|^2 }$。</p>
+<p>由于 $\alpha \delta_C = \delta_C$（指示函数缩放的等价），问题等价于：
+</p>
+$$\arg\min_{y: \|y\|_\infty \leq 1} \frac{1}{2}\|y - v\|^2 - \alpha b^T y$$<p>配方法：$\frac{1}{2}|y - v|^2 - \alpha b^T y = \frac{1}{2}|y - (v + \alpha b)|^2 + \text{常数}$。</p>
+<p>因此 $\operatorname{prox}<em>{\alpha \psi}(v) = P</em>{{|\cdot|_\infty \leq 1}}(v + \alpha b)$，即先平移再投影到无穷范数球。分量形式：
+</p>
+$$[\operatorname{prox}_{\alpha \psi}(v)]_i = \operatorname{clip}(v_i + \alpha b_i, -1, 1) = \max\{-1, \min\{1, v_i + \alpha b_i\}\}$$<p>④ 完整迭代：
+</p>
+$$\boxed{\begin{aligned} y_{k+1} &= P_{\{\|\cdot\|_\infty \leq 1\}}\left( y_k - \alpha K K^T y_k + \alpha b \right) \\ [y_{k+1}]_i &= \operatorname{clip}\left( [y_k - \alpha K K^T y_k + \alpha b]_i, \; -1, \; 1 \right) \end{aligned}}$$<p>每步计算量：$O(mn)$（$K K^T y$ 矩阵向量乘），$O(m)$（clip投影）。非常高效！</p>
+<hr>
+<h3 id="例题103svm对偶的邻近梯度求解">例题10.3（SVM对偶的邻近梯度求解）
+</h3><p><strong>题目</strong>：考虑二分类SVM，训练集 ${(x_i, y_i)}_{i=1}^n$，核函数 $K(x_i, x_j) = e^{-\gamma|x_i - x_j|^2}$。写出用对偶邻近梯度法求解的详细算法。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>步骤1</strong>——对偶问题（标准SVM对偶，推导见10.4节）：
+</p>
+$$\min_{\alpha} \; \frac{1}{2} \alpha^T Q \alpha - \mathbf{1}^T \alpha \quad \text{s.t.} \quad 0 \leq \alpha_i \leq C, \; \sum_i y_i \alpha_i = 0$$<p>其中 $Q_{ij} = y_i y_j K(x_i, x_j)$，$C = 1/\lambda$。</p>
+<p><strong>步骤2</strong>——光滑部分：$\phi(\alpha) = \frac{1}{2}\alpha^T Q \alpha - \mathbf{1}^T \alpha$。梯度：
+</p>
+$$\nabla \phi(\alpha) = Q\alpha - \mathbf{1}$$<p>$\nabla \phi$ 的Lipschitz常数 $L_\phi = |Q|$（核矩阵的谱范数）。由于RBF核矩阵的谱范数 $\leq n$（因为 $K(x_i, x_i) = 1$），可取一个安全的估计 $L_\phi = n$，步长 $\alpha_k \in (0, 2/n)$。</p>
+<p><strong>步骤3</strong>——非光滑部分邻近算子：
+</p>
+$$\operatorname{prox}_{\psi}(v) = \arg\min_{\alpha} \left\{ \delta_{\{\alpha: 0 \leq \alpha_i \leq C\}}(\alpha) + \frac{1}{2}\|\alpha - v\|^2 \right\} \quad \text{s.t.} \quad \sum_i y_i \alpha_i = 0$$<p><strong>步骤4</strong>——完整算法：</p>
+$$\boxed{\begin{aligned} &\textbf{输入：} Q \in \mathbb{R}^{n \times n}, \; y \in \{-1,+1\}^n, \; C > 0, \; \text{步长 } \eta \\ &\textbf{输出：} \alpha^* \\ &1. \; \alpha^0 \leftarrow \mathbf{0} \in \mathbb{R}^n \\ &2. \; \textbf{for } k = 0, 1, 2, \ldots \textbf{ 直到收敛:} \\ &3. \; \quad g^k \leftarrow Q\alpha^k - \mathbf{1} \quad \text{（梯度计算，}O(n^2)\text{）} \\ &4. \; \quad v^k \leftarrow \alpha^k - \eta g^k \quad \text{（前向梯度步）} \\ &5. \; \quad \alpha^{k+1} \leftarrow P_{[0,C]^n \cap \{\alpha: y^T \alpha = 0\}}(v^k) \quad \text{（后向邻近投影）} \\ &\textbf{end} \end{aligned}}$$<p><strong>步骤5</strong>——投影 $P_{[0,C]^n \cap {\alpha: y^T \alpha = 0}}(v)$ 的计算：</p>
+<p>这是一个约束最小二乘问题：
+</p>
+$$\min_{\alpha} \frac{1}{2}\|\alpha - v\|^2 \quad \text{s.t.} \quad 0 \leq \alpha_i \leq C, \; \sum_i y_i \alpha_i = 0$$<p>通过Lagrange乘子法，引入乘子 $\theta$ 处理等式约束。利用KKT条件，解可写成：
+</p>
+$$\alpha_i = \min\left\{ C, \; \max\left\{ 0, \; v_i - \theta y_i \right\} \right\}$$<p>其中 $\theta$ 是使得 $\sum_i y_i \alpha_i = 0$ 成立的唯一标量。可通过二分搜索或者排序法在 $O(n \log n)$ 时间内求出。</p>
+<hr>
+<h3 id="例题104tv-l1去噪的对偶邻近梯度法">例题10.4（TV-L1去噪的对偶邻近梯度法）
+</h3><p><strong>题目</strong>：TV-L1图像去噪问题 $\min_x \frac{1}{2}|x - b|^2 + \tau |\nabla x|_1$，其中 $\nabla$ 是离散梯度算子。写出对偶问题和邻近梯度迭代。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>步骤1</strong>——识别II型结构：$f(x) = \frac{1}{2}|x - b|^2$（1-强凸），$g(z) = \tau |z|_1$。梯度算子 $\nabla$ 作为 $K$。</p>
+<p><strong>步骤2</strong>——共轭：</p>
+<ul>
+<li>$f^*(y) = \frac{1}{2}|y|^2 + b^T y$（平移不影响凸性参数）</li>
+<li>$g^*(y) = \delta_{{|\cdot|_\infty \leq \tau}}(y)$（$\ell_1$ 范数的共轭是指示函数）</li>
+</ul>
+<p><strong>步骤3</strong>——对偶问题（极小化形式）：
+</p>
+$$\boxed{\min_{\|y\|_\infty \leq \tau} \; \frac{1}{2}\|\nabla^T y\|^2 + b^T \nabla^T y}$$<p>其中 $y = (y_h, y_v)$ 是二维对偶变量（水平梯度、垂直梯度方向），$\nabla^T = -\operatorname{div}$ 是负散度算子。</p>
+<p><strong>步骤4</strong>——求解 $\nabla f^*$（即原空间步）：</p>
+<p>$\nabla f^*(w) = \arg\max_x { w^T x - \frac{1}{2}|x - b|^2 } = b + w$。因此若 $w = -K^T y_k = -\nabla^T y_k = \operatorname{div}(y_k)$，则：
+</p>
+$$x_{k+1} = b + \operatorname{div}(y_k)$$<p><strong>步骤5</strong>——邻近梯度迭代：
+</p>
+$$\boxed{y_{k+1} = P_{\{\|\cdot\|_\infty \leq \tau\}}\left( y_k + \alpha \nabla x_{k+1} \right)}$$<p>其中 $P_{{|\cdot|_\infty \leq \tau}}$ 是逐分量的clip到 $[-\tau, \tau]$ 区间。</p>
+<p>这就是著名的<strong>Chambolle投影算法</strong>，是对偶邻近梯度法在TV去噪中的经典特例。</p>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><ol>
+<li>
+<p><strong>对偶邻近梯度法的适用条件</strong>：原问题为II型复合 $\min_x f(x) + g(Kx)$，且 $f$ 是<strong>强凸函数</strong>（保证对偶光滑）。</p>
+</li>
+<li>
+<p><strong>Fenchel对偶的构造</strong>：利用 $g(Kx) = \sup_y { (Kx)^T y - g^<em>(y) }$，将对偶问题化为 $\min_y f^</em>(-K^T y) + g^*(y)$——一个光滑+非光滑的标准邻近梯度法目标。</p>
+</li>
+<li>
+<p><strong>核心迭代分解</strong>：先做原空间步 $x_{k+1} = \nabla f^<em>(-K^T y_k)$（一个最大化问题），再做对偶空间邻近步 $y_{k+1} = \operatorname{prox}_{\alpha g^</em>}(y_k + \alpha K x_{k+1})$。</p>
+</li>
+<li>
+<p><strong>强凸 → 光滑 的桥梁</strong>：$f$ 的 $\mu$-强凸性 $\Rightarrow$ $f^*$ 的 $\frac{1}{\mu}$-Lipschitz光滑性，这是对偶邻近梯度法可行的理论根基（Moreau包络效应）。</p>
+</li>
+<li>
+<p><strong>步长选择</strong>：$\alpha \in (0, 2\mu / |K|^2)$，其中 $\mu$ 为 $f$ 的强凸模量，$|K|$ 为 $K$ 的谱范数。</p>
+</li>
+<li>
+<p><strong>计算优势</strong>：当 $m \ll n$（对偶变量维度远小于原变量维度）或 $g^*$ 的邻近算子有解析式时，对偶邻近梯度法显著优于原始方法。</p>
+</li>
+<li>
+<p><strong>与后续章节的衔接</strong>：本章的对偶邻近梯度法是对偶空间视角的入门——后续Ch12乘子法（增广Lagrange对偶）、Ch13 DR分裂法（I型复合的邻近算子交替）、Ch14 ADMM（可分离约束的交替极小化）、Ch15 PDHG（原始-对偶统一框架）均建立在此基础之上。</p>
+</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>学习路线</strong>：掌握本章后，你已经打通了对偶视角的&quot;任督二脉&quot;——接下来Ch12乘子法将在对偶问题上添加二次惩罚加速收敛；Ch13-15将把对偶思想与分裂技巧结合，形成现代大规模优化的核心工具箱。</p>
+</blockquote>
+<hr>
+<h2 id="106-补充例题">10.6 补充例题
+</h2><h3 id="例题105矩阵补全的对偶邻近梯度法">例题10.5（矩阵补全的对偶邻近梯度法）
+</h3><p><strong>题目</strong>：矩阵补全问题 $\min_X \frac{1}{2}|P_\Omega(X - M)|<em>F^2 + \lambda|X|</em>*$，其中 $P_\Omega$ 仅保留观测位置。写出对偶问题和邻近梯度迭代。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>步骤1</strong>——II型复合识别：$f(X) = \frac{1}{2}|P_\Omega(X - M)|<em>F^2$（在观测位置上1-强凸），$g(Z) = \lambda|Z|</em>*$。线性算子 $K = I$（恒等映射）。</p>
+<p><strong>步骤2</strong>——共轭计算：</p>
+<ul>
+<li>$f^<em>(Y)$：由于 $f$ 仅在 $\Omega$ 上有曲率，$f^</em>(Y) = \frac{1}{2}|Y_\Omega + M_\Omega|<em>F^2 - \frac{1}{2}|M</em>\Omega|<em>F^2$（观测位置），其他位置 $+\infty$（相当于约束 $Y</em>{\Omega^c} = 0$）。</li>
+<li>$g^*(Y) = \delta_{{|\cdot|_2 \leq \lambda}}(Y)$，即 $Y$ 的谱范数（最大奇异值）$\leq \lambda$。</li>
+</ul>
+<p><strong>步骤3</strong>——对偶问题：
+</p>
+$$\boxed{\min_{Y: \|Y\|_2 \leq \lambda, \; P_{\Omega^c}(Y) = 0} \; f^*(Y)}$$<p><strong>步骤4</strong>——邻近梯度迭代：</p>
+<ul>
+<li>原空间步：$X_{k+1} = \nabla f^*(-Y_k)$ = 在 $\Omega$ 上为 $M_\Omega - (Y_k)_\Omega$，在 $\Omega^c$ 上为 0。</li>
+<li>邻近步：$Y_{k+1} = P_{{|\cdot|<em>2 \leq \lambda}}(Y_k + \alpha X</em>{k+1})$，即对 $Y_k + \alpha X_{k+1}$ 做SVD，将大于 $\lambda$ 的奇异值截断到 $\lambda$。</li>
+</ul>
+<p>每次迭代只需一次SVD（$O(n^3)$ 或对稀疏矩阵用随机算法），加上 $O(|\Omega|)$ 的数据拟合。</p>
+<hr>
+<h3 id="例题106对偶邻近梯度法的收敛性数值验证">例题10.6（对偶邻近梯度法的收敛性数值验证）
+</h3><p><strong>题目</strong>：在 $\min_x \frac{1}{2}|x|^2 + |Kx - b|_1$ 中，取 $K \in \mathbb{R}^{100 \times 500}$（随机矩阵），$b$ 随机生成，运行对偶邻近梯度法，分析收敛行为。</p>
+<p><strong>解答框架</strong>：</p>
+<p><strong>参数设置</strong>：$\mu = 1$（$f$ 的强凸常数），$|K| \approx 12.3$（随机矩阵的典型谱范数），$L_\phi = |K|^2 \approx 151$。取步长 $\alpha = 1/L_\phi = 0.0066$。</p>
+<p><strong>收敛曲线特征</strong>：</p>
+<ol>
+<li><strong>目标函数单调下降</strong>：对偶目标值 $h(y_k) = \frac{1}{2}|K^T y_k|^2 - b^T y_k + \delta_{{|\cdot|_\infty \leq 1}}(y_k)$ 单调递减。</li>
+<li><strong>梯度范数趋于0</strong>：$|\nabla \phi(y_k)| \to 0$（证明收敛到平稳点）。</li>
+<li><strong>理论速率 $O(1/k)$</strong>：$|y_k - y^<em>|^2 \leq \frac{L_\phi |y_0 - y^</em>|^2}{k}$。</li>
+</ol>
+<p><strong>与ISTA对比</strong>：在原空间 $\mathbb{R}^{500}$ 运行ISTA vs 在对偶空间 $\mathbb{R}^{100}$ 运行对偶邻近梯度法——后者的每步代价小得多（$100 \times 500$ 的矩阵乘 vs $500 \times 100$ 的矩阵乘，但子问题从 $500$ 维降到了 $100$ 维），且对偶问题的 $\ell_\infty$ 球投影是 $O(m)$ 的 trivial 操作。</p>
+<hr>
+<h3 id="例题107强凸性丢失时的补救更多光滑化技术">例题10.7（强凸性丢失时的补救——更多光滑化技术）
+</h3><p><strong>题目</strong>：若 $f$ 不满足强凸性，如何仍然利用对偶邻近梯度法？</p>
+<p><strong>解答</strong>：</p>
+<p>当 $f$ 非强凸时，$f^*$ 可能非光滑，对偶邻近梯度法失效。补救策略：</p>
+<p><strong>策略1——人工强凸化</strong>：在原问题上加一个小的 $\ell_2$ 正则项：
+</p>
+$$f_\epsilon(x) = f(x) + \frac{\epsilon}{2}\|x\|^2$$<p>
+$f_\epsilon$ 变为 $\epsilon$-强凸，对偶问题变为光滑（Lipschitz常数 $\approx 1/\epsilon$）。$\epsilon \to 0$ 时逼近原解。</p>
+<p><strong>策略2——光滑化逼近</strong>：用Nesterov光滑化技术构造原函数的可微逼近，然后再进入对偶空间。</p>
+<p><strong>策略3——换用PDHG</strong>（Ch15）：PDHG不要求 $f$ 强凸——它同时在原始和对偶空间做邻近梯度步，适用范围更广。当 $f$ 非强凸时，放弃对偶邻近梯度法，改用PDHG是更自然的选择。</p>
+<p><strong>策略4——使用乘子法/ADMM</strong>（Ch12/14）：通过增广Lagrange的二次惩罚项，人为构造强凸性。</p>
+<hr>
+<h2 id="107-算法对比总结">10.7 算法对比总结
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>方法</th>
+					<th>适用问题</th>
+					<th>光滑性要求</th>
+					<th>每次计算</th>
+					<th>收敛率</th>
+					<th>优势场景</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>ISTA (Ch7)</td>
+					<td>$\min f + g$</td>
+					<td>$f$ 光滑</td>
+					<td>$\nabla f$ + $\operatorname{prox}_g$</td>
+					<td>$O(1/k)$</td>
+					<td>$f$ 光滑、$\operatorname{prox}_g$ 便宜</td>
+			</tr>
+			<tr>
+					<td>对偶邻近梯度 (Ch10)</td>
+					<td>$\min f + g(Kx)$</td>
+					<td>$f$ 强凸</td>
+					<td>$\nabla f^<em>$ + $\operatorname{prox}_{g^</em>}$</td>
+					<td>$O(1/k)$</td>
+					<td>$m \ll n$ 或 $\operatorname{prox}_{g^*}$ 简单</td>
+			</tr>
+			<tr>
+					<td>对偶分解 (Ch11)</td>
+					<td>$\min \sum f_i(x_i)$ s.t.</td>
+					<td>无</td>
+					<td>并行子问题 + 次梯度</td>
+					<td>$O(1/\sqrt{k})$</td>
+					<td>大规模分布式</td>
+			</tr>
+			<tr>
+					<td>乘子法 (Ch12)</td>
+					<td>$\min f(x)$ s.t. $Ax=b$</td>
+					<td>无</td>
+					<td>联合极小化 + 乘子更新</td>
+					<td>线性</td>
+					<td>中小规模精确解</td>
+			</tr>
+			<tr>
+					<td>DR分裂 (Ch13)</td>
+					<td>$\min f + g$</td>
+					<td>无</td>
+					<td>$\operatorname{prox}_f$ + $\operatorname{prox}_g$</td>
+					<td>次线性</td>
+					<td>$\operatorname{prox}$ 都便宜</td>
+			</tr>
+			<tr>
+					<td>ADMM (Ch14)</td>
+					<td>可分离 + 约束</td>
+					<td>无</td>
+					<td>交替极小化</td>
+					<td>次线性</td>
+					<td>通用、可分解</td>
+			</tr>
+			<tr>
+					<td>PDHG (Ch15)</td>
+					<td>$\min f + g(Kx)$</td>
+					<td>无</td>
+					<td>原始+对偶邻近梯度</td>
+					<td>$O(1/k)$</td>
+					<td>最通用、统一框架</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<blockquote>
+<p><strong>终极学习要点</strong>：对偶邻近梯度法是专精于&quot;$f$ 强凸、$g^*$ 邻近简单&quot;场景的一把利器。当强凸性不满足时，后文Ch12-15提供了更普适但可能更复杂的替代方案。</p>
+</blockquote>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

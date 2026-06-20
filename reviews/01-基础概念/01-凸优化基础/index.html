@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第1章：凸优化基础 核心思想：凸性是优化问题&quot;好解&quot;的根本原因——在凸函数上，任何一个局部极小点自动是全局极小点。这意味着我们不需要担心&quot;走错路掉进坑里&quot;，只要沿着下降方向一路走到底，就能到达最优解。\n前置知识回顾 在深入学习本章之前，请确认你已掌握以下基础知识（每一项只需一句话即可唤起记忆）：\n知识领域 关键概念 一句话说明 线性代数 向量 $x \\in \\mathbb{R}^n$ $x$ 是一个含有 $n$ 个实数分量的列向量，可以想象成 $n$ 维空间中的一个点 线性代数 矩阵 $A \\in \\mathbb{R}^{m \\times n}$ $A$ 是一个拥有 $m$ 行、$n$ 列的数值阵列，代表从 $\\mathbb{R}^n$ 到 $\\mathbb{R}^m$ 的线性变换 线性代数 内积 $\\langle x, y \\rangle = x^T y = \\sum_{i=1}^n x_i y_i$ 两个向量的&quot;点乘&quot;，结果是一个标量，反映两者方向的相似程度 线性代数 正定矩阵 $A \\succ 0$ 对任意非零向量 $x \\neq 0$，都有 $x^T A x &gt; 0$，即所有特征值均严格大于零 线性代数 半正定矩阵 $A \\succeq 0$ 对任意 $x$，都有 $x^T A x \\geq 0$，即所有特征值均 ≥ 0 微积分 梯度 $\\nabla f(x)$ 函数 $f$ 在点 $x$ 处的&quot;最陡上升方向&quot;，是一个 $n$ 维列向量，由所有偏导数组成 微积分 Hessian 矩阵 $\\nabla^2 f(x)$ 梯度的梯度，一个 $n \\times n$ 的对称矩阵，记录函数在点 $x$ 处的&quot;弯曲程度&quot; 微积分 一阶 Taylor 展开 $f(y) \\approx f(x) + \\nabla f(x)^T (y-x)$，用切平面（线性函数）局部近似原函数 微积分 二阶 Taylor 展开 $f(y) \\approx f(x) + \\nabla f(x)^T (y-x) + \\frac{1}{2}(y-x)^T \\nabla^2 f(x)(y-x)$，用二次曲面局部近似 1.1 凸集 1.1.1 定义与直观理解 定义：设 $C$ 是 $\\mathbb{R}^n$（$n$ 维实数空间）中的一个集合。若对 $C$ 中任意两点 $x$ 和 $y$（都是 $n$ 维列向量），以及任意比例系数 $\\theta \\in [0, 1]$，它们的&quot;凸组合&quot;（加权平均）始终留在 $C$ 内部，则称 $C$ 为凸集。\n">
+<title>第1章：凸优化基础</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/01-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5/01-%E5%87%B8%E4%BC%98%E5%8C%96%E5%9F%BA%E7%A1%80/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第1章：凸优化基础">
+<meta property='og:description' content="第1章：凸优化基础 核心思想：凸性是优化问题&quot;好解&quot;的根本原因——在凸函数上，任何一个局部极小点自动是全局极小点。这意味着我们不需要担心&quot;走错路掉进坑里&quot;，只要沿着下降方向一路走到底，就能到达最优解。\n前置知识回顾 在深入学习本章之前，请确认你已掌握以下基础知识（每一项只需一句话即可唤起记忆）：\n知识领域 关键概念 一句话说明 线性代数 向量 $x \\in \\mathbb{R}^n$ $x$ 是一个含有 $n$ 个实数分量的列向量，可以想象成 $n$ 维空间中的一个点 线性代数 矩阵 $A \\in \\mathbb{R}^{m \\times n}$ $A$ 是一个拥有 $m$ 行、$n$ 列的数值阵列，代表从 $\\mathbb{R}^n$ 到 $\\mathbb{R}^m$ 的线性变换 线性代数 内积 $\\langle x, y \\rangle = x^T y = \\sum_{i=1}^n x_i y_i$ 两个向量的&quot;点乘&quot;，结果是一个标量，反映两者方向的相似程度 线性代数 正定矩阵 $A \\succ 0$ 对任意非零向量 $x \\neq 0$，都有 $x^T A x &gt; 0$，即所有特征值均严格大于零 线性代数 半正定矩阵 $A \\succeq 0$ 对任意 $x$，都有 $x^T A x \\geq 0$，即所有特征值均 ≥ 0 微积分 梯度 $\\nabla f(x)$ 函数 $f$ 在点 $x$ 处的&quot;最陡上升方向&quot;，是一个 $n$ 维列向量，由所有偏导数组成 微积分 Hessian 矩阵 $\\nabla^2 f(x)$ 梯度的梯度，一个 $n \\times n$ 的对称矩阵，记录函数在点 $x$ 处的&quot;弯曲程度&quot; 微积分 一阶 Taylor 展开 $f(y) \\approx f(x) + \\nabla f(x)^T (y-x)$，用切平面（线性函数）局部近似原函数 微积分 二阶 Taylor 展开 $f(y) \\approx f(x) + \\nabla f(x)^T (y-x) + \\frac{1}{2}(y-x)^T \\nabla^2 f(x)(y-x)$，用二次曲面局部近似 1.1 凸集 1.1.1 定义与直观理解 定义：设 $C$ 是 $\\mathbb{R}^n$（$n$ 维实数空间）中的一个集合。若对 $C$ 中任意两点 $x$ 和 $y$（都是 $n$ 维列向量），以及任意比例系数 $\\theta \\in [0, 1]$，它们的&quot;凸组合&quot;（加权平均）始终留在 $C$ 内部，则称 $C$ 为凸集。\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/01-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5/01-%E5%87%B8%E4%BC%98%E5%8C%96%E5%9F%BA%E7%A1%80/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第1章：凸优化基础">
+<meta name="twitter:description" content="第1章：凸优化基础 核心思想：凸性是优化问题&quot;好解&quot;的根本原因——在凸函数上，任何一个局部极小点自动是全局极小点。这意味着我们不需要担心&quot;走错路掉进坑里&quot;，只要沿着下降方向一路走到底，就能到达最优解。\n前置知识回顾 在深入学习本章之前，请确认你已掌握以下基础知识（每一项只需一句话即可唤起记忆）：\n知识领域 关键概念 一句话说明 线性代数 向量 $x \\in \\mathbb{R}^n$ $x$ 是一个含有 $n$ 个实数分量的列向量，可以想象成 $n$ 维空间中的一个点 线性代数 矩阵 $A \\in \\mathbb{R}^{m \\times n}$ $A$ 是一个拥有 $m$ 行、$n$ 列的数值阵列，代表从 $\\mathbb{R}^n$ 到 $\\mathbb{R}^m$ 的线性变换 线性代数 内积 $\\langle x, y \\rangle = x^T y = \\sum_{i=1}^n x_i y_i$ 两个向量的&quot;点乘&quot;，结果是一个标量，反映两者方向的相似程度 线性代数 正定矩阵 $A \\succ 0$ 对任意非零向量 $x \\neq 0$，都有 $x^T A x &gt; 0$，即所有特征值均严格大于零 线性代数 半正定矩阵 $A \\succeq 0$ 对任意 $x$，都有 $x^T A x \\geq 0$，即所有特征值均 ≥ 0 微积分 梯度 $\\nabla f(x)$ 函数 $f$ 在点 $x$ 处的&quot;最陡上升方向&quot;，是一个 $n$ 维列向量，由所有偏导数组成 微积分 Hessian 矩阵 $\\nabla^2 f(x)$ 梯度的梯度，一个 $n \\times n$ 的对称矩阵，记录函数在点 $x$ 处的&quot;弯曲程度&quot; 微积分 一阶 Taylor 展开 $f(y) \\approx f(x) + \\nabla f(x)^T (y-x)$，用切平面（线性函数）局部近似原函数 微积分 二阶 Taylor 展开 $f(y) \\approx f(x) + \\nabla f(x)^T (y-x) + \\frac{1}{2}(y-x)^T \\nabla^2 f(x)(y-x)$，用二次曲面局部近似 1.1 凸集 1.1.1 定义与直观理解 定义：设 $C$ 是 $\\mathbb{R}^n$（$n$ 维实数空间）中的一个集合。若对 $C$ 中任意两点 $x$ 和 $y$（都是 $n$ 维列向量），以及任意比例系数 $\\theta \\in [0, 1]$，它们的&quot;凸组合&quot;（加权平均）始终留在 $C$ 内部，则称 $C$ 为凸集。\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾">前置知识回顾</a></li>
+    <li><a href="#11-凸集">1.1 凸集</a>
+      <ol>
+        <li><a href="#111-定义与直观理解">1.1.1 定义与直观理解</a></li>
+        <li><a href="#112-常见凸集清单">1.1.2 常见凸集清单</a></li>
+        <li><a href="#113-非凸集的典型反例">1.1.3 非凸集的典型反例</a></li>
+        <li><a href="#114-保凸运算">1.1.4 保凸运算</a></li>
+      </ol>
+    </li>
+    <li><a href="#12-凸函数">1.2 凸函数</a>
+      <ol>
+        <li><a href="#121-定义jensen-不等式">1.2.1 定义（Jensen 不等式）</a></li>
+        <li><a href="#122-一阶条件">1.2.2 一阶条件</a></li>
+        <li><a href="#123-二阶条件">1.2.3 二阶条件</a></li>
+        <li><a href="#124-为什么凸函数的驻点就是全局极小点">1.2.4 为什么凸函数的驻点就是全局极小点？</a></li>
+        <li><a href="#125-典型凸函数清单">1.2.5 典型凸函数清单</a></li>
+        <li><a href="#126-凸性判定流程图">1.2.6 凸性判定流程图</a></li>
+        <li><a href="#127-保凸运算">1.2.7 保凸运算</a></li>
+      </ol>
+    </li>
+    <li><a href="#13-凸优化问题">1.3 凸优化问题</a>
+      <ol>
+        <li><a href="#131-标准形式">1.3.1 标准形式</a></li>
+        <li><a href="#132-核心性质局部最优即全局最优">1.3.2 核心性质：局部最优即全局最优</a></li>
+        <li><a href="#133-dcp-规则简介">1.3.3 DCP 规则简介</a></li>
+      </ol>
+    </li>
+    <li><a href="#14-存在性定理">1.4 存在性定理</a>
+      <ol>
+        <li><a href="#141-weierstrass-定理">1.4.1 Weierstrass 定理</a></li>
+        <li><a href="#142-强制性coercivity">1.4.2 强制性（Coercivity）</a></li>
+      </ol>
+    </li>
+    <li><a href="#15-典型例题精讲">1.5 典型例题精讲</a>
+      <ol>
+        <li><a href="#例题-1二次函数的凸性判定定义法">例题 1：二次函数的凸性判定（定义法）</a></li>
+        <li><a href="#例题-2指数函数的凸性证明一阶条件法">例题 2：指数函数的凸性证明（一阶条件法）</a></li>
+        <li><a href="#例题-3hessian-判定法--logistic-损失函数">例题 3：Hessian 判定法 —— Logistic 损失函数</a></li>
+        <li><a href="#例题-4强制性验证--二次函数">例题 4：强制性验证 —— 二次函数</a></li>
+        <li><a href="#例题-5梯度与-hessian-计算--凸性综合判定">例题 5：梯度与 Hessian 计算 + 凸性综合判定</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a>
+      <ol>
+        <li><a href="#11-凸集-1">1.1 凸集</a></li>
+        <li><a href="#12-凸函数-1">1.2 凸函数</a></li>
+        <li><a href="#13-凸优化问题-1">1.3 凸优化问题</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/01-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5/01-%E5%87%B8%E4%BC%98%E5%8C%96%E5%9F%BA%E7%A1%80/">第1章：凸优化基础</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 16 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第1章凸优化基础">第1章：凸优化基础
+</h1><blockquote>
+<p><strong>核心思想</strong>：凸性是优化问题&quot;好解&quot;的根本原因——在凸函数上，任何一个局部极小点自动是全局极小点。这意味着我们不需要担心&quot;走错路掉进坑里&quot;，只要沿着下降方向一路走到底，就能到达最优解。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾">前置知识回顾
+</h2><p>在深入学习本章之前，请确认你已掌握以下基础知识（每一项只需一句话即可唤起记忆）：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>知识领域</th>
+					<th>关键概念</th>
+					<th>一句话说明</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>线性代数</td>
+					<td>向量 $x \in \mathbb{R}^n$</td>
+					<td>$x$ 是一个含有 $n$ 个实数分量的列向量，可以想象成 $n$ 维空间中的一个点</td>
+			</tr>
+			<tr>
+					<td>线性代数</td>
+					<td>矩阵 $A \in \mathbb{R}^{m \times n}$</td>
+					<td>$A$ 是一个拥有 $m$ 行、$n$ 列的数值阵列，代表从 $\mathbb{R}^n$ 到 $\mathbb{R}^m$ 的线性变换</td>
+			</tr>
+			<tr>
+					<td>线性代数</td>
+					<td>内积 $\langle x, y \rangle = x^T y = \sum_{i=1}^n x_i y_i$</td>
+					<td>两个向量的&quot;点乘&quot;，结果是一个标量，反映两者方向的相似程度</td>
+			</tr>
+			<tr>
+					<td>线性代数</td>
+					<td>正定矩阵 $A \succ 0$</td>
+					<td>对任意非零向量 $x \neq 0$，都有 $x^T A x &gt; 0$，即所有特征值均严格大于零</td>
+			</tr>
+			<tr>
+					<td>线性代数</td>
+					<td>半正定矩阵 $A \succeq 0$</td>
+					<td>对任意 $x$，都有 $x^T A x \geq 0$，即所有特征值均 ≥ 0</td>
+			</tr>
+			<tr>
+					<td>微积分</td>
+					<td>梯度 $\nabla f(x)$</td>
+					<td>函数 $f$ 在点 $x$ 处的&quot;最陡上升方向&quot;，是一个 $n$ 维列向量，由所有偏导数组成</td>
+			</tr>
+			<tr>
+					<td>微积分</td>
+					<td>Hessian 矩阵 $\nabla^2 f(x)$</td>
+					<td>梯度的梯度，一个 $n \times n$ 的对称矩阵，记录函数在点 $x$ 处的&quot;弯曲程度&quot;</td>
+			</tr>
+			<tr>
+					<td>微积分</td>
+					<td>一阶 Taylor 展开</td>
+					<td>$f(y) \approx f(x) + \nabla f(x)^T (y-x)$，用切平面（线性函数）局部近似原函数</td>
+			</tr>
+			<tr>
+					<td>微积分</td>
+					<td>二阶 Taylor 展开</td>
+					<td>$f(y) \approx f(x) + \nabla f(x)^T (y-x) + \frac{1}{2}(y-x)^T \nabla^2 f(x)(y-x)$，用二次曲面局部近似</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="11-凸集">1.1 凸集
+</h2><h3 id="111-定义与直观理解">1.1.1 定义与直观理解
+</h3><p><strong>定义</strong>：设 $C$ 是 $\mathbb{R}^n$（$n$ 维实数空间）中的一个集合。若对 $C$ 中任意两点 $x$ 和 $y$（都是 $n$ 维列向量），以及任意比例系数 $\theta \in [0, 1]$，它们的&quot;凸组合&quot;（加权平均）始终留在 $C$ 内部，则称 $C$ 为<strong>凸集</strong>。</p>
+$$\boxed{\theta x + (1-\theta)y \in C, \quad \forall x, y \in C, \; \forall \theta \in [0, 1]}$$<p><strong>逐字解释</strong>：</p>
+<ul>
+<li>$\theta x + (1-\theta)y$：将 $x$ 和 $y$ 按比例 $\theta$ 和 $(1-\theta)$ 混合，得到线段上的一个点。当 $\theta = 0$ 时该点就是 $y$，当 $\theta = 1$ 时该点就是 $x$，当 $\theta = 0.5$ 时就是两点正中间。</li>
+<li>要求这段线段上<strong>每一个点</strong>都在 $C$ 中，不能有一个&quot;跑出去&quot;。</li>
+</ul>
+<p><strong>直观类比</strong>：想象一个实心圆盘——在盘内任意选两点，连接它们的线段完全在盘内。而月牙形（弯月）不是凸集，因为从一端到另一端的线段会穿过缺口（月牙的凹陷部分）。</p>
+<h3 id="112-常见凸集清单">1.1.2 常见凸集清单
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>集合名称</th>
+					<th>数学表达式</th>
+					<th>为什么是凸集</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>全空间</td>
+					<td>$\mathbb{R}^n$</td>
+					<td>任意两个 $n$ 维向量的凸组合仍然是 $n$ 维向量，当然属于 $\mathbb{R}^n$</td>
+			</tr>
+			<tr>
+					<td>半空间</td>
+					<td>${x \in \mathbb{R}^n \mid a^T x \leq b}$</td>
+					<td>线性不等式定义：若 $a^T x \leq b$ 且 $a^T y \leq b$，则 $a^T(\theta x + (1-\theta)y) = \theta a^T x + (1-\theta)a^T y \leq \theta b + (1-\theta)b = b$</td>
+			</tr>
+			<tr>
+					<td>超平面</td>
+					<td>${x \in \mathbb{R}^n \mid a^T x = b}$</td>
+					<td>同上，将 $\leq$ 换成 $=$ 即可：$a^T(\theta x + (1-\theta)y) = \theta b + (1-\theta)b = b$</td>
+			</tr>
+			<tr>
+					<td>多面体</td>
+					<td>${x \mid Ax \leq b, ; Cx = d}$</td>
+					<td>有限个半空间和超平面的交集，而凸集的交集仍然是凸集</td>
+			</tr>
+			<tr>
+					<td>椭球</td>
+					<td>${x \mid (x-x_c)^T P^{-1}(x-x_c) \leq 1}$，$P \succ 0$</td>
+					<td>由二次不等式定义，本质是一个被&quot;压扁&quot;的球。验证：对满足条件的 $x, y$，权重组合也满足（由 $P^{-1}$ 的正定性保证）</td>
+			</tr>
+			<tr>
+					<td>范数球</td>
+					<td>${x \mid |x - x_c| \leq r}$</td>
+					<td>对任意 $x, y$ 满足 $|x-x_c| \leq r$ 和 $|y-x_c| \leq r$，由三角不等式 $|\theta x + (1-\theta)y - x_c| \leq \theta|x-x_c| + (1-\theta)|y-x_c| \leq r$</td>
+			</tr>
+			<tr>
+					<td>半正定锥</td>
+					<td>$\mathbb{S}^n_+ = {X \in \mathbb{S}^n \mid X \succeq 0}$</td>
+					<td>$\mathbb{S}^n$ 是所有 $n \times n$ 对称矩阵的集合。若 $X \succeq 0$ 且 $Y \succeq 0$（即两者均为半正定矩阵），则对任意 $\theta \in [0, 1]$，$\theta X + (1-\theta)Y$ 也是半正定矩阵</td>
+			</tr>
+			<tr>
+					<td>概率单纯形</td>
+					<td>${x \in \mathbb{R}^n \mid x_i \geq 0, ; \sum_{i=1}^n x_i = 1}$</td>
+					<td>非负象限（凸集）与超平面 ${x \mid \sum x_i = 1}$（凸集）的交集，凸集的交仍凸</td>
+			</tr>
+	</tbody>
+</table></div>
+<h3 id="113-非凸集的典型反例">1.1.3 非凸集的典型反例
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>反例集合</th>
+					<th>表达式</th>
+					<th>为什么不凸</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>单位球面</td>
+					<td>${x \mid |x| = 1}$</td>
+					<td>取 $x$ 和 $-x$（模长均为 1），中点 $0.5x + 0.5(-x) = 0$，模长为 $0 \neq 1$，不在球面上</td>
+			</tr>
+			<tr>
+					<td>整数集</td>
+					<td>$\mathbb{Z}^n$</td>
+					<td>取 $0$ 和 $1$，中点 $0.5$ 不是整数</td>
+			</tr>
+			<tr>
+					<td>非凸多边形</td>
+					<td>如月牙形</td>
+					<td>存在两点其连线段穿过凹陷区域</td>
+			</tr>
+			<tr>
+					<td>开口圆盘</td>
+					<td>${x \mid |x| &lt; 1}$</td>
+					<td>虽然是凸集！（开圆盘内任意两点连线都在盘内）——说明&quot;开&quot;与凸无关</td>
+			</tr>
+	</tbody>
+</table></div>
+<blockquote>
+<p><strong>记忆要点</strong>：凸 ≠ 闭。开圆盘是凸集但不是闭集。闭集要求包含所有极限点，凸集只要求包含线段。</p>
+</blockquote>
+<h3 id="114-保凸运算">1.1.4 保凸运算
+</h3><p>已知若干凸集，通过以下运算可以构造出新的凸集：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>运算</th>
+					<th>说明</th>
+					<th>为什么保凸</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>任意多个凸集的交</strong></td>
+					<td>$C = \bigcap_{i \in I} C_i$</td>
+					<td>若 $x, y$ 属于所有 $C_i$，则它们的凸组合也属于每个 $C_i$，因此属于交集 $C$</td>
+			</tr>
+			<tr>
+					<td><strong>仿射变换</strong></td>
+					<td>$f(C) = {Ax + b \mid x \in C}$，$A \in \mathbb{R}^{m \times n}, b \in \mathbb{R}^m$</td>
+					<td>取任意 $u, v \in f(C)$，存在 $x, y \in C$ 使 $u=Ax+b, v=Ay+b$，则 $\theta u + (1-\theta)v = A(\theta x + (1-\theta)y) + b \in f(C)$</td>
+			</tr>
+			<tr>
+					<td><strong>Minkowski 和</strong></td>
+					<td>$C_1 + C_2 = {x+y \mid x \in C_1, y \in C_2}$</td>
+					<td>取 $u_1+u_2$ 和 $v_1+v_2$，凸组合为 $\theta(u_1+u_2)+(1-\theta)(v_1+v_2) = [\theta u_1+(1-\theta)v_1] + [\theta u_2+(1-\theta)v_2] \in C_1 + C_2$</td>
+			</tr>
+			<tr>
+					<td><strong>直积（Cartesian 积）</strong></td>
+					<td>$C_1 \times C_2 = {(x, y) \mid x \in C_1, y \in C_2}$</td>
+					<td>各分量独立取凸组合，每个分量留在各自的凸集中</td>
+			</tr>
+	</tbody>
+</table></div>
+<blockquote>
+<p><strong>注意</strong>：凸集的并一般不保凸。例如 $C_1 = {0}$ 和 $C_2 = {1}$ 都是一维凸集，但它们的并 ${0, 1}$ 不是凸集（中点 $0.5$ 不在其中）。</p>
+</blockquote>
+<hr>
+<h2 id="12-凸函数">1.2 凸函数
+</h2><h3 id="121-定义jensen-不等式">1.2.1 定义（Jensen 不等式）
+</h3><p><strong>定义</strong>：设 $f: \mathbb{R}^n \to \mathbb{R} \cup {+\infty}$（即 $f$ 以 $n$ 维实向量为输入，输出一个实数或 $+\infty$）。函数 $f$ 称为<strong>凸函数</strong>，若其定义域 $\text{dom} f = {x \mid f(x) &lt; +\infty}$ 是凸集，且对任意 $x, y \in \text{dom} f$ 和 $\theta \in [0, 1]$：</p>
+$$\boxed{f(\theta x + (1-\theta)y) \leq \theta f(x) + (1-\theta)f(y)}$$<p><strong>逐字解释</strong>：</p>
+<ul>
+<li>左边 $f(\theta x + (1-\theta)y)$：先取 $x$ 和 $y$ 的加权平均点，再在该点处计算函数值。</li>
+<li>右边 $\theta f(x) + (1-\theta)f(y)$：先在 $x$ 和 $y$ 处分别计算函数值，再对函数值取加权平均。</li>
+<li>不等式说的是：函数曲线上任意两点间的&quot;割线&quot;（即连接 $(x, f(x))$ 和 $(y, f(y))$ 的直线段）始终位于函数图像的上方——这正是&quot;碗形&quot;（开口向上，$\cup$）的数学刻画。</li>
+</ul>
+<p><strong>重要提醒</strong>：中文日常语义中，&ldquo;凸&quot;通常指向外鼓出（如凸透镜，$\cap$ 形），但数学中凸函数是 $\cup$ 形（开口向上）。这是最常见的入门混淆。</p>
+<h3 id="122-一阶条件">1.2.2 一阶条件
+</h3><p><strong>定理</strong>：设 $f$ 为可微函数（即梯度 $\nabla f(x)$ 在定义域内处处存在）。$f$ 为凸函数当且仅当：</p>
+$$\boxed{f(y) \geq f(x) + \nabla f(x)^T (y-x), \quad \forall x, y \in \text{dom} f}$$<p><strong>逐字解释</strong>：对任意点 $x$，以 $x$ 为基点的&quot;一阶 Taylor 近似&rdquo; $f(x) + \nabla f(x)^T (y-x)$（即 $x$ 处的切平面）始终位于原函数 $f(y)$ 的下方，对所有 $y$ 成立。&ldquo;切线永远托住函数图形&rdquo;。</p>
+<p><strong>必要性证明（凸 $\Rightarrow$ 一阶条件）</strong>——每一步都详细拆解：</p>
+<p><strong>Step 1</strong>：从凸函数定义出发。对任意 $x, y$ 和 $\theta \in (0, 1]$：
+</p>
+$$f(x + \theta(y-x)) = f(\theta y + (1-\theta)x) \leq \theta f(y) + (1-\theta)f(x)$$<blockquote>
+<p>这里将 $\theta x + (1-\theta)y$ 换了一种写法：$\theta y + (1-\theta)x = x + \theta(y-x)$，两者等价，因为 $\theta y + (1-\theta)x = \theta y + x - \theta x = x + \theta(y-x)$。</p>
+</blockquote>
+<p><strong>Step 2</strong>：移项，将 $f(x)$ 移到左边：
+</p>
+$$f(x + \theta(y-x)) - f(x) \leq \theta [f(y) - f(x)]$$<p><strong>Step 3</strong>：两边同除以 $\theta &gt; 0$（正数除不等式方向不变）：
+</p>
+$$\frac{f(x + \theta(y-x)) - f(x)}{\theta} \leq f(y) - f(x)$$<p><strong>Step 4</strong>：令 $\theta \to 0^+$（从正侧趋近于 0）。左边是一个极限形式——这正是方向导数的定义：
+</p>
+$$\lim_{\theta \to 0^+} \frac{f(x + \theta(y-x)) - f(x)}{\theta} = \nabla f(x)^T (y-x)$$<blockquote>
+<p>这里用到了微积分中的方向导数公式：$\lim_{t \to 0^+} \frac{f(x+td)-f(x)}{t} = \nabla f(x)^T d$，其中取 $d = y-x$。</p>
+</blockquote>
+<p><strong>Step 5</strong>：取极限后不等式保持（极限保号性）：
+</p>
+$$\nabla f(x)^T (y-x) \leq f(y) - f(x)$$<p><strong>Step 6</strong>：移项得 $f(y) \geq f(x) + \nabla f(x)^T (y-x)$，证毕。</p>
+<p><strong>充分性证明（一阶条件 $\Rightarrow$ 凸）</strong>——需要证明定义式成立：</p>
+<p><strong>Step 1</strong>：对任意 $x, y$，令 $z = \theta x + (1-\theta)y$（连接 $x$ 和 $y$ 的线段上的一点，加权系数 $\theta$）。</p>
+<p><strong>Step 2</strong>：对点对 $(z, x)$ 应用一阶条件：
+</p>
+$$f(x) \geq f(z) + \nabla f(z)^T (x - z) \quad \cdots \quad (1)$$<p>对点对 $(z, y)$ 应用一阶条件：
+</p>
+$$f(y) \geq f(z) + \nabla f(z)^T (y - z) \quad \cdots \quad (2)$$<p><strong>Step 3</strong>：对 $(1)$ 乘 $\theta$，对 $(2)$ 乘 $(1-\theta)$，然后相加：
+</p>
+$$\theta f(x) + (1-\theta)f(y) \geq \theta[f(z) + \nabla f(z)^T (x-z)] + (1-\theta)[f(z) + \nabla f(z)^T (y-z)]$$<p><strong>Step 4</strong>：整理右边。先合并 $f(z)$ 的系数：$\theta f(z) + (1-\theta)f(z) = f(z)$。</p>
+<p>再合并梯度项：
+</p>
+$$\theta \nabla f(z)^T (x-z) + (1-\theta) \nabla f(z)^T (y-z) = \nabla f(z)^T [\theta(x-z) + (1-\theta)(y-z)]$$<p><strong>Step 5</strong>：计算括号内：
+</p>
+$$\theta(x-z) + (1-\theta)(y-z) = \theta x - \theta z + (1-\theta)y - (1-\theta)z$$<p>
+</p>
+$$= [\theta x + (1-\theta)y] - [\theta + (1-\theta)]z = z - z = 0$$<p><strong>Step 6</strong>：因此梯度项消失，得到：
+</p>
+$$\theta f(x) + (1-\theta)f(y) \geq f(z) = f(\theta x + (1-\theta)y)$$<p>这正是凸函数的定义式！证毕。</p>
+<blockquote>
+<p><strong>几何直觉</strong>：一阶条件是最重要的凸函数判定工具。&ldquo;切线托函数&rdquo;——对于一元函数 $f(x) = e^x$，在任意点 $x_0$ 画切线，指数曲线永远在切线上方。这就是一阶条件的直观含义。</p>
+</blockquote>
+<h3 id="123-二阶条件">1.2.3 二阶条件
+</h3><p><strong>定理</strong>：设 $f$ 为二次可微函数（即 Hessian 矩阵 $\nabla^2 f(x)$ 处处存在）。$f$ 为凸函数当且仅当 Hessian 矩阵在定义域上处处半正定：</p>
+$$\boxed{\nabla^2 f(x) \succeq 0, \quad \forall x \in \text{dom} f}$$<blockquote>
+<p><strong>回忆</strong>：$\nabla^2 f(x) \succeq 0$ 表示对任意方向向量 $d \in \mathbb{R}^n$（$n$ 维列向量），有 $d^T \nabla^2 f(x) d \geq 0$。通俗地说，沿任何方向看，&ldquo;弯曲&quot;都是向上的（不向下凹）。</p>
+</blockquote>
+<p><strong>必要性推导（凸 $\Rightarrow$ Hessian 半正定）</strong>：</p>
+<p><strong>Step 1</strong>：对任意 $x$ 和任意方向 $d$，由一阶条件（Step 6 已证一阶条件等价于凸性）：
+</p>
+$$f(x + td) \geq f(x) + \nabla f(x)^T (td) = f(x) + t \nabla f(x)^T d$$<p><strong>Step 2</strong>：左边用二阶 Taylor 展开（带 Peano 余项——即 $o(t^2)$ 表示比 $t^2$ 更快趋近于零的项）：
+</p>
+$$f(x + td) = f(x) + t \nabla f(x)^T d + \frac{t^2}{2} d^T \nabla^2 f(x) d + o(t^2)$$<p><strong>Step 3</strong>：将 Step 2 代入 Step 1 的不等式左边，消去公共项 $f(x) + t \nabla f(x)^T d$：
+</p>
+$$\frac{t^2}{2} d^T \nabla^2 f(x) d + o(t^2) \geq 0$$<p><strong>Step 4</strong>：两边同除以 $\frac{t^2}{2} &gt; 0$：
+</p>
+$$d^T \nabla^2 f(x) d + \frac{o(t^2)}{t^2/2} \geq 0$$<p><strong>Step 5</strong>：令 $t \to 0$，此时 $\frac{o(t^2)}{t^2} \to 0$（这就是小o的定义），得到：
+</p>
+$$d^T \nabla^2 f(x) d \geq 0, \quad \forall d \in \mathbb{R}^n$$<p><strong>Step 6</strong>：由 $d$ 的任意性，这正是 $\nabla^2 f(x) \succeq 0$ 的定义，证毕。</p>
+<p><strong>充分性推导（Hessian 半正定 $\Rightarrow$ 凸）</strong>：</p>
+<p><strong>Step 1</strong>：由带 Lagrange 余项的 Taylor 展开（存在 $\xi$ 在线段 $[x, y]$ 上，即 $\xi = x + t(y-x)$ 对某 $t \in (0, 1)$）：
+</p>
+$$f(y) = f(x) + \nabla f(x)^T (y-x) + \frac{1}{2}(y-x)^T \nabla^2 f(\xi)(y-x)$$<blockquote>
+<p>带 Lagrange 余项的 Taylor 展开：$f(y) = f(x) + \nabla f(x)^T (y-x) + \frac{1}{2}(y-x)^T \nabla^2 f(\xi)(y-x)$，其中 $\xi$ 位于 $x$ 和 $y$ 之间。这一公式要求 $f$ 二阶可微且定义域为凸集。</p>
+</blockquote>
+<p><strong>Step 2</strong>：因为 $\nabla^2 f(\xi) \succeq 0$，二次项非负：
+</p>
+$$\frac{1}{2}(y-x)^T \nabla^2 f(\xi)(y-x) \geq 0$$<p><strong>Step 3</strong>：代入 Step 1，得 $f(y) \geq f(x) + \nabla f(x)^T (y-x)$，即一阶条件成立。由 1.2.2 节的充分性证明，一阶条件 $\Rightarrow$ 凸性，证毕。</p>
+<h3 id="124-为什么凸函数的驻点就是全局极小点">1.2.4 为什么凸函数的驻点就是全局极小点？
+</h3><p><strong>结论</strong>：若 $f$ 是可微凸函数，且 $\nabla f(x^<em>) = 0$（即 $x^</em>$ 是驻点），则 $x^*$ 必为 $f$ 的全局极小点。</p>
+<p><strong>推导</strong>——只用一行不等式即可证明：</p>
+<p>由凸函数的一阶条件（对任意 $y$）：
+</p>
+$$f(y) \geq f(x^*) + \nabla f(x^*)^T (y - x^*)$$<p>将 $\nabla f(x^*) = 0$ 代入：
+</p>
+$$f(y) \geq f(x^*) + 0^T (y - x^*) = f(x^*), \quad \forall y$$<p>这直接说明对任意 $y$，$f(y) \geq f(x^<em>)$，即 $x^</em>$ 是全局极小点。</p>
+<blockquote>
+<p><strong>为什么这很重要？</strong> 对于一般非凸函数，$\nabla f(x^<em>) = 0$ 只能保证 $x^</em>$ 是<strong>驻点</strong>——可能是极小、极大或鞍点。但对凸函数，驻点自动就是全局极小！这大大简化了优化算法：我们只需要找到梯度为零的点就行了。</p>
+</blockquote>
+<h3 id="125-典型凸函数清单">1.2.5 典型凸函数清单
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>函数</th>
+					<th>表达式</th>
+					<th>凸性条件</th>
+					<th>判定方法</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>二次函数</td>
+					<td>$f(x) = \frac{1}{2}x^T Q x + b^T x + c$</td>
+					<td>$Q \succeq 0$（$Q$ 为对称半正定矩阵）</td>
+					<td>Hessian：$\nabla^2 f = Q \succeq 0$</td>
+			</tr>
+			<tr>
+					<td>指数函数</td>
+					<td>$f(x) = e^{ax}$（$a \in \mathbb{R}$）</td>
+					<td>恒凸</td>
+					<td>二阶导数 $a^2 e^{ax} \geq 0$</td>
+			</tr>
+			<tr>
+					<td>负对数</td>
+					<td>$f(x) = -\ln x$（$x &gt; 0$）</td>
+					<td>恒凸</td>
+					<td>二阶导数 $1/x^2 &gt; 0$</td>
+			</tr>
+			<tr>
+					<td>范数</td>
+					<td>$f(x) = |x|$（任意范数）</td>
+					<td>恒凸（但非光滑）</td>
+					<td>三角不等式直接验证定义</td>
+			</tr>
+			<tr>
+					<td>Logistic损失</td>
+					<td>$f(x) = \ln(1 + e^x)$</td>
+					<td>恒凸</td>
+					<td>二阶导数 $\frac{e^x}{(1+e^x)^2} &gt; 0$</td>
+			</tr>
+			<tr>
+					<td>对数-求和-指数</td>
+					<td>$f(x) = \ln\left(\sum_{i=1}^n e^{x_i}\right)$</td>
+					<td>恒凸</td>
+					<td>Hessian半正定（可验证）</td>
+			</tr>
+			<tr>
+					<td>$\ell_p$ 范数</td>
+					<td>$f(x) = |x|_p = (\sum_i</td>
+					<td>x_i</td>
+					<td>^p)^{1/p}$</td>
+			</tr>
+			<tr>
+					<td>max函数</td>
+					<td>$f(x) = \max{x_1, x_2, \ldots, x_n}$</td>
+					<td>恒凸</td>
+					<td>仿射函数的逐点最大，保凸运算</td>
+			</tr>
+			<tr>
+					<td>带约束的指示函数</td>
+					<td>$\delta_C(x) = \begin{cases} 0 &amp; x \in C \ +\infty &amp; x \notin C \end{cases}$</td>
+					<td>$C$ 为凸集时凸</td>
+					<td>验证定义：对 $x, y \in C$，组合 $\theta x+(1-\theta)y \in C$，故指示为 $0 = \theta \cdot 0 + (1-\theta) \cdot 0$</td>
+			</tr>
+	</tbody>
+</table></div>
+<blockquote>
+<p><strong>典型反例（非凸函数）</strong>：</p>
+<ul>
+<li>$f(x) = x^3$：二阶导数 $6x$ 在 $x &lt; 0$ 时为负，不是凸函数</li>
+<li>$f(x) = \sin x$：二阶导数 $-\sin x$ 振荡变号，不是凸函数</li>
+<li>$f(x) = -x^2$：二阶导数恒负（$-2 &lt; 0$），这是<strong>凹函数</strong></li>
+<li>$f(x) = -e^x$：二阶导数 $-e^x &lt; 0$，光滑但凹</li>
+</ul>
+</blockquote>
+<h3 id="126-凸性判定流程图">1.2.6 凸性判定流程图
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">              输入函数 f
+</span></span><span class="line"><span class="cl">                  │
+</span></span><span class="line"><span class="cl">      ┌───────────┼───────────┐
+</span></span><span class="line"><span class="cl">      │           │           │
+</span></span><span class="line"><span class="cl">   二次可微    一次可微     不可微
+</span></span><span class="line"><span class="cl">      │           │           │
+</span></span><span class="line"><span class="cl">      ▼           ▼           ▼
+</span></span><span class="line"><span class="cl">  计算 ∇²f    计算 ∇f     回到定义
+</span></span><span class="line"><span class="cl">      │           │           │
+</span></span><span class="line"><span class="cl">      ▼           ▼           ▼
+</span></span><span class="line"><span class="cl"> ∇²f(x)⪰0?   一阶条件?   Jensen不等式
+</span></span><span class="line"><span class="cl">  ∀x∈dom f   ∀x,y成立?   直接验证
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>补充说明</strong>：二阶条件最简单实用（只需算 Hessian 并判断半正定性），一阶条件在理论上最常用，定义法适用于不可微的凸函数（如范数）。</p>
+<h3 id="127-保凸运算">1.2.7 保凸运算
+</h3><p>已知凸函数可通过以下运算组合产生新的凸函数：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>运算名称</th>
+					<th>公式</th>
+					<th>为什么保凸</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>非负加权和</strong></td>
+					<td>$f = \sum_{i} w_i f_i$，$w_i \geq 0$</td>
+					<td>展开定义：$f(\theta x+(1-\theta)y) = \sum w_i f_i(\cdots) \leq \sum w_i[\theta f_i(x)+(1-\theta)f_i(y)] = \theta f(x)+(1-\theta)f(y)$</td>
+			</tr>
+			<tr>
+					<td><strong>仿射复合</strong></td>
+					<td>$h(x) = f(Ax + b)$</td>
+					<td>变量替换：$h(\theta x+(1-\theta)y) = f(A(\theta x+(1-\theta)y)+b) = f(\theta(Ax+b)+(1-\theta)(Ay+b)) \leq \theta f(Ax+b)+(1-\theta)f(Ay+b) = \theta h(x)+(1-\theta)h(y)$</td>
+			</tr>
+			<tr>
+					<td><strong>逐点最大</strong></td>
+					<td>$f(x) = \max_{i=1,\ldots,m} f_i(x)$</td>
+					<td>设 $k$ 使 $f_k(\theta x+(1-\theta)y)$ 取最大值，则 $f(\theta x+(1-\theta)y) = f_k(\cdots) \leq \theta f_k(x)+(1-\theta)f_k(y) \leq \theta f(x)+(1-\theta)f(y)$</td>
+			</tr>
+			<tr>
+					<td><strong>逐点上确界</strong></td>
+					<td>$f(x) = \sup_{y \in \mathcal{A}} g(x, y)$，每 $g(\cdot, y)$ 凸</td>
+					<td>同理：上确界一族凸函数仍是凸函数</td>
+			</tr>
+	</tbody>
+</table></div>
+<blockquote>
+<p><strong>记忆口诀</strong>：「凸函数取 max 仍凸，凹函数取 min 仍凹。」注意逐点最小（$\min_i f_i(x)$ 对凸函数族）不保凸！例如 $f_1(x) = x$ 和 $f_2(x) = -x$ 都是凸函数（仿射函数），但 $\min{x, -x} = -|x|$ 是凹函数。</p>
+</blockquote>
+<hr>
+<h2 id="13-凸优化问题">1.3 凸优化问题
+</h2><h3 id="131-标准形式">1.3.1 标准形式
+</h3><p>凸优化问题的标准形式为：</p>
+$$\boxed{\begin{aligned} \min_{x \in \mathbb{R}^n} \quad & f_0(x) \\ \text{s.t.} \quad & f_i(x) \leq 0, \quad i = 1, 2, \ldots, m \\ & a_j^T x = b_j, \quad j = 1, 2, \ldots, p \end{aligned}}$$<p><strong>各部分的逐字解释</strong>：</p>
+<ul>
+<li>$x \in \mathbb{R}^n$：待求解的决策变量，是一个 $n$ 维实数列向量。</li>
+<li>$f_0(x)$：<strong>目标函数</strong>，必须是凸函数。我们要让它尽可能小。</li>
+<li>$f_i(x) \leq 0$：<strong>不等式约束</strong>，共 $m$ 个，每个 $f_i$ 都必须是凸函数。要求 $x$ 只能取使所有 $f_i(x) \leq 0$ 的值。</li>
+<li>$a_j^T x = b_j$：<strong>等式约束</strong>，共 $p$ 个，每个必须是<strong>仿射函数</strong>。这很关键——等式约束不能是非线性的，否则可行集可能不再是凸集。这里 $a_j \in \mathbb{R}^n$ 是系数向量，$b_j \in \mathbb{R}$ 是常数。</li>
+</ul>
+<p><strong>为什么等式约束必须是仿射的？</strong> 考虑约束 $h(x) = 0$。若 $h$ 是凸函数，${x \mid h(x) \leq 0}$ 是凸集，但 ${x \mid h(x) = 0}$ 一般不是。唯一例外是 $h$ 既是凸又是凹——即仿射函数。例如：${x \mid |x|^2 = 1}$（球面）不是凸集，因为球面上两点的连线会&quot;穿透&quot;球内部。</p>
+<h3 id="132-核心性质局部最优即全局最优">1.3.2 核心性质：局部最优即全局最优
+</h3><p><strong>定理</strong>：若 $x^<em>$ 是凸优化问题的局部极小点，则 $x^</em>$ 也必然是全局极小点。</p>
+<p><strong>逐行证明（反证法）</strong>：</p>
+<p><strong>Step 1（设定矛盾假设）</strong>：假设 $x^<em>$ 是局部极小但不是全局极小。这意味着存在某个点 $y$（可行点，满足所有约束）使得 $f_0(y) &lt; f_0(x^</em>)$。</p>
+<p><strong>Step 2（利用局部极小定义）</strong>：因为 $x^<em>$ 是局部极小，存在一个以 $x^</em>$ 为球心、半径 $\varepsilon &gt; 0$ 的小球 $B(x^<em>, \varepsilon)$，使得球内所有可行点处的函数值都不小于 $f_0(x^</em>)$。</p>
+<p><strong>Step 3（构造 $x^*$ 和 $y$ 之间的点）</strong>：考虑线段上的点 $z_\theta = \theta y + (1-\theta)x^*$。由于可行集是凸集（由约束条件保证），$z_\theta$ 也是可行点。</p>
+<p><strong>Step 4（取 $\theta$ 充分小）</strong>：选择足够小的 $\theta &gt; 0$，使得 $z_\theta \in B(x^<em>, \varepsilon)$。这是可能的，因为当 $\theta \to 0$ 时，$z_\theta \to x^</em>$，所以当 $\theta$ 足够小时 $z_\theta$ 一定落在球内。具体可取 $\theta &lt; \frac{\varepsilon}{|y - x^*|}$。</p>
+<p><strong>Step 5（应用凸性）</strong>：由目标函数 $f_0$ 的凸性：
+</p>
+$$f_0(z_\theta) = f_0(\theta y + (1-\theta)x^*) \leq \theta f_0(y) + (1-\theta)f_0(x^*)$$<p><strong>Step 6（导出矛盾）</strong>：因为 $f_0(y) &lt; f_0(x^*)$，所以：
+</p>
+$$\theta f_0(y) + (1-\theta)f_0(x^*) < \theta f_0(x^*) + (1-\theta)f_0(x^*) = f_0(x^*)$$<p>因此 $f_0(z_\theta) &lt; f_0(x^<em>)$。但 $z_\theta \in B(x^</em>, \varepsilon)$，这与 $x^<em>$ 是局部极小矛盾！因此假设不成立，$x^</em>$ 必须是全局极小点。</p>
+<blockquote>
+<p><strong>这个证明的核心价值</strong>：一旦我们确认问题是凸的，就不需要担心&quot;陷入局部最优&rdquo;——任何找到的局部极小点自动就是全局最优解。这是凸优化在理论上和实践上都如此重要的根本原因。</p>
+</blockquote>
+<h3 id="133-dcp-规则简介">1.3.3 DCP 规则简介
+</h3><p>**DCP（Disciplined Convex Programming，纪律性凸规划）**是 CVX、CVXPY 等凸优化建模工具中验证问题凸性的规则系统。核心思想：表达式必须是&quot;凸的&quot;（凸函数 + 仿射函数 + 保凸运算的组合）。</p>
+<p>DCP 的规则树（部分）：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Expression
+</span></span><span class="line"><span class="cl">├── Affine（仿射）: 变量本身、常数、线性组合
+</span></span><span class="line"><span class="cl">├── Convex（凸）: 通过保凸运算从 Affine 和已知 Convex 函数构造
+</span></span><span class="line"><span class="cl">│   ├── max(convex, convex)
+</span></span><span class="line"><span class="cl">│   ├── sum(convex expressions)
+</span></span><span class="line"><span class="cl">│   ├── norm(affine)
+</span></span><span class="line"><span class="cl">│   └── quad_form(x, P) 其中 P ⪰ 0
+</span></span><span class="line"><span class="cl">└── Concave（凹）: 通过保凹运算从 Affine 和已知 Concave 函数构造
+</span></span><span class="line"><span class="cl">    ├── min(concave, concave)
+</span></span><span class="line"><span class="cl">    └── log(concave)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>DCP 违规示例</strong>：$f(x) = x^2 / (x+1)$ — 凸函数除以仿射函数不是已知的保凸运算，DCP 会报错。</p>
+<hr>
+<h2 id="14-存在性定理">1.4 存在性定理
+</h2><h3 id="141-weierstrass-定理">1.4.1 Weierstrass 定理
+</h3><p><strong>定理陈述</strong>：若函数 $f: \mathbb{R}^n \to \mathbb{R}$ 连续（即 $x$ 变化很小时 $f(x)$ 变化也很小），且可行集 $S \subseteq \mathbb{R}^n$ 是非空<strong>紧集</strong>（即有界且闭——有界意味着存在一个大球包含 $S$ 中所有点；闭意味着 $S$ 包含其所有极限点），则 $\min_{x \in S} f(x)$ 一定存在全局解。</p>
+<p><strong>完整证明</strong>（5 步构造法）：</p>
+<p><strong>Step 1</strong>：设 $m = \inf_{x \in S} f(x)$。由于 $f$ 在紧集 $S$ 上连续，根据连续函数在紧集上的性质，$f$ 必然有下界，所以 $m &gt; -\infty$（有限值）。</p>
+<p><strong>Step 2</strong>：由下确界的定义，存在序列 ${x_k}_{k=1}^{\infty} \subseteq S$，使得 $f(x_k) \to m$（即随着 $k$ 增大，$f(x_k)$ 无限逼近 $m$）。</p>
+<blockquote>
+<p>下确界定义：$m = \inf_{x \in S} f(x)$ 意味着对任意 $\varepsilon &gt; 0$，存在 $x \in S$ 使 $f(x) &lt; m + \varepsilon$。依次取 $\varepsilon = 1, 1/2, 1/3, \ldots$，构造出所需的逼近序列。</p>
+</blockquote>
+<p><strong>Step 3</strong>：由于 $S$ 是有界集，${x_k}$ 是有界序列。由 Bolzano-Weierstrass 定理（$\mathbb{R}^n$ 中任意有界序列必存在收敛子列），存在子列 ${x_{k_j}}<em>{j=1}^{\infty}$ 收敛到某个极限点 $x^*$，即 $x</em>{k_j} \to x^*$。</p>
+<p><strong>Step 4</strong>：由于 $S$ 是闭集（包含其所有极限点），$x^* \in S$。</p>
+<p><strong>Step 5</strong>：由 $f$ 的连续性，$f(x^<em>) = \lim_{j \to \infty} f(x_{k_j}) = m$。因此 $x^</em>$ 处的函数值恰好等于下确界，即 $x^*$ 是全局极小点。</p>
+<h3 id="142-强制性coercivity">1.4.2 强制性（Coercivity）
+</h3><p>若可行域不紧（如 $S = \mathbb{R}^n$ 无界），可用<strong>强制性</strong>替代紧性保证存在性：</p>
+<p><strong>定义</strong>：函数 $f$ 称为<strong>强制的</strong>（coercive），若当 $|x| \to \infty$（即 $x$ 远离原点趋向无穷远）时，$f(x) \to +\infty$。</p>
+$$\boxed{\lim_{\|x\| \to \infty} f(x) = +\infty}$$<p><strong>推论</strong>：若 $f$ 连续且强制，则 $\min_{x \in \mathbb{R}^n} f(x)$ 存在全局解。</p>
+<p><strong>证明思路</strong>：取任意初始点 $x_0$，设 $L = f(x_0)$。由强制性，存在半径 $R &gt; 0$ 使得球外 $|x| &gt; R$ 的所有点处 $f(x) &gt; L$。因此极小点一定在紧球 ${x \mid |x| \leq R}$ 内（因为球外的函数值都大于 $f(x_0)$，不可能是最小值）。在紧球上应用 Weierstrass 定理即得。</p>
+<hr>
+<h2 id="15-典型例题精讲">1.5 典型例题精讲
+</h2><h3 id="例题-1二次函数的凸性判定定义法">例题 1：二次函数的凸性判定（定义法）
+</h3><p><strong>题目</strong>：证明 $f(x) = \frac{1}{2}x^T Q x + b^T x + c$（其中 $Q \in \mathbb{S}^n_+$，即 $Q$ 是 $n \times n$ 对称半正定矩阵，$b \in \mathbb{R}^n$ 是常数列向量，$c \in \mathbb{R}$ 是标量常数）是凸函数。</p>
+<p><strong>考点标签</strong>：<code>#凸函数</code> <code>#定义法</code> <code>#二次函数</code> <code>#Jensen不等式</code></p>
+<p><strong>详细解答</strong>：</p>
+<p><strong>Step 1（验证定义域凸性）</strong>：$\text{dom} f = \mathbb{R}^n$，这是全空间，显然是凸集。</p>
+<p><strong>Step 2（设定变量）</strong>：取任意 $x, y \in \mathbb{R}^n$（两个 $n$ 维列向量）和 $\theta \in [0, 1]$（连接比例）。</p>
+<p><strong>Step 3（计算左边）</strong>：计算 $f(\theta x + (1-\theta)y)$：
+</p>
+$$f(\theta x + (1-\theta)y) = \frac{1}{2}(\theta x + (1-\theta)y)^T Q (\theta x + (1-\theta)y) + b^T(\theta x + (1-\theta)y) + c$$<p>展开矩阵乘积 $(\theta x + (1-\theta)y)^T Q (\theta x + (1-\theta)y)$：
+</p>
+$$= \theta^2 x^T Q x + \theta(1-\theta)x^T Q y + \theta(1-\theta)y^T Q x + (1-\theta)^2 y^T Q y$$<blockquote>
+<p>由于 $Q$ 对称（$Q = Q^T$），$x^T Q y = y^T Q x$，所以中间两项可合并为 $2\theta(1-\theta)x^T Q y$。</p>
+</blockquote>
+<p>展开线性项 $b^T(\theta x + (1-\theta)y) = \theta b^T x + (1-\theta)b^T y$。加上常数 $c = \theta c + (1-\theta)c$。</p>
+<p>所以左边 = $\frac{1}{2}[\theta^2 x^T Q x + 2\theta(1-\theta)x^T Q y + (1-\theta)^2 y^T Q y] + \theta b^T x + (1-\theta)b^T y + \theta c + (1-\theta)c$</p>
+<p><strong>Step 4（计算右边）</strong>：
+</p>
+$$\theta f(x) + (1-\theta)f(y) = \theta\left(\frac{1}{2}x^T Q x + b^T x + c\right) + (1-\theta)\left(\frac{1}{2}y^T Q y + b^T y + c\right)$$<p><strong>Step 5（作差）</strong>：计算 $\theta f(x) + (1-\theta)f(y) - f(\theta x + (1-\theta)y)$。</p>
+<p>二次型部分相减：
+</p>
+$$\frac{\theta}{2}x^T Q x + \frac{1-\theta}{2}y^T Q y - \frac{1}{2}[\theta^2 x^T Q x + 2\theta(1-\theta)x^T Q y + (1-\theta)^2 y^T Q y]$$<p>合并 $x^T Q x$ 系数：$\frac{\theta}{2} - \frac{\theta^2}{2} = \frac{\theta(1-\theta)}{2}$</p>
+<p>合并 $y^T Q y$ 系数：$\frac{1-\theta}{2} - \frac{(1-\theta)^2}{2} = \frac{(1-\theta) - (1-\theta)^2}{2} = \frac{(1-\theta)[1-(1-\theta)]}{2} = \frac{\theta(1-\theta)}{2}$</p>
+<p>合并 $x^T Q y$ 项：$-\frac{1}{2} \cdot 2\theta(1-\theta)x^T Q y = -\theta(1-\theta)x^T Q y$</p>
+<p>二次型部分汇总：$\frac{\theta(1-\theta)}{2}[x^T Q x + y^T Q y - 2x^T Q y]$</p>
+<p>注意：$x^T Q x + y^T Q y - 2x^T Q y = (x-y)^T Q (x-y)$</p>
+<p>线性项和常数项在左右两边完全抵消。</p>
+<p><strong>Step 6（判定）</strong>：因此：
+</p>
+$$\theta f(x) + (1-\theta)f(y) - f(\theta x + (1-\theta)y) = \frac{1}{2}\theta(1-\theta)(x-y)^T Q (x-y)$$<p>由于 $Q \succeq 0$（半正定），$(x-y)^T Q (x-y) \geq 0$。且 $\theta(1-\theta) \geq 0$（因为 $\theta \in [0, 1]$）。所以差 ≥ 0，即：
+</p>
+$$f(\theta x + (1-\theta)y) \leq \theta f(x) + (1-\theta)f(y)$$<p>这正是凸函数定义式。证毕。</p>
+<blockquote>
+<p><strong>关键观察</strong>：差值恰好是 $\frac{1}{2}\theta(1-\theta)$ 乘以 $Q$ 在差向量上的二次型。这个差 ≥ 0 当且仅当 $Q \succeq 0$。如果 $Q$ 不是半正定（比如有负特征值），则存在方向使差 &lt; 0，$f$ 就不是凸函数。</p>
+</blockquote>
+<hr>
+<h3 id="例题-2指数函数的凸性证明一阶条件法">例题 2：指数函数的凸性证明（一阶条件法）
+</h3><p><strong>题目</strong>：用一阶条件证明 $f(x) = e^{ax}$（$a \in \mathbb{R}$ 为任意实常数）在 $\mathbb{R}$ 上是凸函数。</p>
+<p><strong>考点标签</strong>：<code>#凸函数</code> <code>#一阶条件</code> <code>#指数函数</code></p>
+<p><strong>详细解答</strong>：</p>
+<p><strong>Step 1（计算梯度）</strong>：$f$ 是一维函数，$\nabla f(x) = f&rsquo;(x) = a \cdot e^{ax}$。</p>
+<p><strong>Step 2（写出需要验证的不等式）</strong>：一阶条件要求对任意 $x, y$：
+</p>
+$$e^{ay} \geq e^{ax} + a e^{ax}(y - x)$$<p><strong>Step 3（因式分解）</strong>：两边同除以 $e^{ax} &gt; 0$（指数函数恒正，除法不改变不等式方向）：
+</p>
+$$e^{a(y-x)} \geq 1 + a(y-x)$$<p><strong>Step 4（变量代换）</strong>：令 $t = a(y-x)$，$t$ 可以是任意实数（因为 $y$ 任意）。需证：
+</p>
+$$e^t \geq 1 + t, \quad \forall t \in \mathbb{R}$$<p><strong>Step 5（证明 $e^t \geq 1 + t$）</strong>：构造函数 $\phi(t) = e^t - 1 - t$。</p>
+<p>计算导数：$\phi&rsquo;(t) = e^t - 1$</p>
+<p>分析单调性：</p>
+<ul>
+<li>当 $t &lt; 0$ 时：$e^t &lt; 1$，所以 $\phi&rsquo;(t) &lt; 0$，$\phi$ 在 $(-\infty, 0]$ 上严格递减。</li>
+<li>当 $t &gt; 0$ 时：$e^t &gt; 1$，所以 $\phi&rsquo;(t) &gt; 0$，$\phi$ 在 $[0, +\infty)$ 上严格递增。</li>
+<li>在 $t = 0$ 处：$\phi&rsquo;(0) = 0$。</li>
+</ul>
+<p>因此 $t = 0$ 是 $\phi$ 的全局极小点，且 $\phi(0) = e^0 - 1 - 0 = 0$。所以 $\phi(t) \geq 0$ 对所有 $t \in \mathbb{R}$ 成立，即 $e^t \geq 1 + t$。</p>
+<p><strong>Step 6（结论）</strong>：一阶条件成立，$f$ 是凸函数。</p>
+<blockquote>
+<p><strong>几何直觉</strong>：指数曲线 $y = e^t$ 完全在切线 $y = 1 + t$ 的上方（$t = 0$ 处相切）。这是指数函数&quot;加速增长&quot;的数学表现——增长率本身也在增长。</p>
+</blockquote>
+<hr>
+<h3 id="例题-3hessian-判定法--logistic-损失函数">例题 3：Hessian 判定法 —— Logistic 损失函数
+</h3><p><strong>题目</strong>：判定 $f(x) = \ln(1 + e^x)$ 的凸性。</p>
+<p><strong>考点标签</strong>：<code>#凸函数</code> <code>#二阶条件</code> <code>#Hessian</code> <code>#Logistic函数</code></p>
+<p><strong>详细解答</strong>：</p>
+<p><strong>Step 1（计算一阶导数）</strong>：
+</p>
+$$f'(x) = \frac{d}{dx} \ln(1 + e^x) = \frac{1}{1 + e^x} \cdot e^x = \frac{e^x}{1 + e^x}$$<p>回忆 sigmoid 函数 $\sigma(x) = \frac{1}{1 + e^{-x}} = \frac{e^x}{1 + e^x}$，所以 $f&rsquo;(x) = \sigma(x)$。</p>
+<p><strong>Step 2（计算二阶导数）</strong>：
+</p>
+$$f''(x) = \frac{d}{dx}\left(\frac{e^x}{1 + e^x}\right) = \frac{e^x(1 + e^x) - e^x \cdot e^x}{(1 + e^x)^2} = \frac{e^x + e^{2x} - e^{2x}}{(1 + e^x)^2} = \frac{e^x}{(1 + e^x)^2}$$<p><strong>Step 3（判断符号）</strong>：$e^x &gt; 0$ 对所有 $x$ 成立，分母 $(1 + e^x)^2 &gt; 0$，所以 $f&rsquo;&rsquo;(x) &gt; 0$ 对所有 $x \in \mathbb{R}$ 成立。</p>
+<p><strong>Step 4（结论）</strong>：$f&rsquo;&rsquo;(x) &gt; 0$（严格正），根据二阶条件，$f$ 是<strong>严格凸函数</strong>。</p>
+<blockquote>
+<p><strong>常见混淆警告</strong>：机器学习中常见的 logistic 损失 $\ln(1 + e^{-x})$（注意负号）的二阶导数为 $\frac{e^x}{(1+e^x)^2} &gt; 0$&hellip;等一下，让我重新算。$\frac{d^2}{dx^2}\ln(1+e^{-x}) = \frac{e^x}{(1+e^x)^2} &gt; 0$？不是的。</p>
+<p>重新计算：设 $g(x) = \ln(1 + e^{-x})$。$g&rsquo;(x) = \frac{-e^{-x}}{1 + e^{-x}} = -\frac{1}{1 + e^x}$。$g&rsquo;&rsquo;(x) = \frac{e^x}{(1+e^x)^2} &gt; 0$。所以 $\ln(1 + e^{-x})$ 居然也是凸的！但标准的 margin-based logistic loss $\ln(1 + \exp(-y \cdot w^T x))$ 对 $w$ 是凸的吗？这个需要具体分析，因为 $y \in {\pm 1}$。总之，在做凸性分析时，自变量是什么要搞清楚。</p>
+</blockquote>
+<hr>
+<h3 id="例题-4强制性验证--二次函数">例题 4：强制性验证 —— 二次函数
+</h3><p><strong>题目</strong>：证明 $f(x) = x^T Q x + b^T x$（其中 $Q \succ 0$，即 $Q$ 为对称正定矩阵——所有特征值 &gt; 0）是强制函数。</p>
+<p><strong>考点标签</strong>：<code>#强制性</code> <code>#Weierstrass</code> <code>#二次函数</code> <code>#存在性</code></p>
+<p><strong>详细解答</strong>：</p>
+<p><strong>Step 1（下界分析）</strong>：设 $\lambda_{\min} = \lambda_{\min}(Q) &gt; 0$（$Q$ 的最小特征值，因为 $Q$ 正定所以 &gt; 0）。对任意 $x \in \mathbb{R}^n$：
+</p>
+$$x^T Q x \geq \lambda_{\min} \|x\|^2$$<blockquote>
+<p>回忆：$|x|^2 = x^T x = \sum_{i=1}^n x_i^2$，即向量 $x$ 的各分量平方和。</p>
+</blockquote>
+<p><strong>Step 2（线性项下界）</strong>：对线性项 $b^T x$，由 Cauchy-Schwarz 不等式（$|u^T v| \leq |u| |v|$）：
+</p>
+$$|b^T x| \leq \|b\| \cdot \|x\|$$<p>所以 $b^T x \geq -|b| \cdot |x|$（因为 $b^T x$ 可能为负，最坏情况是不小于负的 $|b| |x|$）。</p>
+<blockquote>
+<p>Cauchy-Schwarz 不等式：对于两个同维度的向量 $u$ 和 $v$，它们的内积满足 $|u^T v| \leq |u| \cdot |v|$。等号当且仅当 $u$ 和 $v$ 平行时成立。</p>
+</blockquote>
+<p><strong>Step 3（合并下界）</strong>：
+</p>
+$$f(x) = x^T Q x + b^T x \geq \lambda_{\min} \|x\|^2 - \|b\| \cdot \|x\|$$<p><strong>Step 4（配平方技巧）</strong>：将右边写成关于 $|x|$ 的完全平方形式：
+</p>
+$$\lambda_{\min} \|x\|^2 - \|b\| \|x\| = \lambda_{\min}\left(\|x\|^2 - \frac{\|b\|}{\lambda_{\min}} \|x\|\right)$$<p>补全平方：
+</p>
+$$= \lambda_{\min}\left[\left(\|x\| - \frac{\|b\|}{2\lambda_{\min}}\right)^2 - \frac{\|b\|^2}{4\lambda_{\min}^2}\right]$$<p>
+</p>
+$$= \lambda_{\min}\left(\|x\| - \frac{\|b\|}{2\lambda_{\min}}\right)^2 - \frac{\|b\|^2}{4\lambda_{\min}}$$<p><strong>Step 5（取极限）</strong>：当 $|x| \to \infty$，平方项 $\lambda_{\min}(|x| - \frac{|b|}{2\lambda_{\min}})^2 \to +\infty$，而常数项 $-\frac{|b|^2}{4\lambda_{\min}}$ 是固定有限值。因此 $f(x) \to +\infty$。</p>
+<p><strong>Step 6（存在性结论）</strong>：由强制性和 $f$ 的连续性，$\min_{x \in \mathbb{R}^n} f(x)$ 一定存在全局极小点。</p>
+<blockquote>
+<p><strong>关键观察</strong>：当 $Q$ 仅为半正定（$Q \succeq 0$，可能 $\lambda_{\min}=0$），配平方技巧失效——当 $\lambda_{\min} = 0$ 时二次项 $x^T Q x$ 在某些方向为零，不足以压倒线性项 $b^T x$。例如 $f(x_1, x_2) = x_2^2 + x_1$（$Q = \text{diag}(0, 1)$），沿 $x_1 \to -\infty$ 方向函数值 $x_1 \to -\infty$，不强制。</p>
+</blockquote>
+<hr>
+<h3 id="例题-5梯度与-hessian-计算--凸性综合判定">例题 5：梯度与 Hessian 计算 + 凸性综合判定
+</h3><p><strong>题目</strong>：设 $f(x) = |Ax - b|^2$，其中 $A \in \mathbb{R}^{m \times n}$（$m \times n$ 矩阵），$b \in \mathbb{R}^m$（$m$ 维列向量）。求 $\nabla f(x)$ 和 $\nabla^2 f(x)$，并判定 $f$ 的凸性。</p>
+<p><strong>考点标签</strong>：<code>#梯度</code> <code>#Hessian</code> <code>#凸性判定</code> <code>#最小二乘</code></p>
+<p><strong>详细解答</strong>：</p>
+<p><strong>(1) 计算梯度 $\nabla f(x)$</strong></p>
+<p><strong>Step 1</strong>：展开目标函数：
+</p>
+$$f(x) = (Ax - b)^T (Ax - b) = (x^T A^T - b^T)(Ax - b)$$<p>
+</p>
+$$= x^T A^T A x - x^T A^T b - b^T A x + b^T b$$<p><strong>Step 2</strong>：注意标量 $x^T A^T b$ 和 $b^T A x$ 互为转置，且都是标量（$1 \times 1$），以 $A^T b$ 为系数简化：
+</p>
+$$x^T A^T b = (x^T A^T b)^T = b^T A x$$<p>所以 $f(x) = x^T A^T A x - 2b^T A x + b^T b$</p>
+<blockquote>
+<p>这里 $b^T A x$ 是一个标量，$(b^T A)x$ 等价于内积 $\langle A^T b, x \rangle$。</p>
+</blockquote>
+<p><strong>Step 3</strong>：对 $x^T A^T A x$ 求梯度：
+</p>
+$$\nabla_x (x^T A^T A x) = (A^T A + (A^T A)^T)x = 2A^T A x \quad (\text{因为 } A^T A \text{ 是对称矩阵})$$<p>对线性项 $-2b^T A x$ 求梯度：
+</p>
+$$\nabla_x (-2b^T A x) = -2A^T b$$<p>对常数项 $b^T b$ 求梯度：$0$。</p>
+<p><strong>Step 4</strong>：合并：
+</p>
+$$\nabla f(x) = 2A^T A x - 2A^T b = 2A^T(Ax - b)$$<p><strong>(2) 计算 Hessian $\nabla^2 f(x)$</strong></p>
+<p>对梯度 $\nabla f(x) = 2A^T A x - 2A^T b$ 再次求导。常数项 $-2A^T b$ 的导数为零，线性项 $2A^T A x$ 的导数即系数矩阵：
+</p>
+$$\nabla^2 f(x) = 2A^T A$$<p>注意 Hessian 与 $x$ 无关——这是二次函数的特性。</p>
+<p><strong>(3) 凸性判定</strong></p>
+<p><strong>Step 1</strong>：检查 $\nabla^2 f(x) = 2A^T A$ 是否半正定。对任意向量 $v \in \mathbb{R}^n$：
+</p>
+$$v^T (2A^T A) v = 2(Av)^T (Av) = 2\|Av\|^2 \geq 0$$<p>因此 $2A^T A \succeq 0$（常数正因子 $2$ 不影响半正定性）。</p>
+<p><strong>Step 2</strong>：由二阶条件，$f$ 是凸函数。</p>
+<p><strong>补充说明</strong>：</p>
+<ul>
+<li>若 $A$ 列满秩（即 $A$ 的各列线性无关，等价于 $\text{rank}(A) = n$），则 $A^T A \succ 0$（正定），此时 $f$ 是<strong>严格凸函数</strong>。</li>
+<li>若 $A$ 不满列秩，存在非零 $v$ 使 $Av = 0$，此时 $v^T A^T A v = 0$，$f$ 沿 $v$ 方向没有曲率——是凸但不严格凸。</li>
+<li>$f(x) = |Ax - b|^2$ 是最经典的最小二乘问题的目标函数，其凸性意味着 $\nabla f(x^<em>) = 0$（即正规方程 $A^T A x^</em> = A^T b$）的解就是全局最小二乘解。</li>
+</ul>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><h3 id="11-凸集-1">1.1 凸集
+</h3><ol>
+<li><strong>定义记忆</strong>：连接集合内任意两点的线段整体落在集合内 → 凸集</li>
+<li><strong>保凸运算</strong>：任意个凸集的交仍凸；凸集的仿射变换仍凸；凸集的并一般不凸</li>
+<li><strong>关键反例</strong>：球面 ${x \mid |x| = 1}$ 是常见非凸集（直径两端点的中点在原点）</li>
+<li><strong>超平面既是凸集也是仿射集</strong>，而仿射集一定是凸集</li>
+<li><strong>可行性判定</strong>：凸优化问题要求可行集是凸集，这等价于不等式约束函数是凸的（$\leq 0$ 形式），等式约束必须是仿射的</li>
+</ol>
+<h3 id="12-凸函数-1">1.2 凸函数
+</h3><ol>
+<li><strong>定义（Jensen）</strong>：$f(\theta x + (1-\theta)y) \leq \theta f(x) + (1-\theta)f(y)$ — &ldquo;割线在函数上方&rdquo;</li>
+<li><strong>一阶条件</strong>：$f(y) \geq f(x) + \nabla f(x)^T (y-x)$ — &ldquo;切线托住函数&rdquo;；凸 ⇔ 一阶条件 ⇔ 二阶条件（对 $C^2$ 函数）</li>
+<li><strong>二阶条件</strong>：$\nabla^2 f(x) \succeq 0, \forall x$ — &ldquo;处处弯曲向上&rdquo;，是最实用的判定工具</li>
+<li><strong>关键定理</strong>：凸函数的驻点（$\nabla f(x^*) = 0$）自动是全局极小点 — 不需要检查二阶条件</li>
+<li><strong>常见混淆</strong>：中文&quot;凸&quot;（$\cup$ 形）= 数学凸函数；中文&quot;凹&quot;（$\cap$ 形）= 数学凹函数</li>
+</ol>
+<h3 id="13-凸优化问题-1">1.3 凸优化问题
+</h3><ol>
+<li><strong>标准形式三要素</strong>：凸目标 + 凸不等式约束 + 仿射等式约束 → 凸优化问题</li>
+<li><strong>核心性质</strong>：局部极小 $\Rightarrow$ 全局极小 — 这是凸优化在理论和实践中最重要的性质</li>
+<li><strong>DCP 规则</strong>：建模工具通过&quot;保凸运算的语法树&quot;验证凸性，max/sum/quad_form 保凸，min 不保凸</li>
+<li><strong>存在性</strong>：Weierstrass 定理（紧集 + 连续 → 有解）和强制性（$\lim_{|x|\to\infty} f(x) = +\infty$ → 无约束问题有解）</li>
+<li><strong>实践口诀</strong>：算 Hessian → 判半正定 → 给结论。二阶条件是最快的凸性判定路径</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

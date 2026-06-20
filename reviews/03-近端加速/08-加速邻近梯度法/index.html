@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第8章：加速邻近梯度法 核心思想：利用历史迭代信息构造&quot;外推步&quot;（在 $x_k$ 的基础上沿 $x_k - x_{k-1}$ 方向再往前跨一步），突破普通一阶方法的 $O(1/k)$ 收敛下界，达到光滑凸优化一阶方法的最优信息论下界 $O(1/k^2)$。 本章的 FISTA（Fast ISTA）是 ISTA 的加速版——在 ISTA 最核心的邻近梯度步之前加一个&quot;外推预测&quot;步。\n前置知识回顾 在开始本章之前，请确保你已经理解以下概念：\n概念 出自 一句话回顾 邻近算子 $\\text{prox}_g$ Ch7 $\\text{prox}_g(x)=\\arg\\min_z{g(z)+\\frac{1}{2}|z-x|^2}$，是在 $x$ 附近使 $g$ 尽量小且不跑远的点 ISTA 迭代 Ch7 $x_{k+1}=\\text{prox}_{\\alpha g}(x_k-\\alpha\\nabla f(x_k))$，前向梯度步 + 后向邻近步 $L$-smooth 函数 Ch2 梯度 Lipschitz：$|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$；等价于二次上界不等式 凸函数的一阶条件 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$，函数图像在切线上方 强凸函数 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)+\\frac{\\mu}{2}|y-x|^2$，被二次函数从下方&quot;托住&quot; GD 的 $O(1/k)$ 收敛 Ch2 $f(x_k)-f^*\\leq O(1/k)$，误差随迭代反比缩小 动量/历史信息 Ch7 邻近梯度法（ISTA）仅用当前点 $x_k$ 的信息，不用历史轨迹 8.1 为什么需要加速 8.1.1 基础方法的收敛极限回顾 回顾前面章节的收敛率（对光滑凸函数类）：\n">
+<title>第8章：加速邻近梯度法</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/08-%E5%8A%A0%E9%80%9F%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第8章：加速邻近梯度法">
+<meta property='og:description' content="第8章：加速邻近梯度法 核心思想：利用历史迭代信息构造&quot;外推步&quot;（在 $x_k$ 的基础上沿 $x_k - x_{k-1}$ 方向再往前跨一步），突破普通一阶方法的 $O(1/k)$ 收敛下界，达到光滑凸优化一阶方法的最优信息论下界 $O(1/k^2)$。 本章的 FISTA（Fast ISTA）是 ISTA 的加速版——在 ISTA 最核心的邻近梯度步之前加一个&quot;外推预测&quot;步。\n前置知识回顾 在开始本章之前，请确保你已经理解以下概念：\n概念 出自 一句话回顾 邻近算子 $\\text{prox}_g$ Ch7 $\\text{prox}_g(x)=\\arg\\min_z{g(z)+\\frac{1}{2}|z-x|^2}$，是在 $x$ 附近使 $g$ 尽量小且不跑远的点 ISTA 迭代 Ch7 $x_{k+1}=\\text{prox}_{\\alpha g}(x_k-\\alpha\\nabla f(x_k))$，前向梯度步 + 后向邻近步 $L$-smooth 函数 Ch2 梯度 Lipschitz：$|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$；等价于二次上界不等式 凸函数的一阶条件 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$，函数图像在切线上方 强凸函数 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)+\\frac{\\mu}{2}|y-x|^2$，被二次函数从下方&quot;托住&quot; GD 的 $O(1/k)$ 收敛 Ch2 $f(x_k)-f^*\\leq O(1/k)$，误差随迭代反比缩小 动量/历史信息 Ch7 邻近梯度法（ISTA）仅用当前点 $x_k$ 的信息，不用历史轨迹 8.1 为什么需要加速 8.1.1 基础方法的收敛极限回顾 回顾前面章节的收敛率（对光滑凸函数类）：\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/08-%E5%8A%A0%E9%80%9F%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第8章：加速邻近梯度法">
+<meta name="twitter:description" content="第8章：加速邻近梯度法 核心思想：利用历史迭代信息构造&quot;外推步&quot;（在 $x_k$ 的基础上沿 $x_k - x_{k-1}$ 方向再往前跨一步），突破普通一阶方法的 $O(1/k)$ 收敛下界，达到光滑凸优化一阶方法的最优信息论下界 $O(1/k^2)$。 本章的 FISTA（Fast ISTA）是 ISTA 的加速版——在 ISTA 最核心的邻近梯度步之前加一个&quot;外推预测&quot;步。\n前置知识回顾 在开始本章之前，请确保你已经理解以下概念：\n概念 出自 一句话回顾 邻近算子 $\\text{prox}_g$ Ch7 $\\text{prox}_g(x)=\\arg\\min_z{g(z)+\\frac{1}{2}|z-x|^2}$，是在 $x$ 附近使 $g$ 尽量小且不跑远的点 ISTA 迭代 Ch7 $x_{k+1}=\\text{prox}_{\\alpha g}(x_k-\\alpha\\nabla f(x_k))$，前向梯度步 + 后向邻近步 $L$-smooth 函数 Ch2 梯度 Lipschitz：$|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$；等价于二次上界不等式 凸函数的一阶条件 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$，函数图像在切线上方 强凸函数 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)+\\frac{\\mu}{2}|y-x|^2$，被二次函数从下方&quot;托住&quot; GD 的 $O(1/k)$ 收敛 Ch2 $f(x_k)-f^*\\leq O(1/k)$，误差随迭代反比缩小 动量/历史信息 Ch7 邻近梯度法（ISTA）仅用当前点 $x_k$ 的信息，不用历史轨迹 8.1 为什么需要加速 8.1.1 基础方法的收敛极限回顾 回顾前面章节的收敛率（对光滑凸函数类）：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾">前置知识回顾</a></li>
+    <li><a href="#81-为什么需要加速">8.1 为什么需要加速</a>
+      <ol>
+        <li><a href="#811-基础方法的收敛极限回顾">8.1.1 基础方法的收敛极限回顾</a></li>
+        <li><a href="#812-最坏情况函数nesterov-的坏函数">8.1.2 最坏情况函数——Nesterov 的&quot;坏函数&quot;</a></li>
+        <li><a href="#813-加速的直觉动量惯性与前瞻">8.1.3 加速的直觉——动量、惯性与前瞻</a></li>
+      </ol>
+    </li>
+    <li><a href="#82-nesterov-加速原理详细推导">8.2 Nesterov 加速原理（详细推导）</a>
+      <ol>
+        <li><a href="#821-估计序列方法的直觉">8.2.1 估计序列方法的直觉</a></li>
+        <li><a href="#822-动量序列-t_k-的推导">8.2.2 动量序列 ${t_k}$ 的推导</a></li>
+        <li><a href="#823-外推步的构造">8.2.3 外推步的构造</a></li>
+        <li><a href="#824-o1k2-收敛率证明框架">8.2.4 $O(1/k^2)$ 收敛率证明框架</a></li>
+      </ol>
+    </li>
+    <li><a href="#83-fista-算法">8.3 FISTA 算法</a>
+      <ol>
+        <li><a href="#831-ista-vs-fista--迭代格式对比">8.3.1 ISTA vs FISTA —— 迭代格式对比</a></li>
+        <li><a href="#832-fista-完整算法伪代码">8.3.2 FISTA 完整算法伪代码</a></li>
+        <li><a href="#833-为什么-fista-可能非单调">8.3.3 为什么 FISTA 可能非单调？</a></li>
+        <li><a href="#834-重启策略restart-在实践中驯服震荡">8.3.4 重启策略（Restart）—— 在实践中驯服震荡</a></li>
+        <li><a href="#835-重球法heavy-ball与-nesterov-加速的关键区别">8.3.5 重球法（Heavy-Ball）与 Nesterov 加速的关键区别</a></li>
+        <li><a href="#836-fista-对-lasso-的实现加速几乎是免费的">8.3.6 FISTA 对 LASSO 的实现——加速几乎是免费的</a></li>
+      </ol>
+    </li>
+    <li><a href="#84-典型例题">8.4 典型例题</a>
+      <ol>
+        <li><a href="#例题-81动量序列的性质证明">例题 8.1：动量序列的性质证明</a></li>
+        <li><a href="#例题-82nag-在二次函数上的行为">例题 8.2：NAG 在二次函数上的行为</a></li>
+        <li><a href="#例题-83fista-对-lasso--加速为什么是免费的">例题 8.3：FISTA 对 LASSO —— 加速为什么是&quot;免费&quot;的</a></li>
+        <li><a href="#例题-84动量系数的渐近行为">例题 8.4：动量系数的渐近行为</a></li>
+        <li><a href="#例题-85fista-的非单调性演示">例题 8.5：FISTA 的非单调性演示</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/08-%E5%8A%A0%E9%80%9F%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/">第8章：加速邻近梯度法</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 8 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第8章加速邻近梯度法">第8章：加速邻近梯度法
+</h1><blockquote>
+<p><strong>核心思想</strong>：利用历史迭代信息构造&quot;外推步&quot;（在 $x_k$ 的基础上沿 $x_k - x_{k-1}$ 方向再往前跨一步），突破普通一阶方法的 $O(1/k)$ 收敛下界，达到光滑凸优化一阶方法的最优信息论下界 $O(1/k^2)$。
+本章的 FISTA（Fast ISTA）是 ISTA 的加速版——在 ISTA 最核心的邻近梯度步之前加一个&quot;外推预测&quot;步。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾">前置知识回顾
+</h2><p>在开始本章之前，请确保你已经理解以下概念：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>概念</th>
+					<th>出自</th>
+					<th>一句话回顾</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>邻近算子 $\text{prox}_g$</td>
+					<td>Ch7</td>
+					<td>$\text{prox}_g(x)=\arg\min_z{g(z)+\frac{1}{2}|z-x|^2}$，是在 $x$ 附近使 $g$ 尽量小且不跑远的点</td>
+			</tr>
+			<tr>
+					<td>ISTA 迭代</td>
+					<td>Ch7</td>
+					<td>$x_{k+1}=\text{prox}_{\alpha g}(x_k-\alpha\nabla f(x_k))$，前向梯度步 + 后向邻近步</td>
+			</tr>
+			<tr>
+					<td>$L$-smooth 函数</td>
+					<td>Ch2</td>
+					<td>梯度 Lipschitz：$|\nabla f(x)-\nabla f(y)|\leq L|x-y|$；等价于二次上界不等式</td>
+			</tr>
+			<tr>
+					<td>凸函数的一阶条件</td>
+					<td>Ch3</td>
+					<td>$f(y)\geq f(x)+\nabla f(x)^T(y-x)$，函数图像在切线上方</td>
+			</tr>
+			<tr>
+					<td>强凸函数</td>
+					<td>Ch3</td>
+					<td>$f(y)\geq f(x)+\nabla f(x)^T(y-x)+\frac{\mu}{2}|y-x|^2$，被二次函数从下方&quot;托住&quot;</td>
+			</tr>
+			<tr>
+					<td>GD 的 $O(1/k)$ 收敛</td>
+					<td>Ch2</td>
+					<td>$f(x_k)-f^*\leq O(1/k)$，误差随迭代反比缩小</td>
+			</tr>
+			<tr>
+					<td>动量/历史信息</td>
+					<td>Ch7</td>
+					<td>邻近梯度法（ISTA）仅用当前点 $x_k$ 的信息，不用历史轨迹</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="81-为什么需要加速">8.1 为什么需要加速
+</h2><h3 id="811-基础方法的收敛极限回顾">8.1.1 基础方法的收敛极限回顾
+</h3><p>回顾前面章节的收敛率（对光滑凸函数类）：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>方法</th>
+					<th>收敛速率</th>
+					<th>达到精度 $\epsilon$ 所需迭代数</th>
+					<th>出处</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>梯度下降法 (GD)</td>
+					<td>$O(1/k)$</td>
+					<td>$O(1/\epsilon)$</td>
+					<td>Ch2</td>
+			</tr>
+			<tr>
+					<td>邻近梯度法 (ISTA)</td>
+					<td>$O(1/k)$</td>
+					<td>$O(1/\epsilon)$</td>
+					<td>Ch7</td>
+			</tr>
+			<tr>
+					<td>次梯度法 (SubGM)</td>
+					<td>$O(1/\sqrt{k})$</td>
+					<td>$O(1/\epsilon^2)$</td>
+					<td>Ch4</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>问：$O(1/k)$ 是光滑凸优化中一阶方法（只使用函数值和梯度信息，不用 Hessian 等二阶信息）能达到的最好速率吗？</p>
+<p>答：<strong>不是！</strong> Nesterov 在 1983 年发表了一篇经典论文，证明了：</p>
+<blockquote>
+<p><strong>一阶方法在光滑凸函数类上的信息论下界是 $O(1/k^2)$。</strong> 即：存在&quot;最坏情况&quot;的 $L$-smooth 凸函数，使得<strong>任何</strong>只使用梯度信息的一阶方法（不论设计得多巧妙），其收敛率不可能优于 $O(1/k^2)$。</p>
+</blockquote>
+<p>而且 Nesterov 不仅给出了下界，还构造出了<strong>达到这个下界</strong>的算法——<strong>加速梯度法</strong>（Accelerated Gradient Method），证明 $O(1/k^2)$ 确实是<strong>最优一阶方法</strong>的收敛率。</p>
+<h3 id="812-最坏情况函数nesterov-的坏函数">8.1.2 最坏情况函数——Nesterov 的&quot;坏函数&quot;
+</h3><p>Nesterov 构造了如下 $L$-smooth 凸函数来证明下界：</p>
+$$f_k(x) = \frac{L}{2}\left(\frac{1}{2}x_1^2 + \frac{1}{2}\sum_{i=1}^{k-1}(x_i - x_{i+1})^2 + \frac{1}{2}x_k^2 - x_1\right)$$<p><strong>这个函数的&quot;坏&quot;在哪？</strong> 它的梯度信息具有&quot;链式依赖&quot;——$x_1$ 的梯度取决于 $x_1$ 和 $x_2$，$x_2$ 的梯度取决于 $x_1$、$x_2$ 和 $x_3$，依此类推。任何一阶方法（只读取各点梯度）要想把信息从 $x_k$ 传回 $x_1$，至少需要 $O(k)$ 步——这就设置了 $O(1/k^2)$ 的速度极限。</p>
+<h3 id="813-加速的直觉动量惯性与前瞻">8.1.3 加速的直觉——动量、惯性与前瞻
+</h3><p><strong>物理类比</strong>：一个球在曲面上滚落。</p>
+<ul>
+<li><strong>梯度下降法（GD）</strong>：球每步都停在当前位置，重新判断最陡方向后走一步——&ldquo;步步为营&rdquo;，保守但缓慢得像个老年人。</li>
+<li><strong>重球法（Heavy Ball, Polyak 1964）</strong>：球带有<strong>惯性/动量</strong>——不仅沿当前梯度方向加速，还保持之前的运动方向（$+\beta(x_k - x_{k-1})$ 项）。类比一个真正有质量、有速度的球滚落曲面，会&quot;顺势而为&quot;越过浅谷。</li>
+<li><strong>Nesterov 加速</strong>：球在<strong>预估的未来位置</strong>（$y_k = x_k + \beta_k(x_k - x_{k-1})$）计算梯度——&ldquo;未雨绸缪&rdquo;，先滑行到预测位置，再判断方向并修正。这相当于用一阶信息<strong>近似了二阶信息</strong>（Hessian 的效应通过历史方向间接体现）。</li>
+</ul>
+<p><strong>数学直觉</strong>：GD 只用了 $x_k$ 处的局部信息（一阶）。加速方法通过 $x_k$ 和 $x_{k-1}$ 的差（隐含的二阶信息），构造&quot;比 $x_k$ 更超前&quot;的试探点 $y_k$，然后在 $y_k$ 处计算梯度。这在计算量几乎不变的情况下（多了一个 $O(n)$ 的向量线性组合），将收敛率从 $O(1/k)$ 提升到 $O(1/k^2)$。</p>
+<blockquote>
+<p><strong>核心要点</strong>：一阶方法在光滑凸函数上的理论下界是 $O(1/k^2)$——GD/ISTA 的 $O(1/k)$ 不是最优的。加速方法通过引入外推步（动量机制）达到了这个下界，实现了&quot;最优一阶方法&quot;。</p>
+</blockquote>
+<hr>
+<h2 id="82-nesterov-加速原理详细推导">8.2 Nesterov 加速原理（详细推导）
+</h2><h3 id="821-估计序列方法的直觉">8.2.1 估计序列方法的直觉
+</h3><p>Nesterov 加速的经典构造基于**估计序列（Estimate Sequence）**思想。</p>
+<p><strong>目标</strong>：对于 $L$-smooth 凸函数 $f$，构造迭代序列 ${x_k}$ 使得：
+</p>
+$$f(x_k) - f^* \leq \frac{2L\|x_0 - x^*\|^2}{(k+1)^2}$$<p><strong>构造思路</strong>：不直接在目标函数 $f$ 上优化（那样只能做到 $O(1/k)$），而是构造一列<strong>辅助函数</strong> ${\phi_k(x)}$（叫做&quot;估计序列&quot;，因为它们从下方逐步逼近 $f$），满足：</p>
+<ol>
+<li>$\phi_k(x) \leq (1 - \theta_k)f(x) + \theta_k \phi_0(x)$ —— 估计序列保持在 $f$ 和初始函数 $\phi_0$ 的凸组合之下</li>
+<li>$f(x_k) \leq \min_x \phi_k(x) = \phi_k^*$ —— 迭代点 $x_k$ 被控制在当前估计序列的最小值之下（这是核心！）</li>
+<li>$\phi_0(x) = f(x_0) + \frac{\gamma_0}{2}|x - v_0|^2$ —— 初始化为一个二次函数（简单、有显式极小值）</li>
+</ol>
+<p>如果这三个条件同时成立，那么：
+</p>
+$$f(x_k) - f^* \leq \phi_k^* - f^* \leq \theta_k(\phi_0(x^*) - f(x^*)) \leq \theta_k \frac{\gamma_0}{2}\|x_0 - x^*\|^2$$<p>通过精心选择 $\theta_k$（让它下降得足够快）和 $\gamma_k$、序列 ${y_k}, {x_k}, {v_k}$，就能导出加速迭代——并且 $\theta_k = O(1/k^2)$ 带来了 $O(1/k^2)$ 的收敛率。</p>
+<h3 id="822-动量序列-t_k-的推导">8.2.2 动量序列 ${t_k}$ 的推导
+</h3><p>定义动量序列 ${t_k}$ 如下：</p>
+$$\boxed{t_0 = 1, \quad t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2}}$$<p><strong>为什么是这个形式？它从哪来的？</strong></p>
+<p>在估计序列分析中，我们需要保证 $\phi_k$ 的二次系数 $\gamma_k$ 递减。令 $\theta_k = \frac{2}{k+2}$（随 $k$ 衰减以保证收敛速度），并定义 $\gamma_{k+1} = (1 - \theta_k)\gamma_k$。通过递推和整理，得到 $t_k = 1/\theta_{k-1}$ 满足：
+</p>
+$$t_{k+1}^2 - t_{k+1} = t_k^2$$<p>解这个关于 $t_{k+1}$ 的二次方程 $t_{k+1}^2 - t_{k+1} - t_k^2 = 0$，取正根：
+</p>
+$$t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2}$$<p>这就是 ${t_k}$ 公式的来源——它是估计序列分析的自然产物，不是凭空编出来的。</p>
+<p><strong>${t_k}$ 的核心恒等式</strong>（考试和证明中反复使用）：</p>
+$$\boxed{t_{k+1}^2 - t_{k+1} = t_k^2}$$<p><strong>验证推导</strong>（一步一步来）：
+</p>
+$$\begin{aligned}
+t_{k+1}^2 - t_{k+1} &= \left(\frac{1 + \sqrt{1 + 4t_k^2}}{2}\right)^2 - \frac{1 + \sqrt{1 + 4t_k^2}}{2} \\[6pt]
+&= \frac{1 + 2\sqrt{1 + 4t_k^2} + (1 + 4t_k^2)}{4} - \frac{1 + \sqrt{1 + 4t_k^2}}{2} \\[6pt]
+&= \frac{2 + 2\sqrt{1 + 4t_k^2} + 4t_k^2}{4} - \frac{1 + \sqrt{1 + 4t_k^2}}{2} \\[6pt]
+&= \frac{1 + \sqrt{1 + 4t_k^2} + 2t_k^2}{2} - \frac{1 + \sqrt{1 + 4t_k^2}}{2} \\[6pt]
+&= t_k^2
+\end{aligned}$$<p><strong>${t_k}$ 的下界估计</strong>：</p>
+$$\boxed{t_k \geq \frac{k+1}{2}, \quad \forall k \geq 0}$$<p><strong>证明</strong>（数学归纳法）：</p>
+<ul>
+<li>$k=0$：$t_0 = 1 \geq \frac{1}{2}$，成立。</li>
+<li>递推步：由 $t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2} \geq \frac{1 + 2t_k}{2} = t_k + \frac{1}{2}$（因为 $\sqrt{1+4t_k^2} \geq 2t_k$，当 $t_k \geq 0$）。</li>
+<li>因此 $t_{k+1} \geq t_k + \frac{1}{2} \geq \frac{k+1}{2} + \frac{1}{2} = \frac{k+2}{2}$。</li>
+</ul>
+<p>这个下界 <strong>$t_k \approx k/2$</strong> 是 $O(1/k^2)$ 收敛率的关键——因为在收敛率推导中，$t_k^2 \approx k^2/4$ 这个二次增长速度直接抵消了 $1/k$ 的线性衰减。</p>
+<h3 id="823-外推步的构造">8.2.3 外推步的构造
+</h3><p>加速方法的核心是引入<strong>外推序列</strong> ${y_k}$（不是在 $x_k$ 处，而是在 $x_k$ 更&quot;超前&quot;的位置计算梯度）。</p>
+<p><strong>Nesterov 加速梯度法（NAG）的标准两序列形式</strong>：
+</p>
+$$\boxed{\begin{cases}
+y_k = x_k + \beta_k(x_k - x_{k-1}) & \text{（外推/动量步——沿历史方向多走一步）} \\[6pt]
+x_{k+1} = y_k - \alpha \nabla f(y_k) & \text{（梯度步——在预测位置 $y_k$ 处执行）} \\[6pt]
+\beta_k = \dfrac{t_k - 1}{t_{k+1}} & \text{（动量系数——由动量序列 $t_k$ 决定）}
+\end{cases}}$$<p>其中 $t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2}$，$t_0 = 1$。</p>
+<p><strong>动量系数 $\beta_k$ 的行为</strong>：</p>
+<ul>
+<li>$k=0$（第一步）：$t_0 = 1$，$t_1 = \frac{1+\sqrt{5}}{2} \approx 1.618$，$\beta_0 = \frac{1-1}{1.618} = 0$。第一步没有历史信息，所以不做外推——退化为普通 GD。</li>
+<li>$k=1$（第二步）：$\beta_1 = \frac{t_1 - 1}{t_2} \approx \frac{0.618}{2.0} = 0.309$。开始有动量了，但还很保守。</li>
+<li>$k \to \infty$（后期）：$t_k \approx k/2$，$\beta_k = \frac{k/2 - 1}{(k+1)/2} \approx \frac{k-2}{k+1} \to 1$。动量越来越大，算法越来越&quot;自信&quot;。</li>
+</ul>
+<p><strong>外推步的几何意义</strong>：
+</p>
+$$y_k = x_k + \beta_k(x_k - x_{k-1})$$<p>$y_k$ 不是老老实实站在 $x_k$ 位置——而是从 $x_{k-1}$ 到 $x_k$ 的方向上<strong>又往前冲了一段</strong>：</p>
+<ul>
+<li>早期（$k$ 小，$\beta_k \approx 0.3$）：外推保守——此时信息不足，不宜冒险走太远。</li>
+<li>后期（$k$ 大，$\beta_k \to 1$）：$y_k \approx 2x_k - x_{k-1}$——<strong>线性外推</strong>！算法已经&quot;摸清了&quot;曲面的下降趋势，大步流星往前冲。</li>
+</ul>
+<h3 id="824-o1k2-收敛率证明框架">8.2.4 $O(1/k^2)$ 收敛率证明框架
+</h3><p><strong>定理（Nesterov, 1983）</strong>：对 $L$-smooth 凸函数 $f$，NAG 取步长 $\alpha = 1/L$，则：</p>
+$$\boxed{f(x_k) - f^* \leq \frac{2L\|x_0 - x^*\|^2}{(k+1)^2}}$$<p><strong>证明框架</strong>（考试标准写法）：</p>
+<p>定义 <strong>Lyapunov 函数</strong>（一个不随时间增长的&quot;能量函数&quot;）：
+</p>
+$$\Phi_k = t_k^2\big(f(x_k) - f^*\big) + \frac{L}{2}\|v_k - x^*\|^2$$<p>其中 $v_k$ 满足 $v_0 = x_0$，且 $v_{k+1} = v_k - \frac{t_k}{\alpha L}\nabla f(y_k)$（$v_k$ 是估计序列的中心，不必深究其含义——它只是证明的辅助工具）。</p>
+<p><strong>关键步骤</strong>（概要）：</p>
+<ol>
+<li>
+<p>利用 $f$ 的凸性（一阶下界：$f(y_k) \geq f(x^<em>) + \nabla f(y_k)^T(y_k - x^</em>)$）和 $L$-smooth 性（二次上界：$f(x_{k+1}) \leq f(y_k) - \frac{1}{2L}|\nabla f(y_k)|^2$，因为 $x_{k+1} = y_k - \frac{1}{L}\nabla f(y_k)$），证明递推关系：
+</p>
+$$\Phi_{k+1} \leq \Phi_k$$</li>
+<li>
+<p>初始值：$\Phi_0 = t_0^2(f(x_0) - f^<em>) + \frac{L}{2}|x_0 - x^</em>|^2$。由于 $t_0=1$ 且 $f(x_0) - f^<em>$ 是一个正的有限值，我们可以用更强的上界 $\Phi_0 \leq \frac{L}{2}|x_0 - x^</em>|^2$（在合理假设下）。</p>
+</li>
+<li>
+<p>由 $\Phi_k$ 非增（$\Phi_k \leq \Phi_0$），有：
+</p>
+$$t_k^2(f(x_k) - f^*) \leq \Phi_k \leq \Phi_0 \leq \frac{L}{2}\|x_0 - x^*\|^2$$</li>
+<li>
+<p>利用下界 $t_k \geq \frac{k+1}{2}$，代入上式：
+</p>
+$$f(x_k) - f^* \leq \frac{L\|x_0 - x^*\|^2}{2t_k^2} \leq \frac{L\|x_0 - x^*\|^2}{2 \cdot (k+1)^2/4} = \frac{2L\|x_0 - x^*\|^2}{(k+1)^2}$$</li>
+</ol>
+<p><strong>与 GD 的对比——加速的关键洞察</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>特征</th>
+					<th>GD（Ch2）</th>
+					<th>NAG（加速版）</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Lyapunov 函数</td>
+					<td>$|x_k - x^*|^2$</td>
+					<td>$t_k^2(f(x_k)-f^<em>) + \frac{L}{2}|v_k-x^</em>|^2$</td>
+			</tr>
+			<tr>
+					<td>收敛率</td>
+					<td>$O(1/k)$</td>
+					<td>$O(1/k^2)$</td>
+			</tr>
+			<tr>
+					<td>权重增长速度</td>
+					<td>$1$（恒定不变）</td>
+					<td>$t_k^2 \approx k^2/4$（<strong>二次增长！</strong>）</td>
+			</tr>
+			<tr>
+					<td>下降性</td>
+					<td>保证单调下降</td>
+					<td><strong>不保证单调</strong>，允许震荡</td>
+			</tr>
+			<tr>
+					<td>每步代价</td>
+					<td>一个梯度计算</td>
+					<td>一个梯度计算（+ $O(n)$ 外推）</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>加速的本质</strong>：给函数值误差 $(f(x_k) - f^<em>)$ 一个<strong>随时间二次增长的权重</strong> $t_k^2$。即使 $f(x_k)$ 本身可能震荡（不单调下降），$t_k^2(f(x_k)-f^</em>)$ 这个加权误差依然被 Lyapunov 函数 $\Phi_k$ 控制着不增长。这意味着 $(f(x_k)-f^*)$ 本身必须以 <strong>$O(1/t_k^2) = O(1/k^2)$</strong> 的速度衰减。</p>
+<blockquote>
+<p><strong>核心要点</strong>：Nesterov 加速的核心是 ${t_k}$ 序列满足 $t_{k+1}^2 - t_{k+1} = t_k^2$，$t_0=1$，且 $t_k \geq (k+1)/2$。通过外推步 $y_k = x_k + \beta_k(x_k - x_{k-1})$（$\beta_k = (t_k-1)/t_{k+1}$），在&quot;超前&quot;位置计算梯度，收敛率从 $O(1/k)$ 提升到 $O(1/k^2)$。加速的代价是<strong>牺牲了单调下降性</strong>——函数值可能震荡，但渐近收敛更快。</p>
+</blockquote>
+<hr>
+<h2 id="83-fista-算法">8.3 FISTA 算法
+</h2><h3 id="831-ista-vs-fista--迭代格式对比">8.3.1 ISTA vs FISTA —— 迭代格式对比
+</h3><p><strong>ISTA</strong>（Ch7，普通速度）：
+</p>
+$$x_{k+1} = \text{prox}_{\alpha g}\big(x_k - \alpha\nabla f(x_k)\big)$$<p><strong>FISTA</strong>（Fast ISTA，加速版）：
+</p>
+$$\boxed{\begin{cases}
+y_k = x_k + \beta_k(x_k - x_{k-1}) \\[6pt]
+x_{k+1} = \text{prox}_{\alpha g}\big(y_k - \alpha\nabla f(y_k)\big)
+\end{cases}}$$<p><strong>唯一的区别</strong>：将 ISTA 邻近梯度步中的评估点从 $x_k$ 替换为外推点 $y_k$！计算量完全不变（多了一个 $O(n)$ 的外推和一行存 $x_{k-1}$ 的内存）。</p>
+<h3 id="832-fista-完整算法伪代码">8.3.2 FISTA 完整算法伪代码
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">输入: f (L-smooth凸), g (闭凸, prox好算), L (或线搜索), x0, 最大迭代 K
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">初始化:
+</span></span><span class="line"><span class="cl">  x_prev = x0,  x_curr = x0    // 前一步和当前步
+</span></span><span class="line"><span class="cl">  t_prev = 1                   // 动量序列初值
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">for k = 1, 2, ..., K:
+</span></span><span class="line"><span class="cl">    // Step 1: 更新动量参数
+</span></span><span class="line"><span class="cl">    t_curr = (1 + sqrt(1 + 4 * t_prev^2)) / 2
+</span></span><span class="line"><span class="cl">    beta = (t_prev - 1) / t_curr
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    // Step 2: 计算外推点（沿历史方向往前走一步）
+</span></span><span class="line"><span class="cl">    y = x_curr + beta * (x_curr - x_prev)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    // Step 3: 在外推点 y 处执行邻近梯度步（这才是 ISTA 的核心操作）
+</span></span><span class="line"><span class="cl">    x_new = prox_{g/L}(y - (1/L) * grad_f(y))
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    // Step 4: 变量轮转，准备下一轮
+</span></span><span class="line"><span class="cl">    x_prev = x_curr
+</span></span><span class="line"><span class="cl">    x_curr = x_new
+</span></span><span class="line"><span class="cl">    t_prev = t_curr
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">输出: x_curr
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="833-为什么-fista-可能非单调">8.3.3 为什么 FISTA 可能非单调？
+</h3><p>设 $F(x) = f(x) + g(x)$ 为复合目标函数，$x_{k+1} = \text{prox}_{\alpha g}(y_k - \alpha\nabla f(y_k))$。</p>
+<p>ISTA 的充分下降性（Ch7 的 7.3.4 节）保证从<strong>同一点</strong>出发的单调下降：
+</p>
+$$F\big(\text{prox}_{\alpha g}(x_k - \alpha\nabla f(x_k))\big) \leq F(x_k) - \frac{L}{2}\|\text{prox} - x_k\|^2$$<p>但 FISTA 中，邻近梯度步的出发点是 <strong>$y_k$ 而不是 $x_k$</strong>。问题在于：$F(y_k)$ 和 $F(x_k)$ 之间<strong>没有大小关系</strong>——$y_k$ 可能通过外推&quot;冲到了&quot;比 $x_k$ 函数值更高的位置（就像一辆有惯性的汽车，冲过了谷底又爬上了对面的坡）。</p>
+<p><strong>结论</strong>：加速算法<strong>牺牲了单调性，换取了更快的渐近收敛率</strong>。这在实际中表现为&quot;过冲→回调→再过冲&quot;的典型震荡模式。Lyapunov 函数分析保证：虽然每一步的函数值可能反弹，但长期来看，<strong>包络线</strong>以 $O(1/k^2)$ 速度单调趋近最小值。</p>
+<h3 id="834-重启策略restart-在实践中驯服震荡">8.3.4 重启策略（Restart）—— 在实践中驯服震荡
+</h3><p>由于 FISTA 可能震荡，<strong>重启</strong>是实践中非常重要且简单的技巧：</p>
+<ul>
+<li><strong>函数值重启</strong>：当 $F(x_{k+1}) &gt; F(x_k)$ 时（函数值反弹了！），重置 $t_k = 1$，$y_k = x_k$（等于从当前位置重新开始加速）。</li>
+<li><strong>固定重启</strong>：每固定 $N$ 步重置一次动量（如 $N = 100$）。</li>
+<li><strong>梯度重启</strong>：当 $\langle \nabla f(y_k), x_{k+1} - x_k \rangle &gt; 0$ 时重启（梯度方向和前进方向&quot;打架&quot;了）。</li>
+</ul>
+<p><strong>强凸情况的特别好处</strong>：对于 $\mu$-强凸函数，带适当重启的 FISTA 可以达到<strong>线性收敛</strong>：
+</p>
+$$\boxed{F(x_k) - F^* = O\big((1 - \sqrt{\mu/L})^k\big)}$$<p>而普通 GD 只有 $O((1 - \mu/L)^k)$。加速将条件数依赖从 $\kappa = L/\mu$ 改进到了 <strong>$\sqrt{\kappa}$</strong>——当条件数很大（问题很&quot;病态&quot;）时，这个改进极其显著。</p>
+<h3 id="835-重球法heavy-ball与-nesterov-加速的关键区别">8.3.5 重球法（Heavy-Ball）与 Nesterov 加速的关键区别
+</h3><p>Polyak 的重球法（1964）：
+</p>
+$$x_{k+1} = x_k - \alpha\nabla f(x_k) + \beta(x_k - x_{k-1})$$<p><strong>与 Nesterov 加速的对比</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>特征</th>
+					<th>重球法 (Heavy Ball)</th>
+					<th>Nesterov 加速 (NAG/FISTA)</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>梯度在哪个点计算？</strong></td>
+					<td>$x_k$（当前位置）</td>
+					<td>$y_k = x_k + \beta_k(x_k - x_{k-1})$（<strong>超前</strong>位置）</td>
+			</tr>
+			<tr>
+					<td>动量参数</td>
+					<td>常数 $\beta \in (0,1)$</td>
+					<td>时变 $\beta_k \to 1$（随迭代增大）</td>
+			</tr>
+			<tr>
+					<td>收敛率（光滑凸）</td>
+					<td>$O(1/k)$（没有理论改进）</td>
+					<td>$O(1/k^2)$（<strong>达到下界！</strong>）</td>
+			</tr>
+			<tr>
+					<td>强凸收敛率</td>
+					<td>$O((1 - \sqrt{\mu/L})^k)$</td>
+					<td>$O((1 - \sqrt{\mu/L})^k)$</td>
+			</tr>
+			<tr>
+					<td>理论来源</td>
+					<td>物理二阶 ODE 离散化</td>
+					<td>估计序列最优化方法</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>一句话总结本质区别</strong>：</p>
+<ul>
+<li>重球法：&ldquo;我先到 $x_k$，看清楚当前梯度，然后带着之前的惯性滑过去。&rdquo;</li>
+<li>Nesterov 加速：&ldquo;我不在 $x_k$ 停——我先顺着历史方向滑到预估点 $y_k$，在那个位置看梯度，判断是否需要修正方向。&rdquo;</li>
+</ul>
+<p>Nesterov 的更优性来自于：在预测位置计算梯度，相当于对&quot;即将到达的地点&quot;做前瞻判断——防止惯性把自己带进坑里。</p>
+<h3 id="836-fista-对-lasso-的实现加速几乎是免费的">8.3.6 FISTA 对 LASSO 的实现——加速几乎是免费的
+</h3><p><strong>ISTA</strong>（LASSO 的普通版）：
+</p>
+$$x_{k+1} = S_{\lambda/L}\left(x_k - \frac{1}{L}A^T(Ax_k - b)\right)$$<p><strong>FISTA</strong>（LASSO 的加速版）：
+</p>
+$$\begin{cases}
+y_k = x_k + \beta_k(x_k - x_{k-1}) \\[4pt]
+x_{k+1} = S_{\lambda/L}\left(y_k - \frac{1}{L}A^T(Ay_k - b)\right)
+\end{cases}$$<p><strong>计算量对比</strong>：</p>
+<ul>
+<li>ISTA 每步：矩阵-向量乘 $Ax_k$（$O(mn)$）+ $A^T(Ax_k - b)$（$O(mn)$）+ 软阈值（$O(n)$）→ $O(mn)$</li>
+<li>FISTA 每步：矩阵-向量乘 $Ay_k$（$O(mn)$）+ $A^T(Ay_k - b)$（$O(mn)$）+ 软阈值（$O(n)$）+ 外推计算 $y_k$（$O(n)$）→ $O(mn)$</li>
+</ul>
+<p><strong>计算量完全相同</strong>（$mn$ 主导，$n$ 可忽略不计）！额外的内存也只是多存一个 $x_{k-1}$ 向量。</p>
+<p><strong>结论</strong>：加速几乎是&quot;免费的&quot;——相同计算量，收敛率从 $O(1/k)$ 翻倍提升到 $O(1/k^2)$。</p>
+<blockquote>
+<p><strong>核心要点</strong>：FISTA 在 ISTA 的核心迭代（邻近梯度步）之前加一个外推步 $y_k = x_k + \beta_k(x_k - x_{k-1})$，将梯度计算的评估点从 $x_k$ 移到更超前的 $y_k$。计算量几乎不变，收敛率从 $O(1/k)$ 提升到 $O(1/k^2)$。FISTA 可能非单调下降，重启策略在实践中恢复稳定性。对强凸函数，加速将条件数依赖从 $\kappa$ 改进到 $\sqrt{\kappa}$。</p>
+</blockquote>
+<hr>
+<h2 id="84-典型例题">8.4 典型例题
+</h2><h3 id="例题-81动量序列的性质证明">例题 8.1：动量序列的性质证明
+</h3><p><strong>题目</strong>：设 $t_0 = 1$，$t_{k+1} = \frac{1 + \sqrt{1 + 4t_k^2}}{2}$。证明：
+(a) $t_{k+1}^2 - t_{k+1} = t_k^2$
+(b) $t_k \geq \frac{k+1}{2}$（对 $k \geq 0$）</p>
+<p><strong>证明</strong>：</p>
+<p>(a) 直接计算——详见 8.2.2 节的逐步推导。</p>
+<p>(b) 归纳法：</p>
+<ul>
+<li>基始 $k=0$：$t_0 = 1 \geq \frac{1}{2}$ 成立。</li>
+<li>归纳假设 $t_k \geq \frac{k+1}{2}$。由 $\sqrt{1+4t_k^2} \geq \sqrt{4t_k^2} = 2t_k$（$t_k \geq 0$ 故舍绝对值）：
+
+$$t_{k+1} = \frac{1 + \sqrt{1+4t_k^2}}{2} \geq \frac{1 + 2t_k}{2} \geq \frac{1 + 2 \cdot \frac{k+1}{2}}{2} = \frac{k+2}{2}$$</li>
+</ul>
+<hr>
+<h3 id="例题-82nag-在二次函数上的行为">例题 8.2：NAG 在二次函数上的行为
+</h3><p><strong>题目</strong>：对 $f(x) = \frac{L}{2}x^2$（$L &gt; 0$，最优解在 $x^* = 0$），取 $x_0 = a$，比较 GD 和 NAG 的收敛行为。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>GD</strong>（$\alpha = 1/L$）：$x_1 = x_0 - \frac{1}{L} \cdot Lx_0 = a - a = 0$。<strong>一步收敛！</strong></p>
+<p><strong>NAG</strong>（$\alpha = 1/L$，$\beta_0 = 0$）：</p>
+<ul>
+<li>$t_0 = 1$，$\beta_0 = 0$，$y_0 = x_0 = a$，$x_1 = y_0 - \frac{1}{L} \cdot Ly_0 = 0$。</li>
+</ul>
+<p>也是一步收敛。为什么？因为纯二次函数的 Hessian 是常数，梯度方向始终指向最优点——不需要动量来&quot;记忆&quot;方向。</p>
+<p><strong>启示</strong>：对于纯二次函数（完美对称的碗），GD 和 NAG 表现相同。加速的<strong>真正优势</strong>体现在<strong>非二次</strong>（条件数大、曲率各向异性）的函数上——GD 在最慢曲率方向上缓慢爬行，而加速通过动量克服了&quot;之字形&quot;震荡。</p>
+<hr>
+<h3 id="例题-83fista-对-lasso--加速为什么是免费的">例题 8.3：FISTA 对 LASSO —— 加速为什么是&quot;免费&quot;的
+</h3><p><strong>题目</strong>：对 LASSO 问题 $\min_x \frac{1}{2}|Ax-b|^2 + \lambda|x|_1$，写出 FISTA 迭代，并详细对比 ISTA 的计算量。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>ISTA</strong>：$x_{k+1} = S_{\lambda/L}(x_k - \frac{1}{L}A^T(Ax_k - b))$</p>
+<p><strong>FISTA</strong>：
+</p>
+$$\begin{cases}
+y_k = x_k + \beta_k(x_k - x_{k-1}) \\
+x_{k+1} = S_{\lambda/L}(y_k - \frac{1}{L}A^T(Ay_k - b))
+\end{cases}$$<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>操作</th>
+					<th>ISTA 每步</th>
+					<th>FISTA 每步</th>
+					<th>差异</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>矩阵-向量乘 $A \cdot$</td>
+					<td>$O(mn)$（$Ax_k$）</td>
+					<td>$O(mn)$（$Ay_k$）</td>
+					<td>0</td>
+			</tr>
+			<tr>
+					<td>$A^T(A\cdot - b)$</td>
+					<td>$O(mn)$</td>
+					<td>$O(mn)$</td>
+					<td>0</td>
+			</tr>
+			<tr>
+					<td>软阈值</td>
+					<td>$O(n)$</td>
+					<td>$O(n)$</td>
+					<td>0</td>
+			</tr>
+			<tr>
+					<td>外推</td>
+					<td>0</td>
+					<td>$O(n)$</td>
+					<td><strong>$+O(n)$</strong></td>
+			</tr>
+			<tr>
+					<td>额外存储</td>
+					<td>1 个 $n$ 维向量</td>
+					<td>2 个 $n$ 维向量</td>
+					<td><strong>$+n$ 内存</strong></td>
+			</tr>
+	</tbody>
+</table></div>
+<p>$O(n)$ 相比于 $O(mn)$（典型 $m, n$ 都可能几千）可以忽略。所以加速<strong>确实几乎是免费的</strong>。</p>
+<hr>
+<h3 id="例题-84动量系数的渐近行为">例题 8.4：动量系数的渐近行为
+</h3><p><strong>题目</strong>：证明 $\lim_{k \to \infty} \beta_k = 1$，并解释其几何含义。</p>
+<p><strong>证明</strong>：</p>
+<p>由 $t_k \geq \frac{k+1}{2}$ 且 $t_{k+1}^2 - t_{k+1} = t_k^2$：</p>
+$$\beta_k = \frac{t_k - 1}{t_{k+1}} = \frac{t_k}{t_{k+1}} \cdot \frac{t_k - 1}{t_k}$$<p>由 $t_{k+1}/t_k \approx 1$（当 $k \to \infty$ 时，$t_k \approx k/2$，$t_{k+1}/t_k \to 1$），且 $(t_k-1)/t_k \to 1$，得 $\beta_k \to 1$。</p>
+<p><strong>几何含义</strong>：$y_k = x_k + \beta_k(x_k - x_{k-1})$。当 $\beta_k \to 1$ 时，$y_k \approx 2x_k - x_{k-1}$——这是<strong>线性外推</strong>！算法已经从&quot;谨慎试探&quot;过渡到了&quot;大胆冲刺&quot;。这也解释了为何加速算法后期可能震荡——外推太&quot;猛&quot;，一旦遇到曲率变化，就冲过头了。</p>
+<hr>
+<h3 id="例题-85fista-的非单调性演示">例题 8.5：FISTA 的非单调性演示
+</h3><p><strong>题目</strong>：找一个简单例子，说明 FISTA 的目标函数值序列不是单调下降的。</p>
+<p><strong>解答</strong>：</p>
+<p>取 $f(x) = \frac{1}{4}x^4$（非二次光滑凸函数，$x^* = 0$），$g(x) = 0$（纯 NAG 情形）。</p>
+<p>初始化 $x_0 = 2$：</p>
+<ul>
+<li>$k=0$：$\beta_0 = 0$，$y_0 = 2$，$x_1 = y_0 - \alpha f&rsquo;(y_0) \approx 2 - \alpha \cdot 8$。取合适的 $\alpha$ 使 $x_1 \approx 1$。</li>
+<li>$k=1$：$\beta_1 \approx 0.309$，$y_1 = x_1 + 0.309(x_1 - x_0) = 1 + 0.309(1 - 2) = 0.691$。此时 $f(f&rsquo;(0.691) = 0.691^3 \approx 0.33)$。$x_2 \approx 0.691 - \alpha \cdot 0.33$。</li>
+</ul>
+<p>由于外推把 $y_1$ 拉向更接近 0 但&quot;冲&quot;的方向与梯度方向不完全一致，$f(x_2)$ 可能大于 $f(x_1)$——这就是非单调性。</p>
+<p><strong>结论</strong>：加速算法允许函数值在迭代中反弹上升，但长期趋势是 $O(1/k^2)$ 速度下降。</p>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>概念</th>
+					<th>核心公式/结论</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>加速动机</td>
+					<td>GD/ISTA 只有 $O(1/k)$，信息论下界是 $O(1/k^2)$——加速达到下界</td>
+			</tr>
+			<tr>
+					<td>动量序列</td>
+					<td>$t_0 = 1$，$t_{k+1} = \frac{1+\sqrt{1+4t_k^2}}{2}$</td>
+			</tr>
+			<tr>
+					<td>核心恒等式</td>
+					<td>$t_{k+1}^2 - t_{k+1} = t_k^2$</td>
+			</tr>
+			<tr>
+					<td>下界估计</td>
+					<td>$t_k \geq \frac{k+1}{2}$（归纳法证明）</td>
+			</tr>
+			<tr>
+					<td>动量系数</td>
+					<td>$\beta_k = \frac{t_k - 1}{t_{k+1}}$，$\beta_k \to 1$（渐近行为）</td>
+			</tr>
+			<tr>
+					<td>NAG 迭代</td>
+					<td>$y_k = x_k + \beta_k(x_k - x_{k-1})$，$x_{k+1} = y_k - \alpha\nabla f(y_k)$</td>
+			</tr>
+			<tr>
+					<td>FISTA 迭代</td>
+					<td>$y_k = x_k + \beta_k(x_k - x_{k-1})$，$x_{k+1} = \text{prox}_{\alpha g}(y_k - \alpha\nabla f(y_k))$</td>
+			</tr>
+			<tr>
+					<td>收敛率（光滑凸）</td>
+					<td>$O(1/k^2)$，达到一阶方法的最优下界</td>
+			</tr>
+			<tr>
+					<td>收敛率（强凸+重启）</td>
+					<td>$O((1 - \sqrt{\mu/L})^k)$，条件数依赖从 $\kappa$ 改进到 $\sqrt{\kappa}$</td>
+			</tr>
+			<tr>
+					<td>重球法 vs NAG</td>
+					<td>重球在 $x_k$ 处算梯度，NAG 在超前点 $y_k$ 处算梯度</td>
+			</tr>
+			<tr>
+					<td>非单调性</td>
+					<td>加速牺牲单调下降性换取更快渐近收敛</td>
+			</tr>
+			<tr>
+					<td>与 ISTA 的计算量对比</td>
+					<td>几乎相同（仅多 $O(n)$ 外推），加速是&quot;免费的&quot;</td>
+			</tr>
+			<tr>
+					<td>重启策略</td>
+					<td>函数值反弹时重置 $t_k=1$，实践中恢复稳定性</td>
+			</tr>
+			<tr>
+					<td>线搜索版本</td>
+					<td>回溯线搜索 + FISTA 仍保持 $O(1/k^2)$</td>
+			</tr>
+			<tr>
+					<td>Lyapunov 分析本质</td>
+					<td>$t_k^2$ 二次增长的权重保证了 $O(1/k^2)$ 速率</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>(End of file)</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

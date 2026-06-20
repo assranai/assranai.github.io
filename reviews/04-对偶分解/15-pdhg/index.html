@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第15章：原始-对偶混合梯度法（PDHG） 核心思想：PDHG通过在原始空间和对偶空间同时做邻近梯度步来求解II型复合优化问题 $\\min_x f(x) + g(Kx)$。它是一种高度统一的算法框架——DR分裂法和ADMM都是它的特例。理解PDHG，就掌握了整个分裂方法族的&quot;统一理论密钥&quot;。\n前置知识回顾 概念 定义（简要） 首次出现 II型复合优化 $\\min_x f(x) + g(Kx)$——$g$ 套在线性算子 $K$ 内部，无法直接对 $g \\circ K$ 用邻近算子 Ch10 DR分裂法 $\\min f + g$（$f,g$均可非光滑）的反射-平均不动点迭代 Ch13 ADMM $\\min_{x,z} f(x) + g(z)$ s.t. $Ax + Bz = c$ 的交替极小化（共识形式最常见） Ch14 邻近算子 $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$ Ch7 共轭函数 $f^*$ $f^*(y) = \\sup_x { y^T x - f(x) }$——原函数的&quot;对偶表示&quot; Ch9 Fenchel对偶 $\\min_x f(x) + g(Kx)$ 的对偶 = $\\max_y -f^(-K^T y) - g^(y)$ Ch10 鞍点问题 $\\min_x \\max_y \\Phi(x, y)$——在 $x$ 方向极小化，在 $y$ 方向极大化 Ch15详述 次梯度 $\\partial f(x) = { g \\mid f(y) \\geq f(x) + g^T(y-x), \\forall y}$——非光滑函数在折角处的斜率集合 Ch11 极大单调算子 $T$ 满足 $\\langle u - v, x - y \\rangle \\geq 0$，$\\partial f$ 是典型例子 Ch9, Ch13 预条件邻近点法 在变换后的变尺度度量下做邻近点法，放宽对步长的限制 Ch15详述 15.1 II型复合优化的原始-对偶鞍点重构 15.1.1 问题的出发点 回顾II型复合凸优化（Ch10对偶邻近梯度法的最核心问题形式）：\n">
+<title>第15章：原始-对偶混合梯度法（PDHG）</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/15-pdhg/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第15章：原始-对偶混合梯度法（PDHG）">
+<meta property='og:description' content="第15章：原始-对偶混合梯度法（PDHG） 核心思想：PDHG通过在原始空间和对偶空间同时做邻近梯度步来求解II型复合优化问题 $\\min_x f(x) + g(Kx)$。它是一种高度统一的算法框架——DR分裂法和ADMM都是它的特例。理解PDHG，就掌握了整个分裂方法族的&quot;统一理论密钥&quot;。\n前置知识回顾 概念 定义（简要） 首次出现 II型复合优化 $\\min_x f(x) + g(Kx)$——$g$ 套在线性算子 $K$ 内部，无法直接对 $g \\circ K$ 用邻近算子 Ch10 DR分裂法 $\\min f + g$（$f,g$均可非光滑）的反射-平均不动点迭代 Ch13 ADMM $\\min_{x,z} f(x) + g(z)$ s.t. $Ax + Bz = c$ 的交替极小化（共识形式最常见） Ch14 邻近算子 $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$ Ch7 共轭函数 $f^*$ $f^*(y) = \\sup_x { y^T x - f(x) }$——原函数的&quot;对偶表示&quot; Ch9 Fenchel对偶 $\\min_x f(x) + g(Kx)$ 的对偶 = $\\max_y -f^(-K^T y) - g^(y)$ Ch10 鞍点问题 $\\min_x \\max_y \\Phi(x, y)$——在 $x$ 方向极小化，在 $y$ 方向极大化 Ch15详述 次梯度 $\\partial f(x) = { g \\mid f(y) \\geq f(x) + g^T(y-x), \\forall y}$——非光滑函数在折角处的斜率集合 Ch11 极大单调算子 $T$ 满足 $\\langle u - v, x - y \\rangle \\geq 0$，$\\partial f$ 是典型例子 Ch9, Ch13 预条件邻近点法 在变换后的变尺度度量下做邻近点法，放宽对步长的限制 Ch15详述 15.1 II型复合优化的原始-对偶鞍点重构 15.1.1 问题的出发点 回顾II型复合凸优化（Ch10对偶邻近梯度法的最核心问题形式）：\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/15-pdhg/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第15章：原始-对偶混合梯度法（PDHG）">
+<meta name="twitter:description" content="第15章：原始-对偶混合梯度法（PDHG） 核心思想：PDHG通过在原始空间和对偶空间同时做邻近梯度步来求解II型复合优化问题 $\\min_x f(x) + g(Kx)$。它是一种高度统一的算法框架——DR分裂法和ADMM都是它的特例。理解PDHG，就掌握了整个分裂方法族的&quot;统一理论密钥&quot;。\n前置知识回顾 概念 定义（简要） 首次出现 II型复合优化 $\\min_x f(x) + g(Kx)$——$g$ 套在线性算子 $K$ 内部，无法直接对 $g \\circ K$ 用邻近算子 Ch10 DR分裂法 $\\min f + g$（$f,g$均可非光滑）的反射-平均不动点迭代 Ch13 ADMM $\\min_{x,z} f(x) + g(z)$ s.t. $Ax + Bz = c$ 的交替极小化（共识形式最常见） Ch14 邻近算子 $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$ Ch7 共轭函数 $f^*$ $f^*(y) = \\sup_x { y^T x - f(x) }$——原函数的&quot;对偶表示&quot; Ch9 Fenchel对偶 $\\min_x f(x) + g(Kx)$ 的对偶 = $\\max_y -f^(-K^T y) - g^(y)$ Ch10 鞍点问题 $\\min_x \\max_y \\Phi(x, y)$——在 $x$ 方向极小化，在 $y$ 方向极大化 Ch15详述 次梯度 $\\partial f(x) = { g \\mid f(y) \\geq f(x) + g^T(y-x), \\forall y}$——非光滑函数在折角处的斜率集合 Ch11 极大单调算子 $T$ 满足 $\\langle u - v, x - y \\rangle \\geq 0$，$\\partial f$ 是典型例子 Ch9, Ch13 预条件邻近点法 在变换后的变尺度度量下做邻近点法，放宽对步长的限制 Ch15详述 15.1 II型复合优化的原始-对偶鞍点重构 15.1.1 问题的出发点 回顾II型复合凸优化（Ch10对偶邻近梯度法的最核心问题形式）：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾">前置知识回顾</a></li>
+    <li><a href="#151-ii型复合优化的原始-对偶鞍点重构">15.1 II型复合优化的原始-对偶鞍点重构</a>
+      <ol>
+        <li><a href="#1511-问题的出发点">15.1.1 问题的出发点</a></li>
+        <li><a href="#1512-鞍点重构的完整推导">15.1.2 鞍点重构的完整推导</a></li>
+        <li><a href="#1513-鞍点形式的对称性之美">15.1.3 鞍点形式的对称性之美</a></li>
+      </ol>
+    </li>
+    <li><a href="#152-对偶问题的等价表述">15.2 对偶问题的等价表述</a>
+      <ol>
+        <li><a href="#1521-从鞍点问题回到对偶问题">15.2.1 从鞍点问题回到对偶问题</a></li>
+      </ol>
+    </li>
+    <li><a href="#153-chambolle-pock算法pdhg的完整推导">15.3 Chambolle-Pock算法（PDHG）的完整推导</a>
+      <ol>
+        <li><a href="#1531-基本思想">15.3.1 基本思想</a></li>
+        <li><a href="#1532-一步一回合法最简单但不收敛的版本">15.3.2 一步一回合法（最简单但不收敛的版本）</a></li>
+        <li><a href="#1533-chambolle-pock算法标准形式">15.3.3 Chambolle-Pock算法（标准形式）</a></li>
+        <li><a href="#1534-每一步的详细推导">15.3.4 每一步的详细推导</a></li>
+      </ol>
+    </li>
+    <li><a href="#154-预条件邻近点法解释">15.4 预条件邻近点法解释</a>
+      <ol>
+        <li><a href="#1541-邻近点法的变尺度推广">15.4.1 邻近点法的变尺度推广</a></li>
+        <li><a href="#1542-pdhg的预条件解释">15.4.2 PDHG的预条件解释</a></li>
+      </ol>
+    </li>
+    <li><a href="#155-统一框架从单调包含到各算法的谱系">15.5 统一框架：从单调包含到各算法的谱系</a>
+      <ol>
+        <li><a href="#1551-极大单调包含问题">15.5.1 极大单调包含问题</a></li>
+        <li><a href="#1552-统一求解框架邻近点法">15.5.2 统一求解框架：邻近点法</a></li>
+        <li><a href="#1553-分裂方法族谱">15.5.3 分裂方法族谱</a></li>
+      </ol>
+    </li>
+    <li><a href="#156-图像去模糊应用">15.6 图像去模糊应用</a>
+      <ol>
+        <li><a href="#1561-tv-l2图像去模糊">15.6.1 TV-L2图像去模糊</a></li>
+        <li><a href="#1562-tv-l2的ii型复合形式">15.6.2 TV-L2的II型复合形式</a></li>
+        <li><a href="#1563-pdhg迭代详解">15.6.3 PDHG迭代详解</a></li>
+      </ol>
+    </li>
+    <li><a href="#157-典型例题">15.7 典型例题</a>
+      <ol>
+        <li><a href="#例题151pdhg推导基础鞍点重构">例题15.1（PDHG推导基础——鞍点重构）</a></li>
+        <li><a href="#例题152pdhg特例退化为ista">例题15.2（PDHG特例——退化为ISTA）</a></li>
+        <li><a href="#例题153pdhg-vs-admm的统一联系">例题15.3（PDHG vs ADMM的统一联系）</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a></li>
+    <li><a href="#158-补充例题">15.8 补充例题</a>
+      <ol>
+        <li><a href="#例题154pdhg求解tv-l1去噪">例题15.4（PDHG求解TV-L1去噪）</a></li>
+        <li><a href="#例题155pdhg的过松弛变体">例题15.5（PDHG的过松弛变体）</a></li>
+        <li><a href="#例题156pdhg框架总览各种特例的推导">例题15.6（PDHG框架总览——各种特例的推导）</a></li>
+      </ol>
+    </li>
+    <li><a href="#159-pdhg的实用指南">15.9 PDHG的实用指南</a>
+      <ol>
+        <li><a href="#1591-步长选取策略">15.9.1 步长选取策略</a></li>
+        <li><a href="#1592-theta-参数的影响">15.9.2 $\theta$ 参数的影响</a></li>
+        <li><a href="#1593-pdhg-vs-admm如何选择">15.9.3 PDHG vs ADMM——如何选择？</a></li>
+      </ol>
+    </li>
+    <li><a href="#1510-课程总结从ch10到ch15的完整知识图谱">15.10 课程总结：从Ch10到Ch15的完整知识图谱</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/15-pdhg/">第15章：原始-对偶混合梯度法（PDHG）</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 10 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第15章原始-对偶混合梯度法pdhg">第15章：原始-对偶混合梯度法（PDHG）
+</h1><blockquote>
+<p><strong>核心思想</strong>：PDHG通过在原始空间和对偶空间<strong>同时做邻近梯度步</strong>来求解II型复合优化问题 $\min_x f(x) + g(Kx)$。它是一种高度统一的算法框架——DR分裂法和ADMM都是它的特例。理解PDHG，就掌握了整个分裂方法族的&quot;统一理论密钥&quot;。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾">前置知识回顾
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>概念</th>
+					<th>定义（简要）</th>
+					<th>首次出现</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>II型复合优化</td>
+					<td>$\min_x f(x) + g(Kx)$——$g$ 套在线性算子 $K$ 内部，无法直接对 $g \circ K$ 用邻近算子</td>
+					<td>Ch10</td>
+			</tr>
+			<tr>
+					<td>DR分裂法</td>
+					<td>$\min f + g$（$f,g$均可非光滑）的反射-平均不动点迭代</td>
+					<td>Ch13</td>
+			</tr>
+			<tr>
+					<td>ADMM</td>
+					<td>$\min_{x,z} f(x) + g(z)$ s.t. $Ax + Bz = c$ 的交替极小化（共识形式最常见）</td>
+					<td>Ch14</td>
+			</tr>
+			<tr>
+					<td>邻近算子</td>
+					<td>$\operatorname{prox}_f(v) = \arg\min_x { f(x) + \frac{1}{2}|x - v|^2 }$</td>
+					<td>Ch7</td>
+			</tr>
+			<tr>
+					<td>共轭函数 $f^*$</td>
+					<td>$f^*(y) = \sup_x { y^T x - f(x) }$——原函数的&quot;对偶表示&quot;</td>
+					<td>Ch9</td>
+			</tr>
+			<tr>
+					<td>Fenchel对偶</td>
+					<td>$\min_x f(x) + g(Kx)$ 的对偶 = $\max_y -f^<em>(-K^T y) - g^</em>(y)$</td>
+					<td>Ch10</td>
+			</tr>
+			<tr>
+					<td>鞍点问题</td>
+					<td>$\min_x \max_y \Phi(x, y)$——在 $x$ 方向极小化，在 $y$ 方向极大化</td>
+					<td>Ch15详述</td>
+			</tr>
+			<tr>
+					<td>次梯度</td>
+					<td>$\partial f(x) = { g \mid f(y) \geq f(x) + g^T(y-x), \forall y}$——非光滑函数在折角处的斜率集合</td>
+					<td>Ch11</td>
+			</tr>
+			<tr>
+					<td>极大单调算子</td>
+					<td>$T$ 满足 $\langle u - v, x - y \rangle \geq 0$，$\partial f$ 是典型例子</td>
+					<td>Ch9, Ch13</td>
+			</tr>
+			<tr>
+					<td>预条件邻近点法</td>
+					<td>在变换后的变尺度度量下做邻近点法，放宽对步长的限制</td>
+					<td>Ch15详述</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="151-ii型复合优化的原始-对偶鞍点重构">15.1 II型复合优化的原始-对偶鞍点重构
+</h2><h3 id="1511-问题的出发点">15.1.1 问题的出发点
+</h3><p>回顾II型复合凸优化（Ch10对偶邻近梯度法的最核心问题形式）：</p>
+$$\boxed{\min_{x \in \mathbb{R}^n} \; f(x) + g(Kx)}$$<p>其中：</p>
+<ul>
+<li>$f: \mathbb{R}^n \to \mathbb{R} \cup {+\infty}$：闭凸函数（可以非光滑，要求 $\operatorname{prox}_f$ 好算）</li>
+<li>$g: \mathbb{R}^m \to \mathbb{R} \cup {+\infty}$：闭凸函数（可以非光滑）</li>
+<li>$K \in \mathbb{R}^{m \times n}$：已知线性算子（矩阵）</li>
+</ul>
+<p><strong>核心困难</strong>：$g(Kx)$ 中 $g$ 和 $K$ 耦合在一起。既不能直接对 $g \circ K$ 用邻近算子（通常没闭式），也不能直接对 $g$ 用梯度法（$g$ 可能非光滑）。</p>
+<h3 id="1512-鞍点重构的完整推导">15.1.2 鞍点重构的完整推导
+</h3><p><strong>第1步——共轭函数展开</strong>：利用 Fenchel-Moreau 定理，对闭凸函数 $g$ 有 $g^{**} = g$：
+</p>
+$$g(Kx) = g^{**}(Kx) = \sup_{y \in \mathbb{R}^m} \left\{ (Kx)^T y - g^*(y) \right\}$$<p>符号解释：</p>
+<ul>
+<li>$y \in \mathbb{R}^m$：对偶变量（也称 Lagrange 乘子，但这里不需要显式的约束形式）</li>
+<li>$g^*(y)$：$g$ 的凸共轭函数</li>
+<li>$(Kx)^T y = \langle Kx, y \rangle$：标准欧氏内积</li>
+</ul>
+<p><strong>第2步——代入原目标</strong>：
+</p>
+$$\begin{aligned} \min_x \left[ f(x) + g(Kx) \right] &= \min_x \left[ f(x) + \sup_y \left\{ \langle Kx, y \rangle - g^*(y) \right\} \right] \\ &= \min_x \sup_y \left[ f(x) + \langle Kx, y \rangle - g^*(y) \right] \end{aligned}$$<p><strong>第3步——定义鞍点函数</strong>：
+</p>
+$$\boxed{\Phi(x, y) = f(x) + \langle Kx, y \rangle - g^*(y)}$$<p>则原问题等价于鞍点问题：
+</p>
+$$\boxed{\min_x \max_y \; \Phi(x, y)}$$<p><strong>验证等价性</strong>（完整链条）：
+给定任意固定的 $x$：
+</p>
+$$\max_y \Phi(x, y) = f(x) + \max_y \left\{ \langle Kx, y \rangle - g^*(y) \right\} = f(x) + g^{**}(Kx) = f(x) + g(Kx)$$<p>因此 $\min_x \max_y \Phi(x, y) = \min_x [f(x) + g(Kx)]$，等价性得证。$\square$</p>
+<h3 id="1513-鞍点形式的对称性之美">15.1.3 鞍点形式的对称性之美
+</h3><p>观察 $\Phi(x, y) = f(x) + \langle Kx, y \rangle - g^*(y)$：</p>
+<ul>
+<li><strong>关于 $x$</strong>：$f(x)$ 可以是非光滑的凸函数 + 线性项 $\langle Kx, y \rangle$（光滑，梯度 = $K^T y$）</li>
+<li><strong>关于 $y$</strong>：$-g^<em>(y)$ 是凹函数（因为 $g^</em>$ 是凸的） + 线性项 $\langle Kx, y \rangle$</li>
+<li>$f$ 的邻近算子作用于原始空间，$g^*$ 的邻近算子作用于对偶空间</li>
+</ul>
+<p>这正是 PDHG 的出发点——<strong>同时在原始方向做&quot;邻近梯度下降&quot;，在对偶方向做&quot;邻近梯度上升&quot;</strong>。</p>
+<hr>
+<h2 id="152-对偶问题的等价表述">15.2 对偶问题的等价表述
+</h2><h3 id="1521-从鞍点问题回到对偶问题">15.2.1 从鞍点问题回到对偶问题
+</h3><p>交换 $\min$ 和 $\max$ 的顺序（假设强对偶成立）：
+</p>
+$$\max_y \min_x \Phi(x, y) = \max_y \min_x \left[ f(x) + \langle Kx, y \rangle - g^*(y) \right]$$<p>先对 $x$ 取极小：
+</p>
+$$\min_x \left[ f(x) + \langle Kx, y \rangle \right] = \min_x \left[ f(x) + x^T(K^T y) \right] = -\max_x \left[ (-K^T y)^T x - f(x) \right] = -f^*(-K^T y)$$<p>因此：
+</p>
+$$\max_y \left[ -f^*(-K^T y) - g^*(y) \right] \iff \boxed{\min_y \; f^*(-K^T y) + g^*(y)}$$<p>这正是Ch10中对偶邻近梯度法所求解的对偶问题。</p>
+<hr>
+<h2 id="153-chambolle-pock算法pdhg的完整推导">15.3 Chambolle-Pock算法（PDHG）的完整推导
+</h2><h3 id="1531-基本思想">15.3.1 基本思想
+</h3><p>鞍点问题 $\min_x \max_y \Phi(x, y)$ 同时涉及 $x$（原始变量）和 $y$（对偶变量）。PDHG的迭代策略是：</p>
+<ol>
+<li>在对偶方向做<strong>邻近梯度上升</strong>（使得 $\Phi$ 增大）</li>
+<li>在原始方向做<strong>邻近梯度下降</strong>（使得 $\Phi$ 减小）</li>
+<li>两个方向交错进行，使用<strong>外推</strong>来稳定和加速</li>
+</ol>
+<h3 id="1532-一步一回合法最简单但不收敛的版本">15.3.2 一步一回合法（最简单但不收敛的版本）
+</h3><p>直观上，可以尝试：
+</p>
+$$\begin{aligned} y_{k+1} &= \operatorname{prox}_{\sigma g^*}\left( y_k + \sigma K \tilde{x}_k \right) \quad \text{（对偶上升步）} \\ x_{k+1} &= \operatorname{prox}_{\tau f}\left( x_k - \tau K^T y_{k+1} \right) \quad \text{（原始下降步）} \end{aligned}$$<p>但直接用 $x_k$ 可能导致振荡。PDHG引入**外推（extrapolation）**来稳定：在计算 $y_{k+1}$ 时，不使用 $x_k$，而使用外推值 $\bar{x}<em>k = x_k + \theta(x_k - x</em>{k-1})$。</p>
+<h3 id="1533-chambolle-pock算法标准形式">15.3.3 Chambolle-Pock算法（标准形式）
+</h3>$$\boxed{\begin{aligned} y_{k+1} &= \operatorname{prox}_{\sigma g^*}\left( y_k + \sigma K \bar{x}_k \right) \quad \text{（对偶步，使用外推的 } \bar{x}_k \text{）} \\ x_{k+1} &= \operatorname{prox}_{\tau f}\left( x_k - \tau K^T y_{k+1} \right) \quad \text{（原始步，使用新得的 } y_{k+1} \text{）} \\ \bar{x}_{k+1} &= x_{k+1} + \theta (x_{k+1} - x_k) \quad \text{（外推步）} \end{aligned}}$$<p><strong>参数说明</strong>：</p>
+<ul>
+<li>$\sigma &gt; 0$：对偶步长</li>
+<li>$\tau &gt; 0$：原始步长</li>
+<li>$\theta \in [0, 1]$：外推参数（$\theta = 1$ 时外推最强，$\theta = 0$ 时无外推）</li>
+<li>要求 $\sigma \tau |K|^2 &lt; 1$（其中 $|K|$ 为 $K$ 的谱范数）</li>
+</ul>
+<p><strong>收敛性</strong>：当 $\theta = 1$ 时，算法以 $O(1/k)$ 速率收敛（对一般的凸函数）。</p>
+<h3 id="1534-每一步的详细推导">15.3.4 每一步的详细推导
+</h3><p><strong>对偶步推导</strong>：
+</p>
+$$\begin{aligned} y_{k+1} &= \arg\min_y \left\{ g^*(y) + \frac{1}{2\sigma}\|y - (y_k + \sigma K \bar{x}_k)\|^2 \right\} \\ &= \arg\min_y \left\{ g^*(y) - \langle K \bar{x}_k, y \rangle + \frac{1}{2\sigma}\|y - y_k\|^2 \right\} \end{aligned}$$<p>解释：对偶步要求 $y$ 同时使 $g^*(y)$ 小（抑制对偶函数的增长）又使 $\langle K \bar{x}_k, y \rangle$ 大（往增大 $\Phi$ 的方向走），但不要离 $y_k$ 太远（2范数正则）。</p>
+<p><strong>原始步推导</strong>：
+</p>
+$$\begin{aligned} x_{k+1} &= \arg\min_x \left\{ f(x) + \frac{1}{2\tau}\|x - (x_k - \tau K^T y_{k+1})\|^2 \right\} \\ &= \arg\min_x \left\{ f(x) + \langle K^T y_{k+1}, x \rangle + \frac{1}{2\tau}\|x - x_k\|^2 \right\} \end{aligned}$$<p>解释：原始步要求 $x$ 同时使 $f(x)$ 小又使 $\langle K^T y_{k+1}, x \rangle$ 小（往减小 $\Phi$ 的方向走），同时不要离 $x_k$ 太远。</p>
+<hr>
+<h2 id="154-预条件邻近点法解释">15.4 预条件邻近点法解释
+</h2><h3 id="1541-邻近点法的变尺度推广">15.4.1 邻近点法的变尺度推广
+</h3><p>标准邻近点法（Ch9）：
+</p>
+$$x_{k+1} = \arg\min_x \left\{ F(x) + \frac{1}{2\alpha}\|x - x_k\|^2 \right\}$$<p>其中正则项使用欧氏度量 $\frac{1}{2}|x - x_k|^2 = \frac{1}{2}(x - x_k)^T I(x - x_k)$。</p>
+<p><strong>预条件邻近点法（Preconditioned PPA）</strong> 将欧氏度量替换为变尺度度量：
+</p>
+$$x_{k+1} = \arg\min_x \left\{ F(x) + \frac{1}{2}(x - x_k)^T M(x - x_k) \right\}$$<p>其中 $M \succ 0$ 是预条件矩阵（如对角矩阵）。预条件通过缩放坐标轴来对不同的分量赋予不同的步长。</p>
+<h3 id="1542-pdhg的预条件解释">15.4.2 PDHG的预条件解释
+</h3><p>PDHG可以写成关于 $z = (x, y)$ 的预条件邻近点法：</p>
+$$z_{k+1} = (I + M^{-1} T)^{-1} z_k$$<p>其中 $T$ 是鞍点问题的极大单调算子：</p>
+$$T(x, y) = \begin{pmatrix} \partial f(x) + K^T y \\ \partial g^*(y) - K x \end{pmatrix}$$<p>预条件矩阵 $M$ 取为对角分块矩阵：
+</p>
+$$M = \begin{pmatrix} \frac{1}{\tau}I & -K^T \\ -K & \frac{1}{\sigma}I \end{pmatrix}$$<p>当 $\sigma \tau |K|^2 &lt; 1$ 时 $M \succ 0$（正定），保证收敛。</p>
+<p><strong>物理含义</strong>：PDHG通过巧妙的预条件设计，允许原始步长 $\tau$ 和对偶步长 $\sigma$ 独立选取（只要乘积受限），从而在两个空间分别优化步长。</p>
+<hr>
+<h2 id="155-统一框架从单调包含到各算法的谱系">15.5 统一框架：从单调包含到各算法的谱系
+</h2><h3 id="1551-极大单调包含问题">15.5.1 极大单调包含问题
+</h3><p>现代凸优化的统一数学语言是<strong>极大单调包含（Maximal Monotone Inclusion）</strong>：</p>
+<p>找到 $x$ 使得：
+</p>
+$$\boxed{0 \in T(x)}$$<p>其中 $T: \mathbb{R}^n \to 2^{\mathbb{R}^n}$ 是极大单调算子。</p>
+<p><strong>为什么这是统一的？</strong> 几乎所有的凸优化问题都可以转化为这种形式：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>问题</th>
+					<th>对应单调算子 $T$</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>$\min_x f(x)$</td>
+					<td>$T = \partial f$（次梯度算子）</td>
+			</tr>
+			<tr>
+					<td>$\min_x f(x) + g(x)$</td>
+					<td>$T = \partial f + \partial g$</td>
+			</tr>
+			<tr>
+					<td>$\min_x f(x) + g(Kx)$</td>
+					<td>$T = \partial f + K^T \circ \partial g \circ K$</td>
+			</tr>
+			<tr>
+					<td>鞍点 $\min_x \max_y \Phi(x,y)$</td>
+					<td>$T = \begin{pmatrix} \partial_x \Phi \ -\partial_y \Phi \end{pmatrix}$</td>
+			</tr>
+			<tr>
+					<td>变分不等式</td>
+					<td>$T$ 即变分不等式的算符</td>
+			</tr>
+	</tbody>
+</table></div>
+<h3 id="1552-统一求解框架邻近点法">15.5.2 统一求解框架：邻近点法
+</h3><p>求解 $0 \in T(x)$ 最经典的方法是邻近点法（PPA）：
+</p>
+$$x_{k+1} = (I + \alpha T)^{-1} x_k$$<p>等价于：
+</p>
+$$0 \in T(x_{k+1}) + \frac{1}{\alpha}(x_{k+1} - x_k)$$<h3 id="1553-分裂方法族谱">15.5.3 分裂方法族谱
+</h3><p>所有分裂方法都可以理解为：将 $T$ 分解为 $T = A + B$，然后通过某种&quot;交替&quot;或&quot;组合&quot;来分别处理 $A$ 和 $B$。</p>
+$$\boxed{\begin{array}{lll} \textbf{算法} & \textbf{分解方式} & \textbf{迭代特征} \\ \hline \text{前向-后向分裂（ISTA）} & T = \nabla f + \partial g & x_{k+1} = (I + \alpha \partial g)^{-1}(x_k - \alpha \nabla f(x_k)) \\ \text{DR分裂法} & T = \partial f + \partial g & z_{k+1} = \frac{R_f \circ R_g + I}{2}(z_k) \\ \text{ADMM} & \text{对偶空间的DR} & x^{k+1}, z^{k+1} \gets \text{交替极小化} \\ \text{PDHG / Chambolle-Pock} & T = \begin{pmatrix} \partial f & K^T \\ -K & \partial g^* \end{pmatrix} & \text{原始-对偶交替邻近梯度} \\ \end{array}}$$<p><strong>谱系关系</strong>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">单调包含 0 ∈ T(x)
+</span></span><span class="line"><span class="cl">    │
+</span></span><span class="line"><span class="cl">    └─ 邻近点法（PPA）── 理论基础
+</span></span><span class="line"><span class="cl">            │
+</span></span><span class="line"><span class="cl">            ├─ 前向-后向分裂（ISTA）：T = 光滑 + 非光滑
+</span></span><span class="line"><span class="cl">            │
+</span></span><span class="line"><span class="cl">            ├─ DR 分裂法：T = 两个非光滑邻近
+</span></span><span class="line"><span class="cl">            │       │
+</span></span><span class="line"><span class="cl">            │       └─ ADMM：DR 在对偶空间的表现
+</span></span><span class="line"><span class="cl">            │
+</span></span><span class="line"><span class="cl">            └─ PDHG / Chambolle-Pock：T = 鞍点结构
+</span></span><span class="line"><span class="cl">                    │
+</span></span><span class="line"><span class="cl">                    ├─ 特例：当 K = I 且 θ = 0 → 退化为 ISTA 的某种形式
+</span></span><span class="line"><span class="cl">                    ├─ 特例：当 K = I 且特定参数 → 与 DR 等价
+</span></span><span class="line"><span class="cl">                    └─ 特例：共识形式下 → 与 ADMM 等价
+</span></span></code></pre></td></tr></table>
+</div>
+</div><hr>
+<h2 id="156-图像去模糊应用">15.6 图像去模糊应用
+</h2><h3 id="1561-tv-l2图像去模糊">15.6.1 TV-L2图像去模糊
+</h3><p><strong>问题</strong>：从模糊观测 $b$ 恢复清晰图像 $x$：
+</p>
+$$\boxed{\min_x \; \frac{1}{2}\|Ax - b\|^2 + \lambda \|\nabla x\|_{2,1}}$$<p>符号解释：</p>
+<ul>
+<li>$A$：模糊算子（卷积矩阵），通常是病态的（ill-conditioned）</li>
+<li>$b \in \mathbb{R}^N$：观测到的模糊图像</li>
+<li>$x \in \mathbb{R}^N$：待恢复的清晰图像</li>
+<li>$\nabla: \mathbb{R}^N \to \mathbb{R}^{2N}$：离散梯度算子（水平梯度 + 垂直梯度）</li>
+<li>$|\nabla x|<em>{2,1} = \sum</em>{i=1}^N \sqrt{(\nabla_h x)_i^2 + (\nabla_v x)_i^2}$：<strong>各向同性全变分（Isotropic TV）</strong>——对每个像素，计算水平和垂直梯度的2范数，再对全图求和。</li>
+</ul>
+<h3 id="1562-tv-l2的ii型复合形式">15.6.2 TV-L2的II型复合形式
+</h3><p>令：
+</p>
+$$f(x) = \frac{1}{2}\|Ax - b\|^2 \quad \text{（光滑凸，梯度 } \nabla f(x) = A^T(Ax - b)\text{）}$$<p>
+</p>
+$$g(y) = \lambda\|y\|_{2,1} \quad \text{（非光滑TV范数，} y = (y_h, y_v)\text{）}$$<p>其中 $y = Kx$，$K = \nabla$（梯度算子）。共轭 $K^T = \nabla^T = -\operatorname{div}$（负散度算子）。</p>
+<h3 id="1563-pdhg迭代详解">15.6.3 PDHG迭代详解
+</h3><p><strong>$g^*(y)$</strong>（TV范数的共轭）：
+</p>
+$$g^*(p) = \sup_y \{ \langle p, y \rangle - \lambda\|y\|_{2,1} \} = \delta_{\{\|\cdot\|_{2,\infty} \leq \lambda\}}(p)$$<p>即要求对每个像素 $i$，$(p_h)_i^2 + (p_v)_i^2 \leq \lambda^2$（各像素的对偶变量落在半径为 $\lambda$ 的2范数球内）。</p>
+<p><strong>$\operatorname{prox}_{\sigma g^*}$</strong>（对偶邻近算子）：
+</p>
+$$\operatorname{prox}_{\sigma g^*}(p) = \text{逐像素投影到半径为 } \lambda \text{ 的 } \ell_2 \text{ 球}$$<p>即对每个像素 $i$：
+</p>
+$$(p_i)_{\text{proj}} = \frac{p_i}{\max\{1, \|p_i\|_2 / \lambda\}}$$<p><strong>$\operatorname{prox}_{\tau f}$</strong>（原始邻近算子）：
+</p>
+$$\operatorname{prox}_{\tau f}(x) = \arg\min_{u} \left\{ \frac{1}{2}\|Au - b\|^2 + \frac{1}{2\tau}\|u - x\|^2 \right\}$$<p>梯度为0：$A^T(Au - b) + \frac{1}{\tau}(u - x) = 0 \implies (A^T A + \frac{1}{\tau}I)u = A^T b + \frac{1}{\tau}x$。</p>
+<p>解得：
+</p>
+$$\operatorname{prox}_{\tau f}(x) = (A^T A + \frac{1}{\tau}I)^{-1}\left( A^T b + \frac{1}{\tau}x \right)$$<p>当 $A$ 是卷积算子时，可利用FFT在 $O(N \log N)$ 时间内求解（对角化）。</p>
+<p><strong>完整PDHG迭代</strong>：
+</p>
+$$\boxed{\begin{aligned} p_{k+1} &= P_{\{\|\cdot\|_{2,\infty} \leq \lambda\}}\left( p_k + \sigma \nabla \bar{x}_k \right) \quad \text{（对偶步：梯度上升 + TV球投影）} \\ x_{k+1} &= (A^T A + \frac{1}{\tau}I)^{-1}\left( A^T b + \frac{1}{\tau}(x_k - \tau \nabla^T p_{k+1}) \right) \quad \text{（原始步：去模糊 + 散度修正）} \\ \bar{x}_{k+1} &= x_{k+1} + \theta(x_{k+1} - x_k) \quad \text{（外推加速）} \end{aligned}}$$<hr>
+<h2 id="157-典型例题">15.7 典型例题
+</h2><h3 id="例题151pdhg推导基础鞍点重构">例题15.1（PDHG推导基础——鞍点重构）
+</h3><p><strong>题目</strong>：对 $\min_x \frac{1}{2}|x - b|^2 + \lambda|Kx|_1$，写出鞍点形式和PDHG迭代。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>步骤1</strong>——识别II型结构：$f(x) = \frac{1}{2}|x - b|^2$（1-强凸），$g(z) = \lambda|z|_1$。</p>
+<p><strong>步骤2</strong>——共轭：$g^*(y) = \delta_{{|\cdot|_\infty \leq \lambda}}(y)$。</p>
+<p><strong>步骤3</strong>——鞍点函数：
+</p>
+$$\Phi(x, y) = \frac{1}{2}\|x - b\|^2 + \langle Kx, y \rangle - \delta_{\{\|\cdot\|_\infty \leq \lambda\}}(y)$$<p><strong>步骤4</strong>——PDHG迭代：
+</p>
+$$\begin{aligned} y_{k+1} &= P_{\{\|\cdot\|_\infty \leq \lambda\}}\left( y_k + \sigma K \bar{x}_k \right) \quad \text{（clip到 }[-\lambda, \lambda]\text{）} \\ x_{k+1} &= \operatorname{prox}_{\tau f}\left( x_k - \tau K^T y_{k+1} \right) \\ &= \frac{1}{1+\tau}\left( x_k - \tau K^T y_{k+1} + \tau b \right) \quad \text{（} \operatorname{prox}_{\frac{\tau}{2}\|\cdot - b\|^2} \text{ 的闭式）} \\ \bar{x}_{k+1} &= x_{k+1} + \theta(x_{k+1} - x_k) \end{aligned}$$<p>步长条件：$\sigma\tau|K|^2 &lt; 1$（通常取 $\sigma = \tau = 1/|K|$）。</p>
+<hr>
+<h3 id="例题152pdhg特例退化为ista">例题15.2（PDHG特例——退化为ISTA）
+</h3><p><strong>题目</strong>：说明当 $K = I$、$\theta = 0$、且 $\tau = \alpha$ 时，PDHG如何退化为邻近梯度法（ISTA）。</p>
+<p><strong>解答</strong>：</p>
+<p>$K = I$ 时，问题变为 $\min_x f(x) + g(x)$（I型复合）。</p>
+<p>PDHG迭代：
+</p>
+$$y_{k+1} = \operatorname{prox}_{\sigma g^*}(y_k + \sigma \bar{x}_k)$$<p>
+</p>
+$$x_{k+1} = \operatorname{prox}_{\tau f}(x_k - \tau y_{k+1})$$<p>取 $\theta = 0$（无外推），则 $\bar{x}_k = x_k$。再取 $\tau = \alpha$。</p>
+<p>对于 $g(x) = \lambda|x|<em>1$，$g^*(y) = \delta</em>{{|\cdot|<em>\infty \leq \lambda}}(y)$，$\operatorname{prox}</em>{\sigma g^*} = P_{{|\cdot|_\infty \leq \lambda}}$。</p>
+<p>取 $\sigma \to \infty$（等价于省去对偶邻近），$y_{k+1} = y_k + \sigma(x_k - \operatorname{prox}_{\sigma^{-1} g}(x_k))$。</p>
+<p>通过Moreau分解：$\operatorname{prox}<em>{\sigma g^*}(y_k + \sigma x_k) = (y_k + \sigma x_k) - \sigma \operatorname{prox}</em>{g/\sigma}(x_k + y_k/\sigma)$。
+当 $\sigma \to \infty$ 时，$y_{k+1} \approx \sigma(x_k - \operatorname{prox}_{g/\sigma}(x_k))$。</p>
+<p>代入原始步：
+</p>
+$$x_{k+1} \approx \operatorname{prox}_{\tau f}(x_k - \tau \sigma(x_k - \operatorname{prox}_{g/\sigma}(x_k)))$$<p>这体现了PDHG向ISTA的渐进退化。更严格地说，当 $f$ 光滑且 $K = I$ 时，通过适当选取参数，PDHG的特殊情形等价于前向-后向分裂（ISTA）。</p>
+<hr>
+<h3 id="例题153pdhg-vs-admm的统一联系">例题15.3（PDHG vs ADMM的统一联系）
+</h3><p><strong>题目</strong>：证明共识ADMM是PDHG的特殊情况（取恰当参数）。</p>
+<p><strong>解答（概要）</strong>：</p>
+<p>考虑问题 $\min_x f(x) + g(x)$ 的共识形式 $\min_{x,z} f(x) + g(z)$ s.t. $x = z$。</p>
+<p>ADMM（缩放形式，取 $\rho = 1$）：
+</p>
+$$\begin{aligned} x^{k+1} &= \operatorname{prox}_f(z^k - u^k) \\ z^{k+1} &= \operatorname{prox}_g(x^{k+1} + u^k) \\ u^{k+1} &= u^k + (x^{k+1} - z^{k+1}) \end{aligned}$$<p>PDHG应用于鞍点形式 $\min_x \max_y { f(x) + \langle x, y \rangle - g^*(y) }$：
+取 $\tau = \sigma = 1$，$\theta = 1$，则：
+</p>
+$$\begin{aligned} y_{k+1} &= \operatorname{prox}_{g^*}(y_k + \bar{x}_k) \\ x_{k+1} &= \operatorname{prox}_f(x_k - y_{k+1}) \\ \bar{x}_{k+1} &= 2x_{k+1} - x_k \end{aligned}$$<p>通过变量变换（$y_k \leftrightarrow u_k$ 等），可以证明这两组迭代完全相同。</p>
+<p><strong>结论</strong>：PDHG和ADMM本质上是同一框架的不同表现形式——PDHG是统一&quot;原始-对偶邻近点法&quot;的标准实现，ADMM是它在特定参数下的等价形式。</p>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><ol>
+<li>
+<p><strong>鞍点重构是PDHG的入口</strong>：利用 $g(Kx) = \sup_y { \langle Kx, y \rangle - g^<em>(y) }$，将II型复合转化为 $\min_x \max_y { f(x) + \langle Kx, y \rangle - g^</em>(y) }$，实现了&quot;耦合删除&quot;。</p>
+</li>
+<li>
+<p><strong>PDHG的核心三步</strong>：① 对偶步（邻近梯度上升，用外推 $\bar{x}<em>k$）；② 原始步（邻近梯度下降，用新得的 $y</em>{k+1}$）；③ 外推步（Momentum加速）。</p>
+</li>
+<li>
+<p><strong>步长条件</strong> $\sigma\tau|K|^2 &lt; 1$：这是确保预条件矩阵 $M$ 正定的条件——等价于邻近点法在变换度量下的收敛性保障。</p>
+</li>
+<li>
+<p><strong>外推参数 $\theta = 1$ 的意义</strong>：标准Chambolle-Pock取 $\theta = 1$，提供 $O(1/k)$ 收敛速度。$\theta \in [0, 1)$ 可以增强稳定性（代价是减慢）。</p>
+</li>
+<li>
+<p><strong>PDHG是统一的&quot;罗塞塔石碑&quot;</strong>：ISTA（前向-后向）、DR分裂法、ADMM都是PDHG框架在不同参数选取下的特例——掌握PDHG就掌握了整个分裂方法族。</p>
+</li>
+<li>
+<p><strong>预条件视角</strong>：PDHG = 预条件邻近点法——通过对角分块的预条件矩阵 $M$，独立控制原始步长 $\tau$ 和对偶步长 $\sigma$，在保证正定性的前提下最大化收敛速度。</p>
+</li>
+<li>
+<p><strong>适用II型复合的所有场景</strong>：TV去噪/去模糊（PDHG特别高效，利用了FFT加速子问题）、$\ell_1$ 正则化、核范数正则化、各种图模型等——只要 $\operatorname{prox}<em>f$ 和 $\operatorname{prox}</em>{g^*}$ 好算即可。</p>
+</li>
+<li>
+<p><strong>与ADMM的&quot;亲缘关系&quot;</strong>：ADMM本质上是对偶空间的DR分裂法；PDHG是原始-对偶空间的统一邻近点法。两者在最常见的共识形式下完全等价，只是参数选取和变量视角不同。</p>
+</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>一句话总结</strong>：PDHG通过鞍点重构和预条件邻近点法，将原始空间和对偶空间的邻近梯度步编织成统一迭代——它是整个分裂方法族（ISTA → DR → ADMM → PDHG）的&quot;理论终点站&quot;，掌握了它就掌握了现代凸优化一阶方法的完整知识图谱。</p>
+</blockquote>
+<hr>
+<h2 id="158-补充例题">15.8 补充例题
+</h2><h3 id="例题154pdhg求解tv-l1去噪">例题15.4（PDHG求解TV-L1去噪）
+</h3><p><strong>题目</strong>：用PDHG求解 $\min_x \frac{1}{2}|x - b|^2 + \lambda|\nabla x|_1$（各向异性TV + L1数据拟合），写出完整迭代。</p>
+<p><strong>解答</strong>：</p>
+<p>$f(x) = \frac{1}{2}|x - b|^2$（1-强凸），$g(z) = \lambda|z|<em>1$（非光滑TV）。$\operatorname{prox}</em>{\tau f}(x) = \frac{x + \tau b}{1 + \tau}$。</p>
+<p>$g^*(p) = \delta_{{|\cdot|<em>\infty \leq \lambda}}(p)$（$\ell_1$ 的共轭 = $\ell</em>\infty$ 球指示函数）。</p>
+<p><strong>PDHG迭代</strong>：</p>
+<p>对偶步（梯度上升 + $\ell_\infty$ 球投影）：
+</p>
+$$p_{k+1} = P_{\{\|\cdot\|_\infty \leq \lambda\}}\left( p_k + \sigma \nabla \bar{x}_k \right)$$<p>分量形式：对每个像素的梯度分量 $p_{h,i}, p_{v,i}$：
+</p>
+$$[p_{k+1}]_i = \operatorname{clip}([p_k + \sigma \nabla \bar{x}_k]_i, -\lambda, \lambda)$$<p>原始步（邻近梯度下降）：
+</p>
+$$x_{k+1} = \frac{1}{1 + \tau}\left( x_k - \tau \nabla^T p_{k+1} + \tau b \right)$$<p>
+其中 $\nabla^T p_{k+1} = -\operatorname{div}(p_{k+1})$ 是向量场 $p_{k+1}$ 的负散度。</p>
+<p>外推步：$\bar{x}<em>{k+1} = x</em>{k+1} + \theta(x_{k+1} - x_k)$。</p>
+<p><strong>步长</strong>：$|\nabla| \leq \sqrt{8}$（二维梯度算子的谱范数），取 $\sigma\tau \cdot 8 &lt; 1$，如 $\sigma = \tau = 1/\sqrt{8} \approx 0.3536$。</p>
+<p><strong>计算复杂度</strong>：每步 $O(N)$（梯度、散度、clip 投影都是线性时间），无需FFT或矩阵分解——PDHG对TV问题极其高效！</p>
+<hr>
+<h3 id="例题155pdhg的过松弛变体">例题15.5（PDHG的过松弛变体）
+</h3><p><strong>题目</strong>：标准PDHG中 $\theta = 1$，但有时实践中使用过松弛PDHG。写出过松弛形式并说明何时使用。</p>
+<p><strong>解答</strong>：</p>
+<p><strong>过松弛PDHG（Over-relaxed PDHG）</strong>：
+</p>
+$$\begin{aligned} \tilde{y}_{k+1} &= \operatorname{prox}_{\sigma g^*}(y_k + \sigma K \bar{x}_k) \\ y_{k+1} &= y_k + \omega(\tilde{y}_{k+1} - y_k) \\ x_{k+1} &= \operatorname{prox}_{\tau f}(x_k - \tau K^T y_{k+1}) \\ \bar{x}_{k+1} &= x_{k+1} + \theta(x_{k+1} - x_k) \end{aligned}$$<p>其中 $\omega \in (0, 2)$ 是过松弛参数。</p>
+<ul>
+<li>$\omega = 1$：标准PDHG</li>
+<li>$\omega \in (1, 2)$：过松弛（可能加速）</li>
+<li>$\omega &lt; 1$：低松弛（更稳定）</li>
+</ul>
+<p><strong>使用场景</strong>：</p>
+<ul>
+<li><strong>$\omega &gt; 1$</strong>：当问题&quot;凸性很好&quot;（如 $f$ 强凸）时，过松弛可额外加速</li>
+<li><strong>$\omega = 1$</strong>：默认选择，大多数场景效果良好</li>
+<li><strong>$\omega &lt; 1$</strong>：当步长条件 $\sigma\tau|K|^2 &lt; 1$ 接近边界时，降低 $\omega$ 可恢复稳定性</li>
+</ul>
+<p><strong>与松弛DR（Ch13的 $\gamma$ 参数）的对比</strong>：两者都是在不动点迭代框架中引入松弛参数来调节收敛速度，$\omega$ 和 $\gamma$ 数学上通过预条件邻近点法的变换矩阵 $M$ 紧密联系。</p>
+<hr>
+<h3 id="例题156pdhg框架总览各种特例的推导">例题15.6（PDHG框架总览——各种特例的推导）
+</h3><p><strong>题目</strong>：证明以下算法都是PDHG的特例：(a) ISTA/FISTA；(b) DR分裂法；(c) ADMM。</p>
+<p><strong>解答概要</strong>：</p>
+<p><strong>(a) ISTA = PDHG with $K = I$, $f$ 光滑</strong>：</p>
+<p>取 $K = I$，问题为 $\min_x f(x) + g(x)$。$f$ 光滑时，用梯度下降替代 $\operatorname{prox}_{\tau f}$：
+</p>
+$$x_{k+1} = x_k - \tau(\nabla f(x_k) + K^T y_{k+1})$$<p>当取 $\tau = \alpha$ 且 $g$ 的邻近步与对偶步等价时（通过Moreau分解），退化为ISTA。</p>
+<p><strong>(b) DR分裂法 = PDHG的对偶版本</strong>：</p>
+<p>在PDHG中取 $\theta = 1$，$\sigma = \tau = 1$，对特定的鞍点结构，PDHG迭代可以重写为 $z_{k+1} = \frac{R_f \circ R_g + I}{2}(z_k)$，即DR分裂法的不动点形式。</p>
+<p><strong>(c) ADMM = PDHG with consensus constraint</strong>：</p>
+<p>共识ADMM的鞍点形式为 $\min_x \max_y { f(x) + \langle x, y \rangle - g^*(y) }$。
+PDHG应用于此鞍点：取 $\tau = \sigma = \rho^{-1}$，$\theta = 1$。代入PDHG更新公式，经过变量替换 $u^k = y^k / \rho$，恰好得到缩放ADMM的共识形式迭代。</p>
+<p><strong>关键启示</strong>：PDHG是元算法——通过指定 $f$, $g$, $K$, $\tau$, $\sigma$, $\theta$ 的不同取值，所有一阶分裂方法都可以被&quot;生成&quot;出来。</p>
+<hr>
+<h2 id="159-pdhg的实用指南">15.9 PDHG的实用指南
+</h2><h3 id="1591-步长选取策略">15.9.1 步长选取策略
+</h3><p><strong>理论条件</strong>：$\sigma\tau|K|^2 &lt; 1$。</p>
+<p><strong>实践公式</strong>：取 $\sigma = \tau = \frac{0.99}{|K|}$（平衡原始和对偶步长）。$|K|$ 可通过幂迭代或利用结构（如 $|\nabla| = \sqrt{8}$）估计。</p>
+<p><strong>自适应变体</strong>：与ADMM的自适应 $\rho$ 类似，PDHG也可根据原始/对偶残差比动态调整 $\sigma$ 和 $\tau$，同时保持乘积满足步长条件。</p>
+<h3 id="1592-theta-参数的影响">15.9.2 $\theta$ 参数的影响
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>$\theta$</th>
+					<th>行为</th>
+					<th>收敛率</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>$0$</td>
+					<td>无外推，最稳定但最慢</td>
+					<td>$O(1/\sqrt{k})$</td>
+			</tr>
+			<tr>
+					<td>$0.5$</td>
+					<td>部分加速</td>
+					<td>介于之间</td>
+			</tr>
+			<tr>
+					<td>$1$</td>
+					<td><strong>标准Chambolle-Pock加速</strong></td>
+					<td>$O(1/k)$</td>
+			</tr>
+			<tr>
+					<td>$&gt;1$</td>
+					<td>可能发散</td>
+					<td>—</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>启示</strong>：$\theta = 1$ 不仅允许而且是推荐的标准值——它与Nesterov加速的Momentum技术内在关联。</p>
+<h3 id="1593-pdhg-vs-admm如何选择">15.9.3 PDHG vs ADMM——如何选择？
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>问题特征</th>
+					<th>推荐算法</th>
+					<th>理由</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>$\operatorname{prox}<em>f$ 和 $\operatorname{prox}</em>{g^*}$ 都有闭式</td>
+					<td><strong>PDHG</strong></td>
+					<td>最直接，无需引入辅助变量</td>
+			</tr>
+			<tr>
+					<td>$g(z)$ 的邻近算子简单但 $g^*(y)$ 无闭式</td>
+					<td><strong>ADMM</strong></td>
+					<td>ADMM 在 $z$ 空间操作，可避免 $g^*$</td>
+			</tr>
+			<tr>
+					<td>$f$ 强凸 + $g$ 非光滑</td>
+					<td>PDHG 或 对偶邻近梯度（Ch10）</td>
+					<td>都适用，PDHG更通用</td>
+			</tr>
+			<tr>
+					<td>分布式/并行计算</td>
+					<td><strong>ADMM</strong>（共识形式）</td>
+					<td>ADMM天然支持分布式</td>
+			</tr>
+			<tr>
+					<td>图像处理中的TV范数</td>
+					<td><strong>PDHG</strong></td>
+					<td>PDHG的子问题都是 $O(N)$（无需FFT/矩阵求逆）</td>
+			</tr>
+			<tr>
+					<td>含复杂线性算子 $K$</td>
+					<td><strong>PDHG</strong></td>
+					<td>PDHG用 $K$ 和 $K^T$ 的乘积，避免 $K^T K$ 的求逆</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="1510-课程总结从ch10到ch15的完整知识图谱">15.10 课程总结：从Ch10到Ch15的完整知识图谱
+</h2><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">                    凸优化一阶方法全景图
+</span></span><span class="line"><span class="cl">                          │
+</span></span><span class="line"><span class="cl">        Ch10 对偶邻近梯度 ←┼→ Ch11 对偶分解（分布式、次梯度）
+</span></span><span class="line"><span class="cl">        &#34;强凸→对偶光滑&#34;    │   &#34;分而治之&#34;
+</span></span><span class="line"><span class="cl">                          │
+</span></span><span class="line"><span class="cl">              ┌───────────┼───────────┐
+</span></span><span class="line"><span class="cl">              │                       │
+</span></span><span class="line"><span class="cl">         Ch12 乘子法              Ch13 DR分裂法
+</span></span><span class="line"><span class="cl">    &#34;罚函数+乘子→加速&#34;        &#34;全非光滑↔不动点迭代&#34;
+</span></span><span class="line"><span class="cl">    &#34;等价对偶邻近点法&#34;        &#34;ISTA的重大推广&#34;
+</span></span><span class="line"><span class="cl">              │                       │
+</span></span><span class="line"><span class="cl">              └───────────┬───────────┘
+</span></span><span class="line"><span class="cl">                          │
+</span></span><span class="line"><span class="cl">                    Ch14 ADMM
+</span></span><span class="line"><span class="cl">              &#34;交替方向→快+可分解&#34;
+</span></span><span class="line"><span class="cl">              &#34; = 对偶DR分裂法&#34;
+</span></span><span class="line"><span class="cl">                          │
+</span></span><span class="line"><span class="cl">                    Ch15 PDHG
+</span></span><span class="line"><span class="cl">              &#34;原始-对偶统一框架&#34;
+</span></span><span class="line"><span class="cl">              &#34;所有一阶方法的元算法&#34;
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>纵向学习链</strong>：</p>
+<ol>
+<li><strong>基础层</strong>（Ch10）：Fenchel对偶 + 邻近梯度 → 建立了&quot;对偶空间求解&quot;的范式</li>
+<li><strong>并行层</strong>（Ch11）：对偶 + 可分离结构 → 大规模分布式优化</li>
+<li><strong>加速层</strong>（Ch12）：二次惩罚 + 乘子更新 → 从次线性到线性收敛</li>
+<li><strong>全非光滑层</strong>（Ch13）：反射 + 不动点 → 无需任何光滑性假设</li>
+<li><strong>融合层</strong>（Ch14）：交替更新 → 速度 + 可分离性的完美结合</li>
+<li><strong>统一层</strong>（Ch15）：原始-对偶 + 预条件 → 涵盖所有以上方法</li>
+</ol>
+<p><strong>横向联系</strong>：</p>
+<ul>
+<li>对偶思想贯穿始终：Ch10（Fenchel对偶）→ Ch11（Lagrange对偶+可分离）→ Ch12（增广Lagrange对偶）→ Ch14/15（对偶DR/原始-对偶统一）</li>
+<li>邻近算子贯穿始终：Ch7基石 → Ch10（对偶邻近梯度）→ Ch12（邻近点法）→ Ch13（反射=2邻近-I）→ Ch14/15（交替邻近）</li>
+<li>分裂技术贯穿始终：ISTA（前向-后向）→ DR（反射-平均）→ ADMM（交替方向）→ PDHG（原始-对偶）</li>
+</ul>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

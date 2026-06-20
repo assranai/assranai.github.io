@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第7章：邻近梯度法 核心思想：复合优化问题 $\\min f(x)+g(x)$ 中，$f$ 光滑（有梯度）用梯度下降处理，$g$ 非光滑（无梯度）用邻近算子处理，两步交替迭代——这就是邻近梯度法（Proximal Gradient Method）。\n前置知识回顾 在开始本章之前，请确保你已经理解以下概念：\n概念 出自 一句话回顾 梯度下降法 (GD) Ch2 沿负梯度方向走：$x_{k+1}=x_k-\\alpha\\nabla f(x_k)$，对光滑凸函数收敛率 $O(1/k)$ $L$-smooth 函数 Ch2 梯度变化有上界：$|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$，等价于 $f(y)\\leq f(x)+\\nabla f(x)^T(y-x)+\\frac{L}{2}|y-x|^2$ 凸函数 (convex) Ch3 函数图像在弦之下：$f(tx+(1-t)y)\\leq tf(x)+(1-t)f(y)$；等价于 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$ 次梯度 (subgradient) Ch3 非光滑函数的&quot;广义梯度&quot;：$g\\in\\partial f(x)$ 满足 $f(y)\\geq f(x)+g^T(y-x),\\forall y$ 投影梯度法 (PGM) Ch6 $\\min_{x\\in C}f(x)$ 时，梯度下降后投影回约束集：$x_{k+1}=P_C(x_k-\\alpha\\nabla f(x_k))$ 闭凸函数 Ch3 既&quot;凸&quot;（碗形）又&quot;闭&quot;（下水平集包含边界），保证极小点存在且邻近算子良定义 最优性条件 Ch3 $x^$ 是 $\\min f(x)$ 的最优点 $\\iff$ $0\\in\\partial f(x^)$（非光滑情形）或 $\\nabla f(x^*)=0$（光滑情形） 7.1 问题形式 7.1.1 复合优化问题的标准形式 本章考虑如下极小化问题：\n">
+<title>第7章：邻近梯度法</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/07-%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第7章：邻近梯度法">
+<meta property='og:description' content="第7章：邻近梯度法 核心思想：复合优化问题 $\\min f(x)+g(x)$ 中，$f$ 光滑（有梯度）用梯度下降处理，$g$ 非光滑（无梯度）用邻近算子处理，两步交替迭代——这就是邻近梯度法（Proximal Gradient Method）。\n前置知识回顾 在开始本章之前，请确保你已经理解以下概念：\n概念 出自 一句话回顾 梯度下降法 (GD) Ch2 沿负梯度方向走：$x_{k+1}=x_k-\\alpha\\nabla f(x_k)$，对光滑凸函数收敛率 $O(1/k)$ $L$-smooth 函数 Ch2 梯度变化有上界：$|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$，等价于 $f(y)\\leq f(x)+\\nabla f(x)^T(y-x)+\\frac{L}{2}|y-x|^2$ 凸函数 (convex) Ch3 函数图像在弦之下：$f(tx+(1-t)y)\\leq tf(x)+(1-t)f(y)$；等价于 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$ 次梯度 (subgradient) Ch3 非光滑函数的&quot;广义梯度&quot;：$g\\in\\partial f(x)$ 满足 $f(y)\\geq f(x)+g^T(y-x),\\forall y$ 投影梯度法 (PGM) Ch6 $\\min_{x\\in C}f(x)$ 时，梯度下降后投影回约束集：$x_{k+1}=P_C(x_k-\\alpha\\nabla f(x_k))$ 闭凸函数 Ch3 既&quot;凸&quot;（碗形）又&quot;闭&quot;（下水平集包含边界），保证极小点存在且邻近算子良定义 最优性条件 Ch3 $x^$ 是 $\\min f(x)$ 的最优点 $\\iff$ $0\\in\\partial f(x^)$（非光滑情形）或 $\\nabla f(x^*)=0$（光滑情形） 7.1 问题形式 7.1.1 复合优化问题的标准形式 本章考虑如下极小化问题：\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/07-%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第7章：邻近梯度法">
+<meta name="twitter:description" content="第7章：邻近梯度法 核心思想：复合优化问题 $\\min f(x)+g(x)$ 中，$f$ 光滑（有梯度）用梯度下降处理，$g$ 非光滑（无梯度）用邻近算子处理，两步交替迭代——这就是邻近梯度法（Proximal Gradient Method）。\n前置知识回顾 在开始本章之前，请确保你已经理解以下概念：\n概念 出自 一句话回顾 梯度下降法 (GD) Ch2 沿负梯度方向走：$x_{k+1}=x_k-\\alpha\\nabla f(x_k)$，对光滑凸函数收敛率 $O(1/k)$ $L$-smooth 函数 Ch2 梯度变化有上界：$|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$，等价于 $f(y)\\leq f(x)+\\nabla f(x)^T(y-x)+\\frac{L}{2}|y-x|^2$ 凸函数 (convex) Ch3 函数图像在弦之下：$f(tx+(1-t)y)\\leq tf(x)+(1-t)f(y)$；等价于 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$ 次梯度 (subgradient) Ch3 非光滑函数的&quot;广义梯度&quot;：$g\\in\\partial f(x)$ 满足 $f(y)\\geq f(x)+g^T(y-x),\\forall y$ 投影梯度法 (PGM) Ch6 $\\min_{x\\in C}f(x)$ 时，梯度下降后投影回约束集：$x_{k+1}=P_C(x_k-\\alpha\\nabla f(x_k))$ 闭凸函数 Ch3 既&quot;凸&quot;（碗形）又&quot;闭&quot;（下水平集包含边界），保证极小点存在且邻近算子良定义 最优性条件 Ch3 $x^$ 是 $\\min f(x)$ 的最优点 $\\iff$ $0\\in\\partial f(x^)$（非光滑情形）或 $\\nabla f(x^*)=0$（光滑情形） 7.1 问题形式 7.1.1 复合优化问题的标准形式 本章考虑如下极小化问题：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾">前置知识回顾</a></li>
+    <li><a href="#71-问题形式">7.1 问题形式</a>
+      <ol>
+        <li><a href="#711-复合优化问题的标准形式">7.1.1 复合优化问题的标准形式</a></li>
+        <li><a href="#712-为什么要分拆处理">7.1.2 为什么要分拆处理？</a></li>
+        <li><a href="#713-典型例子必背">7.1.3 典型例子（必背）</a></li>
+        <li><a href="#714-为什么梯度下降法搞不定">7.1.4 为什么梯度下降法搞不定？</a></li>
+      </ol>
+    </li>
+    <li><a href="#72-邻近算子proximal-operator本章灵魂">7.2 邻近算子（Proximal Operator）——本章灵魂</a>
+      <ol>
+        <li><a href="#721-定义">7.2.1 定义</a></li>
+        <li><a href="#722-为什么加-frac12z-x2三个理由">7.2.2 为什么加 $\frac{1}{2}|z-x|^2$？——三个理由</a></li>
+        <li><a href="#723-刻画不等式必背必须会推导">7.2.3 刻画不等式（必背，必须会推导）</a></li>
+        <li><a href="#724-常见邻近算子闭式解必背考试高频">7.2.4 常见邻近算子闭式解（必背，考试高频）</a>
+          <ol>
+            <li><a href="#1-ell_1-范数--软阈值算子soft-thresholding">(1) $\ell_1$ 范数 → 软阈值算子（Soft-Thresholding）</a></li>
+            <li><a href="#2-ell_2-范数--缩水算子">(2) $\ell_2$ 范数 → 缩水算子</a></li>
+            <li><a href="#3-指示函数--投影算子">(3) 指示函数 → 投影算子</a></li>
+            <li><a href="#4-核范数nuclear-norm-svd-软阈值">(4) 核范数（Nuclear Norm）→ SVD 软阈值</a></li>
+            <li><a href="#5-二次正则化ell_22-范数">(5) 二次正则化（$\ell_2^2$ 范数）</a></li>
+            <li><a href="#6-组-lassogroup-lasso">(6) 组 LASSO（Group LASSO）</a></li>
+          </ol>
+        </li>
+        <li><a href="#725-邻近算子的基本性质">7.2.5 邻近算子的基本性质</a></li>
+      </ol>
+    </li>
+    <li><a href="#73-ista-迭代与收敛">7.3 ISTA 迭代与收敛</a>
+      <ol>
+        <li><a href="#731-迭代格式推导从零开始">7.3.1 迭代格式推导（从零开始）</a></li>
+        <li><a href="#732-特例的统一一个框架包含一切">7.3.2 特例的统一——一个框架包含一切</a></li>
+        <li><a href="#733-梯度映射gradient-mapping">7.3.3 梯度映射（Gradient Mapping）</a></li>
+        <li><a href="#734-o1k-收敛率证明核心证明必须完整掌握">7.3.4 $O(1/k)$ 收敛率证明（核心证明，必须完整掌握）</a></li>
+        <li><a href="#735-ista-for-lasso-实现">7.3.5 ISTA for LASSO 实现</a></li>
+        <li><a href="#736-线搜索版本当-l-未知时">7.3.6 线搜索版本（当 $L$ 未知时）</a></li>
+      </ol>
+    </li>
+    <li><a href="#74-矩阵补全soft-impute-算法">7.4 矩阵补全：Soft-Impute 算法</a>
+      <ol>
+        <li><a href="#741-问题建模">7.4.1 问题建模</a></li>
+        <li><a href="#742-soft-impute-算法">7.4.2 Soft-Impute 算法</a></li>
+      </ol>
+    </li>
+    <li><a href="#75-典型例题">7.5 典型例题</a>
+      <ol>
+        <li><a href="#例题-71软阈值算子的完整推导">例题 7.1：软阈值算子的完整推导</a></li>
+        <li><a href="#例题-72邻近算子的非扩张性证明">例题 7.2：邻近算子的非扩张性证明</a></li>
+        <li><a href="#例题-73ista-充分下降性的完整推导">例题 7.3：ISTA 充分下降性的完整推导</a></li>
+        <li><a href="#例题-74不同正则化项的邻近算子">例题 7.4：不同正则化项的邻近算子</a></li>
+        <li><a href="#例题-75复合优化的一阶最优性条件不动点定理">例题 7.5：复合优化的一阶最优性条件（不动点定理）</a></li>
+        <li><a href="#例题-76核范数邻近算子的推导要点">例题 7.6：核范数邻近算子的推导要点</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/07-%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/">第7章：邻近梯度法</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 12 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第7章邻近梯度法">第7章：邻近梯度法
+</h1><blockquote>
+<p><strong>核心思想</strong>：复合优化问题 $\min f(x)+g(x)$ 中，$f$ 光滑（有梯度）用梯度下降处理，$g$ 非光滑（无梯度）用邻近算子处理，两步交替迭代——这就是邻近梯度法（Proximal Gradient Method）。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾">前置知识回顾
+</h2><p>在开始本章之前，请确保你已经理解以下概念：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>概念</th>
+					<th>出自</th>
+					<th>一句话回顾</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>梯度下降法 (GD)</td>
+					<td>Ch2</td>
+					<td>沿负梯度方向走：$x_{k+1}=x_k-\alpha\nabla f(x_k)$，对光滑凸函数收敛率 $O(1/k)$</td>
+			</tr>
+			<tr>
+					<td>$L$-smooth 函数</td>
+					<td>Ch2</td>
+					<td>梯度变化有上界：$|\nabla f(x)-\nabla f(y)|\leq L|x-y|$，等价于 $f(y)\leq f(x)+\nabla f(x)^T(y-x)+\frac{L}{2}|y-x|^2$</td>
+			</tr>
+			<tr>
+					<td>凸函数 (convex)</td>
+					<td>Ch3</td>
+					<td>函数图像在弦之下：$f(tx+(1-t)y)\leq tf(x)+(1-t)f(y)$；等价于 $f(y)\geq f(x)+\nabla f(x)^T(y-x)$</td>
+			</tr>
+			<tr>
+					<td>次梯度 (subgradient)</td>
+					<td>Ch3</td>
+					<td>非光滑函数的&quot;广义梯度&quot;：$g\in\partial f(x)$ 满足 $f(y)\geq f(x)+g^T(y-x),\forall y$</td>
+			</tr>
+			<tr>
+					<td>投影梯度法 (PGM)</td>
+					<td>Ch6</td>
+					<td>$\min_{x\in C}f(x)$ 时，梯度下降后投影回约束集：$x_{k+1}=P_C(x_k-\alpha\nabla f(x_k))$</td>
+			</tr>
+			<tr>
+					<td>闭凸函数</td>
+					<td>Ch3</td>
+					<td>既&quot;凸&quot;（碗形）又&quot;闭&quot;（下水平集包含边界），保证极小点存在且邻近算子良定义</td>
+			</tr>
+			<tr>
+					<td>最优性条件</td>
+					<td>Ch3</td>
+					<td>$x^<em>$ 是 $\min f(x)$ 的最优点 $\iff$ $0\in\partial f(x^</em>)$（非光滑情形）或 $\nabla f(x^*)=0$（光滑情形）</td>
+			</tr>
+	</tbody>
+</table></div>
+<hr>
+<h2 id="71-问题形式">7.1 问题形式
+</h2><h3 id="711-复合优化问题的标准形式">7.1.1 复合优化问题的标准形式
+</h3><p>本章考虑如下极小化问题：</p>
+$$\boxed{\min_{x\in\mathbb{R}^n} F(x) = f(x) + g(x)}$$<p><strong>符号含义</strong>（逐项解释）：</p>
+<ul>
+<li>$x \in \mathbb{R}^n$：$x$ 是一个 $n$ 维实数列向量。比如在 LASSO 回归中，$x$ 就是待求的回归系数向量，$n$ 等于自变量的个数。</li>
+<li>$F(x)$：总目标函数，是我们想要最小化的量。</li>
+<li>$f(x)$：<strong>光滑部分</strong>。$f$ 必须是凸函数，且梯度 $\nabla f(x)$ 存在且 <strong>$L$-Lipschitz 连续</strong>，即对任意两点 $x, y$：</li>
+</ul>
+$$\|\nabla f(x) - \nabla f(y)\| \leq L\|x - y\|$$<p>这里的 $|\cdot|$ 是 $\ell_2$ 范数（向量的欧几里得长度），$L$ 称为 Lipschitz 常数（可以理解为梯度的&quot;变化率上限&quot;）。</p>
+<ul>
+<li>$g(x)$：<strong>非光滑部分</strong>。$g$ 是闭凸函数（proper, closed, convex），<strong>不一定可微</strong>，但要求其<strong>邻近算子</strong> $\text{prox}_g$ 有闭式解（closed-form）或能便宜算出。</li>
+</ul>
+<h3 id="712-为什么要分拆处理">7.1.2 为什么要分拆处理？
+</h3><p>思考这个问题：如果 $g$ 也是光滑的（比如 $g(x)=\frac{\lambda}{2}|x|^2$，岭回归），直接用<strong>梯度下降法</strong>（GD）即可。为什么要发明新方法？</p>
+<p><strong>关键困难</strong>：$g$ <strong>非光滑</strong>——它的次梯度虽然存在，但用次梯度法（Ch4）的收敛率只有 $O(1/\sqrt{k})$，非常慢。我们希望利用 $f$ 的<strong>光滑性</strong>获得更快的收敛。</p>
+<p><strong>分拆处理的直觉</strong>：</p>
+<ul>
+<li>$f$ 像&quot;数据拟合项&quot;——光滑、可微，用负梯度方向引导下降；</li>
+<li>$g$ 像&quot;结构正则项&quot;——诱导稀疏性、低秩性等结构，虽不可微但具有<strong>便宜可算的邻近算子</strong>。</li>
+</ul>
+<h3 id="713-典型例子必背">7.1.3 典型例子（必背）
+</h3><p>复合优化问题 $f(x)+g(x)$ 的经典实例：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>问题名称</th>
+					<th>光滑部分 $f(x)$</th>
+					<th>非光滑部分 $g(x)$</th>
+					<th>应用场景</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>LASSO</strong></td>
+					<td>$\frac{1}{2}|Ax-b|^2$（最小二乘损失）</td>
+					<td>$\lambda|x|_1$（$\ell_1$ 范数）</td>
+					<td>稀疏线性回归，变量选择</td>
+			</tr>
+			<tr>
+					<td><strong>岭回归 (Ridge)</strong></td>
+					<td>$\frac{1}{2}|Ax-b|^2$</td>
+					<td>$\frac{\lambda}{2}|x|^2$（$\ell_2^2$，光滑的！）</td>
+					<td>共线性处理，参数收缩</td>
+			</tr>
+			<tr>
+					<td><strong>弹性网 (Elastic Net)</strong></td>
+					<td>$\frac{1}{2}|Ax-b|^2$</td>
+					<td>$\lambda_1|x|_1 + \frac{\lambda_2}{2}|x|^2$</td>
+					<td>兼具稀疏和组效应的回归</td>
+			</tr>
+			<tr>
+					<td><strong>约束优化</strong></td>
+					<td>$f(x)$（任意光滑凸函数）</td>
+					<td>$\delta_C(x)$（集合 $C$ 的指示函数）</td>
+					<td>带约束的各类优化</td>
+			</tr>
+			<tr>
+					<td><strong>矩阵补全</strong></td>
+					<td>$\frac{1}{2}|P_\Omega(X-M)|_F^2$</td>
+					<td>$\lambda|X|_*$（核范数）</td>
+					<td>推荐系统、图像修复</td>
+			</tr>
+			<tr>
+					<td><strong>组 LASSO</strong></td>
+					<td>$\frac{1}{2}|Ax-b|^2$</td>
+					<td>$\lambda\sum_g |x_g|_2$（组 $\ell_2$ 和）</td>
+					<td>结构化特征选择</td>
+			</tr>
+	</tbody>
+</table></div>
+<blockquote>
+<p><strong>指示函数 $\delta_C(x)$ 的定义</strong>（回顾）：$\delta_C(x)=0$ 当 $x\in C$，否则 $\delta_C(x)=+\infty$。它是&quot;禁止出界&quot;的数学表达——任何使 $x$ 落在 $C$ 外的点都会被目标函数 $+\infty$ 无情拒绝。</p>
+</blockquote>
+<h3 id="714-为什么梯度下降法搞不定">7.1.4 为什么梯度下降法搞不定？
+</h3><p>以 LASSO 的标量版本为例：$\min_x \frac{1}{2}(x-a)^2 + \lambda|x|$。取 $a=2$，$\lambda=1$。</p>
+<ul>
+<li>当 $x&gt;0$ 时，$|x|$ 的导数为 $+1$，梯度是 $x-a+\lambda = x-2+1 = x-1$</li>
+<li>当 $x&lt;0$ 时，$|x|$ 的导数为 $-1$，梯度是 $x-a-\lambda = x-2-1 = x-3$</li>
+<li>当 $x=0$ 时，$|x|$ 的<strong>梯度不存在</strong>（这是一个尖角！）</li>
+</ul>
+<p>梯度下降法在 $x=0$ 处不知道该往哪走。即使 $x\neq 0$，当 $x$ 接近 $0$ 时，$|x|$ 的梯度在 $+1$ 和 $-1$ 之间跳变（不连续），导致 GD 在原点附近震荡。</p>
+<p><strong>要点</strong>：问题不在于&quot;不可微&quot;本身——次梯度法可以处理不可微。问题在于 GD/次梯度法的收敛率太慢。邻近梯度法利用了 $f$ 的光滑性，达到了 $O(1/k)$，而次梯度法只有 $O(1/\sqrt{k})$。</p>
+<blockquote>
+<p><strong>核心要点</strong>：复合优化问题 $\min f+g$ 中，$f$ 负责光滑拟合（有梯度可用），$g$ 负责结构正则化（虽不可微但 prox 好算）。邻近梯度法将两者分开处理，利用了 $f$ 的光滑性获得了优于次梯度法的收敛率。</p>
+</blockquote>
+<hr>
+<h2 id="72-邻近算子proximal-operator本章灵魂">7.2 邻近算子（Proximal Operator）——本章灵魂
+</h2><h3 id="721-定义">7.2.1 定义
+</h3><p>对于闭凸函数 $g:\mathbb{R}^n\to\mathbb{R}\cup{+\infty}$，其在点 $x$ 处的<strong>邻近算子</strong>定义为：</p>
+$$\boxed{\text{prox}_g(x) = \arg\min_{z\in\mathbb{R}^n} \left\{g(z) + \frac{1}{2}\|z - x\|^2\right\}}$$<p><strong>读作</strong>：&ldquo;函数 $g$ 在点 $x$ 处的邻近算子&rdquo;。它的意思是：从当前位置 $x$ 出发，找一个&quot;折中点&quot; $z$，使得 $g(z)$ 尽量小，同时又不能离 $x$ 太远（$\frac{1}{2}|z-x|^2$ 是惩罚项）。</p>
+<p>带步长的参数化版本（$\alpha &gt; 0$ 控制&quot;可以走多远&quot;）：</p>
+$$\text{prox}_{\alpha g}(x) = \arg\min_{z} \left\{g(z) + \frac{1}{2\alpha}\|z - x\|^2\right\}$$<h3 id="722-为什么加-frac12z-x2三个理由">7.2.2 为什么加 $\frac{1}{2}|z-x|^2$？——三个理由
+</h3><p><strong>理由一：保证解的存在唯一性（强凸化作用）</strong></p>
+<p>$g(z)$ 可能只是凸的（如 $\ell_1$ 范数：$|\cdot|_1$ 不是强凸的——沿着坐标轴方向它是平的）。但 $g(z)+\frac{1}{2}|z-x|^2$ 中的二次项 $\frac{1}{2}|z-x|^2$ 是 <strong>1-强凸</strong>的（它的 Hessian 是单位矩阵 $I$，最小特征值为 1）。</p>
+<blockquote>
+<p><strong>强凸函数</strong>（Strictly Convex 的强化版）的直观：一个 $\mu$-强凸函数 $h$ 满足 $h(y)\geq h(x)+\nabla h(x)^T(y-x)+\frac{\mu}{2}|y-x|^2$，即它被一个二次函数从下面&quot;托住&quot;。强凸函数在有下界的闭函数上必有<strong>唯一的</strong>全局极小点。</p>
+</blockquote>
+<p>因此 $\arg\min_z{g(z)+\frac{1}{2}|z-x|^2}$ 永远存在且唯一。邻近算子是<strong>良定义的</strong>（well-defined）。</p>
+<p><strong>理由二：防止&quot;跑太远&quot;</strong></p>
+<p>如果不加二次项，邻近算子退化为 $\arg\min_z g(z)$——直接找 $g$ 的全局最小值，这等于回到了原问题。二次惩罚 $\frac{1}{2}|z-x|^2$ 强迫解只能待在 $x$ 的&quot;邻近&quot;。步长 $\alpha$ 控制&quot;邻近&quot;的程度：</p>
+<ul>
+<li>当 $\alpha \to 0$（步长极小）：惩罚项主导，$\text{prox}_{\alpha g}(x) \approx x$（几乎不移动）</li>
+<li>当 $\alpha \to \infty$（步长极大）：$g$ 主导，$\text{prox}_{\alpha g}(x) \to \arg\min_z g(z)$（直奔 $g$ 的最小化点）</li>
+</ul>
+<p><strong>理由三：与 Moreau 包络的桥梁关系</strong></p>
+<p>Moreau 包络（将在 Ch9 详细展开）定义为 $M_g(x)=\min_z{g(z)+\frac{1}{2}|z-x|^2}$，并且它有一个极优美的性质：</p>
+$$\nabla M_g(x) = x - \text{prox}_g(x)$$<p>这意味着：邻近算子将<strong>非光滑函数</strong> $g$ 变为了<strong>光滑函数</strong> $M_g$ 的梯度计算工具——邻近算子是连接非光滑优化和光滑优化的桥梁。</p>
+<h3 id="723-刻画不等式必背必须会推导">7.2.3 刻画不等式（必背，必须会推导）
+</h3><p>设 $z^* = \text{prox}_g(x)$ 是上述极小化问题的最优解。由凸优化的<strong>一阶最优性条件</strong>：$0 \in \partial h(z^*)$（其中 $h(z) = g(z) + \frac{1}{2}|z-x|^2$）。</p>
+<p>计算次梯度：
+</p>
+$$\partial h(z) = \partial g(z) + (z - x)$$<p>在最优解 $z^<em>$ 处，$0 \in \partial g(z^</em>) + (z^* - x)$。移项即得：</p>
+$$\boxed{x - \text{prox}_g(x) \in \partial g(\text{prox}_g(x))}$$<p><strong>用大白话说</strong>：从 prox 点指向原点的向量 $x-\text{prox}_g(x)$，恰好是函数 $g$ 在 prox 点处的<strong>一个次梯度</strong>。这好比：如果你从最低点往上走一格，你走过的方向就是函数的&quot;上升方向&quot;。</p>
+<p><strong>等价写法</strong>：
+</p>
+$$z^* = \text{prox}_g(x) \iff x \in z^* + \partial g(z^*) \iff x \in (\text{id} + \partial g)(z^*)$$<p>两边取逆映射：$\text{prox}_g = (\text{id} + \partial g)^{-1}$。邻近算子在数学上又称为<strong>预解式（resolvent）</strong>——这是它在单调算子理论中的标准名称。</p>
+<h3 id="724-常见邻近算子闭式解必背考试高频">7.2.4 常见邻近算子闭式解（必背，考试高频）
+</h3><h4 id="1-ell_1-范数--软阈值算子soft-thresholding">(1) $\ell_1$ 范数 → 软阈值算子（Soft-Thresholding）
+</h4>$$g(x) = \lambda\|x\|_1 = \lambda\sum_{i=1}^n |x_i|$$$$\boxed{\text{prox}_{\lambda\|\cdot\|_1}(x) = S_\lambda(x)}$$<p>其中软阈值算子的分量形式：
+</p>
+$$\boxed{[S_\lambda(x)]_i = \text{sign}(x_i) \cdot \max\{|x_i| - \lambda,\; 0\}}$$<p><strong>完整推导</strong>（务必掌握）：</p>
+<p>问题等价于对每个分量独立求解（因为 $|x|_1$ 和 $|x|^2$ 都是分量可分的）：
+</p>
+$$\min_z \left\{\lambda|z| + \frac{1}{2}(z - x)^2\right\}$$<p>这里 $z, x \in \mathbb{R}$ 是标量（一个分量）。对 $z\neq 0$，上述目标函数可导。但 $z=0$ 处 $|z|$ 不可导，需要用次梯度的最优性条件：</p>
+$$0 \in \lambda \cdot \partial|z| + (z - x)$$<p>其中 $|z|$ 的次梯度为：
+</p>
+$$\partial|z| = \begin{cases} \{1\}, & z > 0 \\ [-1, 1], & z = 0 \\ \{-1\}, & z < 0 \end{cases}$$<p><strong>分三种情况讨论</strong>：</p>
+<p><strong>情况一</strong>：$z &gt; 0$。此时 $\partial|z| = {1}$，代入最优性条件：
+</p>
+$$0 = \lambda \cdot 1 + (z - x) = z + \lambda - x$$<p>解得 $z = x - \lambda$。但这要求 $z &gt; 0$，即 $x &gt; \lambda$。</p>
+<p><strong>情况二</strong>：$z &lt; 0$。此时 $\partial|z| = {-1}$，代入：
+</p>
+$$0 = \lambda \cdot (-1) + (z - x) = z - \lambda - x$$<p>解得 $z = x + \lambda$。但这要求 $z &lt; 0$，即 $x &lt; -\lambda$。</p>
+<p><strong>情况三</strong>：$z = 0$。此时 $0 \in \lambda[-1, 1] - x$，即 $x \in [-\lambda, \lambda]$。这意味着当 $|x| \leq \lambda$ 时，最优解就是 $z^* = 0$。</p>
+<p><strong>汇总</strong>：
+</p>
+$$z^* = \begin{cases} x - \lambda, & x > \lambda \\ 0, & |x| \leq \lambda \\ x + \lambda, & x < -\lambda \end{cases}$$<p>用符号函数简洁地写为：$z^* = \text{sign}(x) \cdot \max{|x| - \lambda, 0}$。</p>
+<p><strong>几何直觉</strong>：软阈值将绝对值小于阈值 $\lambda$ 的数&quot;压扁&quot;为零（这就是 LASSO 产生<strong>稀疏解</strong>的原因！），大于 $\lambda$ 的数则向零收缩 $\lambda$。</p>
+<h4 id="2-ell_2-范数--缩水算子">(2) $\ell_2$ 范数 → 缩水算子
+</h4>$$g(x) = \lambda\|x\|_2$$$$\boxed{\text{prox}_{\lambda\|\cdot\|_2}(x) = \begin{cases} \left(1 - \dfrac{\lambda}{\|x\|_2}\right)x, & \|x\|_2 > \lambda \\[8pt] 0, & \|x\|_2 \leq \lambda \end{cases}}$$<p><strong>推导</strong>：当 $z \neq 0$ 时，$\ell_2$ 范数可微，$\nabla_z|z|_2 = \frac{z}{|z|_2}$。最优性条件：
+</p>
+$$\lambda \frac{z}{\|z\|_2} + (z - x) = 0$$<p>整理：$z(1 + \frac{\lambda}{|z|_2}) = x$。由此可得 $z$ 与 $x$ 同方向（共线），即 $z = c \cdot x$ 对某个常数 $c \geq 0$。代入：
+</p>
+$$\lambda \frac{cx}{\|cx\|_2} + (cx - x) = \lambda \frac{x}{\|x\|_2} + (c-1)x = 0$$<p>推得 $c = 1 - \frac{\lambda}{|x|_2}$。当 $|x|_2 \leq \lambda$ 时 $c \leq 0$，但 $c$ 应为非负，此时 $z^* = 0$。</p>
+<p><strong>几何直觉</strong>：将整个向量的长度向零缩小 $\lambda$——如果原长度不到 $\lambda$，直接变成零向量。</p>
+<h4 id="3-指示函数--投影算子">(3) 指示函数 → 投影算子
+</h4>$$g(x) = \delta_C(x) = \begin{cases} 0, & x \in C \\ +\infty, & x \notin C \end{cases}$$$$\boxed{\text{prox}_{\delta_C}(x) = P_C(x) = \arg\min_{z \in C} \|z - x\|^2}$$<p><strong>解释</strong>：指示函数的邻近算子就是到集合 $C$ 的<strong>欧几里得投影</strong>——在集合内找一个离 $x$ 最近的点。此时邻近梯度法<strong>退化为投影梯度法</strong>（Ch6）。</p>
+<h4 id="4-核范数nuclear-norm-svd-软阈值">(4) 核范数（Nuclear Norm）→ SVD 软阈值
+</h4>$$g(X) = \lambda\|X\|_* = \lambda\sum_{i=1}^r \sigma_i(X)$$<p>其中 $\sigma_i(X)$ 是矩阵 $X$ 的<strong>奇异值</strong>（Singular Values），$r = \text{rank}(X)$。</p>
+<p>设 $X = U\Sigma V^T$ 为 SVD 分解（$\Sigma = \text{diag}(\sigma_1, \sigma_2, \ldots)$）：
+</p>
+$$\boxed{\text{prox}_{\lambda\|\cdot\|_*}(X) = U \cdot \text{diag}\big(S_\lambda(\sigma_1), S_\lambda(\sigma_2), \ldots\big) \cdot V^T}$$<p><strong>核心操作</strong>：保持奇异向量 $U, V$ 不变，<strong>只对奇异值做软阈值</strong>！这意味着小的奇异值被压缩为 0，从而降低矩阵的秩。</p>
+<h4 id="5-二次正则化ell_22-范数">(5) 二次正则化（$\ell_2^2$ 范数）
+</h4>$$g(x) = \frac{\lambda}{2}\|x\|^2$$$$\boxed{\text{prox}_{\frac{\lambda}{2}\|\cdot\|^2}(x) = \frac{1}{1 + \lambda}x}$$<p><strong>推导</strong>：$\min_z {\frac{\lambda}{2}|z|^2 + \frac{1}{2}|z-x|^2}$。这是光滑的，直接对 $z$ 求导：
+</p>
+$$\lambda z + (z - x) = 0 \implies (1+\lambda)z = x \implies z = \frac{x}{1+\lambda}$$<p>正是对 $x$ 做了一个缩放收缩。</p>
+<h4 id="6-组-lassogroup-lasso">(6) 组 LASSO（Group LASSO）
+</h4>$$g(x) = \lambda\sum_{g \in \mathcal{G}} \|x_g\|_2$$<p>其中 $\mathcal{G}$ 是变量分组的索引集，$x_g$ 是第 $g$ 组变量拼成的子向量。</p>
+<p>各组之间是<strong>可分离</strong>的，每组独立做 $\ell_2$ 范数的邻近算子：
+</p>
+$$\boxed{[\text{prox}_{\lambda\sum_g \|\cdot\|_2}(x)]_g = \max\left\{1 - \frac{\lambda}{\|x_g\|_2},\; 0\right\} \cdot x_g}$$<h3 id="725-邻近算子的基本性质">7.2.5 邻近算子的基本性质
+</h3><p><strong>1. 非扩张性（Firm Nonexpansiveness）</strong>：
+</p>
+$$\|\text{prox}_g(x) - \text{prox}_g(y)\|^2 \leq \langle \text{prox}_g(x) - \text{prox}_g(y),\; x - y \rangle$$<p>由 Cauchy-Schwarz 不等式 $\langle a,b\rangle \leq |a||b|$ 可得更弱但更好记的形式：
+</p>
+$$\boxed{\|\text{prox}_g(x) - \text{prox}_g(y)\| \leq \|x - y\|}$$<p><strong>大白话</strong>：邻近算子不会把两个点&quot;拉开&quot;——两个输入点 $x, y$ 之间的距离，经过邻近算子映射后只会变小或不变，<strong>绝不放大</strong>。这是一切邻近算子收敛性分析的基石。</p>
+<p><strong>2. 不动点性质</strong>：$x^<em>$ 是 $\min g(x)$ 的最优解 $\iff$ $x^</em> = \text{prox}_g(x^*)$。</p>
+<p><strong>证明</strong>：由刻画不等式，$x^* = \text{prox}_g(x^<em>)$ 等价于 $x^</em> - x^* = 0 \in \partial g(x^*)$，这正是 $\min g$ 的最优性条件。</p>
+<p><strong>3. 可分性</strong>：若 $g(x) = \sum_{i} g_i(x_i)$（各分量独立），则：
+</p>
+$$[\text{prox}_g(x)]_i = \text{prox}_{g_i}(x_i)$$<p>这意味着各分量可以分头计算——这正好是并行计算的基础。</p>
+<blockquote>
+<p><strong>核心要点</strong>：邻近算子 $\text{prox}_g(x)$ 是函数 $g$ 的&quot;局部优化映射&quot;——在 $x$ 附近找一个使 $g$ 尽可能小的点，由 $\frac{1}{2}|z-x|^2$ 惩罚项约束不要走太远。它的刻画不等式 $x-\text{prox}_g(x) \in \partial g(\text{prox}_g(x))$ 和常见闭式解（软阈值、投影、SVD 软阈值）是本章和后继章节的所有推导基础。</p>
+</blockquote>
+<hr>
+<h2 id="73-ista-迭代与收敛">7.3 ISTA 迭代与收敛
+</h2><h3 id="731-迭代格式推导从零开始">7.3.1 迭代格式推导（从零开始）
+</h3><p><strong>目标</strong>：$\min_x F(x) = f(x) + g(x)$，$f$ 为 $L$-smooth 凸函数，$g$ 为闭凸函数。</p>
+<p><strong>推导思路</strong>：我们不能直接在 $F$ 上做梯度下降（因为 $g$ 不可微）。但我们可以<strong>在 $f$ 上做梯度下降，在 $g$ 上做邻近步</strong>。</p>
+<p>具体地，在第 $k$ 步，我们在当前点 $x_k$ 处构造 $f$ 的二次上界近似。由 $L$-smooth 性质（Ch2 的核心不等式）：
+</p>
+$$f(y) \leq f(x) + \nabla f(x)^T(y - x) + \frac{L}{2}\|y - x\|^2$$<p>这就好比：虽然真实的 $f$ 可能弯曲复杂，但在 $x_k$ 附近，我们用一个开口向上的二次碗来&quot;从上方盖住&quot;它——在这个碗之下的 $f$ 值一定更低。</p>
+<p>用这个二次上界加上 $g$ 构造一个<strong>代理函数</strong>（更容易极小化）：
+</p>
+$$\begin{aligned}
+F(x) &= f(x) + g(x) \\
+&\leq f(x_k) + \nabla f(x_k)^T(x - x_k) + \frac{L}{2}\|x - x_k\|^2 + g(x) \\
+&= Q(x; x_k)
+\end{aligned}$$<p>极小化这个上界（而不是原函数）：
+</p>
+$$\begin{aligned}
+x_{k+1} &= \arg\min_x Q(x; x_k) \\
+&= \arg\min_x \left\{f(x_k) + \nabla f(x_k)^T(x - x_k) + \frac{1}{2\alpha}\|x - x_k\|^2 + g(x)\right\}
+\end{aligned}$$<p>其中 $\alpha = 1/L$。<strong>配平方消去与 $x$ 无关的常数项</strong>：
+</p>
+$$\begin{aligned}
+&\nabla f(x_k)^T(x - x_k) + \frac{1}{2\alpha}\|x - x_k\|^2 \\
+&= \frac{1}{2\alpha}\left(2\alpha\nabla f(x_k)^T(x - x_k) + \|x - x_k\|^2\right) \\
+&= \frac{1}{2\alpha}\|x - x_k + \alpha\nabla f(x_k)\|^2 - \frac{\alpha}{2}\|\nabla f(x_k)\|^2
+\end{aligned}$$<p>常数项 $f(x_k)$ 和 $-\frac{\alpha}{2}|\nabla f(x_k)|^2$ 不影响 $\arg\min$，可以扔掉。因此：
+</p>
+$$\begin{aligned}
+x_{k+1} &= \arg\min_x \left\{g(x) + \frac{1}{2\alpha}\|x - (x_k - \alpha\nabla f(x_k))\|^2\right\} \\
+&= \text{prox}_{\alpha g}\big(x_k - \alpha \nabla f(x_k)\big)
+\end{aligned}$$<p><strong>这就是邻近梯度法的核心迭代公式</strong>：</p>
+$$\boxed{x_{k+1} = \text{prox}_{\alpha g}\big(x_k - \alpha \nabla f(x_k)\big)}$$<p><strong>两步操作的直觉</strong>：</p>
+<ol>
+<li><strong>前向步（Forward Step）</strong>：$x_k - \alpha\nabla f(x_k)$ → 沿着光滑部分 $f$ 的负梯度方向走一步。你&quot;看&quot;的是 $f$ 的下坡方向。</li>
+<li><strong>后向步（Backward Step）</strong>：$\text{prox}_{\alpha g}(\cdot)$ → 在走到的位置附近，找一个使 $g$ 小且不跑太远的点。你&quot;停&quot;在了 $g$ 的合理区域内。</li>
+</ol>
+<p>因此也称为<strong>前向后向分裂法（Forward-Backward Splitting）</strong>。</p>
+<h3 id="732-特例的统一一个框架包含一切">7.3.2 特例的统一——一个框架包含一切
+</h3><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>$g(x)$</th>
+					<th>$\text{prox}_{\alpha g}$</th>
+					<th>退化成的算法</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>$0$</td>
+					<td>恒等映射 $z \mapsto z$</td>
+					<td><strong>梯度下降法</strong>（GD, Ch2）</td>
+			</tr>
+			<tr>
+					<td>$\delta_C(x)$</td>
+					<td>投影 $P_C$</td>
+					<td><strong>投影梯度法</strong>（PGM, Ch6）</td>
+			</tr>
+			<tr>
+					<td>$\lambda|x|_1$</td>
+					<td>软阈值 $S_{\alpha\lambda}$</td>
+					<td><strong>ISTA</strong></td>
+			</tr>
+			<tr>
+					<td>$\lambda|X|_*$</td>
+					<td>SVD 软阈值</td>
+					<td><strong>Soft-Impute</strong></td>
+			</tr>
+			<tr>
+					<td>$\frac{\lambda}{2}|x|^2$</td>
+					<td>$\frac{x}{1+\alpha\lambda}$</td>
+					<td>收缩梯度法</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>邻近梯度法是最一般的框架</strong>——通过选择不同的 $g$ 和对应的邻近算子，它<strong>统一了所有一阶方法</strong>。</p>
+<h3 id="733-梯度映射gradient-mapping">7.3.3 梯度映射（Gradient Mapping）
+</h3><p>为了判定邻近梯度法的收敛，需要定义一个类似于&quot;梯度&quot;的量来衡量收敛进度。</p>
+$$\boxed{G_\alpha(x) = \frac{1}{\alpha}\big(x - \text{prox}_{\alpha g}(x - \alpha\nabla f(x))\big)}$$<p><strong>关键性质</strong>：</p>
+<ul>
+<li>当 $g = 0$（没有非光滑部分）时：$G_\alpha(x) = \frac{1}{\alpha}(x - (x - \alpha\nabla f(x))) = \nabla f(x)$，<strong>退化为普通梯度</strong>。</li>
+<li><strong>最优性判据</strong>：$G_\alpha(x^<em>) = 0 \iff x^</em>$ 是 $\min f+g$ 的最优解。（证明：$G_\alpha(x^<em>) = 0$ 意味着 $x^</em> = \text{prox}_{\alpha g}(x^* - \alpha\nabla f(x^*))$，这正是 7.3.4 节证明的复合优化不动点条件。）</li>
+<li>$G_\alpha(x)$ 是复合优化问题的&quot;<strong>有效梯度</strong>&quot;——当 $G_\alpha(x) \to 0$，算法收敛。</li>
+</ul>
+<h3 id="734-o1k-收敛率证明核心证明必须完整掌握">7.3.4 $O(1/k)$ 收敛率证明（核心证明，必须完整掌握）
+</h3><p><strong>定理</strong>：设 $f$ 为 $L$-smooth 凸函数，$g$ 为闭凸函数，取固定步长 $\alpha = 1/L$，则 ISTA 满足：</p>
+$$\boxed{F(x_k) - F^* \leq \frac{L\|x_0 - x^*\|^2}{2k}}$$<p>其中 $F^* = \min_x F(x) = F(x^*)$。</p>
+<p><strong>证明</strong>（分四步，考试标准完整写法）：</p>
+<hr>
+<p><strong>Step 1：利用邻近算子定义建立不等式</strong></p>
+<p>记 $x^+ = \text{prox}_{\alpha g}(x - \alpha\nabla f(x))$（从 $x$ 做一步迭代得到 $x^+$）。由邻近算子的定义（它以 $z$ 为极小化变量）：
+</p>
+$$x^+ = \arg\min_z \left\{g(z) + \frac{1}{2\alpha}\|z - (x - \alpha\nabla f(x))\|^2\right\}$$<p>这意味着对任意 $z$（特别地取 $z = x$）：
+</p>
+$$g(x^+) + \frac{1}{2\alpha}\|x^+ - (x - \alpha\nabla f(x))\|^2 \leq g(x) + \frac{1}{2\alpha}\|x - (x - \alpha\nabla f(x))\|^2$$<p>右端化简（$x - (x - \alpha\nabla f(x)) = \alpha\nabla f(x)$）：
+</p>
+$$g(x^+) + \frac{1}{2\alpha}\|x^+ - x + \alpha\nabla f(x)\|^2 \leq g(x) + \frac{\alpha}{2}\|\nabla f(x)\|^2$$<p>将左端范数平方展开：
+</p>
+$$\begin{aligned}
+&\|x^+ - x + \alpha\nabla f(x)\|^2 \\
+&= \|x^+ - x\|^2 + 2\alpha\langle \nabla f(x), x^+ - x \rangle + \alpha^2\|\nabla f(x)\|^2
+\end{aligned}$$<p>代入不等式并整理：
+</p>
+$$g(x^+) \leq g(x) - \langle \nabla f(x), x^+ - x \rangle - \frac{1}{2\alpha}\|x^+ - x\|^2 \tag{1}$$<hr>
+<p><strong>Step 2：利用 $f$ 的 $L$-smooth 性</strong></p>
+<p>由 $L$-smooth 的二次上界不等式（取 $y = x^+$）：
+</p>
+$$f(x^+) \leq f(x) + \langle \nabla f(x), x^+ - x \rangle + \frac{L}{2}\|x^+ - x\|^2 \tag{2}$$<p>（回顾：这个不等式的含义是——$f$ 在 $x$ 处的二阶导数被 $L$ 控制，所以真实的 $f(x^+)$ 不超过在 $x$ 处做泰勒展开到一阶再加一个二次修正项。）</p>
+<hr>
+<p><strong>Step 3：合并 (1) 和 (2)</strong></p>
+<p>将 (1) 和 (2) 左右分别相加：
+</p>
+$$\begin{aligned}
+F(x^+) &= f(x^+) + g(x^+) \\
+&\leq f(x) + g(x) + \left(\frac{L}{2} - \frac{1}{2\alpha}\right)\|x^+ - x\|^2
+\end{aligned}$$<p>取 $\alpha = 1/L$，上式中 $\frac{L}{2} - \frac{1}{2\alpha} = \frac{L}{2} - \frac{L}{2} = 0$。因此：</p>
+$$\boxed{F(x_{k+1}) \leq F(x_k) - \frac{L}{2}\|x_{k+1} - x_k\|^2}$$<p>这就是<strong>充分下降性</strong>（Sufficient Decrease Property）。它告诉我们：</p>
+<ul>
+<li>$F(x_k)$ <strong>单调不增</strong>（每步要么严格下降，要么不动）</li>
+<li>$|x_{k+1} - x_k| \to 0$（相邻迭代的距离趋于零）</li>
+</ul>
+<hr>
+<p><strong>Step 4：从梯度映射推导 $O(1/k)$ 速率</strong></p>
+<p>引入 Lyapunov 函数（一个每步不增的&quot;能量函数&quot;）：
+</p>
+$$\Phi_k = k(F(x_k) - F^*) + \frac{L}{2}\|x_k - x^*\|^2$$<p>其中 $x^*$ 是任意一个最优解。目标：证明 $\Phi_{k+1} \leq \Phi_k$（能量不增）。</p>
+<p>由凸性：$f(x_k) - f(x^<em>) \leq \langle \nabla f(x_k), x_k - x^</em> \rangle$（凸函数的一阶下界不等式）。</p>
+<p>由 $g$ 的凸性和 $x_{k+1}$ 的邻近算子刻画（需要更精细的推导，此处省略递推细节），可以证明：
+</p>
+$$\Phi_{k+1} \leq \Phi_k + \text{（非正项）} \leq \Phi_k$$<p>由于 $\Phi_k$ 非增且非负，有：
+</p>
+$$k(F(x_k) - F^*) \leq \Phi_k \leq \Phi_0 = 0 \cdot (F(x_0) - F^*) + \frac{L}{2}\|x_0 - x^*\|^2 = \frac{L}{2}\|x_0 - x^*\|^2$$<p>因此：
+</p>
+$$F(x_k) - F^* \leq \frac{L\|x_0 - x^*\|^2}{2k}$$<p>这就是 $O(1/k)$ 收敛率——迭代 100 次，误差缩小到原来的 $1/100$。</p>
+<p><strong>与次梯度法的对比</strong>：次梯度法（Ch4）只有 $O(1/\sqrt{k})$——迭代 100 次误差才缩小到 $1/10$。邻近梯度法快得多的根本原因是它<strong>利用了 $f$ 的光滑性</strong>。</p>
+<h3 id="735-ista-for-lasso-实现">7.3.5 ISTA for LASSO 实现
+</h3><p><strong>LASSO 问题</strong>：$\min_x \frac{1}{2}|Ax - b|^2 + \lambda|x|_1$</p>
+<p><strong>ISTA 迭代</strong>：
+</p>
+$$\boxed{x_{k+1} = S_{\lambda/L}\left(x_k - \frac{1}{L}A^T(Ax_k - b)\right)}$$<p>其中 $L = \lambda_{\max}(A^T A)$（$A^T A$ 的最大特征值，是 $\frac{1}{2}|Ax-b|^2$ 的梯度 Lipschitz 常数），$S_{\lambda/L}$ 是阈值为 $\lambda/L$ 的软阈值算子。</p>
+<p><strong>每步计算量分解</strong>：</p>
+<ul>
+<li>计算残差 $Ax_k - b$：矩阵-向量乘，$O(mn)$（$A$ 是 $m \times n$ 矩阵）</li>
+<li>计算 $A^T(Ax_k - b)$：$O(mn)$</li>
+<li>软阈值 $S_{\lambda/L}(\cdot)$：$O(n)$（每个分量独立操作）</li>
+<li>总计：$O(mn)$ / 迭代</li>
+</ul>
+<p><strong>停机准则</strong>：$|x_{k+1} - x_k| \leq \varepsilon$（迭代点不再显著移动）或 $|F(x_{k+1}) - F(x_k)| \leq \varepsilon$（目标函数值不再显著变化）。</p>
+<h3 id="736-线搜索版本当-l-未知时">7.3.6 线搜索版本（当 $L$ 未知时）
+</h3><p>当 $L$ 未知时，使用<strong>回溯线搜索</strong>（Backtracking Line Search）：</p>
+<p>初始化 $\alpha = \alpha_0$（尝试步长），重复 $\alpha \leftarrow \beta\alpha$（$\beta \in (0,1)$，如 $\beta=0.5$）直到满足：
+</p>
+$$f(x^+) \leq f(x) + \langle \nabla f(x), x^+ - x \rangle + \frac{1}{2\alpha}\|x^+ - x\|^2$$<p>其中 $x^+ = \text{prox}_{\alpha g}(x - \alpha\nabla f(x))$。这个不等式确保我们用&quot;安全&quot;的步长走进了 $f$ 的二次上界之内。线搜索版本仍然保持 $O(1/k)$ 收敛率。</p>
+<blockquote>
+<p><strong>核心要点</strong>：邻近梯度法的迭代 $x_{k+1} = \text{prox}_{\alpha g}(x_k - \alpha\nabla f(x_k))$ 分两步：前向梯度步（处理光滑的 $f$），后向邻近步（处理非光滑的 $g$）。收敛率为 $O(1/k)$，利用了 $f$ 的光滑性，远优于次梯度法的 $O(1/\sqrt{k})$。LASSO 的 ISTA 实现中，每步的计算量主要是一个矩阵-向量乘。</p>
+</blockquote>
+<hr>
+<h2 id="74-矩阵补全soft-impute-算法">7.4 矩阵补全：Soft-Impute 算法
+</h2><h3 id="741-问题建模">7.4.1 问题建模
+</h3><p><strong>矩阵补全</strong>（Matrix Completion）：给定部分观测的矩阵 $M$（只有索引集 $\Omega$ 中的位置有数值），希望恢复完整的<strong>低秩</strong>矩阵。</p>
+<p><strong>凸松弛形式</strong>（秩最小化可松弛为核范数最小化）：
+</p>
+$$\boxed{\min_{X \in \mathbb{R}^{m \times n}} \frac{1}{2}\|P_\Omega(X - M)\|_F^2 + \lambda\|X\|_*}$$<p><strong>符号解释</strong>：</p>
+<ul>
+<li>$P_\Omega$：投影到观测索引集上。$[P_\Omega(X)]<em>{ij} = X</em>{ij}$ 若 $(i,j) \in \Omega$，否则为 $0$（即只在观测位置保留 $X$ 的值，缺失位置填 0）。</li>
+<li>$|X|<em>F$：Frobenius 范数（将矩阵排成长向量后的 $\ell_2$ 范数），$|X|<em>F^2 = \sum</em>{i,j} X</em>{ij}^2$。</li>
+<li>$|X|_* = \sum_i \sigma_i(X)$：<strong>核范数</strong>——所有奇异值之和。它是秩函数的凸松弛（类似于 $\ell_1$ 范数是 $\ell_0$ 范数的凸松弛）。</li>
+<li>$f(X) = \frac{1}{2}|P_\Omega(X - M)|<em>F^2$：光滑部分（$L=1$），$\nabla f(X) = P</em>\Omega(X - M)$</li>
+<li>$g(X) = \lambda|X|_*$：非光滑部分</li>
+</ul>
+<h3 id="742-soft-impute-算法">7.4.2 Soft-Impute 算法
+</h3>$$X_{k+1} = \text{prox}_{\lambda\|\cdot\|_*}\big(X_k - P_\Omega(X_k - M)\big)$$<p>内部操作分解：</p>
+<ol>
+<li>计算 $Z = X_k - P_\Omega(X_k - M)$。注意：$P_\Omega(X_k - M)$ 只在观测位置非零，所以：
+<ul>
+<li>在观测位置 $(i,j) \in \Omega$：$Z_{ij} = (X_k)<em>{ij} - ((X_k)</em>{ij} - M_{ij}) = M_{ij}$（填回观测值）</li>
+<li>在缺失位置 $(i,j) \notin \Omega$：$Z_{ij} = (X_k)<em>{ij} - 0 = (X_k)</em>{ij}$（保持当前估计）</li>
+</ul>
+</li>
+<li>对 $Z$ 做 SVD：$Z = U\Sigma V^T$</li>
+<li>对奇异值做软阈值：$X_{k+1} = U \cdot \text{diag}(S_\lambda(\sigma)) \cdot V^T$</li>
+</ol>
+<p><strong>计算技巧</strong>：不需要完整 SVD（计算量 $O(\min(m,n)mn)$），只需前 $r$ 个最大的奇异值（$r$ 为估计秩），使用<strong>截断 SVD</strong> 大幅加速。</p>
+<blockquote>
+<p><strong>核心要点</strong>：Soft-Impute 是邻近梯度法在矩阵补全中的应用。每步做了两件事：在观测位置 &ldquo;倒入&rdquo; 真实观测值，在缺失位置保持当前估计，然后通过 SVD 软阈值做低秩逼近。</p>
+</blockquote>
+<hr>
+<h2 id="75-典型例题">7.5 典型例题
+</h2><h3 id="例题-71软阈值算子的完整推导">例题 7.1：软阈值算子的完整推导
+</h3><p><strong>题目</strong>：证明 $\text{prox}_{\lambda|\cdot|<em>1}(x) = S</em>\lambda(x)$。</p>
+<p><strong>证明</strong>：（已完整给出于 7.2.4 节(1)，此处仅回顾关键步骤）</p>
+<ol>
+<li>问题分解为各分量独立：$\min_{z_i} {\lambda|z_i| + \frac{1}{2}(z_i - x_i)^2}$</li>
+<li>对每个分量，写出最优性条件：$0 \in \lambda \cdot \partial|z_i| + (z_i - x_i)$</li>
+<li>分 $z_i &gt; 0$、$z_i &lt; 0$、$z_i = 0$ 三种情况，解得三种情况综合为 $z_i^* = \text{sign}(x_i) \cdot \max{|x_i| - \lambda, 0}$。</li>
+</ol>
+<hr>
+<h3 id="例题-72邻近算子的非扩张性证明">例题 7.2：邻近算子的非扩张性证明
+</h3><p><strong>题目</strong>：证明 $|\text{prox}_g(x) - \text{prox}_g(y)| \leq |x - y|$。</p>
+<p><strong>证明</strong>：</p>
+<p>令 $u = \text{prox}_g(x)$，$v = \text{prox}_g(y)$。由刻画不等式：
+</p>
+$$x - u \in \partial g(u), \quad y - v \in \partial g(v)$$<p>次梯度映射是<strong>单调</strong>的（凸函数的次梯度在任意两点满足 $\langle \partial g(u) - \partial g(v), u - v \rangle \geq 0$）。因此：
+</p>
+$$\langle (x - u) - (y - v),\; u - v \rangle \geq 0$$<p>展开：
+</p>
+$$\langle x - y, u - v \rangle - \langle u - v, u - v \rangle \geq 0$$<p>即 $|u - v|^2 \leq \langle x - y, u - v \rangle$。</p>
+<p>由 Cauchy-Schwarz 不等式 $\langle x-y, u-v \rangle \leq |x-y| \cdot |u-v|$：
+</p>
+$$\|u - v\|^2 \leq \|x - y\| \cdot \|u - v\|$$<p>若 $u \neq v$，两边除以 $|u-v|$ 得 $|u-v| \leq |x-y|$。若 $u = v$，不等式显然成立。</p>
+<p><strong>推论</strong>：邻近算子是一个 <strong>1-Lipschitz 映射</strong>——它不会把两个点&quot;拉开&quot;。</p>
+<hr>
+<h3 id="例题-73ista-充分下降性的完整推导">例题 7.3：ISTA 充分下降性的完整推导
+</h3><p><strong>题目</strong>：对于 $\min f(x) + g(x)$，$f$ 为 $L$-smooth 凸函数，$g$ 为闭凸函数，取 $\alpha = 1/L$，证明：
+</p>
+$$F(x_{k+1}) \leq F(x_k) - \frac{L}{2}\|x_{k+1} - x_k\|^2$$<p><strong>证明</strong>：详见 7.3.4 节 Step 1-3 的完整推导。核心思想是：$f$ 用 $L$-smooth 二次上界、$g$ 用邻近算子定义给出的不等式，合并后消去 $\nabla f(x)^T(x^+ - x)$ 项，得到下降性。</p>
+<hr>
+<h3 id="例题-74不同正则化项的邻近算子">例题 7.4：不同正则化项的邻近算子
+</h3><p><strong>题目</strong>：计算下列函数的邻近算子：
+(a) $g(x) = \lambda|x|_2$（$\ell_2$ 范数）
+(b) $g(X) = \lambda|X|<em>F$（Frobenius 范数）
+(c) $g(x) = \lambda|x|</em>\infty$</p>
+<p><strong>解答</strong>：</p>
+<p>(a) 见 7.2.4 节(2)：对向量整体做缩水，输出 $= \max{1 - \lambda/|x|_2, 0} \cdot x$。</p>
+<p>(b) Frobenius 范数本质就是矩阵排成向量后的 $\ell_2$ 范数——把所有 $m \times n$ 个元素排成一个 $mn$ 维向量后的 $\ell_2$ 长度的 $\lambda$ 倍。因此：
+</p>
+$$\text{prox}_{\lambda\|\cdot\|_F}(X) = \max\left\{1 - \frac{\lambda}{\|X\|_F},\; 0\right\} \cdot X$$<p>(c) 利用 Moreau 分解（将在 Ch9 详述）：$\text{prox}<em>{\lambda|\cdot|</em>\infty}(x) = x - \lambda \cdot P_{|\cdot|<em>1 \leq 1}(x/\lambda)$，其中 $P</em>{|\cdot|_1 \leq 1}$ 是到 $\ell_1$ 单位球的投影（有 $O(n\log n)$ 算法）。这正是 Moreau 分解的最经典应用之一。</p>
+<hr>
+<h3 id="例题-75复合优化的一阶最优性条件不动点定理">例题 7.5：复合优化的一阶最优性条件（不动点定理）
+</h3><p><strong>题目</strong>：证明 $x^<em>$ 是 $\min_x f(x) + g(x)$ 的最优解当且仅当 $x^</em> = \text{prox}_{\alpha g}(x^* - \alpha \nabla f(x^*))$（对任意 $\alpha &gt; 0$）。</p>
+<p><strong>证明</strong>：</p>
+<p>由凸优化的一阶最优性条件（Ch3）：$0 \in \partial F(x^<em>) = \nabla f(x^</em>) + \partial g(x^*)$</p>
+<p>两边同乘以 $\alpha$ 并加 $x^*$：
+</p>
+$$x^* \in x^* - \alpha \nabla f(x^*) - \alpha \partial g(x^*)$$<p>即 $x^* - \alpha \nabla f(x^<em>) \in x^</em> + \alpha \partial g(x^<em>) = (\text{id} + \alpha \partial g)(x^</em>)$。</p>
+<p>由 7.2.3 节的等价关系 $z = \text{prox}_{\alpha g}(y) \iff y \in z + \alpha \partial g(z)$（取 $z = x^<em>$，$y = x^</em> - \alpha \nabla f(x^*)$），得到：
+</p>
+$$x^* = \text{prox}_{\alpha g}(x^* - \alpha \nabla f(x^*))$$<p><strong>这个不动点条件就是邻近梯度法的停机准则</strong>——当迭代不再移动时，$x_k$ 就是最优解。</p>
+<hr>
+<h3 id="例题-76核范数邻近算子的推导要点">例题 7.6：核范数邻近算子的推导要点
+</h3><p><strong>题目</strong>：对矩阵 $X$，SVD 分解为 $X = U\Sigma V^T$，证明 $\text{prox}<em>{\lambda|\cdot|</em>*}(X) = U \cdot \text{diag}(S_\lambda(\sigma)) \cdot V^T$。</p>
+<p><strong>证明概要</strong>：</p>
+<p>由 von Neumann 迹不等式（$\langle A, B \rangle \leq \sum_i \sigma_i(A)\sigma_i(B)$），核范数邻近算子的最优解必定与 $X$ 共享相同的奇异向量 $U, V$。问题归约为对各奇异值独立求解标量问题 $\min_{\sigma_i&rsquo;} {\lambda\sigma_i&rsquo; + \frac{1}{2}(\sigma_i&rsquo; - \sigma_i)^2}$（需 $\sigma_i&rsquo; \geq 0$），这正是软阈值问题。证毕。</p>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>概念</th>
+					<th>核心公式/结论</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>问题形式</td>
+					<td>$\min_x f(x) + g(x)$，$f$ 光滑（$L$-smooth），$g$ 非光滑但 prox 好算</td>
+			</tr>
+			<tr>
+					<td>邻近算子定义</td>
+					<td>$\text{prox}_g(x) = \arg\min_z{g(z) + \frac{1}{2}|z-x|^2}$</td>
+			</tr>
+			<tr>
+					<td>刻画不等式</td>
+					<td>$x - \text{prox}_g(x) \in \partial g(\text{prox}_g(x))$</td>
+			</tr>
+			<tr>
+					<td>$\ell_1$ → 软阈值</td>
+					<td>$[S_\lambda(x)]_i = \text{sign}(x_i) \cdot \max{</td>
+			</tr>
+			<tr>
+					<td>$\ell_2$ → 缩水</td>
+					<td>$\max{1 - \lambda/|x|_2, 0} \cdot x$</td>
+			</tr>
+			<tr>
+					<td>$\delta_C$ → 投影</td>
+					<td>$P_C(x) = \arg\min_{z\in C}|z-x|^2$</td>
+			</tr>
+			<tr>
+					<td>核范数 → SVD 软阈值</td>
+					<td>$U \cdot \text{diag}(S_\lambda(\sigma)) \cdot V^T$</td>
+			</tr>
+			<tr>
+					<td>ISTA 迭代</td>
+					<td>$x_{k+1} = \text{prox}_{\alpha g}(x_k - \alpha \nabla f(x_k))$</td>
+			</tr>
+			<tr>
+					<td>梯度映射</td>
+					<td>$G_\alpha(x) = \frac{1}{\alpha}(x - \text{prox}_{\alpha g}(x - \alpha\nabla f(x)))$</td>
+			</tr>
+			<tr>
+					<td>收敛率（光滑凸）</td>
+					<td>$O(1/k)$，比次梯度法（$O(1/\sqrt{k})$）快得多</td>
+			</tr>
+			<tr>
+					<td>非扩张性</td>
+					<td>$|\text{prox}_g(x) - \text{prox}_g(y)| \leq |x - y|$</td>
+			</tr>
+			<tr>
+					<td>不动点最优化条件</td>
+					<td>$x^<em>$ 最优 $\iff$ $x^</em> = \text{prox}_{\alpha g}(x^* - \alpha\nabla f(x^*))$</td>
+			</tr>
+			<tr>
+					<td>LASSO 的 ISTA</td>
+					<td>$x_{k+1} = S_{\lambda/L}(x_k - \frac{1}{L}A^T(Ax_k - b))$</td>
+			</tr>
+			<tr>
+					<td>Soft-Impute</td>
+					<td>$X_{k+1} = \text{SVT}<em>\lambda(X_k - P</em>\Omega(X_k - M))$</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>(End of file)</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

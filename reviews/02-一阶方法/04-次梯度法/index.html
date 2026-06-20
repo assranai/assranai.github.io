@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第4章：次梯度法 核心思想：梯度下降要求函数处处可微（每一点都能求唯一梯度），次梯度法将这一思想推广到不可微凸函数——用次梯度集合 $\\partial f(x_k)$ 中的任意一个向量 $g_k$ 代替 $\\nabla f(x_k)$，沿 $-g_k$ 方向迭代。代价是收敛率从光滑 GD 的 $O(1/k)$ 退化为 $O(1/\\sqrt{k})$，复杂度也从 $O(1/\\epsilon)$ 退化为 $O(1/\\epsilon^2)$。\n前置知识回顾 本章的论述建立在第2章（梯度下降法）和第3章（次梯度理论）的基础之上。为了方便自包含地阅读，此处对必备概念做系统回顾。\nA. 从第2章回顾：梯度下降法 (Gradient Descent, GD) GD 是解决无约束光滑凸优化问题的最基本算法。其迭代格式为：\n$$\\boxed{x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)}$$下面逐一定义每个符号的含义，不做任何假定：\n$x_k$ 是什么？ $x_k \\in \\mathbb{R}^n$ 是第 $k$ 步迭代后的解估计。$\\mathbb{R}^n$ 表示 $n$ 维实数向量空间——也就是说 $x_k$ 是一个含有 $n$ 个实数分量的列向量，可以写为 $x_k = (x_{k,1}, x_{k,2}, \\dots, x_{k,n})^T$，其中 $^T$ 表示转置（将行向量变为列向量）。初始点 $x_0$ 由用户任意指定。\n$\\alpha_k$ 是什么？ $\\alpha_k &gt; 0$ 是第 $k$ 步的步长（step size），是一个正实数标量。在机器学习文献中常称为学习率（learning rate）。步长控制着沿梯度方向移动的距离——步长太小则收敛过慢（一步步蠕动），步长太大则可能在最优解附近剧烈跳跃甚至发散。\n">
+<title>第4章：次梯度法</title>
+
+<link rel='canonical' href='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/04-%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.b0e76e98cdd4f7082d1fc36f7af7e0843a81201db2197c03ca426751dc923735.css"><meta property='og:title' content="第4章：次梯度法">
+<meta property='og:description' content="第4章：次梯度法 核心思想：梯度下降要求函数处处可微（每一点都能求唯一梯度），次梯度法将这一思想推广到不可微凸函数——用次梯度集合 $\\partial f(x_k)$ 中的任意一个向量 $g_k$ 代替 $\\nabla f(x_k)$，沿 $-g_k$ 方向迭代。代价是收敛率从光滑 GD 的 $O(1/k)$ 退化为 $O(1/\\sqrt{k})$，复杂度也从 $O(1/\\epsilon)$ 退化为 $O(1/\\epsilon^2)$。\n前置知识回顾 本章的论述建立在第2章（梯度下降法）和第3章（次梯度理论）的基础之上。为了方便自包含地阅读，此处对必备概念做系统回顾。\nA. 从第2章回顾：梯度下降法 (Gradient Descent, GD) GD 是解决无约束光滑凸优化问题的最基本算法。其迭代格式为：\n$$\\boxed{x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)}$$下面逐一定义每个符号的含义，不做任何假定：\n$x_k$ 是什么？ $x_k \\in \\mathbb{R}^n$ 是第 $k$ 步迭代后的解估计。$\\mathbb{R}^n$ 表示 $n$ 维实数向量空间——也就是说 $x_k$ 是一个含有 $n$ 个实数分量的列向量，可以写为 $x_k = (x_{k,1}, x_{k,2}, \\dots, x_{k,n})^T$，其中 $^T$ 表示转置（将行向量变为列向量）。初始点 $x_0$ 由用户任意指定。\n$\\alpha_k$ 是什么？ $\\alpha_k &gt; 0$ 是第 $k$ 步的步长（step size），是一个正实数标量。在机器学习文献中常称为学习率（learning rate）。步长控制着沿梯度方向移动的距离——步长太小则收敛过慢（一步步蠕动），步长太大则可能在最优解附近剧烈跳跃甚至发散。\n">
+<meta property='og:url' content='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/04-%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Reviews' /><meta property='article:published_time' content='2026-06-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-06-20T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="第4章：次梯度法">
+<meta name="twitter:description" content="第4章：次梯度法 核心思想：梯度下降要求函数处处可微（每一点都能求唯一梯度），次梯度法将这一思想推广到不可微凸函数——用次梯度集合 $\\partial f(x_k)$ 中的任意一个向量 $g_k$ 代替 $\\nabla f(x_k)$，沿 $-g_k$ 方向迭代。代价是收敛率从光滑 GD 的 $O(1/k)$ 退化为 $O(1/\\sqrt{k})$，复杂度也从 $O(1/\\epsilon)$ 退化为 $O(1/\\epsilon^2)$。\n前置知识回顾 本章的论述建立在第2章（梯度下降法）和第3章（次梯度理论）的基础之上。为了方便自包含地阅读，此处对必备概念做系统回顾。\nA. 从第2章回顾：梯度下降法 (Gradient Descent, GD) GD 是解决无约束光滑凸优化问题的最基本算法。其迭代格式为：\n$$\\boxed{x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)}$$下面逐一定义每个符号的含义，不做任何假定：\n$x_k$ 是什么？ $x_k \\in \\mathbb{R}^n$ 是第 $k$ 步迭代后的解估计。$\\mathbb{R}^n$ 表示 $n$ 维实数向量空间——也就是说 $x_k$ 是一个含有 $n$ 个实数分量的列向量，可以写为 $x_k = (x_{k,1}, x_{k,2}, \\dots, x_{k,n})^T$，其中 $^T$ 表示转置（将行向量变为列向量）。初始点 $x_0$ 由用户任意指定。\n$\\alpha_k$ 是什么？ $\\alpha_k &gt; 0$ 是第 $k$ 步的步长（step size），是一个正实数标量。在机器学习文献中常称为学习率（learning rate）。步长控制着沿梯度方向移动的距离——步长太小则收敛过慢（一步步蠕动），步长太大则可能在最优解附近剧烈跳跃甚至发散。\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前置知识回顾">前置知识回顾</a>
+      <ol>
+        <li><a href="#a-从第2章回顾梯度下降法-gradient-descent-gd">A. 从第2章回顾：梯度下降法 (Gradient Descent, GD)</a></li>
+        <li><a href="#b-从第3章回顾次梯度-subgradient-基础">B. 从第3章回顾：次梯度 (Subgradient) 基础</a></li>
+      </ol>
+    </li>
+    <li><a href="#41-从梯度下降到次梯度法">4.1 从梯度下降到次梯度法</a>
+      <ol>
+        <li><a href="#411-梯度下降为什么会失败不可微的现实问题">4.1.1 梯度下降为什么会失败：不可微的现实问题</a></li>
+        <li><a href="#412-次梯度法的迭代格式">4.1.2 次梯度法的迭代格式</a></li>
+        <li><a href="#413-关键区别负次梯度方向不一定使函数下降">4.1.3 关键区别：负次梯度方向<strong>不一定</strong>使函数下降</a></li>
+      </ol>
+    </li>
+    <li><a href="#42-步长策略">4.2 步长策略</a>
+      <ol>
+        <li><a href="#421-固定步长-alpha_k-equiv-alpha">4.2.1 固定步长 $\alpha_k \equiv \alpha$</a></li>
+        <li><a href="#422-递减步长保证精确收敛的充要条件">4.2.2 递减步长：保证精确收敛的充要条件</a></li>
+        <li><a href="#423-标准化步长保持物理位移幅度恒定">4.2.3 标准化步长（保持物理位移幅度恒定）</a></li>
+        <li><a href="#424-polyak-步长当-f-已知时理论上最优">4.2.4 Polyak 步长：当 $f^*$ 已知时理论上最优</a></li>
+      </ol>
+    </li>
+    <li><a href="#43-收敛性证明逐行推导每一步均作解释">4.3 收敛性证明（逐行推导，每一步均作解释）</a>
+      <ol>
+        <li><a href="#431-前提假设assumptions">4.3.1 前提假设（Assumptions）</a></li>
+        <li><a href="#432-step-1展开距离平方">4.3.2 Step 1：展开距离平方</a></li>
+        <li><a href="#433-step-2用次梯度不等式消去内积">4.3.3 Step 2：用次梯度不等式消去内积</a></li>
+        <li><a href="#434-step-3移项以获得-delta_k-的上界">4.3.4 Step 3：移项以获得 $\delta_k$ 的上界</a></li>
+        <li><a href="#435-step-4telescoping-求和">4.3.5 Step 4：Telescoping 求和</a></li>
+        <li><a href="#436-step-5从加权求和到历史最优界">4.3.6 Step 5：从加权求和到历史最优界</a></li>
+        <li><a href="#437-step-6代入具体步长获得-o1sqrtk-收敛率">4.3.7 Step 6：代入具体步长获得 $O(1/\sqrt{K})$ 收敛率</a></li>
+        <li><a href="#438-计算复杂度">4.3.8 计算复杂度</a></li>
+        <li><a href="#439-强凸函数下的加速">4.3.9 强凸函数下的加速</a></li>
+      </ol>
+    </li>
+    <li><a href="#44-典型例题">4.4 典型例题</a>
+      <ol>
+        <li><a href="#例题1次梯度法的步长对比">例题1：次梯度法的步长对比</a></li>
+        <li><a href="#例题2基本收敛率证明">例题2：基本收敛率证明</a></li>
+        <li><a href="#例题3lasso-的次梯度法实现">例题3：LASSO 的次梯度法实现</a></li>
+        <li><a href="#例题4强凸次梯度法加速">例题4：强凸次梯度法加速</a></li>
+        <li><a href="#例题5polyak-步长在对偶问题中的应用">例题5：Polyak 步长在对偶问题中的应用</a></li>
+      </ol>
+    </li>
+    <li><a href="#核心要点">核心要点</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/04-%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/">第4章：次梯度法</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-06-20T00:00:00Z'>Jun 20, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 10 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="第4章次梯度法">第4章：次梯度法
+</h1><blockquote>
+<p><strong>核心思想</strong>：梯度下降要求函数处处可微（每一点都能求唯一梯度），次梯度法将这一思想推广到不可微凸函数——用次梯度集合 $\partial f(x_k)$ 中的任意一个向量 $g_k$ 代替 $\nabla f(x_k)$，沿 $-g_k$ 方向迭代。代价是收敛率从光滑 GD 的 $O(1/k)$ 退化为 $O(1/\sqrt{k})$，复杂度也从 $O(1/\epsilon)$ 退化为 $O(1/\epsilon^2)$。</p>
+</blockquote>
+<hr>
+<h2 id="前置知识回顾">前置知识回顾
+</h2><p>本章的论述建立在第2章（梯度下降法）和第3章（次梯度理论）的基础之上。为了方便自包含地阅读，此处对必备概念做系统回顾。</p>
+<h3 id="a-从第2章回顾梯度下降法-gradient-descent-gd">A. 从第2章回顾：梯度下降法 (Gradient Descent, GD)
+</h3><p>GD 是解决无约束光滑凸优化问题的最基本算法。其迭代格式为：</p>
+$$\boxed{x_{k+1} = x_k - \alpha_k \nabla f(x_k)}$$<p>下面逐一定义每个符号的含义，不做任何假定：</p>
+<p><strong>$x_k$ 是什么？</strong> $x_k \in \mathbb{R}^n$ 是第 $k$ 步迭代后的解估计。$\mathbb{R}^n$ 表示 $n$ 维实数向量空间——也就是说 $x_k$ 是一个含有 $n$ 个实数分量的列向量，可以写为 $x_k = (x_{k,1}, x_{k,2}, \dots, x_{k,n})^T$，其中 $^T$ 表示转置（将行向量变为列向量）。初始点 $x_0$ 由用户任意指定。</p>
+<p><strong>$\alpha_k$ 是什么？</strong> $\alpha_k &gt; 0$ 是第 $k$ 步的<strong>步长</strong>（step size），是一个正实数标量。在机器学习文献中常称为<strong>学习率</strong>（learning rate）。步长控制着沿梯度方向移动的距离——步长太小则收敛过慢（一步步蠕动），步长太大则可能在最优解附近剧烈跳跃甚至发散。</p>
+<p><strong>$\nabla f(x_k)$ 是什么？</strong> $\nabla f(x_k) \in \mathbb{R}^n$ 是目标函数 $f$ 在点 $x_k$ 处的<strong>梯度</strong>（gradient）。它是一个 $n$ 维向量，其第 $i$ 个分量就是偏导数：
+</p>
+$$\frac{\partial f}{\partial x_i}(x_k) = \lim_{h \to 0} \frac{f(x_k + h e_i) - f(x_k)}{h}$$<p>
+其中一个重要的几何性质是：梯度总是指向函数值<strong>上升最快</strong>的方向。因此取 $-\nabla f(x_k)$ 就得到局部<strong>下降最快</strong>的方向。这是 GD 的物理直觉基础。</p>
+<p><strong>下降性质是什么？</strong> 如果 $\nabla f(x_k) \neq \mathbf{0}$（$\mathbf{0}$ 表示所有 $n$ 个分量都为零的零向量，此时说明梯度&quot;消失&quot;了，当前点可能是局部极值点），那么一定存在某个充分小的正实数阈值 $\bar{\alpha} &gt; 0$，使得对所有满足 $0 &lt; \alpha &lt; \bar{\alpha}$ 的步长，都有：
+</p>
+$$f(x_{k+1}) = f(x_k - \alpha \nabla f(x_k)) < f(x_k)$$<p>换句话说：只要步长足够小，沿精确负梯度方向走就一定能降低函数值。这个简单而强大的性质保证了 GD 是<strong>单调收敛</strong>的——函数值永不上升。</p>
+<p><strong>$L$-光滑（$L$-smooth）的定义与推论</strong>：当目标函数 $f$ 更进一步满足<strong>光滑性</strong>（即梯度自身的变化是有界的），GD 的收敛率可以得到精确刻画。光滑性的数学定义是：存在常数 $L &gt; 0$（光滑常数），使得对任意两点 $x, y \in \mathbb{R}^n$，有：
+</p>
+$$\|\nabla f(x) - \nabla f(y)\| \le L\|x - y\|$$<p>
+这里 $|z| = \sqrt{\sum_{i=1}^n z_i^2}$ 是向量的<strong>欧几里得范数</strong>（Euclidean norm，即向量在空间中的&quot;长度&quot;）。不等式的含义是：任意两点之间梯度的&quot;变化量&quot;的长度，不超过这两点距离的 $L$ 倍。$L$ 越大，函数越可能&quot;颠簸&quot;——在短距离内梯度剧烈摆动。</p>
+<p>光滑性最重要的推论是<strong>二次上界</strong>（Descent Lemma）：
+</p>
+$$f(y) \le f(x) + \nabla f(x)^T(y - x) + \frac{L}{2}\|y - x\|^2$$<p>
+这个公式的含义：函数 $f$ 在任意点 $y$ 的值，被以 $x$ 处的一阶 Taylor 展开 $\big(f(x) + \nabla f(x)^T(y-x)\big)$ 为中心的一个二次函数从上方&quot;压住&quot;——$f$ 不会比二次函数长得更快。</p>
+<p><strong>光滑凸 GD 的收敛率</strong>：当 $f$ 既光滑又凸，取步长 $\alpha_k = 1/L$ 时，GD 的收敛率精确为：
+</p>
+$$\boxed{f(x_k) - f^* \le \frac{L\|x_0 - x^*\|^2}{2k} = O\!\left(\frac{1}{k}\right)}$$<p>
+其中 $f^* = \min_{x \in \mathbb{R}^n} f(x)$ 是 $f$ 在整个空间中的全局最小值，$x^*$ 是取到该最小值的任意一个点（argmin）。记号 $O(1/k)$ 是说存在常数 $C$ 使得误差 $\le C/k$——直观上，迭代次数翻倍，误差大约缩小一半。迭代 100 步误差约缩到 1/100，迭代 1000 步约缩到 1/1000。</p>
+<h3 id="b-从第3章回顾次梯度-subgradient-基础">B. 从第3章回顾：次梯度 (Subgradient) 基础
+</h3><p><strong>凸函数的精确定义</strong>：函数 $f: \mathbb{R}^n \to \mathbb{R} \cup {+\infty}$ 称为<strong>凸函数</strong>，当且仅当对任意两点 $x, y \in \mathbb{R}^n$ 和任意比例 $\lambda \in [0, 1]$（$\lambda$ 控制 $x$ 和 $y$ 在凸组合中的相对权重），以下不等式成立：
+</p>
+$$f(\lambda x + (1-\lambda) y) \le \lambda f(x) + (1-\lambda) f(y)$$<p><strong>几何直觉</strong>：用一句话说——连接函数图像上任意两点的弦，始终位于函数图像的上方。或者说函数图像是&quot;下凸&quot;的（形如一只碗），任意局部极小值点就是全局最小值点。</p>
+<p><strong>次梯度（Subgradient）的严格定义</strong>：设 $f$ 为凸函数。一个向量 $g \in \mathbb{R}^n$ 称为 $f$ 在点 $x$ 处的<strong>次梯度</strong>，当且仅当对<strong>所有的</strong> $y \in \mathbb{R}^n$（注意是&quot;所有的&quot;，即对空间中的每一个可能的点都成立），以下<strong>支撑超平面不等式</strong>成立：
+</p>
+$$\boxed{f(y) \ge f(x) + g^T(y - x)}$$<p>对这个不等式做逐项说明：</p>
+<ul>
+<li>左边 $f(y)$：函数在任意其他点 $y$ 的值。</li>
+<li>右边 $f(x) + g^T(y - x)$：一个以 $x$ 为基点的<strong>线性函数</strong>在 $y$ 处的值。其中 $f(x)$ 是函数的当前值（截距），$g^T(y - x) = \sum_{i=1}^n g_i \cdot (y_i - x_i)$ 是向量 $g$ 和向量 $y - x$ 的<strong>内积</strong>（两个向量对应分量相乘然后相加，结果是一个标量——一个实数）。</li>
+<li>整体含义：以 $g$ 为&quot;广义斜率&quot;的线性函数在<strong>任何地方</strong>都不超过 $f$。这个线性函数是 $f$ 的一个<strong>全局下界</strong>——它从下方&quot;支撑&quot;着 $f$ 的图像。</li>
+</ul>
+<p><strong>次微分（Subdifferential）</strong>：$f$ 在点 $x$ 处<strong>所有次梯度的集合</strong>称为次微分，记为 $\partial f(x)$：
+</p>
+$$\partial f(x) = \left\{ g \in \mathbb{R}^n \;\middle|\; f(y) \ge f(x) + g^T(y - x), \; \forall y \in \mathbb{R}^n \right\}$$<p>
+关于次微分的核心性质：$\partial f(x)$ 是一个<strong>闭凸集</strong>（集合内任意两点的凸组合仍在集合中）。在 $f$ 可微的点处，$\partial f(x) = {\nabla f(x)}$（次微分退化为仅含梯度这一个元素的单点集）。在 $f$ 不可微的&quot;折角&quot;处（如 $|x|$ 在 $x=0$），$\partial f(x)$ 包含多个向量（常是一个闭区间）。</p>
+<p><strong>次梯度与梯度的本质区别</strong>：梯度给出的是切平面（局部的最优线性逼近），它告诉你函数的局部走势。次梯度给出的是一个全局下界（支撑平面），它只保证函数值不会低于这个下界，但<strong>不保证</strong>沿支持平面的反方向走会让函数值下降。最关键的直觉是：梯度方向是&quot;我能看清楚接下来的路&quot;，次梯度方向是&quot;我知道底线在哪里，但不知道前面是上坡还是下坡&quot;。</p>
+<hr>
+<h2 id="41-从梯度下降到次梯度法">4.1 从梯度下降到次梯度法
+</h2><h3 id="411-梯度下降为什么会失败不可微的现实问题">4.1.1 梯度下降为什么会失败：不可微的现实问题
+</h3><p>梯度下降法的每一步都需要计算 $\nabla f(x_k)$。但大量的实际优化问题在关键位置存在<strong>不可微点</strong>——函数在这些点处的偏导数不存在（或者说有多个候选的&quot;方向导数&quot;但没有唯一良定义的梯度）。下表列出了几个标志性例子：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>问题名称</th>
+					<th>目标函数 $f(x)$ 的数学形式</th>
+					<th>不可微点的精确位置</th>
+					<th>为何这些不可微点至关重要</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><strong>LASSO</strong>（稀疏回归）</td>
+					<td>$f(x)=\frac{1}{2}|Ax-b|_2^2+\lambda|x|_1$</td>
+					<td>各个分量 $x_i=0$</td>
+					<td>$\ell_1$ 范数 $|x|_1=\sum_i</td>
+			</tr>
+			<tr>
+					<td><strong>SVM</strong>（支持向量机）</td>
+					<td>$f(w)=\sum_i\max(0,1-y_i(w^T a_i+b))$</td>
+					<td>Hinge 折点：$y_i(w^T a_i+b)=1$</td>
+					<td>位于分类决策边界上的样本恰是<strong>支持向量</strong>，折点处的非光滑结构是 SVM 模型的核心数学特征</td>
+			</tr>
+			<tr>
+					<td><strong>中位数回归</strong></td>
+					<td>$f(x)=\sum_i</td>
+					<td>y_i-a_i^T x</td>
+					<td>$</td>
+			</tr>
+			<tr>
+					<td><strong>核范数正则化</strong></td>
+					<td>$f(X)=|X|_*$（奇异值之和）</td>
+					<td>奇异值退化处（两个以上奇异值相等）</td>
+					<td>核范数在奇异值交织处不可微，但这些低秩结构正是矩阵补全的目标</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>以上任意一种问题在不可微点都无法直接用 GD 求解。<strong>次梯度法</strong>正是为应对这类情况而诞生的——它把&quot;唯一的梯度&quot;推广为&quot;集合中的任选向量&quot;。</p>
+<h3 id="412-次梯度法的迭代格式">4.1.2 次梯度法的迭代格式
+</h3><p>次梯度法（Subgradient Method, SubGM）沿袭 GD 的整体框架，将 $\nabla f(x_k)$（在不可微点不存在）替换为 $\partial f(x_k)$ 中<strong>任意选出的一个</strong>元素 $g_k$：</p>
+$$\boxed{x_{k+1} = x_k - \alpha_k g_k, \quad \text{其中 } g_k \in \partial f(x_k)}$$<p>每个符号的精确含义：</p>
+<ul>
+<li>$x_k \in \mathbb{R}^n$：第 $k$ 步迭代后的解估计，$n$ 维实向量。</li>
+<li>$\alpha_k &gt; 0$：第 $k$ 步的步长（正实数标量）。次梯度法对步长策略的要求比 GD 更为严苛——步长不仅决定收敛速度，还决定能否收敛——本章 §4.2 将用一整节的篇幅详细论述。</li>
+<li>$\partial f(x_k)$：$f$ 在 $x_k$ 处的<strong>次微分</strong>——所有次梯度的集合。记号 $\partial$ 是偏微分符号的变体。</li>
+<li>$g_k \in \partial f(x_k)$：符号 $\in$ 读作&quot;属于&quot;——$g_k$ 是从集合 $\partial f(x_k)$ 中<strong>任意挑选</strong>出的某一个向量。挑选规则：可选择集合中的任意元素，次梯度法的收敛理论对集合中的所有选择都成立。实践中，一般挑选最容易计算的那个元素。</li>
+</ul>
+<blockquote>
+<p><strong>全书的符号约定</strong>：本书统一用字母 $g$、$g_k$（不带 $\nabla$）表示次梯度；而用 $\nabla f$ 保留给可微情形表示精确梯度。这样，读者在看到公式时立刻就能区分&quot;这里用的是精确梯度还是某个次梯度&quot;。</p>
+</blockquote>
+<h3 id="413-关键区别负次梯度方向不一定使函数下降">4.1.3 关键区别：负次梯度方向<strong>不一定</strong>使函数下降
+</h3><p>这是次梯度法与梯度下降之间<strong>最本质的理论差异</strong>，也是初学者极容易犯错的核心知识点。</p>
+<p><strong>先回顾 GD 的下降性质</strong>。如果 $\nabla f(x_k) \neq \mathbf{0}$（梯度非零），则存在 $x_k$ 的一个邻域和一个正数阈值 $\bar{\alpha} &gt; 0$，使得对所有步长满足 $0 &lt; \alpha &lt; \bar{\alpha}$：
+</p>
+$$f(x_k - \alpha \nabla f(x_k)) < f(x_k)$$<p>
+即：只要沿<strong>精确的负梯度方向</strong>走<strong>充分小</strong>的一步，函数值一定严格下降。这是 GD 的基石。</p>
+<p><strong>对比次梯度法</strong>。即使当前点不是最优解（即 $0 \notin \partial f(x_k)$——因为最优性条件恰好是 $0 \in \partial f(x^*)$），我们也<strong>不能</strong>断言存在 $\alpha &gt; 0$ 使得：
+</p>
+$$f(x_k - \alpha g_k) < f(x_k)$$<p>
+这个不等式<strong>可能根本不成立</strong>——沿某个次梯度的反方向走一小步，函数值可能<strong>不降反升</strong>。</p>
+<p><strong>为什么会这样？——几何根源</strong>：</p>
+<p>梯度和次梯度的几何角色完全不同：</p>
+<ul>
+<li><strong>梯度</strong> $\nabla f(x_k)$：定义了函数图像在 $x_k$ 处的<strong>切平面</strong>——这是函数在局部的<strong>最优线性逼近</strong>。切平面精确地追踪了函数附近的上升和下降走势。沿负梯度方向走一小步，相当于顺势下滑。</li>
+<li><strong>次梯度</strong> $g_k$：仅定义了一个经过 $(x_k, f(x_k))$ 且处处不超过 $f$ 的<strong>支撑超平面</strong>——这是一个<strong>全局下界</strong>，而不是局部逼近。支撑超平面只保证函数值不会跌穿某个底，但完全<strong>不保证</strong>沿其反方向走会让函数下降。沿下界方向走，可能先穿过山谷，再爬上对面的山脊。</li>
+</ul>
+<p><strong>一个具体的一维反例</strong>来帮助理解：</p>
+<p>设 $f(x) = |x|$（最基本的非光滑凸函数）。取 $x_k = 1$（正半轴，$f$ 在此处是可微的，次微分退化为梯度）：</p>
+<ul>
+<li>$\partial f(1) = {f&rsquo;(1)} = {1}$，即 $g_k = 1$。</li>
+<li>我们考虑沿负次梯度方向走：即 $x_{k+1} = 1 - \alpha \cdot 1 = 1 - \alpha$。</li>
+<li>函数值的变化：
+
+$$f(x_{k+1}) = |1 - \alpha| = \begin{cases} 1 - \alpha, & \text{当 } 0 \le \alpha \le 1 \text{（尚未跨过原点，在下降）} \\ \alpha - 1, & \text{当 } \alpha > 1 \text{（已跨过原点，开始上升！）} \end{cases}$$</li>
+<li>当 $\alpha = 2$ 时，$f(1-2) = | -1 | = 1 = f(1)$（回到了原来的值）。</li>
+<li>当 $\alpha = 3$ 时，$f(1-3) = 2 &gt; 1 = f(1)$（反而更差了！）</li>
+</ul>
+<p>这个极简单的例子揭示了一个深刻的道理：即使是 $|x|$ 这样平凡的函数，只要步长稍大，沿次梯度反方向走也会让函数值不降反升。在高维空间和更复杂的非光滑函数上，即使步长选得很小，也可能走错方向。</p>
+<p><strong>次梯度法的三个直接后果</strong>：</p>
+<ol>
+<li>
+<p><strong>非单调性</strong>（Non-monotonicity）：函数值序列 ${f(x_k)}$ 可能<strong>上下振荡</strong>，不像 GD 那样每步都确保变小。这是次梯度法从 GD 继承下来的&quot;确定性&quot;外貌下最大的不同。收敛分析不能依赖函数值下降，只能度量&quot;距离最优解还有多远&quot;。</p>
+</li>
+<li>
+<p><strong>不能使用线搜索</strong>（No Line Search）：GD 中常用的 Armijo 回溯线搜索等方法，本质上是找&quot;让函数值充分下降的步长&quot;。它们的理论保证完全依赖于&quot;沿该方向走函数值一定会下降&quot;这个前提。既然次梯度方向不一定下降，线搜索彻底失去意义。</p>
+</li>
+<li>
+<p><strong>算法输出必须是历史最优</strong>：由于最后一个迭代点 $x_K$ 的值 $f(x_K)$ 可能比早期某个点 $x_k$（$k &lt; K$）的值更差，最终的算法输出不能简单地取 $x_K$，而必须返回<strong>所有历史迭代点中函数值最小的那个</strong>：
+</p>
+$$\boxed{f_{\text{best}}^K = \min_{0 \le i \le K} f(x_i), \qquad x_{\text{best}}^K = \arg\min_{0 \le i \le K} f(x_i)}$$<p>
+这里 $\arg\min$ 返回取到最小值的那个自变量的值——即函数值最小的迭代点的坐标。这要求算法在运行过程中<strong>额外跟踪</strong>当前见过的最优值及其对应的点。</p>
+</li>
+</ol>
+<hr>
+<h2 id="42-步长策略">4.2 步长策略
+</h2><p>步长 $\alpha_k$ 的选择是次梯度法成败的关键所在。步长既要足够大以推动有意义的进展，又必须随迭代进行而逐步缩小以避免在最优解附近持续震荡。</p>
+<h3 id="421-固定步长-alpha_k-equiv-alpha">4.2.1 固定步长 $\alpha_k \equiv \alpha$
+</h3><p><strong>收敛结论</strong>：固定步长只能将次梯度法收敛到最优值的<strong>某个邻域</strong>（neighborhood），而<strong>不能</strong>精确收敛到最优值 $f^*$ 本身。</p>
+<p><strong>严格的数学刻画</strong>（完整推导见 §4.3）：
+</p>
+$$\boxed{\limsup_{K \to \infty} \; f_{\text{best}}^K - f^* \le \frac{\alpha G^2}{2}}$$<p>符号含义逐项解释：</p>
+<ul>
+<li>$\limsup_{K \to \infty}$（读作 limes superior）：上极限，即当 $K$ 无限增大时，序列 ${f_{\text{best}}^K}$ 的<strong>最大聚点</strong>的极限。这里的含义是：无论你迭代多少步，最多只能保证误差不超过 $\alpha G^2/2$，再多的迭代也无法突破这个下界。</li>
+<li>$G$：函数 $f$ 的 <strong>Lipschitz 常数</strong>。严格定义为存在 $G &gt; 0$，使对任意 $x$ 和任意 $g \in \partial f(x)$，$|g| \le G$ 均成立。这个条件等价于 $|f(x) - f(y)| \le G|x-y|$ 对任意 $x, y$ 成立。$G$ 度量的是函数值的&quot;最大变化速率&quot;。</li>
+<li>$\frac{\alpha G^2}{2}$：收敛球的<strong>半径</strong>。无论迭代多少次，函数值都无法突破以 $f^*$ 为球心、以此值为半径的球体。</li>
+</ul>
+<p><strong>物理直觉</strong>：想象一个弹珠在一个锯齿碗中滚动。固定步长意味着弹珠每次跳动的距离是固定的。当它接近碗底时，固定的跳跃距离让它无法精确落在碗底——它会在碗底周围一个半径约为 $\alpha G^2/2$ 的区域内反复弹跳。</p>
+<p><strong>固定步长的优缺点总结</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>优点</th>
+					<th>缺点</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>实现最简单：只需指定一个常数</td>
+					<td><strong>不能收敛到 $f^*$ 本身</strong>，只能到 $\alpha G^2/2$ 邻域</td>
+			</tr>
+			<tr>
+					<td>不需要动态计算步长的任何参数</td>
+					<td>$\alpha$ 的选取非常敏感：太小 → 极慢；太大 → 邻域过大失去意义</td>
+			</tr>
+			<tr>
+					<td>对初始猜测相对鲁棒</td>
+					<td>对高精度需求（$\epsilon \le 10^{-6}$）完全无法满足</td>
+			</tr>
+	</tbody>
+</table></div>
+<h3 id="422-递减步长保证精确收敛的充要条件">4.2.2 递减步长：保证精确收敛的充要条件
+</h3><p>要使次梯度法<strong>精确收敛到 $f^*$</strong>（而不是收敛到某个邻域），步长必须满足以下三个条件（缺一不可）：</p>
+$$\boxed{\alpha_k \to 0, \qquad \sum_{k=0}^{\infty} \alpha_k = \infty, \qquad \sum_{k=0}^{\infty} \alpha_k^2 < \infty}$$<p>下面逐条解释各条件的物理意义：</p>
+<p><strong>(1) $\alpha_k \to 0$（步长趋于零）</strong>：$\lim_{k \to \infty} \alpha_k = 0$。当迭代越来越接近最优解时，每一步的移动幅度必须越来越零碎。这就像开车找到大致位置后要减速缓行——如果用固定的大步幅，将永远在最优解附近&quot;跳过去、跳过来&quot;而无法稳定。</p>
+<p><strong>(2) $\sum_{k=0}^{\infty} \alpha_k = \infty$（步长之和发散到无穷大）</strong>：这是三个条件中<strong>最关键</strong>的一个。级数 $\sum \alpha_k$ 发散意味着无论已经迭代了多少步，<strong>往后还能累积的总行程是无穷大的</strong>。这保证了从任意起始点（无论离最优解有多远）出发，算法都有足够的&quot;总步长&quot;来覆盖这段距离。</p>
+<p><strong>一个重要的反例</strong>：取 $\alpha_k = 1/k^2$。这是满足 $\alpha_k \to 0$ 且 $\sum \alpha_k^2 = \sum 1/k^4 = \pi^4/90 &lt; \infty$ 的。但：
+</p>
+$$\sum_{k=1}^{\infty} \frac{1}{k^2} = \frac{\pi^2}{6} \approx 1.64 < \infty$$<p>
+总行程只有约 1.64 个单位。如果你初始点距离最优解超过 1.64，算法将永远&quot;走不到&quot;目的地。这就是为什么不满足 $\sum \alpha_k = \infty$ 的衰减步长无法保证收敛。</p>
+<p><strong>(3) $\sum_{k=0}^{\infty} \alpha_k^2 &lt; \infty$（步长平方和必须收敛）</strong>：在 §4.3 的收敛分析中，由步长引发的累积&quot;噪声&quot;表现为 $G^2 \sum \alpha_k^2$。如果平方和发散，那么即使总行程无穷大，步长带来的累积偏差也会同步放大，最终淹没收敛信号，使误差无法趋于零。</p>
+<p><strong>典型递减步长方案及其判定</strong>：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>方案名称</th>
+					<th>步长公式</th>
+					<th>$\sum \alpha_k$ 是否 $\infty$？</th>
+					<th>$\sum \alpha_k^2$ 是否 $&lt;\infty$？</th>
+					<th>综合评价</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>幂律 $1/\sqrt{k}$</td>
+					<td>$\alpha_k = \frac{\alpha_0}{\sqrt{k+1}}$</td>
+					<td>是（$\int dx/\sqrt{x}$ 发散）</td>
+					<td><strong>否！</strong>（$\sum 1/k$ 为调和级数，发散）</td>
+					<td><strong>不满足理论条件！</strong></td>
+			</tr>
+			<tr>
+					<td>调和 $1/k$</td>
+					<td>$\alpha_k = \frac{\alpha_0}{k+1}$</td>
+					<td>是</td>
+					<td>是（$\sum 1/k^2 = \pi^2/6$）</td>
+					<td>经典取法，后期较慢</td>
+			</tr>
+			<tr>
+					<td>$k^{-p}$（$p \in (0.5,1]$）</td>
+					<td>$\alpha_k = \frac{\alpha_0}{(k+1)^p}$</td>
+					<td>是（$p \le 1$）</td>
+					<td>是（$2p &gt; 1$）</td>
+					<td>$p \approx 0.51$ 或 $0.6$ 常用</td>
+			</tr>
+			<tr>
+					<td>分阶段常数</td>
+					<td>$\alpha_k = \frac{\alpha_0}{1+\lfloor k/K_0\rfloor}$</td>
+					<td>是</td>
+					<td>是</td>
+					<td>工程实现简便</td>
+			</tr>
+	</tbody>
+</table></div>
+<p><strong>关于 $\alpha_k = 1/\sqrt{k}$ 的重要讨论</strong>：</p>
+$$\sum_{k=0}^{\infty} \alpha_k^2 = \sum_{k=0}^{\infty} \frac{1}{k+1}$$<p>这是著名的<strong>调和级数</strong>——它是<strong>发散</strong>的（$H_K \approx \ln K + \gamma$，其中 $\gamma \approx 0.577$ 是欧拉常数）。所以表面上看起来温和的 $1/\sqrt{k}$ 衰减实际上<strong>不满足</strong>平方和收敛的条件。</p>
+<p><strong>实践中的解决方案</strong>：</p>
+<ul>
+<li><strong>更快的衰减</strong>：取 $p &gt; 0.5$，如 $p = 0.51$ 或 $0.6$，即 $\alpha_k = \alpha_0 / k^{0.6}$。</li>
+<li><strong>固定总步数分析</strong>（horizon-dependent）：如果预先设定了总迭代步数 $K$（实践中几乎是必然的），可以取 $\alpha_k \equiv R/(G\sqrt{K})$ ——所有 $K+1$ 步都用同一个常数步长。然后分析当 $K \to \infty$ 时上界 $RG/\sqrt{K}$ 的渐近行为。这种分析框架绕过了 $\sum \alpha_k^2$ 发散的问题。</li>
+</ul>
+<h3 id="423-标准化步长保持物理位移幅度恒定">4.2.3 标准化步长（保持物理位移幅度恒定）
+</h3><p>步长与次梯度的范数成反比：
+</p>
+$$\boxed{\alpha_k = \frac{\gamma}{\|g_k\|}}$$<p>其中 $\gamma &gt; 0$ 是用户预设的<strong>位移幅度常数</strong>（desired step length），$|g_k|$ 是次梯度向量的欧几里得范数。</p>
+<p>此策略下每步在 $\mathbb{R}^n$ 空间中的<strong>实际移动距离</strong>恒为 $\gamma$：
+</p>
+$$\|x_{k+1} - x_k\| = \|\alpha_k g_k\| = \gamma \cdot \frac{\|g_k\|}{\|g_k\|} = \gamma$$<p>含义：无论山体陡峭（$|g_k|$ 大）还是平缓（$|g_k|$ 小），你每步都迈出相同的欧几里得距离 $\gamma$。</p>
+<p><strong>优点</strong>：对次梯度范数的剧烈变化完全不敏感——避免&quot;梯度爆炸导致大步跳跃&quot;或&quot;梯度消失导致停滞不前&quot;。
+<strong>缺点</strong>：(a) 每步需额外计算 $|g_k|$ → $O(n)$ 额外开销；(b) 由于 $\alpha_k$ 不一定趋于零（$|g_k|$ 趋于零时 $\alpha_k$ 反而趋于无穷），理论上不保证收敛到精确最优，只能到邻域。</p>
+<h3 id="424-polyak-步长当-f-已知时理论上最优">4.2.4 Polyak 步长：当 $f^*$ 已知时理论上最优
+</h3><p>当目标最优值 $f^<em>$ 恰好已知时（在许多对偶问题中，由强对偶定理保障 $p^</em> = d^<em>$，其中 $p^</em>$ 和 $d^*$ 分别为原始和对偶最优值），Polyak 步长给出了理论上最优的自适应步长：</p>
+$$\boxed{\alpha_k = \frac{f(x_k) - f^*}{\|g_k\|^2}}$$<p><strong>完整推导（逐行推演，每一步均解释依据）</strong>：</p>
+<p><strong>第一步</strong>：由次梯度的支撑超平面不等式，取被比较的点 $y = x^<em>$：
+$$f(x^*) \ge f(x_k) + g_k^T(x^* - x_k)$$
+移项（把含 $g_k^T$ 的项移到不等式左边，含 $f(x^</em>)$ 的项移到右边，不等号方向保持不变因为移的项均未乘负数）：
+</p>
+$$g_k^T(x_k - x^*) \ge f(x_k) - f(x^*)$$<p><strong>第二步</strong>：写出一步更新后到最优解 $x^*$ 的距离平方的变化。由迭代格式 $x_{k+1} = x_k - \alpha_k g_k$：
+</p>
+$$\begin{aligned}
+\|x_{k+1} - x^*\|^2 &= \|(x_k - \alpha_k g_k) - x^*\|^2 \quad \text{(代入迭代式)} \\
+&= \|(x_k - x^*) - \alpha_k g_k\|^2 \quad \text{(重新分组)} \\
+&= \|x_k - x^*\|^2 - 2\alpha_k g_k^T(x_k - x^*) + \alpha_k^2 \|g_k\|^2 \quad \text{(展开平方：}\|a-b\|^2 = \|a\|^2 - 2a^T b + \|b\|^2\text{)}
+\end{aligned}$$<p><strong>第三步</strong>：将第一步得到的内积下界 $g_k^T(x_k - x^<em>) \ge f(x_k) - f^</em>$ 代入：
+</p>
+$$\|x_{k+1} - x^*\|^2 \le \|x_k - x^*\|^2 - 2\alpha_k\big(f(x_k) - f^*\big) + \alpha_k^2 \|g_k\|^2$$<p>
+注意不等号方向——因为不等式前有 $-2\alpha_k$，代入更大的 $g_k^T(\cdots)$ 会使整体更小（更负），所以$\le$ 仍然是正确的。</p>
+<p><strong>第四步</strong>：我们希望右边的值（到 $x^*$ 的距离平方）在每一步中尽可能小。将右边视为 $\alpha_k$ 的二次函数（$|g_k|^2 &gt; 0$，所以开口向上，最小值取在顶点处）：
+</p>
+$$h(\alpha_k) = \|x_k - x^*\|^2 - 2\alpha_k\big(f(x_k) - f^*\big) + \alpha_k^2 \|g_k\|^2$$<p>
+求导并令导数为零：
+</p>
+$$\frac{d}{d\alpha_k}h(\alpha_k) = -2\big(f(x_k) - f^*\big) + 2\alpha_k \|g_k\|^2 = 0$$<p>
+</p>
+$$\Longrightarrow \alpha_k = \frac{f(x_k) - f^*}{\|g_k\|^2}$$<p>此即 Polyak 步长。推导完成——每一步都有明确的代数依据，从次梯度的定义一步步走向最优步长解。</p>
+<p><strong>物理直觉</strong>：Polyak 步长实现了完美的&quot;自适应导航&quot;——当 $f(x_k)$ 尚远离 $f^<em>$ 时，分子大 → 步长大 → 快速靠近；当逐渐逼近 $f^</em>$ 时，分子自动趋于零 → 步长随之缩小 → 精准逼近而不冲过头。</p>
+<p><strong>核心局限</strong>：要使用 Polyak 步长必须预先知道 $f^<em>$。在绝大多数机器学习任务中 $f^</em>$ 是未知的（如果知道的话还优化什么），但在许多凸优化对偶问题中，对偶最优值正好是已知的（如为零或可根据理论推出），此时 Polyak 步长极其实用。</p>
+<hr>
+<h2 id="43-收敛性证明逐行推导每一步均作解释">4.3 收敛性证明（逐行推导，每一步均作解释）
+</h2><h3 id="431-前提假设assumptions">4.3.1 前提假设（Assumptions）
+</h3><p>在开始严谨推导之前，列出所有必须的假设条件：</p>
+<ol>
+<li><strong>凸性</strong>：$f: \mathbb{R}^n \to \mathbb{R}$ 是凸函数。</li>
+<li><strong>$G$-Lipschitz</strong>：存在 $G &gt; 0$，对任意 $x$ 和任意 $g \in \partial f(x)$，$|g| \le G$ 成立。</li>
+<li><strong>最优解存在</strong>：$f^* = \min_x f(x)$ 可达。取 $x^*$ 为任意一个最小值点。</li>
+<li><strong>定义初始距离</strong>：令 $R = |x_0 - x^*|$，这是初始点到最优解的欧几里得距离，是一个已知的有限正数。</li>
+<li><strong>步长为正</strong>：$\alpha_k &gt; 0$ 对所有的迭代步 $k \ge 0$。</li>
+</ol>
+<h3 id="432-step-1展开距离平方">4.3.2 Step 1：展开距离平方
+</h3><p>对任意的迭代步 $k$，考察 $x_{k+1}$ 到 $x^*$ 的欧几里得距离平方的变化：</p>
+$$\begin{aligned}
+\|x_{k+1} - x^*\|^2 &= \|(x_k - \alpha_k g_k) - x^*\|^2 \\
+&= \|(x_k - x^*) - \alpha_k g_k\|^2 \\
+&= \|x_k - x^*\|^2 - 2\alpha_k g_k^T(x_k - x^*) + \alpha_k^2 \|g_k\|^2
+\end{aligned}$$<p>利用 Lipschitz 假设 $|g_k| \le G$（从而 $|g_k|^2 \le G^2$）：
+</p>
+$$\|x_{k+1} - x^*\|^2 \le \|x_k - x^*\|^2 - 2\alpha_k g_k^T(x_k - x^*) + \alpha_k^2 G^2 \tag{1}$$<p><strong>为什么从这个公式开始？</strong> GD 的收敛分析也是从 $|x_{k+1} - x^<em>|^2$ 开始的，但在 GD 中，后面可以利用 $\nabla f(x_k)^T(x_k - x^</em>)$ 和 $f(x_k) - f^*$ 之间的精确等式关系。次梯度法没有这种精确关系——$g_k$ 只给出一个下界。所以我们转而直接度量&quot;物理上离最优解还有多远&quot;，以此间接判断收敛进展。</p>
+<h3 id="433-step-2用次梯度不等式消去内积">4.3.3 Step 2：用次梯度不等式消去内积
+</h3><p>次梯度的定义（取 $y = x^*$）：
+</p>
+$$f(x^*) \ge f(x_k) + g_k^T(x^* - x_k)$$<p>
+移项：
+</p>
+$$g_k^T(x_k - x^*) \ge f(x_k) - f(x^*)$$<p>定义第 $k$ 步的<strong>最优性间隙</strong>（optimality gap）为 $\delta_k = f(x_k) - f^* \ge 0$，则 $g_k^T(x_k - x^*) \ge \delta_k$。</p>
+<p>将其代入 (1)（注意 $-2\alpha_k$ 的负号会翻转不等式方向）：
+</p>
+$$\|x_{k+1} - x^*\|^2 \le \|x_k - x^*\|^2 - 2\alpha_k \delta_k + \alpha_k^2 G^2 \tag{2}$$<p>这个核心不等式的<strong>物理含义</strong>：到最优解的距离平方经一步更新后 = 原来的距离平方 − $2\alpha_k$ × 当前间隙（期望缩小的部分）+ $\alpha_k^2 G^2$（步长噪声阻碍缩小的部分）。三项之间的此消彼长最终决定了整个算法的收敛行为。</p>
+<h3 id="434-step-3移项以获得-delta_k-的上界">4.3.4 Step 3：移项以获得 $\delta_k$ 的上界
+</h3><p>将 (2) 中含 $\delta_k$ 的项移到左边：
+</p>
+$$2\alpha_k \delta_k \le \|x_k - x^*\|^2 - \|x_{k+1} - x^*\|^2 + \alpha_k^2 G^2 \tag{3}$$<p>这告诉我们：第 $k$ 步的遗憾 $\delta_k$ 被&quot;距离平方在这一步中的变化量&quot;和&quot;步长噪声项&quot;共同控制。</p>
+<h3 id="435-step-4telescoping-求和">4.3.5 Step 4：Telescoping 求和
+</h3><p>将 (3) 对 $k = 0, 1, 2, \dots, K$ 逐式写出并求和：
+</p>
+$$2\sum_{k=0}^K \alpha_k \delta_k \le \sum_{k=0}^K \big(\|x_k - x^*\|^2 - \|x_{k+1} - x^*\|^2\big) + G^2 \sum_{k=0}^K \alpha_k^2$$<p>观察中间的和式，这是一串前后相消的&quot;望远镜级数&quot;：</p>
+<ul>
+<li>对 $k=0$：$|x_0 - x^<em>|^2 - |x_1 - x^</em>|^2$</li>
+<li>对 $k=1$：$+|x_1 - x^<em>|^2 - |x_2 - x^</em>|^2$</li>
+<li>对 $k=2$：$+|x_2 - x^<em>|^2 - |x_3 - x^</em>|^2$</li>
+<li>&hellip;</li>
+<li>对 $k=K$：$+|x_K - x^<em>|^2 - |x_{K+1} - x^</em>|^2$</li>
+</ul>
+<p>$-|x_1 - x^<em>|^2$ 和 $+|x_1 - x^</em>|^2$ 相消，$-|x_2 - x^<em>|^2$ 和 $+|x_2 - x^</em>|^2$ 相消，以此类推。最终仅剩首尾两项：
+</p>
+$$= \|x_0 - x^*\|^2 - \|x_{K+1} - x^*\|^2 \le \|x_0 - x^*\|^2 = R^2$$<p>
+（因为 $|x_{K+1} - x^*|^2 \ge 0$，减去一个非负数使结果不大于原值）</p>
+<p>因此：
+</p>
+$$2\sum_{k=0}^K \alpha_k \delta_k \le R^2 + G^2 \sum_{k=0}^K \alpha_k^2 \tag{4}$$<h3 id="436-step-5从加权求和到历史最优界">4.3.6 Step 5：从加权求和到历史最优界
+</h3><p>由历史最优的定义 $\delta_{\min}^K = f_{\text{best}}^K - f^* = \min_{0 \le k \le K} \delta_k$，显然 $\delta_{\min}^K \le \delta_k$ 对所有 $k$，因此：
+</p>
+$$2\delta_{\min}^K \sum_{k=0}^K \alpha_k \le 2\sum_{k=0}^K \alpha_k \delta_k \le R^2 + G^2 \sum_{k=0}^K \alpha_k^2$$<p>移项即得到<strong>次梯度法的核心收敛界</strong>（core convergence bound）：</p>
+$$\boxed{f_{\text{best}}^K - f^* \le \frac{R^2 + G^2 \sum_{k=0}^K \alpha_k^2}{2 \sum_{k=0}^K \alpha_k}}$$<p><strong>公式结构逐项解读</strong>：</p>
+<ul>
+<li><strong>分子</strong>：$R^2$（初始偏差，固定常数）+ $G^2\sum \alpha_k^2$（随迭代步数增长但被 $\sum \alpha_k^2 &lt; \infty$ 限制的累积噪声）。</li>
+<li><strong>分母</strong>：$2\sum \alpha_k$（总步长和的两倍）。</li>
+<li>为了使右端 → 0，分母必须发散到 $\infty$ → 要求 $\sum \alpha_k = \infty$。</li>
+<li>同时分子的噪声项必须保持有界 → 要求 $\sum \alpha_k^2 &lt; \infty$。</li>
+<li>这就是之前所述的步长三条件的数学根源——它们不是&quot;随便想出来&quot;的经验法则，而是这个不等式直接推出的充要条件。</li>
+</ul>
+<h3 id="437-step-6代入具体步长获得-o1sqrtk-收敛率">4.3.7 Step 6：代入具体步长获得 $O(1/\sqrt{K})$ 收敛率
+</h3><p>在&quot;固定总步数 $K$&ldquo;的框架下，取全程常数步长 $\alpha_k \equiv \frac{R}{G\sqrt{K+1}}$。计算两个关键和式：
+</p>
+$$\sum_{k=0}^K \alpha_k = (K+1) \cdot \frac{R}{G\sqrt{K+1}} = \frac{R\sqrt{K+1}}{G}$$<p>
+</p>
+$$\sum_{k=0}^K \alpha_k^2 = (K+1) \cdot \frac{R^2}{G^2(K+1)} = \frac{R^2}{G^2}$$<p>代入核心收敛界：
+</p>
+$$\begin{aligned}
+f_{\text{best}}^K - f^* &\le \frac{R^2 + G^2 \cdot \frac{R^2}{G^2}}{2 \cdot \frac{R\sqrt{K+1}}{G}}
+= \frac{R^2 + R^2}{2R\sqrt{K+1}/G}
+= \frac{2R^2 \cdot G}{2R\sqrt{K+1}}
+= \frac{RG}{\sqrt{K+1}}
+\end{aligned}$$<p>即：
+</p>
+$$\boxed{f_{\text{best}}^K - f^* \le \frac{RG}{\sqrt{K+1}} = O\!\left(\frac{1}{\sqrt{K}}\right)}$$<h3 id="438-计算复杂度">4.3.8 计算复杂度
+</h3><p>为达到目标精度 $\epsilon &gt; 0$（即 $f_{\text{best}}^K - f^* \le \epsilon$），所需的最少迭代步数满足：
+</p>
+$$\frac{RG}{\sqrt{K}} \le \epsilon \;\Longrightarrow\; \sqrt{K} \ge \frac{RG}{\epsilon} \;\Longrightarrow\; K \ge \frac{R^2 G^2}{\epsilon^2}$$<p>用大 $O$ 记号表达为：
+</p>
+$$\boxed{K = O\!\left(\frac{1}{\epsilon^2}\right)}$$<p><strong>与 GD 的对比</strong>：光滑凸 GD 达到精度 $\epsilon$ 仅需 $O(1/\epsilon)$ 步。次梯度法需要 $O(1/\epsilon^2)$ 步——<strong>慢了一个完整的量级</strong>。例如要达到 $\epsilon = 10^{-3}$，GD 约需 $\sim 10^3$ 步，次梯度法约需 $\sim 10^6$ 步。这是处理非光滑性在理论上必然付出的代价。</p>
+<h3 id="439-强凸函数下的加速">4.3.9 强凸函数下的加速
+</h3><p>如果 $f$ 不仅是凸的而且是**$\mu$-强凸**的（$\mu &gt; 0$），即满足：
+</p>
+$$f(y) \ge f(x) + g^T(y - x) + \frac{\mu}{2}\|y - x\|^2, \quad \forall g \in \partial f(x)$$<p>
+则次梯度法的收敛率可加速至 $O(1/k)$。取步长 $\alpha_k = \frac{2}{\mu(k+1)}$ 时可证：
+</p>
+$$\boxed{f(x_k) - f^* \le \frac{2G^2}{\mu(k+1)} = O\!\left(\frac{1}{k}\right)}$$<p>
+这与一般凸下的 $O(1/\sqrt{k})$ 相比，速度快了一个量级。强凸性带来的&quot;函数弯曲&quot;使得次梯度的方向信息显著改善。</p>
+<hr>
+<h2 id="44-典型例题">4.4 典型例题
+</h2><h3 id="例题1次梯度法的步长对比">例题1：次梯度法的步长对比
+</h3><p><strong>题目</strong>：设 $f(x) = |Ax - b|_1$，其中 $A \in \mathbb{R}^{10 \times 100}$，$b \in \mathbb{R}^{10}$。求：
+(a) $f$ 在任意点 $x$ 的次梯度表达式
+(b) $f$ 的 Lipschitz 常数 $G$
+(c) 对比固定步长 $0.01$ 和衰减步长 $1/\sqrt{k+1}$ 的行为差异</p>
+<p><strong>解答</strong>：</p>
+<p><strong>(a)</strong> $f(x) = \sum_{i=1}^m |(Ax-b)_i|$。对分量 $i$，令 $r_i = (Ax-b)_i$。$|r_i|$ 的次梯度：$r_i &gt; 0$ 时为 ${1}$，$r_i &lt; 0$ 时为 ${-1}$，$r_i = 0$ 时为 $[-1,1]$（取 $0$ 作为方便之选）。由链式法则：
+</p>
+$$g_k = A^T \cdot \text{sign}(A x_k - b) \in \partial f(x_k)$$<p>
+其中 $\text{sign}(\cdot)$ 逐分量作用（正→$+1$，负→$-1$，零→$0$）。</p>
+<p><strong>(b)</strong> $|g_k| = |A^T s_k| \le |A|_2 \cdot |s_k| \le |A|_2 \cdot \sqrt{m}$。故 $G = \sqrt{m} \cdot |A|_2 = \sqrt{10} \cdot |A|_2$。</p>
+<p><strong>(c)</strong> 固定步长：误差在 $\sim \alpha G^2/2$ 邻域内振荡，始终无法趋零。衰减步长：误差按 $O(1/\sqrt{k})$ 持续缩小，虽然速度不断放缓但终将趋于零。</p>
+<h3 id="例题2基本收敛率证明">例题2：基本收敛率证明
+</h3><p><strong>题目</strong>：$f$ 凸且 $|g| \le G$。取 $\alpha_k \equiv \frac{R}{G\sqrt{T+1}}$ 运行 $T+1$ 步次梯度法。证明 $f_{\text{best}}^T - f^* \le \frac{RG}{\sqrt{T+1}}$。</p>
+<p><strong>解答</strong>：严格按照 §4.3 的六步推导流程即可完成——无需重复叙述。</p>
+<h3 id="例题3lasso-的次梯度法实现">例题3：LASSO 的次梯度法实现
+</h3><p><strong>题目</strong>：对 $\min_x \frac{1}{2}|Ax-b|^2 + \lambda|x|_1$，写出次梯度法迭代并详细说明 $x_i=0$ 处的处理方式。</p>
+<p><strong>解答</strong>：光滑部分的梯度为 $\nabla(\frac{1}{2}|Ax-b|^2) = A^T(Ax-b)$。$\ell_1$ 项逐分量次梯度：</p>
+<ul>
+<li>$x_i &gt; 0$：取 $g_i = \lambda$</li>
+<li>$x_i &lt; 0$：取 $g_i = -\lambda$</li>
+<li>$x_i = 0$：取 $g_i = 0$（区间 $[-\lambda, \lambda]$ 的中点）
+总次梯度：$g_k = A^T(Ax_k-b) + g_{\ell_1}$。迭代 $x_{k+1} = x_k - \alpha_k g_k$。取 $g_i=0$ 在零点处的动机是让 $\ell_1$ 惩罚不主动推动该坐标离开零，这有利于生成稀疏解。</li>
+</ul>
+<h3 id="例题4强凸次梯度法加速">例题4：强凸次梯度法加速
+</h3><p><strong>题目</strong>：$f$ 是 $\mu$-强凸，$|g| \le G$。步长 $\alpha_k = \frac{2}{\mu(k+1)}$。证明 $f(x_k) - f^* \le \frac{2G^2}{\mu(k+1)}$。</p>
+<p><strong>要点</strong>：强凸性使内积下界增强为 $g_k^T(x_k-x^<em>) \ge f(x_k)-f^</em> + \frac{\mu}{2}|x_k-x^<em>|^2$。代入距离平方递推产生 $(1-\mu\alpha_k)|x_k-x^</em>|^2$ 的收缩项，取 $\alpha_k = 2/(\mu(k+1))$ 后收缩因子为 $(k-1)/(k+1)$。递推得 $O(1/k)$。</p>
+<h3 id="例题5polyak-步长在对偶问题中的应用">例题5：Polyak 步长在对偶问题中的应用
+</h3><p><strong>题目</strong>：对偶问题最优值 $d^<em>$ 已知。分析 Polyak 步长 $\alpha_k = \frac{f(x_k) - d^</em>}{|g_k|^2}$ 的计算开销与适用性。</p>
+<p><strong>解答</strong>：每步额外开销仅 $O(n)$（计算 $|g_k|^2$）。适用场景：许多对偶问题中 $d^<em>$ 由理论保证（如强对偶定理 $p^</em> = d^<em>$），直接套用即可享受自适应步长的加速。注意数值稳定性——$f(x_k) \approx d^</em>$ 时需防除零。</p>
+<hr>
+<h2 id="核心要点">核心要点
+</h2><ol>
+<li><strong>本质</strong>：GD 的 $\nabla f(x_k)$ → 次微分 $\partial f(x_k)$ 中任选 $g_k$，推广到不可微凸函数。</li>
+<li><strong>非单调性是根本特征</strong>：$f(x_{k+1}) &lt; f(x_k)$ 不保证成立；必须记录 $f_{\text{best}}^K$。</li>
+<li><strong>步长三条件</strong>：$\alpha_k \to 0$ + $\sum \alpha_k = \infty$ + $\sum \alpha_k^2 &lt; \infty$ → 保证收敛到精确 $f^*$。</li>
+<li><strong>固定步长陷阱</strong>：仅收敛到 $\sim \alpha G^2/2$ 邻域，无法精确收敛。</li>
+<li><strong>收敛率</strong>：一般凸 $O(1/\sqrt{k})$，复杂度 $O(1/\epsilon^2)$；强凸下可加速到 $O(1/k)$。</li>
+<li><strong>Polyak 步长</strong>：$f^*$ 已知时理论最优，自适应调节步幅。</li>
+<li><strong>记忆口诀</strong>：「光滑快($O(1/k)$)，非光滑慢($O(1/\sqrt{k})$)；梯度下降一除 $k$，次梯度法一除根号 $k$」</li>
+</ol>
+<hr>
+<blockquote>
+<p><strong>交叉引用</strong>：次梯度理论细节见第3章；随机版（SGD）见第5章；带约束的推广见第6章（投影次梯度法）。</p>
+</blockquote>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

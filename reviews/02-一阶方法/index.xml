@@ -1,0 +1,1126 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>一阶方法 on Assranai&#39;s 手账</title>
+        <link>https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/</link>
+        <description>Recent content in 一阶方法 on Assranai&#39;s 手账</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en-us</language>
+        <copyright>Assranai</copyright>
+        <lastBuildDate>Sat, 20 Jun 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>第4章：次梯度法</title>
+        <link>https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/04-%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/</link>
+        <pubDate>Sat, 20 Jun 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/04-%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/</guid>
+        <description>&lt;h1 id=&#34;第4章次梯度法&#34;&gt;第4章：次梯度法
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心思想&lt;/strong&gt;：梯度下降要求函数处处可微（每一点都能求唯一梯度），次梯度法将这一思想推广到不可微凸函数——用次梯度集合 $\partial f(x_k)$ 中的任意一个向量 $g_k$ 代替 $\nabla f(x_k)$，沿 $-g_k$ 方向迭代。代价是收敛率从光滑 GD 的 $O(1/k)$ 退化为 $O(1/\sqrt{k})$，复杂度也从 $O(1/\epsilon)$ 退化为 $O(1/\epsilon^2)$。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;前置知识回顾&#34;&gt;前置知识回顾
+&lt;/h2&gt;&lt;p&gt;本章的论述建立在第2章（梯度下降法）和第3章（次梯度理论）的基础之上。为了方便自包含地阅读，此处对必备概念做系统回顾。&lt;/p&gt;
+&lt;h3 id=&#34;a-从第2章回顾梯度下降法-gradient-descent-gd&#34;&gt;A. 从第2章回顾：梯度下降法 (Gradient Descent, GD)
+&lt;/h3&gt;&lt;p&gt;GD 是解决无约束光滑凸优化问题的最基本算法。其迭代格式为：&lt;/p&gt;
+$$\boxed{x_{k+1} = x_k - \alpha_k \nabla f(x_k)}$$&lt;p&gt;下面逐一定义每个符号的含义，不做任何假定：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;$x_k$ 是什么？&lt;/strong&gt; $x_k \in \mathbb{R}^n$ 是第 $k$ 步迭代后的解估计。$\mathbb{R}^n$ 表示 $n$ 维实数向量空间——也就是说 $x_k$ 是一个含有 $n$ 个实数分量的列向量，可以写为 $x_k = (x_{k,1}, x_{k,2}, \dots, x_{k,n})^T$，其中 $^T$ 表示转置（将行向量变为列向量）。初始点 $x_0$ 由用户任意指定。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;$\alpha_k$ 是什么？&lt;/strong&gt; $\alpha_k &amp;gt; 0$ 是第 $k$ 步的&lt;strong&gt;步长&lt;/strong&gt;（step size），是一个正实数标量。在机器学习文献中常称为&lt;strong&gt;学习率&lt;/strong&gt;（learning rate）。步长控制着沿梯度方向移动的距离——步长太小则收敛过慢（一步步蠕动），步长太大则可能在最优解附近剧烈跳跃甚至发散。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;$\nabla f(x_k)$ 是什么？&lt;/strong&gt; $\nabla f(x_k) \in \mathbb{R}^n$ 是目标函数 $f$ 在点 $x_k$ 处的&lt;strong&gt;梯度&lt;/strong&gt;（gradient）。它是一个 $n$ 维向量，其第 $i$ 个分量就是偏导数：
+&lt;/p&gt;
+$$\frac{\partial f}{\partial x_i}(x_k) = \lim_{h \to 0} \frac{f(x_k + h e_i) - f(x_k)}{h}$$&lt;p&gt;
+其中一个重要的几何性质是：梯度总是指向函数值&lt;strong&gt;上升最快&lt;/strong&gt;的方向。因此取 $-\nabla f(x_k)$ 就得到局部&lt;strong&gt;下降最快&lt;/strong&gt;的方向。这是 GD 的物理直觉基础。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;下降性质是什么？&lt;/strong&gt; 如果 $\nabla f(x_k) \neq \mathbf{0}$（$\mathbf{0}$ 表示所有 $n$ 个分量都为零的零向量，此时说明梯度&amp;quot;消失&amp;quot;了，当前点可能是局部极值点），那么一定存在某个充分小的正实数阈值 $\bar{\alpha} &amp;gt; 0$，使得对所有满足 $0 &amp;lt; \alpha &amp;lt; \bar{\alpha}$ 的步长，都有：
+&lt;/p&gt;
+$$f(x_{k+1}) = f(x_k - \alpha \nabla f(x_k)) &lt; f(x_k)$$&lt;p&gt;换句话说：只要步长足够小，沿精确负梯度方向走就一定能降低函数值。这个简单而强大的性质保证了 GD 是&lt;strong&gt;单调收敛&lt;/strong&gt;的——函数值永不上升。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;$L$-光滑（$L$-smooth）的定义与推论&lt;/strong&gt;：当目标函数 $f$ 更进一步满足&lt;strong&gt;光滑性&lt;/strong&gt;（即梯度自身的变化是有界的），GD 的收敛率可以得到精确刻画。光滑性的数学定义是：存在常数 $L &amp;gt; 0$（光滑常数），使得对任意两点 $x, y \in \mathbb{R}^n$，有：
+&lt;/p&gt;
+$$\|\nabla f(x) - \nabla f(y)\| \le L\|x - y\|$$&lt;p&gt;
+这里 $|z| = \sqrt{\sum_{i=1}^n z_i^2}$ 是向量的&lt;strong&gt;欧几里得范数&lt;/strong&gt;（Euclidean norm，即向量在空间中的&amp;quot;长度&amp;quot;）。不等式的含义是：任意两点之间梯度的&amp;quot;变化量&amp;quot;的长度，不超过这两点距离的 $L$ 倍。$L$ 越大，函数越可能&amp;quot;颠簸&amp;quot;——在短距离内梯度剧烈摆动。&lt;/p&gt;
+&lt;p&gt;光滑性最重要的推论是&lt;strong&gt;二次上界&lt;/strong&gt;（Descent Lemma）：
+&lt;/p&gt;
+$$f(y) \le f(x) + \nabla f(x)^T(y - x) + \frac{L}{2}\|y - x\|^2$$&lt;p&gt;
+这个公式的含义：函数 $f$ 在任意点 $y$ 的值，被以 $x$ 处的一阶 Taylor 展开 $\big(f(x) + \nabla f(x)^T(y-x)\big)$ 为中心的一个二次函数从上方&amp;quot;压住&amp;quot;——$f$ 不会比二次函数长得更快。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;光滑凸 GD 的收敛率&lt;/strong&gt;：当 $f$ 既光滑又凸，取步长 $\alpha_k = 1/L$ 时，GD 的收敛率精确为：
+&lt;/p&gt;
+$$\boxed{f(x_k) - f^* \le \frac{L\|x_0 - x^*\|^2}{2k} = O\!\left(\frac{1}{k}\right)}$$&lt;p&gt;
+其中 $f^* = \min_{x \in \mathbb{R}^n} f(x)$ 是 $f$ 在整个空间中的全局最小值，$x^*$ 是取到该最小值的任意一个点（argmin）。记号 $O(1/k)$ 是说存在常数 $C$ 使得误差 $\le C/k$——直观上，迭代次数翻倍，误差大约缩小一半。迭代 100 步误差约缩到 1/100，迭代 1000 步约缩到 1/1000。&lt;/p&gt;
+&lt;h3 id=&#34;b-从第3章回顾次梯度-subgradient-基础&#34;&gt;B. 从第3章回顾：次梯度 (Subgradient) 基础
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;凸函数的精确定义&lt;/strong&gt;：函数 $f: \mathbb{R}^n \to \mathbb{R} \cup {+\infty}$ 称为&lt;strong&gt;凸函数&lt;/strong&gt;，当且仅当对任意两点 $x, y \in \mathbb{R}^n$ 和任意比例 $\lambda \in [0, 1]$（$\lambda$ 控制 $x$ 和 $y$ 在凸组合中的相对权重），以下不等式成立：
+&lt;/p&gt;
+$$f(\lambda x + (1-\lambda) y) \le \lambda f(x) + (1-\lambda) f(y)$$&lt;p&gt;&lt;strong&gt;几何直觉&lt;/strong&gt;：用一句话说——连接函数图像上任意两点的弦，始终位于函数图像的上方。或者说函数图像是&amp;quot;下凸&amp;quot;的（形如一只碗），任意局部极小值点就是全局最小值点。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;次梯度（Subgradient）的严格定义&lt;/strong&gt;：设 $f$ 为凸函数。一个向量 $g \in \mathbb{R}^n$ 称为 $f$ 在点 $x$ 处的&lt;strong&gt;次梯度&lt;/strong&gt;，当且仅当对&lt;strong&gt;所有的&lt;/strong&gt; $y \in \mathbb{R}^n$（注意是&amp;quot;所有的&amp;quot;，即对空间中的每一个可能的点都成立），以下&lt;strong&gt;支撑超平面不等式&lt;/strong&gt;成立：
+&lt;/p&gt;
+$$\boxed{f(y) \ge f(x) + g^T(y - x)}$$&lt;p&gt;对这个不等式做逐项说明：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;左边 $f(y)$：函数在任意其他点 $y$ 的值。&lt;/li&gt;
+&lt;li&gt;右边 $f(x) + g^T(y - x)$：一个以 $x$ 为基点的&lt;strong&gt;线性函数&lt;/strong&gt;在 $y$ 处的值。其中 $f(x)$ 是函数的当前值（截距），$g^T(y - x) = \sum_{i=1}^n g_i \cdot (y_i - x_i)$ 是向量 $g$ 和向量 $y - x$ 的&lt;strong&gt;内积&lt;/strong&gt;（两个向量对应分量相乘然后相加，结果是一个标量——一个实数）。&lt;/li&gt;
+&lt;li&gt;整体含义：以 $g$ 为&amp;quot;广义斜率&amp;quot;的线性函数在&lt;strong&gt;任何地方&lt;/strong&gt;都不超过 $f$。这个线性函数是 $f$ 的一个&lt;strong&gt;全局下界&lt;/strong&gt;——它从下方&amp;quot;支撑&amp;quot;着 $f$ 的图像。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;次微分（Subdifferential）&lt;/strong&gt;：$f$ 在点 $x$ 处&lt;strong&gt;所有次梯度的集合&lt;/strong&gt;称为次微分，记为 $\partial f(x)$：
+&lt;/p&gt;
+$$\partial f(x) = \left\{ g \in \mathbb{R}^n \;\middle|\; f(y) \ge f(x) + g^T(y - x), \; \forall y \in \mathbb{R}^n \right\}$$&lt;p&gt;
+关于次微分的核心性质：$\partial f(x)$ 是一个&lt;strong&gt;闭凸集&lt;/strong&gt;（集合内任意两点的凸组合仍在集合中）。在 $f$ 可微的点处，$\partial f(x) = {\nabla f(x)}$（次微分退化为仅含梯度这一个元素的单点集）。在 $f$ 不可微的&amp;quot;折角&amp;quot;处（如 $|x|$ 在 $x=0$），$\partial f(x)$ 包含多个向量（常是一个闭区间）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;次梯度与梯度的本质区别&lt;/strong&gt;：梯度给出的是切平面（局部的最优线性逼近），它告诉你函数的局部走势。次梯度给出的是一个全局下界（支撑平面），它只保证函数值不会低于这个下界，但&lt;strong&gt;不保证&lt;/strong&gt;沿支持平面的反方向走会让函数值下降。最关键的直觉是：梯度方向是&amp;quot;我能看清楚接下来的路&amp;quot;，次梯度方向是&amp;quot;我知道底线在哪里，但不知道前面是上坡还是下坡&amp;quot;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;41-从梯度下降到次梯度法&#34;&gt;4.1 从梯度下降到次梯度法
+&lt;/h2&gt;&lt;h3 id=&#34;411-梯度下降为什么会失败不可微的现实问题&#34;&gt;4.1.1 梯度下降为什么会失败：不可微的现实问题
+&lt;/h3&gt;&lt;p&gt;梯度下降法的每一步都需要计算 $\nabla f(x_k)$。但大量的实际优化问题在关键位置存在&lt;strong&gt;不可微点&lt;/strong&gt;——函数在这些点处的偏导数不存在（或者说有多个候选的&amp;quot;方向导数&amp;quot;但没有唯一良定义的梯度）。下表列出了几个标志性例子：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;问题名称&lt;/th&gt;
+					&lt;th&gt;目标函数 $f(x)$ 的数学形式&lt;/th&gt;
+					&lt;th&gt;不可微点的精确位置&lt;/th&gt;
+					&lt;th&gt;为何这些不可微点至关重要&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;LASSO&lt;/strong&gt;（稀疏回归）&lt;/td&gt;
+					&lt;td&gt;$f(x)=\frac{1}{2}|Ax-b|_2^2+\lambda|x|_1$&lt;/td&gt;
+					&lt;td&gt;各个分量 $x_i=0$&lt;/td&gt;
+					&lt;td&gt;$\ell_1$ 范数 $|x|_1=\sum_i&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;SVM&lt;/strong&gt;（支持向量机）&lt;/td&gt;
+					&lt;td&gt;$f(w)=\sum_i\max(0,1-y_i(w^T a_i+b))$&lt;/td&gt;
+					&lt;td&gt;Hinge 折点：$y_i(w^T a_i+b)=1$&lt;/td&gt;
+					&lt;td&gt;位于分类决策边界上的样本恰是&lt;strong&gt;支持向量&lt;/strong&gt;，折点处的非光滑结构是 SVM 模型的核心数学特征&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;中位数回归&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$f(x)=\sum_i&lt;/td&gt;
+					&lt;td&gt;y_i-a_i^T x&lt;/td&gt;
+					&lt;td&gt;$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;核范数正则化&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$f(X)=|X|_*$（奇异值之和）&lt;/td&gt;
+					&lt;td&gt;奇异值退化处（两个以上奇异值相等）&lt;/td&gt;
+					&lt;td&gt;核范数在奇异值交织处不可微，但这些低秩结构正是矩阵补全的目标&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;以上任意一种问题在不可微点都无法直接用 GD 求解。&lt;strong&gt;次梯度法&lt;/strong&gt;正是为应对这类情况而诞生的——它把&amp;quot;唯一的梯度&amp;quot;推广为&amp;quot;集合中的任选向量&amp;quot;。&lt;/p&gt;
+&lt;h3 id=&#34;412-次梯度法的迭代格式&#34;&gt;4.1.2 次梯度法的迭代格式
+&lt;/h3&gt;&lt;p&gt;次梯度法（Subgradient Method, SubGM）沿袭 GD 的整体框架，将 $\nabla f(x_k)$（在不可微点不存在）替换为 $\partial f(x_k)$ 中&lt;strong&gt;任意选出的一个&lt;/strong&gt;元素 $g_k$：&lt;/p&gt;
+$$\boxed{x_{k+1} = x_k - \alpha_k g_k, \quad \text{其中 } g_k \in \partial f(x_k)}$$&lt;p&gt;每个符号的精确含义：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$x_k \in \mathbb{R}^n$：第 $k$ 步迭代后的解估计，$n$ 维实向量。&lt;/li&gt;
+&lt;li&gt;$\alpha_k &amp;gt; 0$：第 $k$ 步的步长（正实数标量）。次梯度法对步长策略的要求比 GD 更为严苛——步长不仅决定收敛速度，还决定能否收敛——本章 §4.2 将用一整节的篇幅详细论述。&lt;/li&gt;
+&lt;li&gt;$\partial f(x_k)$：$f$ 在 $x_k$ 处的&lt;strong&gt;次微分&lt;/strong&gt;——所有次梯度的集合。记号 $\partial$ 是偏微分符号的变体。&lt;/li&gt;
+&lt;li&gt;$g_k \in \partial f(x_k)$：符号 $\in$ 读作&amp;quot;属于&amp;quot;——$g_k$ 是从集合 $\partial f(x_k)$ 中&lt;strong&gt;任意挑选&lt;/strong&gt;出的某一个向量。挑选规则：可选择集合中的任意元素，次梯度法的收敛理论对集合中的所有选择都成立。实践中，一般挑选最容易计算的那个元素。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;全书的符号约定&lt;/strong&gt;：本书统一用字母 $g$、$g_k$（不带 $\nabla$）表示次梯度；而用 $\nabla f$ 保留给可微情形表示精确梯度。这样，读者在看到公式时立刻就能区分&amp;quot;这里用的是精确梯度还是某个次梯度&amp;quot;。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&#34;413-关键区别负次梯度方向不一定使函数下降&#34;&gt;4.1.3 关键区别：负次梯度方向&lt;strong&gt;不一定&lt;/strong&gt;使函数下降
+&lt;/h3&gt;&lt;p&gt;这是次梯度法与梯度下降之间&lt;strong&gt;最本质的理论差异&lt;/strong&gt;，也是初学者极容易犯错的核心知识点。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;先回顾 GD 的下降性质&lt;/strong&gt;。如果 $\nabla f(x_k) \neq \mathbf{0}$（梯度非零），则存在 $x_k$ 的一个邻域和一个正数阈值 $\bar{\alpha} &amp;gt; 0$，使得对所有步长满足 $0 &amp;lt; \alpha &amp;lt; \bar{\alpha}$：
+&lt;/p&gt;
+$$f(x_k - \alpha \nabla f(x_k)) &lt; f(x_k)$$&lt;p&gt;
+即：只要沿&lt;strong&gt;精确的负梯度方向&lt;/strong&gt;走&lt;strong&gt;充分小&lt;/strong&gt;的一步，函数值一定严格下降。这是 GD 的基石。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;对比次梯度法&lt;/strong&gt;。即使当前点不是最优解（即 $0 \notin \partial f(x_k)$——因为最优性条件恰好是 $0 \in \partial f(x^*)$），我们也&lt;strong&gt;不能&lt;/strong&gt;断言存在 $\alpha &amp;gt; 0$ 使得：
+&lt;/p&gt;
+$$f(x_k - \alpha g_k) &lt; f(x_k)$$&lt;p&gt;
+这个不等式&lt;strong&gt;可能根本不成立&lt;/strong&gt;——沿某个次梯度的反方向走一小步，函数值可能&lt;strong&gt;不降反升&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;为什么会这样？——几何根源&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;梯度和次梯度的几何角色完全不同：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;梯度&lt;/strong&gt; $\nabla f(x_k)$：定义了函数图像在 $x_k$ 处的&lt;strong&gt;切平面&lt;/strong&gt;——这是函数在局部的&lt;strong&gt;最优线性逼近&lt;/strong&gt;。切平面精确地追踪了函数附近的上升和下降走势。沿负梯度方向走一小步，相当于顺势下滑。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;次梯度&lt;/strong&gt; $g_k$：仅定义了一个经过 $(x_k, f(x_k))$ 且处处不超过 $f$ 的&lt;strong&gt;支撑超平面&lt;/strong&gt;——这是一个&lt;strong&gt;全局下界&lt;/strong&gt;，而不是局部逼近。支撑超平面只保证函数值不会跌穿某个底，但完全&lt;strong&gt;不保证&lt;/strong&gt;沿其反方向走会让函数下降。沿下界方向走，可能先穿过山谷，再爬上对面的山脊。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;一个具体的一维反例&lt;/strong&gt;来帮助理解：&lt;/p&gt;
+&lt;p&gt;设 $f(x) = |x|$（最基本的非光滑凸函数）。取 $x_k = 1$（正半轴，$f$ 在此处是可微的，次微分退化为梯度）：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\partial f(1) = {f&amp;rsquo;(1)} = {1}$，即 $g_k = 1$。&lt;/li&gt;
+&lt;li&gt;我们考虑沿负次梯度方向走：即 $x_{k+1} = 1 - \alpha \cdot 1 = 1 - \alpha$。&lt;/li&gt;
+&lt;li&gt;函数值的变化：
+
+$$f(x_{k+1}) = |1 - \alpha| = \begin{cases} 1 - \alpha, &amp; \text{当 } 0 \le \alpha \le 1 \text{（尚未跨过原点，在下降）} \\ \alpha - 1, &amp; \text{当 } \alpha &gt; 1 \text{（已跨过原点，开始上升！）} \end{cases}$$&lt;/li&gt;
+&lt;li&gt;当 $\alpha = 2$ 时，$f(1-2) = | -1 | = 1 = f(1)$（回到了原来的值）。&lt;/li&gt;
+&lt;li&gt;当 $\alpha = 3$ 时，$f(1-3) = 2 &amp;gt; 1 = f(1)$（反而更差了！）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这个极简单的例子揭示了一个深刻的道理：即使是 $|x|$ 这样平凡的函数，只要步长稍大，沿次梯度反方向走也会让函数值不降反升。在高维空间和更复杂的非光滑函数上，即使步长选得很小，也可能走错方向。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;次梯度法的三个直接后果&lt;/strong&gt;：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;非单调性&lt;/strong&gt;（Non-monotonicity）：函数值序列 ${f(x_k)}$ 可能&lt;strong&gt;上下振荡&lt;/strong&gt;，不像 GD 那样每步都确保变小。这是次梯度法从 GD 继承下来的&amp;quot;确定性&amp;quot;外貌下最大的不同。收敛分析不能依赖函数值下降，只能度量&amp;quot;距离最优解还有多远&amp;quot;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;不能使用线搜索&lt;/strong&gt;（No Line Search）：GD 中常用的 Armijo 回溯线搜索等方法，本质上是找&amp;quot;让函数值充分下降的步长&amp;quot;。它们的理论保证完全依赖于&amp;quot;沿该方向走函数值一定会下降&amp;quot;这个前提。既然次梯度方向不一定下降，线搜索彻底失去意义。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;算法输出必须是历史最优&lt;/strong&gt;：由于最后一个迭代点 $x_K$ 的值 $f(x_K)$ 可能比早期某个点 $x_k$（$k &amp;lt; K$）的值更差，最终的算法输出不能简单地取 $x_K$，而必须返回&lt;strong&gt;所有历史迭代点中函数值最小的那个&lt;/strong&gt;：
+&lt;/p&gt;
+$$\boxed{f_{\text{best}}^K = \min_{0 \le i \le K} f(x_i), \qquad x_{\text{best}}^K = \arg\min_{0 \le i \le K} f(x_i)}$$&lt;p&gt;
+这里 $\arg\min$ 返回取到最小值的那个自变量的值——即函数值最小的迭代点的坐标。这要求算法在运行过程中&lt;strong&gt;额外跟踪&lt;/strong&gt;当前见过的最优值及其对应的点。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;42-步长策略&#34;&gt;4.2 步长策略
+&lt;/h2&gt;&lt;p&gt;步长 $\alpha_k$ 的选择是次梯度法成败的关键所在。步长既要足够大以推动有意义的进展，又必须随迭代进行而逐步缩小以避免在最优解附近持续震荡。&lt;/p&gt;
+&lt;h3 id=&#34;421-固定步长-alpha_k-equiv-alpha&#34;&gt;4.2.1 固定步长 $\alpha_k \equiv \alpha$
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;收敛结论&lt;/strong&gt;：固定步长只能将次梯度法收敛到最优值的&lt;strong&gt;某个邻域&lt;/strong&gt;（neighborhood），而&lt;strong&gt;不能&lt;/strong&gt;精确收敛到最优值 $f^*$ 本身。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;严格的数学刻画&lt;/strong&gt;（完整推导见 §4.3）：
+&lt;/p&gt;
+$$\boxed{\limsup_{K \to \infty} \; f_{\text{best}}^K - f^* \le \frac{\alpha G^2}{2}}$$&lt;p&gt;符号含义逐项解释：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\limsup_{K \to \infty}$（读作 limes superior）：上极限，即当 $K$ 无限增大时，序列 ${f_{\text{best}}^K}$ 的&lt;strong&gt;最大聚点&lt;/strong&gt;的极限。这里的含义是：无论你迭代多少步，最多只能保证误差不超过 $\alpha G^2/2$，再多的迭代也无法突破这个下界。&lt;/li&gt;
+&lt;li&gt;$G$：函数 $f$ 的 &lt;strong&gt;Lipschitz 常数&lt;/strong&gt;。严格定义为存在 $G &amp;gt; 0$，使对任意 $x$ 和任意 $g \in \partial f(x)$，$|g| \le G$ 均成立。这个条件等价于 $|f(x) - f(y)| \le G|x-y|$ 对任意 $x, y$ 成立。$G$ 度量的是函数值的&amp;quot;最大变化速率&amp;quot;。&lt;/li&gt;
+&lt;li&gt;$\frac{\alpha G^2}{2}$：收敛球的&lt;strong&gt;半径&lt;/strong&gt;。无论迭代多少次，函数值都无法突破以 $f^*$ 为球心、以此值为半径的球体。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;物理直觉&lt;/strong&gt;：想象一个弹珠在一个锯齿碗中滚动。固定步长意味着弹珠每次跳动的距离是固定的。当它接近碗底时，固定的跳跃距离让它无法精确落在碗底——它会在碗底周围一个半径约为 $\alpha G^2/2$ 的区域内反复弹跳。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;固定步长的优缺点总结&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;优点&lt;/th&gt;
+					&lt;th&gt;缺点&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;实现最简单：只需指定一个常数&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;不能收敛到 $f^*$ 本身&lt;/strong&gt;，只能到 $\alpha G^2/2$ 邻域&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;不需要动态计算步长的任何参数&lt;/td&gt;
+					&lt;td&gt;$\alpha$ 的选取非常敏感：太小 → 极慢；太大 → 邻域过大失去意义&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;对初始猜测相对鲁棒&lt;/td&gt;
+					&lt;td&gt;对高精度需求（$\epsilon \le 10^{-6}$）完全无法满足&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;422-递减步长保证精确收敛的充要条件&#34;&gt;4.2.2 递减步长：保证精确收敛的充要条件
+&lt;/h3&gt;&lt;p&gt;要使次梯度法&lt;strong&gt;精确收敛到 $f^*$&lt;/strong&gt;（而不是收敛到某个邻域），步长必须满足以下三个条件（缺一不可）：&lt;/p&gt;
+$$\boxed{\alpha_k \to 0, \qquad \sum_{k=0}^{\infty} \alpha_k = \infty, \qquad \sum_{k=0}^{\infty} \alpha_k^2 &lt; \infty}$$&lt;p&gt;下面逐条解释各条件的物理意义：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;(1) $\alpha_k \to 0$（步长趋于零）&lt;/strong&gt;：$\lim_{k \to \infty} \alpha_k = 0$。当迭代越来越接近最优解时，每一步的移动幅度必须越来越零碎。这就像开车找到大致位置后要减速缓行——如果用固定的大步幅，将永远在最优解附近&amp;quot;跳过去、跳过来&amp;quot;而无法稳定。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;(2) $\sum_{k=0}^{\infty} \alpha_k = \infty$（步长之和发散到无穷大）&lt;/strong&gt;：这是三个条件中&lt;strong&gt;最关键&lt;/strong&gt;的一个。级数 $\sum \alpha_k$ 发散意味着无论已经迭代了多少步，&lt;strong&gt;往后还能累积的总行程是无穷大的&lt;/strong&gt;。这保证了从任意起始点（无论离最优解有多远）出发，算法都有足够的&amp;quot;总步长&amp;quot;来覆盖这段距离。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;一个重要的反例&lt;/strong&gt;：取 $\alpha_k = 1/k^2$。这是满足 $\alpha_k \to 0$ 且 $\sum \alpha_k^2 = \sum 1/k^4 = \pi^4/90 &amp;lt; \infty$ 的。但：
+&lt;/p&gt;
+$$\sum_{k=1}^{\infty} \frac{1}{k^2} = \frac{\pi^2}{6} \approx 1.64 &lt; \infty$$&lt;p&gt;
+总行程只有约 1.64 个单位。如果你初始点距离最优解超过 1.64，算法将永远&amp;quot;走不到&amp;quot;目的地。这就是为什么不满足 $\sum \alpha_k = \infty$ 的衰减步长无法保证收敛。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;(3) $\sum_{k=0}^{\infty} \alpha_k^2 &amp;lt; \infty$（步长平方和必须收敛）&lt;/strong&gt;：在 §4.3 的收敛分析中，由步长引发的累积&amp;quot;噪声&amp;quot;表现为 $G^2 \sum \alpha_k^2$。如果平方和发散，那么即使总行程无穷大，步长带来的累积偏差也会同步放大，最终淹没收敛信号，使误差无法趋于零。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;典型递减步长方案及其判定&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;方案名称&lt;/th&gt;
+					&lt;th&gt;步长公式&lt;/th&gt;
+					&lt;th&gt;$\sum \alpha_k$ 是否 $\infty$？&lt;/th&gt;
+					&lt;th&gt;$\sum \alpha_k^2$ 是否 $&amp;lt;\infty$？&lt;/th&gt;
+					&lt;th&gt;综合评价&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;幂律 $1/\sqrt{k}$&lt;/td&gt;
+					&lt;td&gt;$\alpha_k = \frac{\alpha_0}{\sqrt{k+1}}$&lt;/td&gt;
+					&lt;td&gt;是（$\int dx/\sqrt{x}$ 发散）&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;否！&lt;/strong&gt;（$\sum 1/k$ 为调和级数，发散）&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;不满足理论条件！&lt;/strong&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;调和 $1/k$&lt;/td&gt;
+					&lt;td&gt;$\alpha_k = \frac{\alpha_0}{k+1}$&lt;/td&gt;
+					&lt;td&gt;是&lt;/td&gt;
+					&lt;td&gt;是（$\sum 1/k^2 = \pi^2/6$）&lt;/td&gt;
+					&lt;td&gt;经典取法，后期较慢&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$k^{-p}$（$p \in (0.5,1]$）&lt;/td&gt;
+					&lt;td&gt;$\alpha_k = \frac{\alpha_0}{(k+1)^p}$&lt;/td&gt;
+					&lt;td&gt;是（$p \le 1$）&lt;/td&gt;
+					&lt;td&gt;是（$2p &amp;gt; 1$）&lt;/td&gt;
+					&lt;td&gt;$p \approx 0.51$ 或 $0.6$ 常用&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;分阶段常数&lt;/td&gt;
+					&lt;td&gt;$\alpha_k = \frac{\alpha_0}{1+\lfloor k/K_0\rfloor}$&lt;/td&gt;
+					&lt;td&gt;是&lt;/td&gt;
+					&lt;td&gt;是&lt;/td&gt;
+					&lt;td&gt;工程实现简便&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;关于 $\alpha_k = 1/\sqrt{k}$ 的重要讨论&lt;/strong&gt;：&lt;/p&gt;
+$$\sum_{k=0}^{\infty} \alpha_k^2 = \sum_{k=0}^{\infty} \frac{1}{k+1}$$&lt;p&gt;这是著名的&lt;strong&gt;调和级数&lt;/strong&gt;——它是&lt;strong&gt;发散&lt;/strong&gt;的（$H_K \approx \ln K + \gamma$，其中 $\gamma \approx 0.577$ 是欧拉常数）。所以表面上看起来温和的 $1/\sqrt{k}$ 衰减实际上&lt;strong&gt;不满足&lt;/strong&gt;平方和收敛的条件。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;实践中的解决方案&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;更快的衰减&lt;/strong&gt;：取 $p &amp;gt; 0.5$，如 $p = 0.51$ 或 $0.6$，即 $\alpha_k = \alpha_0 / k^{0.6}$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;固定总步数分析&lt;/strong&gt;（horizon-dependent）：如果预先设定了总迭代步数 $K$（实践中几乎是必然的），可以取 $\alpha_k \equiv R/(G\sqrt{K})$ ——所有 $K+1$ 步都用同一个常数步长。然后分析当 $K \to \infty$ 时上界 $RG/\sqrt{K}$ 的渐近行为。这种分析框架绕过了 $\sum \alpha_k^2$ 发散的问题。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;423-标准化步长保持物理位移幅度恒定&#34;&gt;4.2.3 标准化步长（保持物理位移幅度恒定）
+&lt;/h3&gt;&lt;p&gt;步长与次梯度的范数成反比：
+&lt;/p&gt;
+$$\boxed{\alpha_k = \frac{\gamma}{\|g_k\|}}$$&lt;p&gt;其中 $\gamma &amp;gt; 0$ 是用户预设的&lt;strong&gt;位移幅度常数&lt;/strong&gt;（desired step length），$|g_k|$ 是次梯度向量的欧几里得范数。&lt;/p&gt;
+&lt;p&gt;此策略下每步在 $\mathbb{R}^n$ 空间中的&lt;strong&gt;实际移动距离&lt;/strong&gt;恒为 $\gamma$：
+&lt;/p&gt;
+$$\|x_{k+1} - x_k\| = \|\alpha_k g_k\| = \gamma \cdot \frac{\|g_k\|}{\|g_k\|} = \gamma$$&lt;p&gt;含义：无论山体陡峭（$|g_k|$ 大）还是平缓（$|g_k|$ 小），你每步都迈出相同的欧几里得距离 $\gamma$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;优点&lt;/strong&gt;：对次梯度范数的剧烈变化完全不敏感——避免&amp;quot;梯度爆炸导致大步跳跃&amp;quot;或&amp;quot;梯度消失导致停滞不前&amp;quot;。
+&lt;strong&gt;缺点&lt;/strong&gt;：(a) 每步需额外计算 $|g_k|$ → $O(n)$ 额外开销；(b) 由于 $\alpha_k$ 不一定趋于零（$|g_k|$ 趋于零时 $\alpha_k$ 反而趋于无穷），理论上不保证收敛到精确最优，只能到邻域。&lt;/p&gt;
+&lt;h3 id=&#34;424-polyak-步长当-f-已知时理论上最优&#34;&gt;4.2.4 Polyak 步长：当 $f^*$ 已知时理论上最优
+&lt;/h3&gt;&lt;p&gt;当目标最优值 $f^&lt;em&gt;$ 恰好已知时（在许多对偶问题中，由强对偶定理保障 $p^&lt;/em&gt; = d^&lt;em&gt;$，其中 $p^&lt;/em&gt;$ 和 $d^*$ 分别为原始和对偶最优值），Polyak 步长给出了理论上最优的自适应步长：&lt;/p&gt;
+$$\boxed{\alpha_k = \frac{f(x_k) - f^*}{\|g_k\|^2}}$$&lt;p&gt;&lt;strong&gt;完整推导（逐行推演，每一步均解释依据）&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第一步&lt;/strong&gt;：由次梯度的支撑超平面不等式，取被比较的点 $y = x^&lt;em&gt;$：
+$$f(x^*) \ge f(x_k) + g_k^T(x^* - x_k)$$
+移项（把含 $g_k^T$ 的项移到不等式左边，含 $f(x^&lt;/em&gt;)$ 的项移到右边，不等号方向保持不变因为移的项均未乘负数）：
+&lt;/p&gt;
+$$g_k^T(x_k - x^*) \ge f(x_k) - f(x^*)$$&lt;p&gt;&lt;strong&gt;第二步&lt;/strong&gt;：写出一步更新后到最优解 $x^*$ 的距离平方的变化。由迭代格式 $x_{k+1} = x_k - \alpha_k g_k$：
+&lt;/p&gt;
+$$\begin{aligned}
+\|x_{k+1} - x^*\|^2 &amp;= \|(x_k - \alpha_k g_k) - x^*\|^2 \quad \text{(代入迭代式)} \\
+&amp;= \|(x_k - x^*) - \alpha_k g_k\|^2 \quad \text{(重新分组)} \\
+&amp;= \|x_k - x^*\|^2 - 2\alpha_k g_k^T(x_k - x^*) + \alpha_k^2 \|g_k\|^2 \quad \text{(展开平方：}\|a-b\|^2 = \|a\|^2 - 2a^T b + \|b\|^2\text{)}
+\end{aligned}$$&lt;p&gt;&lt;strong&gt;第三步&lt;/strong&gt;：将第一步得到的内积下界 $g_k^T(x_k - x^&lt;em&gt;) \ge f(x_k) - f^&lt;/em&gt;$ 代入：
+&lt;/p&gt;
+$$\|x_{k+1} - x^*\|^2 \le \|x_k - x^*\|^2 - 2\alpha_k\big(f(x_k) - f^*\big) + \alpha_k^2 \|g_k\|^2$$&lt;p&gt;
+注意不等号方向——因为不等式前有 $-2\alpha_k$，代入更大的 $g_k^T(\cdots)$ 会使整体更小（更负），所以$\le$ 仍然是正确的。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第四步&lt;/strong&gt;：我们希望右边的值（到 $x^*$ 的距离平方）在每一步中尽可能小。将右边视为 $\alpha_k$ 的二次函数（$|g_k|^2 &amp;gt; 0$，所以开口向上，最小值取在顶点处）：
+&lt;/p&gt;
+$$h(\alpha_k) = \|x_k - x^*\|^2 - 2\alpha_k\big(f(x_k) - f^*\big) + \alpha_k^2 \|g_k\|^2$$&lt;p&gt;
+求导并令导数为零：
+&lt;/p&gt;
+$$\frac{d}{d\alpha_k}h(\alpha_k) = -2\big(f(x_k) - f^*\big) + 2\alpha_k \|g_k\|^2 = 0$$&lt;p&gt;
+&lt;/p&gt;
+$$\Longrightarrow \alpha_k = \frac{f(x_k) - f^*}{\|g_k\|^2}$$&lt;p&gt;此即 Polyak 步长。推导完成——每一步都有明确的代数依据，从次梯度的定义一步步走向最优步长解。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;物理直觉&lt;/strong&gt;：Polyak 步长实现了完美的&amp;quot;自适应导航&amp;quot;——当 $f(x_k)$ 尚远离 $f^&lt;em&gt;$ 时，分子大 → 步长大 → 快速靠近；当逐渐逼近 $f^&lt;/em&gt;$ 时，分子自动趋于零 → 步长随之缩小 → 精准逼近而不冲过头。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;核心局限&lt;/strong&gt;：要使用 Polyak 步长必须预先知道 $f^&lt;em&gt;$。在绝大多数机器学习任务中 $f^&lt;/em&gt;$ 是未知的（如果知道的话还优化什么），但在许多凸优化对偶问题中，对偶最优值正好是已知的（如为零或可根据理论推出），此时 Polyak 步长极其实用。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;43-收敛性证明逐行推导每一步均作解释&#34;&gt;4.3 收敛性证明（逐行推导，每一步均作解释）
+&lt;/h2&gt;&lt;h3 id=&#34;431-前提假设assumptions&#34;&gt;4.3.1 前提假设（Assumptions）
+&lt;/h3&gt;&lt;p&gt;在开始严谨推导之前，列出所有必须的假设条件：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;凸性&lt;/strong&gt;：$f: \mathbb{R}^n \to \mathbb{R}$ 是凸函数。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;$G$-Lipschitz&lt;/strong&gt;：存在 $G &amp;gt; 0$，对任意 $x$ 和任意 $g \in \partial f(x)$，$|g| \le G$ 成立。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;最优解存在&lt;/strong&gt;：$f^* = \min_x f(x)$ 可达。取 $x^*$ 为任意一个最小值点。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;定义初始距离&lt;/strong&gt;：令 $R = |x_0 - x^*|$，这是初始点到最优解的欧几里得距离，是一个已知的有限正数。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;步长为正&lt;/strong&gt;：$\alpha_k &amp;gt; 0$ 对所有的迭代步 $k \ge 0$。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;432-step-1展开距离平方&#34;&gt;4.3.2 Step 1：展开距离平方
+&lt;/h3&gt;&lt;p&gt;对任意的迭代步 $k$，考察 $x_{k+1}$ 到 $x^*$ 的欧几里得距离平方的变化：&lt;/p&gt;
+$$\begin{aligned}
+\|x_{k+1} - x^*\|^2 &amp;= \|(x_k - \alpha_k g_k) - x^*\|^2 \\
+&amp;= \|(x_k - x^*) - \alpha_k g_k\|^2 \\
+&amp;= \|x_k - x^*\|^2 - 2\alpha_k g_k^T(x_k - x^*) + \alpha_k^2 \|g_k\|^2
+\end{aligned}$$&lt;p&gt;利用 Lipschitz 假设 $|g_k| \le G$（从而 $|g_k|^2 \le G^2$）：
+&lt;/p&gt;
+$$\|x_{k+1} - x^*\|^2 \le \|x_k - x^*\|^2 - 2\alpha_k g_k^T(x_k - x^*) + \alpha_k^2 G^2 \tag{1}$$&lt;p&gt;&lt;strong&gt;为什么从这个公式开始？&lt;/strong&gt; GD 的收敛分析也是从 $|x_{k+1} - x^&lt;em&gt;|^2$ 开始的，但在 GD 中，后面可以利用 $\nabla f(x_k)^T(x_k - x^&lt;/em&gt;)$ 和 $f(x_k) - f^*$ 之间的精确等式关系。次梯度法没有这种精确关系——$g_k$ 只给出一个下界。所以我们转而直接度量&amp;quot;物理上离最优解还有多远&amp;quot;，以此间接判断收敛进展。&lt;/p&gt;
+&lt;h3 id=&#34;433-step-2用次梯度不等式消去内积&#34;&gt;4.3.3 Step 2：用次梯度不等式消去内积
+&lt;/h3&gt;&lt;p&gt;次梯度的定义（取 $y = x^*$）：
+&lt;/p&gt;
+$$f(x^*) \ge f(x_k) + g_k^T(x^* - x_k)$$&lt;p&gt;
+移项：
+&lt;/p&gt;
+$$g_k^T(x_k - x^*) \ge f(x_k) - f(x^*)$$&lt;p&gt;定义第 $k$ 步的&lt;strong&gt;最优性间隙&lt;/strong&gt;（optimality gap）为 $\delta_k = f(x_k) - f^* \ge 0$，则 $g_k^T(x_k - x^*) \ge \delta_k$。&lt;/p&gt;
+&lt;p&gt;将其代入 (1)（注意 $-2\alpha_k$ 的负号会翻转不等式方向）：
+&lt;/p&gt;
+$$\|x_{k+1} - x^*\|^2 \le \|x_k - x^*\|^2 - 2\alpha_k \delta_k + \alpha_k^2 G^2 \tag{2}$$&lt;p&gt;这个核心不等式的&lt;strong&gt;物理含义&lt;/strong&gt;：到最优解的距离平方经一步更新后 = 原来的距离平方 − $2\alpha_k$ × 当前间隙（期望缩小的部分）+ $\alpha_k^2 G^2$（步长噪声阻碍缩小的部分）。三项之间的此消彼长最终决定了整个算法的收敛行为。&lt;/p&gt;
+&lt;h3 id=&#34;434-step-3移项以获得-delta_k-的上界&#34;&gt;4.3.4 Step 3：移项以获得 $\delta_k$ 的上界
+&lt;/h3&gt;&lt;p&gt;将 (2) 中含 $\delta_k$ 的项移到左边：
+&lt;/p&gt;
+$$2\alpha_k \delta_k \le \|x_k - x^*\|^2 - \|x_{k+1} - x^*\|^2 + \alpha_k^2 G^2 \tag{3}$$&lt;p&gt;这告诉我们：第 $k$ 步的遗憾 $\delta_k$ 被&amp;quot;距离平方在这一步中的变化量&amp;quot;和&amp;quot;步长噪声项&amp;quot;共同控制。&lt;/p&gt;
+&lt;h3 id=&#34;435-step-4telescoping-求和&#34;&gt;4.3.5 Step 4：Telescoping 求和
+&lt;/h3&gt;&lt;p&gt;将 (3) 对 $k = 0, 1, 2, \dots, K$ 逐式写出并求和：
+&lt;/p&gt;
+$$2\sum_{k=0}^K \alpha_k \delta_k \le \sum_{k=0}^K \big(\|x_k - x^*\|^2 - \|x_{k+1} - x^*\|^2\big) + G^2 \sum_{k=0}^K \alpha_k^2$$&lt;p&gt;观察中间的和式，这是一串前后相消的&amp;quot;望远镜级数&amp;quot;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;对 $k=0$：$|x_0 - x^&lt;em&gt;|^2 - |x_1 - x^&lt;/em&gt;|^2$&lt;/li&gt;
+&lt;li&gt;对 $k=1$：$+|x_1 - x^&lt;em&gt;|^2 - |x_2 - x^&lt;/em&gt;|^2$&lt;/li&gt;
+&lt;li&gt;对 $k=2$：$+|x_2 - x^&lt;em&gt;|^2 - |x_3 - x^&lt;/em&gt;|^2$&lt;/li&gt;
+&lt;li&gt;&amp;hellip;&lt;/li&gt;
+&lt;li&gt;对 $k=K$：$+|x_K - x^&lt;em&gt;|^2 - |x_{K+1} - x^&lt;/em&gt;|^2$&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;$-|x_1 - x^&lt;em&gt;|^2$ 和 $+|x_1 - x^&lt;/em&gt;|^2$ 相消，$-|x_2 - x^&lt;em&gt;|^2$ 和 $+|x_2 - x^&lt;/em&gt;|^2$ 相消，以此类推。最终仅剩首尾两项：
+&lt;/p&gt;
+$$= \|x_0 - x^*\|^2 - \|x_{K+1} - x^*\|^2 \le \|x_0 - x^*\|^2 = R^2$$&lt;p&gt;
+（因为 $|x_{K+1} - x^*|^2 \ge 0$，减去一个非负数使结果不大于原值）&lt;/p&gt;
+&lt;p&gt;因此：
+&lt;/p&gt;
+$$2\sum_{k=0}^K \alpha_k \delta_k \le R^2 + G^2 \sum_{k=0}^K \alpha_k^2 \tag{4}$$&lt;h3 id=&#34;436-step-5从加权求和到历史最优界&#34;&gt;4.3.6 Step 5：从加权求和到历史最优界
+&lt;/h3&gt;&lt;p&gt;由历史最优的定义 $\delta_{\min}^K = f_{\text{best}}^K - f^* = \min_{0 \le k \le K} \delta_k$，显然 $\delta_{\min}^K \le \delta_k$ 对所有 $k$，因此：
+&lt;/p&gt;
+$$2\delta_{\min}^K \sum_{k=0}^K \alpha_k \le 2\sum_{k=0}^K \alpha_k \delta_k \le R^2 + G^2 \sum_{k=0}^K \alpha_k^2$$&lt;p&gt;移项即得到&lt;strong&gt;次梯度法的核心收敛界&lt;/strong&gt;（core convergence bound）：&lt;/p&gt;
+$$\boxed{f_{\text{best}}^K - f^* \le \frac{R^2 + G^2 \sum_{k=0}^K \alpha_k^2}{2 \sum_{k=0}^K \alpha_k}}$$&lt;p&gt;&lt;strong&gt;公式结构逐项解读&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;分子&lt;/strong&gt;：$R^2$（初始偏差，固定常数）+ $G^2\sum \alpha_k^2$（随迭代步数增长但被 $\sum \alpha_k^2 &amp;lt; \infty$ 限制的累积噪声）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;分母&lt;/strong&gt;：$2\sum \alpha_k$（总步长和的两倍）。&lt;/li&gt;
+&lt;li&gt;为了使右端 → 0，分母必须发散到 $\infty$ → 要求 $\sum \alpha_k = \infty$。&lt;/li&gt;
+&lt;li&gt;同时分子的噪声项必须保持有界 → 要求 $\sum \alpha_k^2 &amp;lt; \infty$。&lt;/li&gt;
+&lt;li&gt;这就是之前所述的步长三条件的数学根源——它们不是&amp;quot;随便想出来&amp;quot;的经验法则，而是这个不等式直接推出的充要条件。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;437-step-6代入具体步长获得-o1sqrtk-收敛率&#34;&gt;4.3.7 Step 6：代入具体步长获得 $O(1/\sqrt{K})$ 收敛率
+&lt;/h3&gt;&lt;p&gt;在&amp;quot;固定总步数 $K$&amp;ldquo;的框架下，取全程常数步长 $\alpha_k \equiv \frac{R}{G\sqrt{K+1}}$。计算两个关键和式：
+&lt;/p&gt;
+$$\sum_{k=0}^K \alpha_k = (K+1) \cdot \frac{R}{G\sqrt{K+1}} = \frac{R\sqrt{K+1}}{G}$$&lt;p&gt;
+&lt;/p&gt;
+$$\sum_{k=0}^K \alpha_k^2 = (K+1) \cdot \frac{R^2}{G^2(K+1)} = \frac{R^2}{G^2}$$&lt;p&gt;代入核心收敛界：
+&lt;/p&gt;
+$$\begin{aligned}
+f_{\text{best}}^K - f^* &amp;\le \frac{R^2 + G^2 \cdot \frac{R^2}{G^2}}{2 \cdot \frac{R\sqrt{K+1}}{G}}
+= \frac{R^2 + R^2}{2R\sqrt{K+1}/G}
+= \frac{2R^2 \cdot G}{2R\sqrt{K+1}}
+= \frac{RG}{\sqrt{K+1}}
+\end{aligned}$$&lt;p&gt;即：
+&lt;/p&gt;
+$$\boxed{f_{\text{best}}^K - f^* \le \frac{RG}{\sqrt{K+1}} = O\!\left(\frac{1}{\sqrt{K}}\right)}$$&lt;h3 id=&#34;438-计算复杂度&#34;&gt;4.3.8 计算复杂度
+&lt;/h3&gt;&lt;p&gt;为达到目标精度 $\epsilon &amp;gt; 0$（即 $f_{\text{best}}^K - f^* \le \epsilon$），所需的最少迭代步数满足：
+&lt;/p&gt;
+$$\frac{RG}{\sqrt{K}} \le \epsilon \;\Longrightarrow\; \sqrt{K} \ge \frac{RG}{\epsilon} \;\Longrightarrow\; K \ge \frac{R^2 G^2}{\epsilon^2}$$&lt;p&gt;用大 $O$ 记号表达为：
+&lt;/p&gt;
+$$\boxed{K = O\!\left(\frac{1}{\epsilon^2}\right)}$$&lt;p&gt;&lt;strong&gt;与 GD 的对比&lt;/strong&gt;：光滑凸 GD 达到精度 $\epsilon$ 仅需 $O(1/\epsilon)$ 步。次梯度法需要 $O(1/\epsilon^2)$ 步——&lt;strong&gt;慢了一个完整的量级&lt;/strong&gt;。例如要达到 $\epsilon = 10^{-3}$，GD 约需 $\sim 10^3$ 步，次梯度法约需 $\sim 10^6$ 步。这是处理非光滑性在理论上必然付出的代价。&lt;/p&gt;
+&lt;h3 id=&#34;439-强凸函数下的加速&#34;&gt;4.3.9 强凸函数下的加速
+&lt;/h3&gt;&lt;p&gt;如果 $f$ 不仅是凸的而且是**$\mu$-强凸**的（$\mu &amp;gt; 0$），即满足：
+&lt;/p&gt;
+$$f(y) \ge f(x) + g^T(y - x) + \frac{\mu}{2}\|y - x\|^2, \quad \forall g \in \partial f(x)$$&lt;p&gt;
+则次梯度法的收敛率可加速至 $O(1/k)$。取步长 $\alpha_k = \frac{2}{\mu(k+1)}$ 时可证：
+&lt;/p&gt;
+$$\boxed{f(x_k) - f^* \le \frac{2G^2}{\mu(k+1)} = O\!\left(\frac{1}{k}\right)}$$&lt;p&gt;
+这与一般凸下的 $O(1/\sqrt{k})$ 相比，速度快了一个量级。强凸性带来的&amp;quot;函数弯曲&amp;quot;使得次梯度的方向信息显著改善。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;44-典型例题&#34;&gt;4.4 典型例题
+&lt;/h2&gt;&lt;h3 id=&#34;例题1次梯度法的步长对比&#34;&gt;例题1：次梯度法的步长对比
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：设 $f(x) = |Ax - b|_1$，其中 $A \in \mathbb{R}^{10 \times 100}$，$b \in \mathbb{R}^{10}$。求：
+(a) $f$ 在任意点 $x$ 的次梯度表达式
+(b) $f$ 的 Lipschitz 常数 $G$
+(c) 对比固定步长 $0.01$ 和衰减步长 $1/\sqrt{k+1}$ 的行为差异&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;(a)&lt;/strong&gt; $f(x) = \sum_{i=1}^m |(Ax-b)_i|$。对分量 $i$，令 $r_i = (Ax-b)_i$。$|r_i|$ 的次梯度：$r_i &amp;gt; 0$ 时为 ${1}$，$r_i &amp;lt; 0$ 时为 ${-1}$，$r_i = 0$ 时为 $[-1,1]$（取 $0$ 作为方便之选）。由链式法则：
+&lt;/p&gt;
+$$g_k = A^T \cdot \text{sign}(A x_k - b) \in \partial f(x_k)$$&lt;p&gt;
+其中 $\text{sign}(\cdot)$ 逐分量作用（正→$+1$，负→$-1$，零→$0$）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;(b)&lt;/strong&gt; $|g_k| = |A^T s_k| \le |A|_2 \cdot |s_k| \le |A|_2 \cdot \sqrt{m}$。故 $G = \sqrt{m} \cdot |A|_2 = \sqrt{10} \cdot |A|_2$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;(c)&lt;/strong&gt; 固定步长：误差在 $\sim \alpha G^2/2$ 邻域内振荡，始终无法趋零。衰减步长：误差按 $O(1/\sqrt{k})$ 持续缩小，虽然速度不断放缓但终将趋于零。&lt;/p&gt;
+&lt;h3 id=&#34;例题2基本收敛率证明&#34;&gt;例题2：基本收敛率证明
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$f$ 凸且 $|g| \le G$。取 $\alpha_k \equiv \frac{R}{G\sqrt{T+1}}$ 运行 $T+1$ 步次梯度法。证明 $f_{\text{best}}^T - f^* \le \frac{RG}{\sqrt{T+1}}$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：严格按照 §4.3 的六步推导流程即可完成——无需重复叙述。&lt;/p&gt;
+&lt;h3 id=&#34;例题3lasso-的次梯度法实现&#34;&gt;例题3：LASSO 的次梯度法实现
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：对 $\min_x \frac{1}{2}|Ax-b|^2 + \lambda|x|_1$，写出次梯度法迭代并详细说明 $x_i=0$ 处的处理方式。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：光滑部分的梯度为 $\nabla(\frac{1}{2}|Ax-b|^2) = A^T(Ax-b)$。$\ell_1$ 项逐分量次梯度：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$x_i &amp;gt; 0$：取 $g_i = \lambda$&lt;/li&gt;
+&lt;li&gt;$x_i &amp;lt; 0$：取 $g_i = -\lambda$&lt;/li&gt;
+&lt;li&gt;$x_i = 0$：取 $g_i = 0$（区间 $[-\lambda, \lambda]$ 的中点）
+总次梯度：$g_k = A^T(Ax_k-b) + g_{\ell_1}$。迭代 $x_{k+1} = x_k - \alpha_k g_k$。取 $g_i=0$ 在零点处的动机是让 $\ell_1$ 惩罚不主动推动该坐标离开零，这有利于生成稀疏解。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;例题4强凸次梯度法加速&#34;&gt;例题4：强凸次梯度法加速
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$f$ 是 $\mu$-强凸，$|g| \le G$。步长 $\alpha_k = \frac{2}{\mu(k+1)}$。证明 $f(x_k) - f^* \le \frac{2G^2}{\mu(k+1)}$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;要点&lt;/strong&gt;：强凸性使内积下界增强为 $g_k^T(x_k-x^&lt;em&gt;) \ge f(x_k)-f^&lt;/em&gt; + \frac{\mu}{2}|x_k-x^&lt;em&gt;|^2$。代入距离平方递推产生 $(1-\mu\alpha_k)|x_k-x^&lt;/em&gt;|^2$ 的收缩项，取 $\alpha_k = 2/(\mu(k+1))$ 后收缩因子为 $(k-1)/(k+1)$。递推得 $O(1/k)$。&lt;/p&gt;
+&lt;h3 id=&#34;例题5polyak-步长在对偶问题中的应用&#34;&gt;例题5：Polyak 步长在对偶问题中的应用
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：对偶问题最优值 $d^&lt;em&gt;$ 已知。分析 Polyak 步长 $\alpha_k = \frac{f(x_k) - d^&lt;/em&gt;}{|g_k|^2}$ 的计算开销与适用性。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：每步额外开销仅 $O(n)$（计算 $|g_k|^2$）。适用场景：许多对偶问题中 $d^&lt;em&gt;$ 由理论保证（如强对偶定理 $p^&lt;/em&gt; = d^&lt;em&gt;$），直接套用即可享受自适应步长的加速。注意数值稳定性——$f(x_k) \approx d^&lt;/em&gt;$ 时需防除零。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;核心要点&#34;&gt;核心要点
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;本质&lt;/strong&gt;：GD 的 $\nabla f(x_k)$ → 次微分 $\partial f(x_k)$ 中任选 $g_k$，推广到不可微凸函数。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;非单调性是根本特征&lt;/strong&gt;：$f(x_{k+1}) &amp;lt; f(x_k)$ 不保证成立；必须记录 $f_{\text{best}}^K$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;步长三条件&lt;/strong&gt;：$\alpha_k \to 0$ + $\sum \alpha_k = \infty$ + $\sum \alpha_k^2 &amp;lt; \infty$ → 保证收敛到精确 $f^*$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;固定步长陷阱&lt;/strong&gt;：仅收敛到 $\sim \alpha G^2/2$ 邻域，无法精确收敛。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;收敛率&lt;/strong&gt;：一般凸 $O(1/\sqrt{k})$，复杂度 $O(1/\epsilon^2)$；强凸下可加速到 $O(1/k)$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Polyak 步长&lt;/strong&gt;：$f^*$ 已知时理论最优，自适应调节步幅。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;记忆口诀&lt;/strong&gt;：「光滑快($O(1/k)$)，非光滑慢($O(1/\sqrt{k})$)；梯度下降一除 $k$，次梯度法一除根号 $k$」&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;交叉引用&lt;/strong&gt;：次梯度理论细节见第3章；随机版（SGD）见第5章；带约束的推广见第6章（投影次梯度法）。&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+        </item>
+        <item>
+        <title>第5章：随机次梯度法（随机梯度下降，SGD）</title>
+        <link>https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/05-%E9%9A%8F%E6%9C%BA%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/</link>
+        <pubDate>Sat, 20 Jun 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/05-%E9%9A%8F%E6%9C%BA%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/</guid>
+        <description>&lt;h1 id=&#34;第5章随机次梯度法随机梯度下降sgd&#34;&gt;第5章：随机次梯度法（随机梯度下降，SGD）
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心思想&lt;/strong&gt;：当目标函数 $f$ 是海量分量函数 $f_i$ 的平均值时（如 ERM），每步不计算全量（次）梯度，而是随机抽取一个（或一小批）样本分量，用其梯度作为真实梯度的&lt;strong&gt;无偏估计&lt;/strong&gt;进行迭代。在期望意义下，SGD 的收敛率与确定性次梯度法完全相同——$O(1/\sqrt{K})$，但每步的计算代价从 $O(m)$ 骤降至 $O(1)$（以样本数计）。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;前置知识回顾来自第4章次梯度法&#34;&gt;前置知识回顾（来自第4章：次梯度法）
+&lt;/h2&gt;&lt;p&gt;本章建立在第4章（次梯度法）的完整理论基础之上。下列关键点请在本章阅读过程中随时参考：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;次梯度法的迭代&lt;/strong&gt;：$x_{k+1} = x_k - \alpha_k g_k$，其中 $g_k \in \partial f(x_k)$。$\partial f(x_k)$ 是 $f$ 在 $x_k$ 处的次微分（全体次梯度的集合），$g_k$ 是从该集合中任选的一个向量。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;非单调性&lt;/strong&gt;：$f(x_{k+1}) &amp;lt; f(x_k)$ 不保证成立。因此必须记录历史最优 $f_{\text{best}}^K = \min_{0 \le i \le K} f(x_i)$ 及其对应点。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;核心收敛界（确定性）&lt;/strong&gt;：
+
+$$\boxed{f_{\text{best}}^K - f^* \le \frac{R^2 + G^2 \sum_{k=0}^K \alpha_k^2}{2 \sum_{k=0}^K \alpha_k}}$$
+其中 $R = |x_0 - x^*|$（初始点到最优解的距离），$G$ 是 Lipschitz 常数（$|g| \le G$ 对所有次梯度 $g \in \partial f(x)$ 成立）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;步长三条件&lt;/strong&gt;：$\alpha_k \to 0$（趋于零）、$\sum \alpha_k = \infty$（总行程无穷大）、$\sum \alpha_k^2 &amp;lt; \infty$（噪声累积有界）→ 保证精确收敛到 $f^*$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;固定步长&lt;/strong&gt;：只能收敛到以 $f^*$ 为中心、半径 $\sim \alpha G^2/2$ 的邻域。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;收敛率&lt;/strong&gt;：一般凸 → $O(1/\sqrt{K})$，复杂度 $O(1/\epsilon^2)$。强凸 → 加速到 $O(1/k)$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;51-从确定次梯度到随机次梯度&#34;&gt;5.1 从确定次梯度到随机次梯度
+&lt;/h2&gt;&lt;h3 id=&#34;511-动机为什么需要随机化&#34;&gt;5.1.1 动机：为什么需要随机化
+&lt;/h3&gt;&lt;p&gt;现代机器学习和数据科学中的优化问题通常呈现为&lt;strong&gt;经验风险最小化&lt;/strong&gt;（Empirical Risk Minimization, ERM）的形式：&lt;/p&gt;
+$$\boxed{f(x) = \frac{1}{m} \sum_{i=1}^{m} f_i(x)}$$&lt;p&gt;对这个形式的逐项解读：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$m$：训练集的&lt;strong&gt;样本总数&lt;/strong&gt;（sample size）。在 ImageNet 中 $m \approx 1.28 \times 10^6$；在大语言模型预训练中 $m$ 可达数十亿。&lt;/li&gt;
+&lt;li&gt;$f_i(x)$：第 $i$ 个样本上的&lt;strong&gt;损失函数&lt;/strong&gt;（loss function）在参数 $x$ 处的值。例如：
+&lt;ul&gt;
+&lt;li&gt;线性回归：$f_i(x) = \frac{1}{2}(a_i^T x - b_i)^2$（残差平方的 1/2 倍）&lt;/li&gt;
+&lt;li&gt;二分类 SVM：$f_i(x) = \max(0, 1 - y_i a_i^T x)$（Hinge loss）&lt;/li&gt;
+&lt;li&gt;逻辑回归：$f_i(x) = \log(1 + \exp(-y_i a_i^T x))$&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;$x \in \mathbb{R}^n$：待学习的&lt;strong&gt;参数向量&lt;/strong&gt;（$n$ 个特征对应的 $n$ 个权重）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;此时，精确（次）梯度需要对&lt;strong&gt;全部 $m$ 个样本&lt;/strong&gt;的梯度求和：
+&lt;/p&gt;
+$$\nabla f(x) = \frac{1}{m} \sum_{i=1}^{m} \nabla f_i(x) \quad \text{或} \quad g \in \frac{1}{m} \sum_{i=1}^{m} \partial f_i(x)$$&lt;p&gt;这一运算的复杂度为 $O(m \cdot n \cdot d)$，其中 $d$ 是每个样本特征的实际计算维度。当 $m$ 极庞大时，每一步都扫描全量数据的代价是任何算力都难以承受的。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;三大现实场景迫使随机化&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;场景&lt;/th&gt;
+					&lt;th&gt;数据特征&lt;/th&gt;
+					&lt;th&gt;全量梯度为何不现实&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;大规模 ERM&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$m \ge 10^6$，训练集已静态收集完毕&lt;/td&gt;
+					&lt;td&gt;跑 $10^3$ 步就要 $10^9$ 次梯度计算&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;流式数据&lt;/strong&gt;（Streaming）&lt;/td&gt;
+					&lt;td&gt;数据一条一条连续到达，无固定训练集&lt;/td&gt;
+					&lt;td&gt;每到达一条新数据就重新算全梯度？数据流永不停止&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;在线学习&lt;/strong&gt;（Online Learning）&lt;/td&gt;
+					&lt;td&gt;当前决策直接影响未来数据分布&lt;/td&gt;
+					&lt;td&gt;根本没有事先收集好的训练集，梯度必须在行动中即时估计&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;SGD 的核心策略&lt;/strong&gt;：用一个&lt;strong&gt;随机量&lt;/strong&gt; $\tilde{g}_k$ 代替真实的（次）梯度，只需满足&lt;strong&gt;无偏性&lt;/strong&gt;——即 $\mathbb{E}[\tilde{g}_k] \in \partial f(x_k)$。那么在&lt;strong&gt;期望&lt;/strong&gt;意义下，SGD 可以达到与确定性次梯度法完全相同的收敛率，而每步的计算代价却缩减了 $m$ 倍。&lt;/p&gt;
+&lt;h3 id=&#34;512-随机-oraclerandom-oracle模型的精确定义&#34;&gt;5.1.2 随机 Oracle（Random Oracle）模型的精确定义
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;定义&lt;/strong&gt;：对凸函数 $f$，称随机向量 $\tilde{g}(x; \xi)$ 是 $f$ 在点 $x$ 处的&lt;strong&gt;随机次梯度&lt;/strong&gt;（stochastic subgradient），若其数学期望落在 $f$ 的次微分中：&lt;/p&gt;
+$$\boxed{\mathbb{E}_{\xi}[\tilde{g}(x; \xi)] \in \partial f(x)}$$&lt;p&gt;对定义中每个符号的详细解释：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\tilde{g}(x; \xi)$：依赖于当前参数 $x$ 和一个随机变量 $\xi$ 的随机向量。波形符号 $\tilde{\ }$（tilde）是小波浪线，提示这是一个随机量而非确定量。&lt;/li&gt;
+&lt;li&gt;$\xi$：从一个已知概率分布 $\mathcal{D}$ 中&lt;strong&gt;随机抽取&lt;/strong&gt;的变量。$\xi$ 的具体性质取决于实现方式——可以是样本的索引（如 $i \in {1,\dots,m}$）、噪声向量、或坐标方向索引。&lt;/li&gt;
+&lt;li&gt;$\mathbb{E}&lt;em&gt;{\xi}[\cdot]$：对随机变量 $\xi$ 的&lt;strong&gt;数学期望&lt;/strong&gt;（expected value）。对于离散的 $\xi$，$\mathbb{E}[h(\xi)] = \sum&lt;/em&gt;{\xi} h(\xi) \cdot \Pr[\xi]$（各可能取值乘以其概率之和）；对于连续的 $\xi$，$\mathbb{E}[h(\xi)] = \int h(\xi) p(\xi) d\xi$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;关键性质&lt;/strong&gt;：$\tilde{g}$ 的单次抽样值&lt;strong&gt;不必&lt;/strong&gt;落在 $\partial f(x)$ 中（可能&amp;quot;不准&amp;quot;）。但多次独立抽样的平均值一定会收敛到次微分中的某个元素——这就是&lt;strong&gt;无偏性&lt;/strong&gt;的统计学含义。&lt;/p&gt;
+&lt;h3 id=&#34;513-三种典型的随机-oracle-实现方式&#34;&gt;5.1.3 三种典型的随机 Oracle 实现方式
+&lt;/h3&gt;&lt;h4 id=&#34;类型-a含噪声梯度noisy-gradient&#34;&gt;类型 A：含噪声梯度（Noisy Gradient）
+&lt;/h4&gt;&lt;p&gt;最直接的随机化——在精确梯度上加&lt;strong&gt;零均值&lt;/strong&gt;的随机扰动噪声：
+&lt;/p&gt;
+$$\tilde{g}(x; \xi) = \nabla f(x) + \epsilon, \quad \mathbb{E}[\epsilon] = \mathbf{0}, \quad \mathbb{E}[\|\epsilon\|^2] \le \sigma^2$$&lt;p&gt;其中 $\epsilon \in \mathbb{R}^n$ 是一个随机噪声向量，每个分量的均值都是 $0$。噪声的二阶矩（平均&amp;quot;能量&amp;quot;）有界 $\le \sigma^2$。这一模型常用于描述传感测量误差或物理系统中的随机扰动。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;无偏性验证&lt;/strong&gt;：
+&lt;/p&gt;
+$$\mathbb{E}[\tilde{g}] = \mathbb{E}[\nabla f(x) + \epsilon] = \nabla f(x) + \mathbb{E}[\epsilon] = \nabla f(x) + \mathbf{0} = \nabla f(x) \quad \checkmark$$&lt;h4 id=&#34;类型-b增量次梯度法incremental-subgradient最常见的-sgd&#34;&gt;类型 B：增量次梯度法（Incremental Subgradient）——最常见的 SGD
+&lt;/h4&gt;&lt;p&gt;每次迭代只使用&lt;strong&gt;一个随机均匀抽取的样本&lt;/strong&gt;的（次）梯度：
+&lt;/p&gt;
+$$\tilde{g}(x; \xi = i) = g_i(x), \quad g_i(x) \in \partial f_i(x), \quad \Pr[\xi = i] = \frac{1}{m}$$&lt;p&gt;逐项解释：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\xi$ 取值 $i \in {1, 2, \dots, m}$（样本索引），每个样本被抽到的概率&lt;strong&gt;相等&lt;/strong&gt;，均为 $1/m$（即均匀分布）。&lt;/li&gt;
+&lt;li&gt;$g_i(x) \in \partial f_i(x)$ 是第 $i$ 个&lt;strong&gt;分量函数&lt;/strong&gt; $f_i$ 在点 $x$ 处的任意一个次梯度。&lt;/li&gt;
+&lt;li&gt;计算量：从 $O(m)$（全量）骤降为 $O(1)$（归一化到单样本的计算量）——这就是 SGD 计算优势的根源。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;无偏性验证&lt;/strong&gt;（当所有 $f_i$ 可微时，次梯度退化为梯度）：
+&lt;/p&gt;
+$$\mathbb{E}[\tilde{g}] = \sum_{i=1}^{m} \Pr[\xi = i] \cdot \nabla f_i(x) = \sum_{i=1}^{m} \frac{1}{m} \nabla f_i(x) = \frac{1}{m} \sum_{i=1}^{m} \nabla f_i(x) = \nabla f(x) \quad \checkmark$$&lt;h4 id=&#34;类型-c随机坐标下降randomized-coordinate-descent&#34;&gt;类型 C：随机坐标下降（Randomized Coordinate Descent）
+&lt;/h4&gt;&lt;p&gt;每次只沿一个&lt;strong&gt;随机选取的坐标方向更新&lt;/strong&gt;：
+&lt;/p&gt;
+$$\tilde{g}(x; \xi = j) = n \cdot e_j e_j^T \nabla f(x), \quad \Pr[\xi = j] = \frac{1}{n}, \quad j \in \{1, \dots, n\}$$&lt;p&gt;符号解释：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$e_j \in \mathbb{R}^n$：第 $j$ 个&lt;strong&gt;标准基向量&lt;/strong&gt;（第 $j$ 分量为 1，其余全 0）。&lt;/li&gt;
+&lt;li&gt;$e_j e_j^T$：一个 $n \times n$ 的秩 1 矩阵，其作用是将任意向量&amp;quot;投影&amp;quot;到第 $j$ 个坐标轴——仅保留第 $j$ 个分量，其余归零。&lt;/li&gt;
+&lt;li&gt;乘以因子 $n$：&lt;strong&gt;补偿&lt;/strong&gt;抽样概率 $1/n$。因为每次只抽一个坐标，要保持期望为完整梯度，必须将被选中坐标方向的分量放大 $n$ 倍。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;无偏性验证&lt;/strong&gt;：
+&lt;/p&gt;
+$$\begin{aligned}
+\mathbb{E}[\tilde{g}] &amp;= \frac{1}{n} \sum_{j=1}^{n} n \cdot e_j e_j^T \nabla f(x) \\
+&amp;= \sum_{j=1}^{n} e_j e_j^T \nabla f(x) \\
+&amp;= \left(\sum_{j=1}^{n} e_j e_j^T\right) \nabla f(x)
+\end{aligned}$$&lt;p&gt;&lt;strong&gt;关键恒等式&lt;/strong&gt;：$\sum_{j=1}^{n} e_j e_j^T = I_n$，其中 $I_n$ 是 $n \times n$ 的&lt;strong&gt;单位矩阵&lt;/strong&gt;（对角线全 1，其余为 0）。因此：
+&lt;/p&gt;
+$$\mathbb{E}[\tilde{g}] = I_n \cdot \nabla f(x) = \nabla f(x) \quad \checkmark$$&lt;p&gt;随机坐标下降的迭代形式：
+&lt;/p&gt;
+$$x_{k+1} = x_k - \alpha_k \cdot n \cdot e_{j_k} e_{j_k}^T \nabla f(x_k)$$&lt;p&gt;
+这意味着每次只有第 $j_k$ 个坐标分量被更新，其余 $n-1$ 个分量保持原样。&lt;/p&gt;
+&lt;h3 id=&#34;514-sgd-的迭代格式及其与-gd-的全面对比&#34;&gt;5.1.4 SGD 的迭代格式及其与 GD 的全面对比
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;SGD 迭代格式&lt;/strong&gt;：
+&lt;/p&gt;
+$$\boxed{x_{k+1} = x_k - \alpha_k \tilde{g}_k}$$&lt;p&gt;
+其中 $\tilde{g}_k = \tilde{g}(x_k; \xi_k)$，且各步之间的随机变量 $\xi_0, \xi_1, \xi_2, \dots$ 是&lt;strong&gt;相互独立&lt;/strong&gt;抽取的（各步的随机性互不影响）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;GD vs SGD 全维度对比表&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;比较维度&lt;/th&gt;
+					&lt;th&gt;梯度下降 (GD)&lt;/th&gt;
+					&lt;th&gt;随机次梯度下降 (SGD)&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;迭代公式&lt;/td&gt;
+					&lt;td&gt;$x_{k+1} = x_k - \alpha_k \nabla f(x_k)$&lt;/td&gt;
+					&lt;td&gt;$x_{k+1} = x_k - \alpha_k \tilde{g}_k$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;每步计算量&lt;/td&gt;
+					&lt;td&gt;$O(m n d)$（全量梯度）&lt;/td&gt;
+					&lt;td&gt;$O(b n d)$（$b$ = mini-batch 大小）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;方向质量&lt;/td&gt;
+					&lt;td&gt;精确无误，确定性的&lt;/td&gt;
+					&lt;td&gt;含噪声但&lt;strong&gt;期望无偏&lt;/strong&gt;：$\mathbb{E}[\tilde{g}_k \mid x_k] \in \partial f(x_k)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;函数值单调性&lt;/td&gt;
+					&lt;td&gt;是（合理步长下 $f(x_{k+1}) \le f(x_k)$）&lt;/td&gt;
+					&lt;td&gt;否——函数值剧烈上下振荡&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;收敛保证类型&lt;/td&gt;
+					&lt;td&gt;确定性（数学上严格既定的）&lt;/td&gt;
+					&lt;td&gt;仅&lt;strong&gt;期望意义下&lt;/strong&gt;收敛（有概率性）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;轨迹外观&lt;/td&gt;
+					&lt;td&gt;平滑、可预测、如流水般向最优解流淌&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;剧烈抖动的醉汉步伐&lt;/strong&gt;——趋势向下但步步颠簸&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;固定步长的终态&lt;/td&gt;
+					&lt;td&gt;收敛到 $f^*$（取 $\alpha = 1/L$ 时）&lt;/td&gt;
+					&lt;td&gt;收敛到半径为 $\sim \alpha G^2/2$ 的球&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;515-mini-batch方差缩减与计算代价的折衷方案&#34;&gt;5.1.5 Mini-batch：方差缩减与计算代价的折衷方案
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;定义&lt;/strong&gt;：不是单样本和全量之间做&amp;quot;非此即彼&amp;quot;的选择，而是取 $b$ 个样本做平均：
+&lt;/p&gt;
+$$\boxed{\tilde{g}_k = \frac{1}{b} \sum_{i \in B_k} \nabla f_i(x_k)}$$&lt;p&gt;
+其中 $B_k \subset {1, \dots, m}$ 是从训练集中&lt;strong&gt;均匀随机无放回&lt;/strong&gt;（或有放回）抽取的、大小为 $b$ 的子集。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;方差分析&lt;/strong&gt;：设单个样本梯度的内在方差为 $\sigma^2$，即 $\mathbb{E}[|\nabla f_i(x) - \nabla f(x)|^2] = \sigma^2$。由 $b$ 个独立同分布随机变量均值的方差公式——方差缩小 $b$ 倍：
+&lt;/p&gt;
+$$\mathbb{E}[\|\tilde{g}_k - \nabla f(x_k)\|^2] = \frac{\sigma^2}{b}$$&lt;p&gt;
+这个公式揭示了 Mini-batch 的核心统计效应：&lt;strong&gt;批量翻倍 → 方差减半&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;效率的权衡分析&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$b = 1$（纯 SGD）：$K$ 步总计算量 $cK$，方向方差 $\sigma^2$ ——极便宜，极嘈杂。&lt;/li&gt;
+&lt;li&gt;$b = m$（满量 GD）：$K$ 步总计算量 $cmK$，方向方差 $0$ ——极昂贵，极精准。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;最优 $b$&lt;/strong&gt; 位于中间：取决于噪声方差的量级、目标精度需求和硬件并行效率。实践常用 $b \in [32, 256]$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;52-收敛性分析期望意义下&#34;&gt;5.2 收敛性分析（期望意义下）
+&lt;/h2&gt;&lt;h3 id=&#34;521-前提假设&#34;&gt;5.2.1 前提假设
+&lt;/h3&gt;&lt;p&gt;除第4章的凸性和 Lipschitz 连续假设之外，SGD 还需额外的随机性假设：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;凸性&lt;/strong&gt;：$f$ 是凸函数。$f^* = \min_x f(x)$，$x^*$ 为某最优解。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;无偏性&lt;/strong&gt;：$\mathbb{E}[\tilde{g}_k \mid x_k] = \bar{g}_k \in \partial f(x_k)$。这里的 $\mathbb{E}[\cdot \mid x_k]$ 是&lt;strong&gt;条件期望&lt;/strong&gt;——给定当前点 $x_k$ 以及所有历史随机信息后，对第 $k$ 步的随机抽取 $\xi_k$ 取期望。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;二阶矩有界&lt;/strong&gt;：$\mathbb{E}[|\tilde{g}_k|^2 \mid x_k] \le G^2$。&lt;/li&gt;
+&lt;li&gt;（可选更精细假设）条件方差有界：$\mathbb{E}[|\tilde{g}_k - \bar{g}_k|^2 \mid x_k] \le \sigma^2$。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;522-核心递推条件期望版&#34;&gt;5.2.2 核心递推（条件期望版）
+&lt;/h3&gt;&lt;p&gt;从 SGD 迭代出发，展开距离平方：
+&lt;/p&gt;
+$$\begin{aligned}
+\|x_{k+1} - x^*\|^2 &amp;= \|x_k - \alpha_k \tilde{g}_k - x^*\|^2 \\
+&amp;= \|x_k - x^*\|^2 - 2\alpha_k \tilde{g}_k^T(x_k - x^*) + \alpha_k^2 \|\tilde{g}_k\|^2
+\end{aligned}$$&lt;p&gt;对历史 $\mathcal{F}_k$ 取&lt;strong&gt;条件期望&lt;/strong&gt;：
+&lt;/p&gt;
+$$\begin{aligned}
+\mathbb{E}[\|x_{k+1} - x^*\|^2 \mid \mathcal{F}_k]
+&amp;\le \|x_k - x^*\|^2 - 2\alpha_k \underbrace{\mathbb{E}[\tilde{g}_k \mid \mathcal{F}_k]^T(x_k - x^*)}_{= \bar{g}_k^T(x_k - x^*)} + \alpha_k^2 \underbrace{\mathbb{E}[\|\tilde{g}_k\|^2 \mid \mathcal{F}_k]}_{\le G^2}
+\end{aligned}$$&lt;p&gt;由无偏假设和次梯度定义：$\bar{g}_k^T(x_k - x^&lt;em&gt;) \ge f(x_k) - f^&lt;/em&gt; = \delta_k$。因此：
+&lt;/p&gt;
+$$\boxed{\mathbb{E}[\|x_{k+1} - x^*\|^2 \mid \mathcal{F}_k] \le \|x_k - x^*\|^2 - 2\alpha_k \delta_k + \alpha_k^2 G^2}$$&lt;p&gt;&lt;strong&gt;关键观察&lt;/strong&gt;：该条件期望递推与第4章的确定性递推&lt;strong&gt;完全同构&lt;/strong&gt;。差别仅在于外层还需展开全期望。&lt;/p&gt;
+&lt;h3 id=&#34;523-全期望展开与-telescoping&#34;&gt;5.2.3 全期望展开与 Telescoping
+&lt;/h3&gt;&lt;p&gt;取全期望（对式子的两边再用一次期望）：
+&lt;/p&gt;
+$$\mathbb{E}[\|x_{k+1} - x^*\|^2] \le \mathbb{E}[\|x_k - x^*\|^2] - 2\alpha_k \mathbb{E}[f(x_k) - f^*] + \alpha_k^2 G^2$$&lt;p&gt;对 $k = 0$ 到 $K$ 求和进行 Telescoping：
+&lt;/p&gt;
+$$\begin{aligned}
+2\sum_{k=0}^K \alpha_k \mathbb{E}[f(x_k) - f^*]
+&amp;\le \mathbb{E}[\|x_0 - x^*\|^2] - \mathbb{E}[\|x_{K+1} - x^*\|^2] + G^2 \sum_{k=0}^K \alpha_k^2 \\
+&amp;\le \|x_0 - x^*\|^2 + G^2 \sum_{k=0}^K \alpha_k^2
+\end{aligned}$$&lt;p&gt;&lt;strong&gt;构造加权平均迭代点&lt;/strong&gt;（SGD 中替代历史最优的标准手段）：
+&lt;/p&gt;
+$$\bar{x}_K = \frac{\sum_{k=0}^K \alpha_k x_k}{\sum_{k=0}^K \alpha_k}$$&lt;p&gt;由 Jensen 不等式（凸函数的加权平均函数值 $\le$ 函数值的加权平均）：
+&lt;/p&gt;
+$$f(\bar{x}_K) \le \frac{\sum_{k=0}^K \alpha_k f(x_k)}{\sum_{k=0}^K \alpha_k}$$&lt;p&gt;取期望并代入 Telescoping 上界：
+&lt;/p&gt;
+$$\boxed{\mathbb{E}[f(\bar{x}_K)] - f^* \le \frac{R^2 + G^2 \sum_{k=0}^K \alpha_k^2}{2 \sum_{k=0}^K \alpha_k}}$$&lt;p&gt;&lt;strong&gt;惊人结论&lt;/strong&gt;：SGD 的&lt;strong&gt;期望收敛界&lt;/strong&gt;与确定性次梯度法完全一致！每步使用有噪声的随机方向，但期望意义上不损失收敛率。&lt;/p&gt;
+&lt;h3 id=&#34;524-固定步长的渐近行为&#34;&gt;5.2.4 固定步长的渐近行为
+&lt;/h3&gt;&lt;p&gt;固定步长 $\alpha_k \equiv \alpha$ 时：
+&lt;/p&gt;
+$$\mathbb{E}[f(\bar{x}_K)] - f^* \le \frac{R^2}{2(K+1)\alpha} + \frac{\alpha G^2}{2} \;\longrightarrow\; \frac{\alpha G^2}{2} \quad (K \to \infty)$$&lt;ul&gt;
+&lt;li&gt;固定步长 SGD 也只收敛到半径 $\alpha G^2/2$ 的球，无法精确收敛。&lt;/li&gt;
+&lt;li&gt;深度学习中的&lt;strong&gt;学习率衰减&lt;/strong&gt;策略（Step Decay、Cosine Annealing）正是为了在&amp;quot;前期大步快进&amp;quot;和&amp;quot;后期小步精调&amp;quot;之间寻找平衡。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;525-取步长得-o1sqrtk&#34;&gt;5.2.5 取步长得 $O(1/\sqrt{K})$
+&lt;/h3&gt;&lt;p&gt;取 $\alpha_k \equiv R/(G\sqrt{K+1})$：
+&lt;/p&gt;
+$$\sum \alpha_k = \frac{R\sqrt{K+1}}{G}, \quad \sum \alpha_k^2 = \frac{R^2}{G^2}$$&lt;p&gt;
+代入得：
+&lt;/p&gt;
+$$\boxed{\mathbb{E}[f(\bar{x}_K)] - f^* \le \frac{RG}{\sqrt{K+1}} = O\!\left(\frac{1}{\sqrt{K}}\right)}$$&lt;hr&gt;
+&lt;h2 id=&#34;53-感知机sgd-的终极经典特例&#34;&gt;5.3 感知机：SGD 的终极经典特例
+&lt;/h2&gt;&lt;h3 id=&#34;531-线性分类与-hinge-loss&#34;&gt;5.3.1 线性分类与 Hinge Loss
+&lt;/h3&gt;&lt;p&gt;二分类数据 ${(a_i, y_i)}_{i=1}^m$，其中 $a_i \in \mathbb{R}^n$ 是特征向量，$y_i \in {-1,+1}$ 是标签。感知机等价于极小化 Hinge Loss：
+&lt;/p&gt;
+$$\boxed{f(w) = \frac{1}{m} \sum_{i=1}^m \max\{0, -y_i \cdot a_i^T w\}}$$&lt;p&gt;&lt;strong&gt;损失函数的含义&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;若分类正确（$y_i \cdot a_i^T w &amp;gt; 0$）：$\max{0, -\text{正数}} = 0$，该样本无损失。&lt;/li&gt;
+&lt;li&gt;若分类错误（$y_i \cdot a_i^T w &amp;lt; 0$）：$\max{0, -\text{负数}} = \text{正数}$，损失 = 错误程度。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;532-感知机作为-sgd-的推导&#34;&gt;5.3.2 感知机作为 SGD 的推导
+&lt;/h3&gt;&lt;p&gt;第 $i$ 个 Hinge Loss 对 $w$ 的次梯度：
+&lt;/p&gt;
+$$g_i(w) = \begin{cases} -y_i a_i, &amp; \text{若 } y_i a_i^T w &lt; 0 \;\; \text{(误分类)} \\ \mathbf{0}, &amp; \text{其他（分类正确）} \end{cases}$$&lt;p&gt;SGD 迭代（类型 B，均匀随机单样本抽取）：
+&lt;/p&gt;
+$$w_{k+1} = w_k - \alpha_k \cdot (-y_i a_i) = w_k + \alpha_k y_i a_i \quad \text{(仅当误分类时更新)}$$&lt;p&gt;取 $\alpha_k = 1$ → 经典感知机更新规则（Rosenblatt, 1958）：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;误分类 → $w \leftarrow w + y_i a_i$&lt;/li&gt;
+&lt;li&gt;分类正确 → $w$ 不变&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;533-novikoff-定理&#34;&gt;5.3.3 Novikoff 定理
+&lt;/h3&gt;&lt;p&gt;若数据&lt;strong&gt;线性可分&lt;/strong&gt;（存在 $w^&lt;em&gt;$ 完全正确分类全部样本），定义最大几何间隔 $\gamma = \min_i \frac{y_i a_i^T w^&lt;/em&gt;}{|w^*|}$ 和样本最大范数 $R = \max_i |a_i|$。则步长 $\alpha = 1$ 的感知机在至多 $(R/\gamma)^2$ 步内收敛。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;54-典型例题&#34;&gt;5.4 典型例题
+&lt;/h2&gt;&lt;h3 id=&#34;例题1sgd-基本收敛性证明&#34;&gt;例题1：SGD 基本收敛性证明
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$f(x)=\frac{1}{m}\sum_i f_i(x)$，各 $f_i$ 可微且 $|\nabla f_i(x)| \le G$。取步长 $\alpha_k \equiv D/(G\sqrt{K+1})$ 运行 SGD 共 $K+1$ 步（$D=|x_0-x^&lt;em&gt;|$）。证明 $\mathbb{E}[f(\bar{x}_K)]-f^&lt;/em&gt; \le DG/\sqrt{K+1}$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：复用 §5.2.3 的 Telescoping 模板。无偏性 + 二阶矩有界 → 代入 $\alpha_k$ → 计算 $\sum\alpha_k = D\sqrt{K+1}/G$，$\sum\alpha_k^2 = D^2/G^2$ → 代数化简得证。&lt;/p&gt;
+&lt;h3 id=&#34;例题2mini-batch-大小优化&#34;&gt;例题2：Mini-batch 大小优化
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：线性最小二乘 $f(x)=\frac{1}{m}\sum_i \frac{1}{2}(a_i^T x-b_i)^2$，固定总计算预算 $C$ 次梯度计算。比较 $b=1$（$K=C$ 步）和 $b=C$（$K=1$ 步，满量GD）的效果。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：纯 SGD → 步数多但方向噪声大，期望误差 $O(1/\sqrt{C})$。满量 GD → 仅 1 步，误差 $\approx O(LD^2)$。最优 $b$ 取决于 $\sigma^2$、$L$ 和精度需求。实践中 $b \in [32,256]$ 是通用值。&lt;/p&gt;
+&lt;h3 id=&#34;例题3随机坐标下降的无偏性&#34;&gt;例题3：随机坐标下降的无偏性
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$f(x) = \frac{1}{2}x^T Q x - c^T x$，$Q \succ 0$。写出随机坐标下降的 $\tilde{g}$ 并验证 $\mathbb{E}[\tilde{g}] = \nabla f(x)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：随机选坐标 $j \sim \text{Uniform}(1,\dots,n)$，$\tilde{g} = n \cdot e_j e_j^T(Qx-c)$。$\mathbb{E}[\tilde{g}] = \frac{1}{n}\sum_{j=1}^n n e_j e_j^T (Qx-c) = (\sum_j e_j e_j^T)(Qx-c) = I_n(Qx-c) = Qx-c = \nabla f(x)$。✓&lt;/p&gt;
+&lt;h3 id=&#34;例题4强凸-sgd-的加速&#34;&gt;例题4：强凸 SGD 的加速
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$f$ 是 $\mu$-强凸，$\mathbb{E}[|\tilde{g}_k|^2] \le G^2$。取步长 $\alpha_k = 2/(\mu(k+1))$。证明 $\mathbb{E}[f(x_k)]-f^* \le 2G^2/(\mu(k+1))$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;要点&lt;/strong&gt;：强凸性增强内积下界，递推中产生 $(1-\mu\alpha_k)$ 的几何收缩，取 $\alpha_k = 2/(\mu(k+1))$ 后得收缩比 $(k-1)/(k+1)$ → 归纳得 $O(1/k)$。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;核心要点&#34;&gt;核心要点
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;随机 Oracle&lt;/strong&gt;：$\mathbb{E}[\tilde{g}] \in \partial f(x)$ —— 仅需期望无偏，每步方向可以有噪声。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;三种实现&lt;/strong&gt;：噪声梯度、单样本抽样（SGD）、随机坐标下降。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Mini-batch&lt;/strong&gt;：方差 $\propto 1/b$；噪声与计算代价的经典权衡。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;期望收敛率&lt;/strong&gt;：$O(1/\sqrt{K})$，与确定性子梯度法同阶。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;固定步长陷阱&lt;/strong&gt;：收敛到半径 $\alpha G^2/2$ 的球，无法精确收敛到 $f^*$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;感知机 = SGD&lt;/strong&gt;：Hinge Loss + 单样本 SGD + $\alpha=1$ = 经典感知机。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;口诀&lt;/strong&gt;：「随机梯度省算力，固定步长到球里；递减步长到最优，方差决定收敛速」&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;交叉引用&lt;/strong&gt;：确定性次梯度法见第4章；约束下的 SGD → 投影随机次梯度法（第6章 PGD 的随机版本）；SGD 的动量变体（Momentum, Adam）属于进阶课题。&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+        </item>
+        <item>
+        <title>第6章：投影梯度法</title>
+        <link>https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/06-%E6%8A%95%E5%BD%B1%E6%A2%AF%E5%BA%A6%E6%B3%95/</link>
+        <pubDate>Sat, 20 Jun 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/06-%E6%8A%95%E5%BD%B1%E6%A2%AF%E5%BA%A6%E6%B3%95/</guid>
+        <description>&lt;h1 id=&#34;第6章投影梯度法&#34;&gt;第6章：投影梯度法
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;核心思想&lt;/strong&gt;：将无约束优化的负梯度方向迈步与向可行凸集&amp;quot;投影&amp;quot;修正相结合——先迈出梯度步，若走出可行域则用投影弹回最近的可行点。当投影本身计算昂贵时，Frank-Wolfe（条件梯度法）以廉价的&lt;strong&gt;线性极小化&lt;/strong&gt;取代投影，在同等 $O(1/k)$ 收敛率下大幅降低每步开销。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;前置知识回顾&#34;&gt;前置知识回顾
+&lt;/h2&gt;&lt;h3 id=&#34;从第2章梯度下降-gd回顾&#34;&gt;从第2章（梯度下降 GD）回顾
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;GD 迭代&lt;/strong&gt;：$x_{k+1} = x_k - \alpha_k \nabla f(x_k)$。$\nabla f(x_k)$ 是 $f$ 在 $x_k$ 处的梯度（$n$ 维偏导数向量），指向上升最快的方向。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;$L$-光滑（$L$-smooth）&lt;/strong&gt;：存在 $L &amp;gt; 0$（光滑常数），使得对任意 $x, y \in \mathbb{R}^n$：
+&lt;/p&gt;
+$$\|\nabla f(x) - \nabla f(y)\| \le L\|x - y\|$$&lt;p&gt;
+其中 $|z| = \sqrt{\sum_{i=1}^n z_i^2}$ 为欧几里得范数。光滑性意味着梯度不会&amp;quot;突变&amp;quot;——梯度的变化速度被 $L$ 约束。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;二次上界&lt;/strong&gt;（Descent Lemma）：对 $L$-光滑的 $f$，以下不等式对一切 $x, y$ 成立：
+&lt;/p&gt;
+$$\boxed{f(y) \le f(x) + \nabla f(x)^T(y - x) + \frac{L}{2}\|y - x\|^2}$$&lt;p&gt;
+含义是函数值在任意点不超过以 $x$ 处一阶展开为中心的二次函数。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;光滑凸 GD 收敛率&lt;/strong&gt;（取步长 $\alpha = 1/L$）：
+&lt;/p&gt;
+$$\boxed{f(x_k) - f^* \le \frac{L\|x_0 - x^*\|^2}{2k} = O(1/k)}$$&lt;h3 id=&#34;从第4章次梯度法回顾&#34;&gt;从第4章（次梯度法）回顾
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;次梯度迭代&lt;/strong&gt;：$x_{k+1} = x_k - \alpha_k g_k$，$g_k \in \partial f(x_k)$（从次微分集合中任选）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;$G$-Lipschitz&lt;/strong&gt;：$|g| \le G$ 对所有次梯度成立（等价于 $|f(x)-f(y)| \le G|x-y|$）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;收敛率&lt;/strong&gt;：$f_{\text{best}}^K - f^* \le \frac{R^2 + G^2 \sum \alpha_k^2}{2\sum \alpha_k} = O(1/\sqrt{K})$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;关键区别&lt;/strong&gt;：GD 复杂度 $O(1/\epsilon)$，次梯度 $O(1/\epsilon^2)$——差一个量级。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;61-投影算子&#34;&gt;6.1 投影算子
+&lt;/h2&gt;&lt;h3 id=&#34;611-投影的严格定义&#34;&gt;6.1.1 投影的严格定义
+&lt;/h3&gt;&lt;p&gt;设 $C \subset \mathbb{R}^n$ 是一个&lt;strong&gt;非空闭凸集&lt;/strong&gt;。逐一定义这三个性质：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;非空&lt;/strong&gt;（nonempty）：$C$ 中至少含有一个点。空集的投影没有意义。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;闭&lt;/strong&gt;（closed）：$C$ 包含其所有的极限点（边界点）。这保证了&amp;quot;最小化距离&amp;quot;这个极小值&lt;strong&gt;可以取到&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;凸&lt;/strong&gt;（convex）：对任意 $x, y \in C$ 和 $\lambda \in [0, 1]$，凸组合 $\lambda x + (1-\lambda) y \in C$。凸性保证了投影的&lt;strong&gt;唯一性&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;对任意点 $y \in \mathbb{R}^n$，$y$ 到集合 $C$ 的&lt;strong&gt;投影&lt;/strong&gt;（projection）定义为 $C$ 中使欧几里得距离平方最小的那个点：&lt;/p&gt;
+$$\boxed{P_C(y) = \arg\min_{x \in C} \|x - y\|^2 = \arg\min_{x \in C} \sum_{i=1}^n (x_i - y_i)^2}$$&lt;p&gt;$\arg\min$ 意为&amp;quot;令下列表达式取最小值的那个参数值&amp;quot;。为什么最小化的是距离的&lt;strong&gt;平方&lt;/strong&gt;而非距离本身？因为平方函数是光滑且严格凸的（Hessian 恒等于单位矩阵 $I_n \succ 0$），分析起来方便很多，且平方和距离在同一处取最小值（因为是单调变换）。&lt;/p&gt;
+&lt;h3 id=&#34;612-存在性与唯一性投影定理&#34;&gt;6.1.2 存在性与唯一性：投影定理
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;投影定理&lt;/strong&gt;（必背的核心结论）：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;设 $C \subset \mathbb{R}^n$ 为非空闭凸集。对任意 $y \in \mathbb{R}^n$，存在&lt;strong&gt;唯一&lt;/strong&gt;的 $P_C(y) \in C$ 满足：
+&lt;/p&gt;
+$$\boxed{\|P_C(y) - y\| = \min_{x \in C} \|x - y\|}$$&lt;p&gt;
+且 $x^* = P_C(y)$ 等价于以下&lt;strong&gt;投影不等式&lt;/strong&gt;（也是最优化的一阶充要条件）：
+&lt;/p&gt;
+$$\boxed{\langle y - x^*, z - x^* \rangle \le 0, \quad \forall z \in C}$$&lt;/blockquote&gt;
+&lt;p&gt;其中 $\langle a, b \rangle = a^T b = \sum_{i=1}^n a_i b_i$ 是两个向量的&lt;strong&gt;内积&lt;/strong&gt;（dot product）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;投影不等式的几何直觉&lt;/strong&gt;：向量 $y - x^&lt;em&gt;$ 是从投影点指向原始点的方向；向量 $z - x^&lt;/em&gt;$ 是从投影点指向 $C$ 内任意其他点的方向。这两个向量的&lt;strong&gt;夹角 $\ge 90^\circ$&lt;/strong&gt;（因为内积 $\le 0$）。换句话说——整个凸集 $C$ 完全坐落在以 $x^&lt;em&gt;$ 为顶点、以外法向 $y - x^&lt;/em&gt;$ 为方向的某个闭合&lt;strong&gt;半空间&lt;/strong&gt;（half-space）之内，而点 $y$ 位于这个半空间的外部。想象用一个&amp;quot;直角挡板&amp;quot;把整个集合和点 $y$ 隔开，$x^*$ 正好在挡板的顶点处。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;存在性的证明思路&lt;/strong&gt;：由于目标函数 $|x - y|^2$ 是强制的（当 $|x| \to \infty$，$|x - y|^2 \to \infty$），极小化这个问题等价于在其有界子集上极小化。Weierstrass 定理保证闭集上的连续函数在有界闭子集上取到最小值。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;唯一性的证明思路&lt;/strong&gt;：$|x - y|^2$ 是&lt;strong&gt;严格凸函数&lt;/strong&gt;（其二阶导 = $2I_n$ 恒正定）。严格凸函数在凸集上如果有两个不同的极小点 $x_1 \neq x_2$，取中点 $(x_1+x_2)/2$ 的函数值严格小于 $x_1$ 和 $x_2$ 的函数值（由严格凸性的定义），但这与它们都是极小点矛盾。因此极小点唯一。&lt;/p&gt;
+&lt;h3 id=&#34;613-投影不等式的完整推导&#34;&gt;6.1.3 投影不等式的完整推导
+&lt;/h3&gt;&lt;p&gt;从优化问题的最优性条件出发，逐行推导投影不等式。设 $x^* = P_C(y)$。&lt;/p&gt;
+&lt;p&gt;对任意 $z \in C$ 和 $\theta \in (0, 1]$，由 $C$ 的凸性，点 $x_\theta = (1-\theta) x^* + \theta z = x^* + \theta(z - x^*)$ 也属于 $C$。&lt;/p&gt;
+&lt;p&gt;由 $x^*$ 是极小点：
+&lt;/p&gt;
+$$\|y - x^*\|^2 \le \|y - x_\theta\|^2 = \|y - x^* - \theta(z - x^*)\|^2$$&lt;p&gt;展开右边的范数平方：
+&lt;/p&gt;
+$$\|y - x^*\|^2 \le \|y - x^*\|^2 - 2\theta \langle y - x^*, z - x^* \rangle + \theta^2 \|z - x^*\|^2$$&lt;p&gt;两边的 $|y - x^*|^2$ 抵销后，两边同除以正数 $\theta$：
+&lt;/p&gt;
+$$0 \le -2\langle y - x^*, z - x^* \rangle + \theta \|z - x^*\|^2$$&lt;p&gt;令 $\theta \to 0^+$（趋近于 0 但不等于 0），含 $\theta$ 的项 $\theta |z - x^*|^2 \to 0$，取极限得：
+&lt;/p&gt;
+$$\langle y - x^*, z - x^* \rangle \le 0, \quad \forall z \in C$$&lt;p&gt;推导完成。全过程中每一步的代数操作都有明确依据。&lt;/p&gt;
+&lt;h3 id=&#34;614-非扩张性nonexpansivenesspgd-的理论基石&#34;&gt;6.1.4 非扩张性（Nonexpansiveness）——PGD 的理论基石
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;定理&lt;/strong&gt;：投影算子 $P_C$ 是&lt;strong&gt;非扩张的&lt;/strong&gt;——即 1-Lipschitz：
+&lt;/p&gt;
+$$\boxed{\|P_C(x) - P_C(y)\| \le \|x - y\|, \quad \forall x, y \in \mathbb{R}^n}$$&lt;p&gt;这个性质的含义是：两点的投影之间的距离&lt;strong&gt;绝不超过&lt;/strong&gt;两点原距离。投影操作&amp;quot;不会放大误差&amp;quot;——这是 PGD 保持 GD 收敛率不衰减的终极原因。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;完整证明&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;设 $u = P_C(x)$，$v = P_C(y)$。&lt;/p&gt;
+&lt;p&gt;分别写出投影不等式。对于 $u$，取 $z = v \in C$：
+&lt;/p&gt;
+$$\langle x - u, v - u \rangle \le 0 \tag{1}$$&lt;p&gt;
+对于 $v$，取 $z = u \in C$：
+&lt;/p&gt;
+$$\langle y - v, u - v \rangle \le 0 \tag{2}$$&lt;p&gt;改写 (2)：将 $y - v$ 写为 $-(v - y)$，将 $u - v$ 写为 $-(v - u)$，两个负号相乘得正号：
+&lt;/p&gt;
+$$\langle y - v, u - v \rangle = \langle v - y, v - u \rangle \le 0$$&lt;p&gt;将 (1) 和改写后的 (2) 相加：
+&lt;/p&gt;
+$$\langle x - u, v - u \rangle + \langle v - y, v - u \rangle \le 0$$&lt;p&gt;利用内积对第一参数的双线性性，提取公因式 $(v - u)$：
+&lt;/p&gt;
+$$\langle (x - u) + (v - y), v - u \rangle \le 0$$&lt;p&gt;
+即：
+&lt;/p&gt;
+$$\langle (x - y) + (v - u), v - u \rangle \le 0$$&lt;p&gt;展开得含两项的内积和：
+&lt;/p&gt;
+$$\langle x - y, v - u \rangle + \langle v - u, v - u \rangle \le 0$$&lt;p&gt;注意到 $\langle v - u, v - u \rangle = |v - u|^2$。移项：
+&lt;/p&gt;
+$$\|v - u\|^2 \le -\langle x - y, v - u \rangle = \langle x - y, u - v \rangle$$&lt;p&gt;由 &lt;strong&gt;Cauchy-Schwarz 不等式&lt;/strong&gt;（$|\langle a, b \rangle| \le |a| \cdot |b|$）：
+&lt;/p&gt;
+$$\|u - v\|^2 \le \langle x - y, u - v \rangle \le \|x - y\| \cdot \|u - v\|$$&lt;p&gt;若 $|u - v| &amp;gt; 0$，两边除以 $|u - v|$ 即得 $|u - v| \le |x - y|$。若 $|u - v| = 0$，不等式平凡成立。证毕。&lt;/p&gt;
+&lt;h3 id=&#34;615-常见凸集投影的闭式解公式&#34;&gt;6.1.5 常见凸集投影的闭式解公式
+&lt;/h3&gt;&lt;p&gt;闭式解（closed-form）指仅需有限次基本运算（加、减、乘、除、取最大/最小）即可直接算出，无需迭代求解子问题。&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;集合&lt;/th&gt;
+					&lt;th&gt;数学描述&lt;/th&gt;
+					&lt;th&gt;投影 $P_C(y)$ 的闭式公式&lt;/th&gt;
+					&lt;th&gt;计算复杂度&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;非负象限&lt;/td&gt;
+					&lt;td&gt;${x \mid x_i \ge 0}$&lt;/td&gt;
+					&lt;td&gt;$\max(y_i, 0)$（逐分量截断负数）&lt;/td&gt;
+					&lt;td&gt;$O(n)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;箱子约束&lt;/td&gt;
+					&lt;td&gt;$[l, u] = {x \mid l_i \le x_i \le u_i}$&lt;/td&gt;
+					&lt;td&gt;$\max(l_i, \min(y_i, u_i))$&lt;/td&gt;
+					&lt;td&gt;$O(n)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\ell_2$ 球&lt;/td&gt;
+					&lt;td&gt;${x \mid |x|_2 \le r}$&lt;/td&gt;
+					&lt;td&gt;$\frac{r}{\max(r, |y|_2)} \cdot y$&lt;/td&gt;
+					&lt;td&gt;$O(n)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;仿射空间&lt;/td&gt;
+					&lt;td&gt;${x \mid Ax = b}$，$A$ 行满秩&lt;/td&gt;
+					&lt;td&gt;$y - A^T(AA^T)^{-1}(Ay - b)$&lt;/td&gt;
+					&lt;td&gt;$O(n^2 m)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\ell_1$ 球&lt;/td&gt;
+					&lt;td&gt;${x \mid |x|_1 \le 1}$&lt;/td&gt;
+					&lt;td&gt;需排序 + 二分搜索&lt;/td&gt;
+					&lt;td&gt;$O(n \log n)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;核范数球&lt;/td&gt;
+					&lt;td&gt;${X \mid |X|_* \le \tau}$（奇异值和 ≤ τ）&lt;/td&gt;
+					&lt;td&gt;需全量 SVD&lt;/td&gt;
+					&lt;td&gt;$O(n^3)$ — 贵&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;概率单纯形&lt;/td&gt;
+					&lt;td&gt;${x \mid x \ge 0, \sum_i x_i = 1}$&lt;/td&gt;
+					&lt;td&gt;需排序 + 累加搜索&lt;/td&gt;
+					&lt;td&gt;$O(n \log n)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;半空间&lt;/td&gt;
+					&lt;td&gt;${x \mid a^T x \le b}$ ($a \neq 0$)&lt;/td&gt;
+					&lt;td&gt;$y - \frac{\max(0, a^T y - b)}{|a|^2}a$&lt;/td&gt;
+					&lt;td&gt;$O(n)$&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h4 id=&#34;ell_2-球投影的详细推导&#34;&gt;$\ell_2$ 球投影的详细推导
+&lt;/h4&gt;&lt;p&gt;问题：$\min_{|x|_2 \le r} \frac{1}{2}|x - y|_2^2$（乘 $1/2$ 方便求导，不影响最优解位置）。&lt;/p&gt;
+&lt;p&gt;构造 Lagrange 函数：$\mathcal{L}(x, \lambda) = \frac{1}{2}|x-y|^2 + \lambda(|x| - r)$，其中 $\lambda \ge 0$ 是不等式约束 $|x| \le r$ 对应的 Lagrange 乘子。&lt;/p&gt;
+&lt;p&gt;对 $x$ 求梯度并令为零（设 $x \neq 0$）：
+&lt;/p&gt;
+$$\nabla_x \mathcal{L} = x - y + \lambda \cdot \frac{x}{\|x\|} = \mathbf{0}$$&lt;p&gt;整理：$x(1 + \frac{\lambda}{|x|}) = y$。这说明 $x$ 和 $y$ &lt;strong&gt;共线&lt;/strong&gt;——存在标量 $\gamma \in (0, 1]$ 使得 $x = \gamma y$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;分两种情况&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$|y| \le r$（$y$ 已在球内）：取 $\gamma = 1$，$x = y$，不移动。&lt;/li&gt;
+&lt;li&gt;$|y| &amp;gt; r$（$y$ 在球外）：约束是紧的，$|x| = \gamma |y| = r$ → $\gamma = r / |y|$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;合并公式：
+&lt;/p&gt;
+$$\boxed{P_C(y) = \frac{r}{\max(r, \|y\|_2)} \cdot y}$$&lt;p&gt;&lt;strong&gt;直觉&lt;/strong&gt;：沿从原点到 $y$ 的射线方向缩放——在球外则缩到球面，在球内则保持不动。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;62-投影梯度法-projected-gradient-descent-pgd&#34;&gt;6.2 投影梯度法 (Projected Gradient Descent, PGD)
+&lt;/h2&gt;&lt;h3 id=&#34;621-问题与迭代格式&#34;&gt;6.2.1 问题与迭代格式
+&lt;/h3&gt;&lt;p&gt;考虑带凸约束的凸优化问题：
+&lt;/p&gt;
+$$\boxed{\min_{x \in C} \; f(x)}$$&lt;p&gt;
+其中 $f$ 为可微凸函数，$C$ 为非空闭凸集且其投影 $P_C$ 计算代价可接受。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;PGD 的迭代格式&lt;/strong&gt;：
+&lt;/p&gt;
+$$\boxed{x_{k+1} = P_C\!\big(x_k - \alpha_k \nabla f(x_k)\big)}$$&lt;p&gt;&lt;strong&gt;分解为两步理解&lt;/strong&gt;：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;无约束梯度步&lt;/strong&gt;：$\tilde{x}_{k+1} = x_k - \alpha_k \nabla f(x_k)$（同 GD）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;投影修正&lt;/strong&gt;：$x_{k+1} = P_C(\tilde{x}_{k+1})$（若走出 $C$ 则弹回最近的可行点）。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;物理类比&lt;/strong&gt;：山坡上有限制区域（围栏）——第一步沿最陡方向迈出，若踩到围栏外，就反弹到最近的围栏内位置。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&#34;622-收敛性光滑凸--闭凸约束&#34;&gt;6.2.2 收敛性（光滑凸 + 闭凸约束）
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;假设&lt;/strong&gt;：$f$ 是 $L$-光滑凸；$C$ 非空闭凸；最优解 $x^* \in C$ 存在；取步长 $\alpha_k = 1/L$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;结论&lt;/strong&gt;：PGD 与无约束 GD 的收敛率&lt;strong&gt;完全相同&lt;/strong&gt;：
+&lt;/p&gt;
+$$\boxed{f(x_k) - f(x^*) \le \frac{L\|x_0 - x^*\|^2}{2k} = O(1/k)}$$&lt;p&gt;投影的非扩张性（不放大误差）是这一结论的理论保障。&lt;/p&gt;
+&lt;h3 id=&#34;623-收敛性推导要点&#34;&gt;6.2.3 收敛性推导要点
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;核心技巧&lt;/strong&gt;：利用非扩张性，$|x_{k+1} - x^&lt;em&gt;| \le |\tilde{x}_{k+1} - x^&lt;/em&gt;|$。将 $\tilde{x}_{k+1} = x_k - \frac{1}{L}\nabla f(x_k)$ 代入并展开范数平方，结合 $L$-光滑的二次上界和凸性的一阶条件，经代数整理得核心递推：
+&lt;/p&gt;
+$$f(x_{k+1}) - f^* \le \frac{L}{2}(\|x_k - x^*\|^2 - \|x_{k+1} - x^*\|^2)$$&lt;p&gt;对 $i = 0, \dots, k-1$ 累加（Telescoping），利用 $f(x_{i+1}) \le f(x_i)$（光滑凸 PGD 下的单调递减），得 $k(f(x_k) - f^&lt;em&gt;) \le \frac{L}{2}|x_0 - x^&lt;/em&gt;|^2$。移项即得结果。&lt;/p&gt;
+&lt;h3 id=&#34;624-投影次梯度法非光滑情形&#34;&gt;6.2.4 投影次梯度法（非光滑情形）
+&lt;/h3&gt;&lt;p&gt;当 $f$ 不可微但 $G$-Lipschitz 凸时，用次梯度 $g_k \in \partial f(x_k)$ 替代：
+&lt;/p&gt;
+$$\boxed{x_{k+1} = P_C(x_k - \alpha_k g_k)}$$&lt;p&gt;
+收敛率退化到与无约束次梯度法同阶：
+&lt;/p&gt;
+$$f_{\text{best}}^K - f^* \le \frac{R^2 + G^2 \sum \alpha_k^2}{2\sum \alpha_k} = O(1/\sqrt{K})$$&lt;hr&gt;
+&lt;h2 id=&#34;63-frank-wolfefw--条件梯度法&#34;&gt;6.3 Frank-Wolfe（FW / 条件梯度法）
+&lt;/h2&gt;&lt;h3 id=&#34;631-动机当投影变得昂贵&#34;&gt;6.3.1 动机：当投影变得昂贵
+&lt;/h3&gt;&lt;p&gt;PGD 每步需要 $P_C(y)$。当 $C$ 的投影有便宜闭式（box、$\ell_2$ 球）时 PGD 是高效的。但很多重要的凸约束其投影&lt;strong&gt;没有便宜闭式&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\ell_1$ 球：投影需 $O(n \log n)$ 排序——高维时瓶颈显著。&lt;/li&gt;
+&lt;li&gt;核范数球：投影需全量 SVD → $O(n^3)$——对大型矩阵不可接受。&lt;/li&gt;
+&lt;li&gt;一般多面体 ${x: Ax \le b}$：投影本身是一轮二次规划。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;FW 的核心创意&lt;/strong&gt;：用&lt;strong&gt;线性极小化&lt;/strong&gt;（LMO）取代投影——每步只需最小化一个&lt;strong&gt;线性函数&lt;/strong&gt;在凸集 $C$ 上。&lt;/p&gt;
+&lt;h3 id=&#34;632-fw-的迭代格式&#34;&gt;6.3.2 FW 的迭代格式
+&lt;/h3&gt;$$\boxed{\begin{aligned}
+s_k &amp;= \arg\min_{s \in C} \; \nabla f(x_k)^T s \quad \text{(LMO：线性极小化)} \\
+x_{k+1} &amp;= (1 - \gamma_k) x_k + \gamma_k s_k \quad \text{(凸组合更新)}
+\end{aligned}}$$&lt;p&gt;符号逐一定义：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$s_k$ 是使线性函数 $\nabla f(x_k)^T s$（$s$ 的线性函数，因 $\nabla f(x_k)$ 在本步是常数向量）在 $C$ 上取&lt;strong&gt;最小&lt;/strong&gt;的那个点。由于线性函数在紧凸集上的最小值必定在&lt;strong&gt;极点&lt;/strong&gt;（extreme point / vertex，集合的&amp;quot;角&amp;quot;）处取到，因此 $s_k$ 是 $C$ 的一个顶点。&lt;/li&gt;
+&lt;li&gt;$\gamma_k \in [0, 1]$：步长（权重参数）。标准取法为 $\gamma_k = \frac{2}{k+2}$。&lt;/li&gt;
+&lt;li&gt;$x_{k+1}$ 是 $x_k$ 和 $s_k$ 的凸组合——由于两者都在 $C$ 内且 $\gamma_k \in [0, 1]$，$x_{k+1}$ 自动落在 $C$ 内——&lt;strong&gt;完全不需要投影来修正可行性&lt;/strong&gt;！&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;$k$ 步后迭代点的结构&lt;/strong&gt;：$x_k$ 是初始点 $x_0$ 和 $k$ 个顶点 $s_0, \dots, s_{k-1}$ 的凸组合。这意味着 FW 天然产生&lt;strong&gt;稀疏/低秩&lt;/strong&gt;表示——在大量应用中这是无价的附加值。&lt;/p&gt;
+&lt;h4 id=&#34;以-ell_1-球为例lmo-为何比投影便宜得多&#34;&gt;以 $\ell_1$ 球为例：LMO 为何比投影便宜得多
+&lt;/h4&gt;&lt;p&gt;对于 $C = {x: |x|&lt;em&gt;1 \le 1}$：
+$$\min_{\|s\|_1 \le 1} \nabla f(x)^T s = -\max_{\|s\|_1 \le 1} (-\nabla f(x))^T s = -\|\nabla f(x)\|_\infty$$
+其中 $|v|&lt;/em&gt;\infty = \max_i |v_i|$ 是无穷范数。这只需扫描 $\nabla f(x)$ 的 $n$ 个分量找到绝对值最大的那个 → &lt;strong&gt;$O(n)$ 时间&lt;/strong&gt;。对比投影的 $O(n \log n)$。&lt;/p&gt;
+&lt;h3 id=&#34;633-收敛性分析o1k-的数学归纳法完整证明&#34;&gt;6.3.3 收敛性分析：$O(1/k)$ 的数学归纳法完整证明
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;假设&lt;/strong&gt;：$f$ 是 $L$-光滑凸；$C$ 为紧凸集，直径 $D = \max_{x,y \in C}|x-y| &amp;lt; \infty$；$x^* \in C$；步长 $\gamma_k = 2/(k+2)$；定义最优性间隙 $\Delta_k = f(x_k) - f^*$。&lt;/p&gt;
+&lt;h4 id=&#34;step-1利用-l-光滑二次上界&#34;&gt;Step 1：利用 $L$-光滑二次上界
+&lt;/h4&gt;$$f(x_{k+1}) \le f(x_k) + \nabla f(x_k)^T(x_{k+1} - x_k) + \frac{L}{2}\|x_{k+1} - x_k\|^2$$&lt;p&gt;代入 $x_{k+1} - x_k = \gamma_k(s_k - x_k)$ 并利用 $|s_k - x_k| \le D$：
+&lt;/p&gt;
+$$f(x_{k+1}) \le f(x_k) + \gamma_k \nabla f(x_k)^T(s_k - x_k) + \frac{L}{2}\gamma_k^2 D^2 \tag{1}$$&lt;h4 id=&#34;step-2lmo-的最优性导出核心不等式&#34;&gt;Step 2：LMO 的最优性导出核心不等式
+&lt;/h4&gt;&lt;p&gt;$s_k$ 使 $\nabla f(x_k)^T s$ 在 $C$ 上取最小值，因此对任意 $y \in C$（特别取 $y = x^*$）：
+&lt;/p&gt;
+$$\nabla f(x_k)^T s_k \le \nabla f(x_k)^T x^*$$&lt;p&gt;所以：
+&lt;/p&gt;
+$$\nabla f(x_k)^T(s_k - x_k) \le \nabla f(x_k)^T(x^* - x_k)$$&lt;p&gt;由 $f$ 的凸性（$f(x^&lt;em&gt;) \ge f(x_k) + \nabla f(x_k)^T(x^&lt;/em&gt; - x_k)$）移项：
+&lt;/p&gt;
+$$\nabla f(x_k)^T(x^* - x_k) \le -\Delta_k$$&lt;p&gt;合并得 &lt;strong&gt;FW 核心不等式&lt;/strong&gt;：
+&lt;/p&gt;
+$$\boxed{\nabla f(x_k)^T(s_k - x_k) \le -\Delta_k} \tag{2}$$&lt;p&gt;
+含义：LMO 给出的方向 $s_k - x_k$ 的线性近似，至少和直接指向 $x^*$ 的方向一样好。&lt;/p&gt;
+&lt;h4 id=&#34;step-3代入得核心递推&#34;&gt;Step 3：代入得核心递推
+&lt;/h4&gt;&lt;p&gt;将 (2) 代入 (1) 并两边减去 $f^*$：
+&lt;/p&gt;
+$$\Delta_{k+1} \le \Delta_k - \gamma_k \Delta_k + \frac{L}{2}\gamma_k^2 D^2$$&lt;p&gt;
+即：
+&lt;/p&gt;
+$$\boxed{\Delta_{k+1} \le (1 - \gamma_k)\Delta_k + \frac{L}{2}\gamma_k^2 D^2} \tag{★}$$&lt;p&gt;这是 FW 收敛的&lt;strong&gt;核心递推不等式&lt;/strong&gt;。&lt;/p&gt;
+&lt;h4 id=&#34;step-4数学归纳法&#34;&gt;Step 4：数学归纳法
+&lt;/h4&gt;&lt;p&gt;取 $\gamma_k = 2/(k+2)$。&lt;strong&gt;归纳假设&lt;/strong&gt;：$\Delta_k \le \frac{2LD^2}{k+2}$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;归纳奠基&lt;/strong&gt;（$k=0$）：由光滑性可证 $\Delta_0 \le LD^2 \le \frac{2LD^2}{2}$。✓&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;归纳递推&lt;/strong&gt;（设归纳假设对 $k$ 成立，证对 $k+1$ 成立）：&lt;/p&gt;
+&lt;p&gt;将 $\gamma_k = 2/(k+2)$ 和归纳假设代入 (★)：
+&lt;/p&gt;
+$$\begin{aligned}
+\Delta_{k+1} &amp;\le \left(1 - \frac{2}{k+2}\right) \cdot \frac{2LD^2}{k+2} + \frac{L}{2} \cdot \left(\frac{2}{k+2}\right)^2 \cdot D^2 \\
+&amp;= \frac{k}{k+2} \cdot \frac{2LD^2}{k+2} + \frac{L}{2} \cdot \frac{4}{(k+2)^2} \cdot D^2 \\
+&amp;= \frac{2LD^2 k}{(k+2)^2} + \frac{2LD^2}{(k+2)^2} \\
+&amp;= \frac{2LD^2 (k+1)}{(k+2)^2}
+\end{aligned}$$&lt;p&gt;需要验证 $\frac{2LD^2(k+1)}{(k+2)^2} \le \frac{2LD^2}{k+3}$。约去 $2LD^2$：
+&lt;/p&gt;
+$$\frac{k+1}{(k+2)^2} \le \frac{1}{k+3}$$&lt;p&gt;交叉相乘（分母均为正）：
+&lt;/p&gt;
+$$(k+1)(k+3) \le (k+2)^2$$&lt;p&gt;
+展开：
+&lt;/p&gt;
+$$k^2 + 4k + 3 \le k^2 + 4k + 4 \iff 3 \le 4$$&lt;p&gt;恒成立！归纳完成。&lt;/p&gt;
+$$\boxed{f(x_k) - f(x^*) \le \frac{2LD^2}{k+2} = O(1/k)}$$&lt;p&gt;此处取 $\gamma_k = 2/(k+2)$ 的原因：$\gamma_0 = 2/2 = 1$，意味着第一步完全跳到第一个 LMO 给出的顶点。&lt;/p&gt;
+&lt;h3 id=&#34;634-fw-与-pgd-的系统对比&#34;&gt;6.3.4 FW 与 PGD 的系统对比
+&lt;/h3&gt;&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;维度&lt;/th&gt;
+					&lt;th&gt;投影梯度法 (PGD)&lt;/th&gt;
+					&lt;th&gt;Frank-Wolfe (FW)&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;每步子问题&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;投影 $P_C(\cdot)$&lt;/td&gt;
+					&lt;td&gt;线性极小化 $\min_{s \in C} g^T s$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;$\ell_1$ 球开销&lt;/td&gt;
+					&lt;td&gt;$O(n \log n)$（排序）&lt;/td&gt;
+					&lt;td&gt;$O(n)$（扫描）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;核范数球开销&lt;/td&gt;
+					&lt;td&gt;$O(n^3)$（满SVD）&lt;/td&gt;
+					&lt;td&gt;$O(n^2)$（秩1幂迭代）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;可行性&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;事后投影修正&lt;/td&gt;
+					&lt;td&gt;自动（凸组合天然可行）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;收敛率&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$O(1/k)$&lt;/td&gt;
+					&lt;td&gt;$O(1/k)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;收敛常数&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$\frac{L}{2}|x_0 - x^*|^2$&lt;/td&gt;
+					&lt;td&gt;$2LD^2$（$D \ge R$，常数偏大）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;迭代点结构&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;密集向量&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;稀疏/低秩&lt;/strong&gt;（顶点凸组合）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;强凸下表现&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;线性收敛&lt;/td&gt;
+					&lt;td&gt;仅 $O(1/k)$（无加速）&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;适用场景&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;投影便宜时&lt;/td&gt;
+					&lt;td&gt;投影贵但 LMO 便宜时&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;选型原则&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;投影有 $O(n)$ 闭式 → &lt;strong&gt;PGD&lt;/strong&gt;（最快最直接）&lt;/li&gt;
+&lt;li&gt;投影需 $O(n \log n)$ 或以上 → 考虑 &lt;strong&gt;FW&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;需要稀疏/低秩迭代点作为副产品 → &lt;strong&gt;FW&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;需要高精度（$\epsilon \le 10^{-7}$）→ &lt;strong&gt;PGD&lt;/strong&gt;（FW 常数大 + 后期慢）&lt;/li&gt;
+&lt;li&gt;目标函数强凸 → 必须 &lt;strong&gt;PGD&lt;/strong&gt;（FW 无法利用强凸性加速）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;64-典型例题&#34;&gt;6.4 典型例题
+&lt;/h2&gt;&lt;h3 id=&#34;例题1投影非扩张性完整证明&#34;&gt;例题1：投影非扩张性完整证明
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$C$ 非空闭凸，证明 $|P_C(x) - P_C(y)| \le |x - y|$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：已在上文 §6.1.4 给出逐行推演——写两条投影不等式 → 相加 → 合并 → 利用 $|u-v|^2$ 恒等式 → Cauchy-Schwarz → 消去因子得证。&lt;/p&gt;
+&lt;h3 id=&#34;例题2pgd-收敛性&#34;&gt;例题2：PGD 收敛性
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$f$ 是 $L$-光滑凸，$C$ 非空闭凸，$\alpha = 1/L$。证明 $f(x_k) - f^* \le \frac{L|x_0 - x^*|^2}{2k}$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;证明&lt;/strong&gt;：关键三步——光滑性展开 $f(x_{k+1})$ + 投影非扩张性控制 $|x_{k+1} - x^*|$ + Telescoping。投影不扩大距离，约束不损害收敛率。&lt;/p&gt;
+&lt;h3 id=&#34;例题3fw-收敛归纳法证明&#34;&gt;例题3：FW 收敛归纳法证明
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：补全 §6.3.3 的归纳步骤，验证 $\gamma_k = 2/(k+2)$ 时 $\Delta_k \le 2LD^2/(k+2)$。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：核心验证为 $(k+1)(k+3) \le (k+2)^2 \iff k^2+4k+3 \le k^2+4k+4 \iff 3 \le 4$ 恒成立。取 $\gamma_k = 2/(k+2)$ 确保 $\gamma_0 = 1$。&lt;/p&gt;
+&lt;h3 id=&#34;例题4ell_1-球-fw-vs-pgd-对比&#34;&gt;例题4：$\ell_1$ 球 FW vs PGD 对比
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$C = {x: |x|_1 \le 1}$。对比 FW 和 PGD 每步的完整计算流程及复杂度。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;步骤&lt;/th&gt;
+					&lt;th&gt;FW&lt;/th&gt;
+					&lt;th&gt;PGD&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;子问题&lt;/td&gt;
+					&lt;td&gt;找 $-|\nabla f(x_k)|_\infty$：$O(n)$&lt;/td&gt;
+					&lt;td&gt;$\ell_1$ 球投影：$O(n \log n)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;更新&lt;/td&gt;
+					&lt;td&gt;凸组合：$O(n)$&lt;/td&gt;
+					&lt;td&gt;直接赋值：$O(n)$&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;总步耗&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;$\approx 2n$&lt;/td&gt;
+					&lt;td&gt;$\approx n \log n + n$&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;$n = 10^6$ 时：FW ≈ 2ms，PGD ≈ 20ms → FW 约快 10 倍。&lt;/p&gt;
+&lt;h3 id=&#34;例题5核范数约束-fw&#34;&gt;例题5：核范数约束 FW
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$C = {X: |X|_* \le \tau}$。写出 FW 的 LMO 解及开销分析。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：$\min_{|S|_* \le \tau} \langle G, S \rangle = -\tau |G|_2$。取 $G = \nabla f(X_k)$ 的最大奇异值对应的左右奇异向量 $u_1, v_1$，得 LMO 解 $S_k = -\tau u_1 v_1^T$（秩 1）。开销：幂迭代法 $O(mn)$，vs 满 SVD 的 $O(mn\min(m,n))$。且 FW 自动维护低秩——$k$ 步后 $\text{rank}(X_k) \le k$。&lt;/p&gt;
+&lt;h3 id=&#34;例题6半空间投影推导&#34;&gt;例题6：半空间投影推导
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;题目&lt;/strong&gt;：$C = {x: a^T x \le b}$，推导 $P_C(y)$ 的闭式。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;解答&lt;/strong&gt;：Lagrange 函数 → 导数为零 → $x = y - \lambda a$。分情况：若 $a^T y \le b$ 则 $\lambda = 0$；否则 $\lambda = (a^T y - b)/|a|^2$。合并公式：
+&lt;/p&gt;
+$$\boxed{P_C(y) = y - \frac{\max(0, a^T y - b)}{\|a\|^2} a}$$&lt;hr&gt;
+&lt;h2 id=&#34;核心要点&#34;&gt;核心要点
+&lt;/h2&gt;&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;投影&lt;/strong&gt;：$P_C(y) = \arg\min_{x \in C} |x-y|^2$；$C$ 非空闭凸 → 存在唯一。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;投影不等式&lt;/strong&gt;：$\langle y - P_C(y), z - P_C(y) \rangle \le 0$，$\forall z \in C$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;非扩张性&lt;/strong&gt;：$|P_C(x) - P_C(y)| \le |x - y|$ → PGD 不损失 GD 收敛率的根源。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;PGD 收敛率&lt;/strong&gt;：光滑凸 → $O(1/k)$，与无约束 GD 完全一致。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;FW 动机&lt;/strong&gt;：投影太贵时，用 $O(n)$ 的 LMO 替代（$\ell_1$ 球、核范数球的巨大差距）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;FW 收敛率&lt;/strong&gt;：$O(1/k)$ 归纳证明；$\gamma_k = 2/(k+2)$；核心验证 $3 \le 4$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;选型原则&lt;/strong&gt;：投影便宜 → PGD；投影贵 → FW；需稀疏/低秩 → FW。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;交叉引用&lt;/strong&gt;：无约束 GD 见第2章；次梯度定义见第3章；非光滑约束下见投影次梯度法（与第4章一脉相承）。FW 的进阶变体（Away-step FW, Pairwise FW）可在强凸下获得线性收敛，属进阶专题。&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>
