@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器” 主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：代理模型 × PDE/FEM × AI 全栈工程 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[ \\boxed{ \\text{普通代理：学习 }x\\mapsto y } \\]而 Neural Operator 试图学习：\n\\[ \\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} } \\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[ x= (E,\\nu,F,\\text{gap}) \\]输出：\n\\[ y= \\sigma_{\\max}. \\]Kriging、MLP、XGBoost 都可以学习：\n\\[ f:\\mathbb R^4\\rightarrow\\mathbb R. \\]这个问题本质上是：\n\\[ \\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}} \\]即使输出不是一个标量，而是：\n\\[ 1000 \\]个节点位移：\n">
+<title>Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/13-neural-operator/'>
+
+<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”">
+<meta property='og:description' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器” 主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：代理模型 × PDE/FEM × AI 全栈工程 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[ \\boxed{ \\text{普通代理：学习 }x\\mapsto y } \\]而 Neural Operator 试图学习：\n\\[ \\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} } \\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[ x= (E,\\nu,F,\\text{gap}) \\]输出：\n\\[ y= \\sigma_{\\max}. \\]Kriging、MLP、XGBoost 都可以学习：\n\\[ f:\\mathbb R^4\\rightarrow\\mathbb R. \\]这个问题本质上是：\n\\[ \\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}} \\]即使输出不是一个标量，而是：\n\\[ 1000 \\]个节点位移：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/13-neural-operator/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='PDE' /><meta property='article:tag' content='FEM' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:tag' content='科学机器学习' /><meta property='article:published_time' content='2026-08-26T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-26T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”">
+<meta name="twitter:description" content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器” 主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：代理模型 × PDE/FEM × AI 全栈工程 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[ \\boxed{ \\text{普通代理：学习 }x\\mapsto y } \\]而 Neural Operator 试图学习：\n\\[ \\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} } \\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[ x= (E,\\nu,F,\\text{gap}) \\]输出：\n\\[ y= \\sigma_{\\max}. \\]Kriging、MLP、XGBoost 都可以学习：\n\\[ f:\\mathbb R^4\\rightarrow\\mathbb R. \\]这个问题本质上是：\n\\[ \\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}} \\]即使输出不是一个标量，而是：\n\\[ 1000 \\]个节点位移：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-普通代理模型到底在学什么">1. 普通代理模型到底在学什么？</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/13-neural-operator/">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-26T00:00:00Z'>Aug 26, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 6 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="neural-operator代理模型真正跨过的一道门槛是从学一个响应函数变成学一个求解器">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”
+</h1><p><strong>主题：Neural Operator（神经算子），重点理解 FNO 的思想位置</strong><br>
+<strong>领域：代理模型 × PDE/FEM × AI 全栈工程 × 科学机器学习</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：</p>
+\[
+\boxed{
+\text{普通代理：学习 }x\mapsto y
+}
+\]<p>而 Neural Operator 试图学习：</p>
+\[
+\boxed{
+\mathcal G:\text{输入函数}\mapsto\text{输出函数}
+}
+\]<p>这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：<strong>模型参数可以独立于具体离散分辨率</strong>。</p>
+<p>这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。</p>
+<hr>
+<h2 id="1-普通代理模型到底在学什么">1. 普通代理模型到底在学什么？
+</h2><p>假设有限元模型输入：</p>
+\[
+x=
+(E,\nu,F,\text{gap})
+\]<p>输出：</p>
+\[
+y=
+\sigma_{\max}.
+\]<p>Kriging、MLP、XGBoost 都可以学习：</p>
+\[
+f:\mathbb R^4\rightarrow\mathbb R.
+\]<p>这个问题本质上是：</p>
+\[
+\boxed{\text{有限维向量}\rightarrow\text{有限维向量}}
+\]<p>即使输出不是一个标量，而是：</p>
+\[
+1000
+\]<p>个节点位移：</p>
+\[
+u\in\mathbb R^{3000},
+\]<p>你仍然是在学习：</p>
+\[
+\mathbb R^4\rightarrow\mathbb R^{3000}.
+\]<p>问题是，这个：</p>
+\[
+3000
+\]<p>其实来自某一次具体网格离散。</p>
+<p>一旦：</p>
+\[
+3000\rightarrow12000
+\]<p>节点数变了，普通网络的输出维度通常也跟着失效。</p>
+<p>这说明它真正学习的是：</p>
+\[
+\boxed{\text{某个离散问题}}
+\]<p>而不是：</p>
+\[
+\boxed{\text{连续物理问题本身}}
+\]<p>Neural Operator 正是在这一点上换了问题定义。</p>
+<hr>
+<h1 id="2-pde-本来就是函数到函数的映射">2. PDE 本来就是“函数到函数”的映射
+</h1><p>考虑 Darcy 方程：</p>
+\[
+-\nabla\cdot(a(x)\nabla u(x))=f(x).
+\]<p>输入并不只是几个数字。</p>
+<p>材料系数：</p>
+\[
+a(x)
+\]<p>本身就是一个空间函数。</p>
+<p>输出：</p>
+\[
+u(x)
+\]<p>也是函数。</p>
+<p>因此真正的物理关系其实是：</p>
+\[
+\boxed{
+\mathcal G:
+a(x)\mapsto u(x)
+}
+\]<p>这里：</p>
+\[
+\mathcal G
+\]<p>就是 PDE 的 <strong>solution operator</strong>。</p>
+<p>传统 FEM 做的事情是：</p>
+\[
+a(x)
+\]<p>先离散成：</p>
+\[
+a_h\in\mathbb R^N,
+\]<p>然后求：</p>
+\[
+u_h\in\mathbb R^N.
+\]<p>而 Neural Operator 的目标是在概念上直接逼近：</p>
+\[
+\boxed{
+\mathcal G:a\mapsto u
+}
+\]<p>而不是固定某个：</p>
+\[
+N.
+\]<p>所以 Neural Operator 的真正跃迁在于：</p>
+\[
+\boxed{
+\text{learning functions}
+\rightarrow
+\text{learning operators}
+}
+\]<p>DeepONet 和 Neural Operator/FNO 都建立在这一思想上。DeepONet 2021 直接从 operator universal approximation theorem 出发构造 branch/trunk 网络；Kovachki 等则给出了更统一的 neural operator 框架。</p>
+<hr>
+<h1 id="3-为什么这对-fem-surrogate-很关键">3. 为什么这对 FEM surrogate 很关键？
+</h1><p>假设你想代理：</p>
+\[
+E(x)\rightarrow u(x).
+\]<p>传统做法可能把有限元场展平：</p>
+\[
+u=
+[u_1,u_2,\dots,u_N]
+\]<p>然后训练网络。</p>
+<p>这种方式的麻烦是：</p>
+\[
+\boxed{
+\text{mesh topology / node count 被硬编码进模型}
+}
+\]<p>而工程模型很容易发生：</p>
+<ul>
+<li>网格细化；</li>
+<li>采样分辨率变化；</li>
+<li>输出位置变化；</li>
+<li>不同传感器数量；</li>
+<li>不同离散尺度。</li>
+</ul>
+<p>Neural Operator 更希望满足：</p>
+\[
+\boxed{
+\text{train on one discretization}
+\rightarrow
+\text{evaluate on another discretization}
+}
+\]<p>这就是所谓：</p>
+\[
+\boxed{\text{discretization invariance}}
+\]<p>JMLR 的统一理论论文把它列为 neural operator 的关键设计属性；官方 NeuralOperator 库也直接把“resolution invariant”作为其核心定位。</p>
+<p>不过这里要很谨慎：</p>
+<blockquote>
+<p><strong>“resolution invariant”不等于“任何新网格、新几何、新 PDE 都能零误差泛化”。</strong></p>
+</blockquote>
+<p>它主要指网络参数定义不依赖固定采样点数这一结构性质。</p>
+<hr>
+<h1 id="4-fno-是怎么做到这一点的">4. FNO 是怎么做到这一点的？
+</h1><p>Fourier Neural Operator 是目前最经典的一种 Neural Operator。</p>
+<p>它的一层可以粗略写成：</p>
+<h1 id="v_l1x">[
+v_{l+1}(x)
+</h1><p>\sigma
+\left[
+Wv_l(x)
++
+\mathcal K_\theta v_l(x)
+\right].
+]</p>
+<p>其中：</p>
+\[
+W
+\]<p>是局部线性变换，</p>
+<p>而：</p>
+\[
+\mathcal K_\theta
+\]<p>是一个积分算子：</p>
+<h1 id="mathcal-kvx">[
+(\mathcal Kv)(x)
+</h1><p>\int_D
+\kappa_\theta(x,y)v(y),dy.
+]</p>
+<p>FNO 的关键是：</p>
+<blockquote>
+<p>不直接在物理空间学习这个巨大 kernel，而是在 Fourier 空间参数化它。</p>
+</blockquote>
+<p>因为卷积满足：</p>
+<h1 id="mathcal-fkv">[
+\mathcal F(K*v)
+</h1><p>\mathcal F(K)\mathcal F(v).
+]</p>
+<p>于是实际计算大致变成：</p>
+\[
+\boxed{
+v
+\xrightarrow{\mathrm{FFT}}
+\hat v
+\xrightarrow{\text{低频模态线性变换}}
+R_\theta\hat v
+\xrightarrow{\mathrm{IFFT}}
+\tilde v
+}
+\]<p>再加局部项和非线性：</p>
+<h1 id="v_l1">[
+v_{l+1}
+</h1><p>\sigma(\tilde v+Wv_l).
+]</p>
+<p>官方 FNO 理论指南也把 Fourier layer 总结为：</p>
+<ol>
+<li>Fourier transform；</li>
+<li>对保留的低频 Fourier modes 做可学习线性变换；</li>
+<li>inverse transform。</li>
+</ol>
+<hr>
+<h1 id="5-为什么-fourier-空间很适合-pde">5. 为什么 Fourier 空间很适合 PDE？
+</h1><p>这里有两个原因。</p>
+<p>第一，FFT 很便宜。</p>
+<p>若物理空间做全局积分：</p>
+<h1 id="mathcal-kvx-1">[
+(\mathcal Kv)(x)
+</h1><p>\int\kappa(x,y)v(y)dy,
+]</p>
+<p>离散后朴素成本可能接近：</p>
+\[
+O(N^2).
+\]<p>FFT 卷积可以做到大致：</p>
+\[
+O(N\log N).
+\]<p>第二，很多 PDE 的大尺度结构主要集中在低频模态。</p>
+<p>因此 FNO 通常只保留：</p>
+\[
+k\le k_{\max}
+\]<p>的部分 Fourier modes。</p>
+<p>高频直接截断。</p>
+<p>这既降低成本，也相当于一种：</p>
+\[
+\boxed{\text{learned spectral model reduction}}
+\]<p>所以 FNO 可以粗略理解成：</p>
+\[
+\boxed{
+\text{谱方法的表示能力}
++
+\text{神经网络学习未知算子}
+}
+\]<p>这也是它和传统 CNN 最大的不同之一：CNN 每层通常主要做局部邻域传播，而 FNO 的 Fourier convolution 一层就可以产生全局耦合。</p>
+<hr>
+<h1 id="6-一个直观例子随机材料场到位移场">6. 一个直观例子：随机材料场到位移场
+</h1><p>假设二维弹性体的 Young 模量不是一个标量，而是：</p>
+\[
+E(x,y).
+\]<p>你可能有局部软区：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">硬 硬 硬 硬
+</span></span><span class="line"><span class="cl">硬 软 软 硬
+</span></span><span class="line"><span class="cl">硬 软 软 硬
+</span></span><span class="line"><span class="cl">硬 硬 硬 硬
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>给定载荷以后，希望得到：</p>
+\[
+u_x(x,y),\quad u_y(x,y).
+\]<p>传统 Kriging 如果把每个网格点：</p>
+\[
+E_1,\dots,E_{10000}
+\]<p>全当输入，把：</p>
+\[
+u_1,\dots,u_{20000}
+\]<p>全当输出，会变成一个极高维回归。</p>
+<p>Neural Operator 的问题定义则更自然：</p>
+\[
+\boxed{
+E(x,y)
+\mapsto
+u(x,y)
+}
+\]<p>于是模型真正学习的是：</p>
+<blockquote>
+<p>“不同空间分布的材料场，会怎样改变整个结构响应场？”</p>
+</blockquote>
+<p>这就是 operator learning 特别适合：</p>
+<ul>
+<li>随机场；</li>
+<li>PDE 系数场；</li>
+<li>边界条件场；</li>
+<li>初值场；</li>
+</ul>
+<p>的原因。</p>
+<hr>
+<h1 id="7-这与-pod--reduced-basis-的差别很值得分清">7. 这与 POD / Reduced Basis 的差别很值得分清
+</h1><p>前几期讲过 Reduced Basis：</p>
+\[
+u(x;\mu)
+\approx
+\sum_{i=1}^r a_i(\mu)\phi_i(x).
+\]<p>它先构造：</p>
+\[
+\{\phi_i\}
+\]<p>这样的低维物理解空间。</p>
+<p>然后只学习：</p>
+\[
+\mu\mapsto a_i.
+\]<p>所以 RB 的思路是：</p>
+\[
+\boxed{
+\text{找到低维物理子空间}
++
+\text{在里面求解}
+}
+\]<p>Neural Operator 则更倾向：</p>
+\[
+\boxed{
+\text{直接学习完整 solution operator}
+}
+\]<p>优势是灵活、表达力强。</p>
+<p>代价是：</p>
+\[
+\boxed{
+\text{通常缺少传统 ROM 那样直接的误差认证和物理保证}
+}
+\]<p>因此两者在知识体系里并不是竞争关系。</p>
+<p>更适合这样理解：</p>
+\[
+\text{RB/POD}
+\quad\longleftrightarrow\quad
+\text{physics-driven model reduction}
+\]\[
+\text{Neural Operator}
+\quad\longleftrightarrow\quad
+\text{data-driven operator approximation}.
+\]<hr>
+<h1 id="8-它学的是求解器这句话要怎么准确理解">8. “它学的是求解器”这句话要怎么准确理解？
+</h1><p>假设 PDE 由参数：</p>
+\[
+a(x)
+\]<p>决定。</p>
+<p>传统数值求解器每来一个新输入：</p>
+\[
+a^{(i)}
+\]<p>都执行：</p>
+\[
+\boxed{
+\text{assemble}
+\rightarrow
+\text{solve}
+}
+\]<p>Neural Operator 在训练阶段见过大量：</p>
+\[
+a^{(i)}\rightarrow u^{(i)}.
+\]<p>训练完成后，新输入直接：</p>
+\[
+a^{(*)}
+\xrightarrow{\mathcal G_\theta}
+u^{(*)}.
+\]<p>所以：</p>
+\[
+\boxed{
+\text{昂贵 PDE solve}
+}
+\]<p>变成：</p>
+\[
+\boxed{
+\text{一次神经网络 forward}
+}
+\]<p>原始 FNO 论文在 Burgers、Darcy 和 Navier–Stokes 等 PDE 上展示了这种能力，并报告在其测试设置中相较传统数值求解可达到最高约三个数量级的推理加速。</p>
+<p>但这里特别要强调：</p>
+\[
+\boxed{\text{训练成本没有消失}}
+\]<p>你仍然要先获得高质量：</p>
+\[
+(a_i,u_i)
+\]<p>训练数据。</p>
+<p>所以它真正适合的是：</p>
+\[
+\boxed{\text{many-query setting}}
+\]<p>例如：</p>
+<ul>
+<li>Monte Carlo；</li>
+<li>参数优化；</li>
+<li>实时控制；</li>
+<li>数字孪生；</li>
+<li>大量场预测。</li>
+</ul>
+<p>这和 Reduced Basis 的使用场景其实非常相似。</p>
+<hr>
+<h1 id="9-为什么零样本超分辨率很吸引人">9. 为什么“零样本超分辨率”很吸引人？
+</h1><p>FNO 原始工作一个很著名的结果是：</p>
+\[
+\boxed{\text{zero-shot super-resolution}}
+\]<p>例如较低分辨率训练：</p>
+\[
+64\times64
+\]<p>然后更高分辨率评价。</p>
+<p>为什么理论上可以这么做？</p>
+<p>因为学习参数主要作用于：</p>
+\[
+\boxed{\text{Fourier modes}}
+\]<p>而不是固定的：</p>
+\[
+64\times64
+\]<p>神经元连接。</p>
+<p>换句话说，模型学习的是近似连续频谱算子。</p>
+<p>换一个采样密度，只是在更细的 grid 上评价同一个 learned operator。</p>
+<p>这正是 neural operator 与普通固定尺寸 CNN 的重要结构差异。</p>
+<hr>
+<h1 id="10-但这件事有一个很重要的限制高频细节可能正是-fno-的弱点">10. 但这件事有一个很重要的限制：高频细节可能正是 FNO 的弱点
+</h1><p>FNO 最常见的实现会截断高 Fourier modes：</p>
+\[
+\hat v_k=0,
+\qquad |k|>k_{\max}.
+\]<p>这本来是效率来源。</p>
+<p>但如果问题真正重要的信息恰好来自：</p>
+<ul>
+<li>冲击波；</li>
+<li>接触边界；</li>
+<li>裂纹尖端；</li>
+<li>sharp interface；</li>
+<li>高梯度应力集中；</li>
+</ul>
+<p>那么：</p>
+\[
+\boxed{\text{低频全局表示可能过度平滑}}
+\]<p>这不是一个次要实现细节，而是 FNO 架构本身的 inductive bias。</p>
+<p>2024 年 ICML 的 Local Neural Operator 工作就直接指出：FNO 的 global operations 容易 over-smoothing，可能无法捕捉局部细节；引入局部积分核和微分算子后，其测试中相对 \(L^2\) 误差进一步降低了 34–72%。</p>
+<p>这说明 Neural Operator 当前一个很重要的发展方向是：</p>
+\[
+\boxed{
+\text{global operator}
++
+\text{local differential structure}
+}
+\]<hr>
+<h1 id="11-这对有限元问题尤其重要">11. 这对有限元问题尤其重要
+</h1><p>在很多结构问题中：</p>
+\[
+\text{global displacement}
+\]<p>其实很好预测。</p>
+<p>难的是：</p>
+\[
+\boxed{
+\text{local stress concentration}
+}
+\]<p>例如孔边：</p>
+\[
+\sigma_{\max}
+\]<p>可能来自非常小的局部区域。</p>
+<p>那么一个场模型即使：</p>
+\[
+\|u-\hat u\|_{L^2}
+\]<p>很小，</p>
+<p>也不代表：</p>
+\[
+\max_x\sigma(x)
+\]<p>准确。</p>
+<p>因为：</p>
+\[
+\sigma=C:\nabla u
+\]<p>对梯度误差更敏感。</p>
+<p>所以如果把 Neural Operator 用于可靠性分析，不能只看：</p>
+\[
+\boxed{\text{field }L^2\text{ error}}
+\]<p>还应该检查：</p>
+\[
+\|\nabla u-\nabla\hat u\|,
+\]<p>极值误差：</p>
+\[
+|\sigma_{\max}-\hat\sigma_{\max}|,
+\]<p>以及失效边界：</p>
+\[
+g(X)=0
+\]<p>附近的分类错误。</p>
+<p>这和前面 AK-MCS 的思想再次接上了：</p>
+<blockquote>
+<p><strong>最终任务需要什么信息，代理模型就应该围绕什么误差训练和评价。</strong></p>
+</blockquote>
+<hr>
+<h1 id="12-它对可靠性研究的真正价值在哪里">12. 它对可靠性研究的真正价值在哪里？
+</h1><p>假设随机输入不再是：</p>
+\[
+X=(x_1,x_2,x_3),
+\]<p>而是随机场：</p>
+\[
+E(x,\omega),
+\]\[
+p(x,\omega),
+\]\[
+T(x,\omega).
+\]<p>传统 Kriging 很容易遭遇：</p>
+\[
+\boxed{\text{输入维数爆炸}}
+\]<p>因为随机场离散后：</p>
+\[
+10000
+\]<p>个网格点就是：</p>
+\[
+10000
+\]<p>维输入。</p>
+<p>通常要先做：</p>
+\[
+\text{Karhunen–Loève expansion}
+\]<p>降成几十个随机变量。</p>
+<p>Neural Operator 则允许更直接地接受：</p>
+\[
+\boxed{\text{field input}}
+\]<p>因此特别适合：</p>
+\[
+\text{random field}
+\rightarrow
+\text{response field}.
+\]<p>再从：</p>
+\[
+u(x)
+\]<p>提取：</p>
+\[
+g(u)
+\]<p>做可靠性计算。</p>
+<p>所以它在可靠性里的潜力不只是“替代 Kriging”。</p>
+<p>它更可能改变：</p>
+\[
+\boxed{\text{高维随机场可靠性}}
+\]<p>这一类问题的建模方式。</p>
+<hr>
+<h1 id="13-对软体动力学也有一个很强的迁移">13. 对软体动力学也有一个很强的迁移
+</h1><p>考虑：</p>
+\[
+u(x,t)
+\]<p>或者：</p>
+\[
+x(X,t).
+\]<p>理论上可以训练 operator：</p>
+\[
+\boxed{
+(x_t,v_t,\text{material},f_{\rm ext})
+\mapsto
+(x_{t+\Delta t},v_{t+\Delta t})
+}
+\]<p>这已经很接近：</p>
+\[
+\boxed{\text{learned timestepper}}
+\]<p>甚至可以直接学习：</p>
+\[
+\text{initial state}
+\mapsto
+\text{whole trajectory}.
+\]<p>但对于物理引擎，有一个巨大问题：</p>
+\[
+\boxed{\text{rollout stability}}
+\]<p>即单步：</p>
+\[
+1\%\text{ error}
+\]<p>连续滚动：</p>
+\[
+1000
+\]<p>步后不一定还是：</p>
+\[
+1\%.
+\]<p>可能逐步偏离物理流形。</p>
+<p>尤其涉及：</p>
+<ul>
+<li>contact；</li>
+<li>\(J>0\)；</li>
+<li>momentum；</li>
+<li>energy；</li>
+<li>friction；</li>
+</ul>
+<p>这类硬结构时，纯数据驱动 operator 可能给出视觉上合理、物理上非法的状态。</p>
+<p>所以在实时物理里，更有吸引力的方向往往是：</p>
+\[
+\boxed{
+\text{learned operator}
++
+\text{physics constraints / correction / projection}
+}
+\]<p>而不是彻底删除 solver。</p>
+<hr>
+<h1 id="14-一个非常值得实践的最小实验">14. 一个非常值得实践的最小实验
+</h1><p>如果想真正理解 Neural Operator，我建议不要一开始做 Navier–Stokes。</p>
+<p>可以做一个非常简单的 2D Poisson/Darcy 问题：</p>
+\[
+-\nabla\cdot(a(x)\nabla u)=f.
+\]<p>生成：</p>
+\[
+N=1000
+\]<p>个随机：</p>
+\[
+a(x,y)
+\]<p>场。</p>
+<p>FEM/FDM 求：</p>
+\[
+u(x,y).
+\]<p>然后训练 FNO：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">input:
+</span></span><span class="line"><span class="cl">    a(x,y)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">FNO:
+</span></span><span class="line"><span class="cl">    lift channels
+</span></span><span class="line"><span class="cl">    FFT
+</span></span><span class="line"><span class="cl">    truncate modes
+</span></span><span class="line"><span class="cl">    learned spectral multiplication
+</span></span><span class="line"><span class="cl">    IFFT
+</span></span><span class="line"><span class="cl">    nonlinear activation
+</span></span><span class="line"><span class="cl">    repeat
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">output:
+</span></span><span class="line"><span class="cl">    u(x,y)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>最值得做的实验不是单纯看训练误差，而是：</p>
+\[
+\boxed{\text{64×64 训练}}
+\]<p>然后：</p>
+\[
+\boxed{\text{128×128 测试}}
+\]<p>再检查：</p>
+\[
+L^2\text{ error},
+\]\[
+H^1\text{ error},
+\]<p>以及 PDE residual：</p>
+\[
+\|-\nabla\cdot(a\nabla\hat u)-f\|.
+\]<p>这样你会直接看见：</p>
+\[
+\boxed{
+\text{“预测一个数组”}
+\]<p>和：</p>
+\[
+\boxed{
+\text{“学习一个离散无关算子”}
+}
+\]<p>之间到底差在哪里。</p>
+<p>官方 <code>neuraloperator</code> 项目已经提供 FNO、TFNO、训练流程和理论指南，适合作为直接实现入口。</p>
+<hr>
+<h1 id="15-最值得警惕的一点neural-operator-仍然没有真正理解-pde">15. 最值得警惕的一点：Neural Operator 仍然没有真正“理解 PDE”
+</h1><p>这是科学机器学习里非常容易夸大的地方。</p>
+<p>如果训练数据全部来自某个：</p>
+\[
+\mathcal P_{\rm train},
+\]<p>那么网络实际学到的是：</p>
+\[
+\boxed{
+\mathcal G
+\text{ 在训练分布附近的近似}
+}
+\]<p>它并不自动拥有：</p>
+<ul>
+<li>守恒律；</li>
+<li>最大值原理；</li>
+<li>单调性；</li>
+<li>接触可行性；</li>
+<li>网格无关误差界；</li>
+<li>OOD 保证。</li>
+</ul>
+<p>因此：</p>
+\[
+\boxed{
+\text{operator learning}
+\neq
+\text{numerical analysis guarantee}
+}
+\]<p>这一点对工程应用特别重要。</p>
+<p>它非常适合作为：</p>
+\[
+\boxed{\text{快速 many-query surrogate}}
+\]<p>但如果任务要求：</p>
+\[
+10^{-6}\text{ 失效概率}
+\]<p>或者：</p>
+\[
+\text{严格无穿透}
+\]<p>那么仍然需要：</p>
+<ul>
+<li>certification；</li>
+<li>residual checking；</li>
+<li>active learning；</li>
+<li>high-fidelity fallback；</li>
+<li>conservative physics correction。</li>
+</ul>
+<p>这也是 Neural Operator 和前几期 Certified Reduced Basis 可以很好互补的地方。</p>
+<hr>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Neural Operator 最深刻的地方，可以浓缩成：</p>
+\[
+\boxed{
+\text{它试图代理的不是一个响应面，而是一整个“输入场到解场”的求解过程。}
+}
+\]<p>所以它在知识体系中的位置大约是：</p>
+\[
+\text{Kriging / MLP surrogate}
+\]\[
+\downarrow
+\]\[
+\boxed{\text{Neural Operator}}
+\]\[
+\downarrow
+\]\[
+\text{learned PDE solver / scientific foundation model}.
+\]<p>它真正值得学的原因并不是“FNO 很流行”，而是它迫使我们重新思考一个问题：</p>
+\[
+\boxed{
+\text{代理模型究竟应该学习最终输出，还是学习产生这些输出的算子？}
+}
+\]<p>对于随机场可靠性、多工况有限元、数字孪生和 AI 驱动求解器，这个区别会越来越重要。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><ol>
+<li>
+<p><strong>Kovachki et al., <em>Neural Operator: Learning Maps Between Function Spaces With Applications to PDEs</em>, JMLR 2023</strong>。这是目前理解 neural operator 理论位置最完整的入口，系统讲函数空间、离散无关性、通用逼近和多种 operator parameterization。<br>
+<a class="link" href="https://www.jmlr.org/beta/papers/v24/21-1524.html"  target="_blank" rel="noopener"
+    >JMLR 论文页</a></p>
+</li>
+<li>
+<p><strong>Li et al., <em>Fourier Neural Operator for Parametric Partial Differential Equations</em>, ICLR 2021</strong>。FNO 原始论文，重点看 Fourier kernel parameterization、Darcy/Navier–Stokes 实验以及 zero-shot super-resolution。<br>
+<a class="link" href="https://iclr.cc/virtual/2021/poster/3281"  target="_blank" rel="noopener"
+    >ICLR 论文页</a></p>
+</li>
+<li>
+<p><strong>Lu et al., <em>Learning nonlinear operators via DeepONet</em>, Nature Machine Intelligence 2021</strong>。适合对照理解另一条 operator-learning 路线：branch net 编码输入函数，trunk net 编码输出坐标。</p>
+</li>
+<li>
+<p><strong>NeuralOperator 官方库与理论文档</strong>。这是 FNO 原作者体系维护的 PyTorch 实现，当前包含 FNO、TFNO 等模型以及完整理论指南。<br>
+<a class="link" href="https://neuraloperator.github.io/dev/"  target="_blank" rel="noopener"
+    >官方文档</a></p>
+</li>
+<li>
+<p><strong>Liu-Schiaffini et al., <em>Neural Operators with Localized Integral and Differential Kernels</em>, ICML 2024</strong>。如果想理解 FNO 下一步为什么要补“局部结构”，这篇非常合适；它直接针对 global Fourier operation 的过平滑问题。</p>
+</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+            <a href="/tags/pde/">PDE</a>
+        
+            <a href="/tags/fem/">FEM</a>
+        
+            <a href="/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/">AI 全栈工程</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

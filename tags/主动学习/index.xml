@@ -1,0 +1,578 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>主动学习 on Assranai&#39;s 手账</title>
+        <link>https://assranai.github.io/tags/%E4%B8%BB%E5%8A%A8%E5%AD%A6%E4%B9%A0/</link>
+        <description>Recent content in 主动学习 on Assranai&#39;s 手账</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en-us</language>
+        <copyright>Assranai</copyright>
+        <lastBuildDate>Sat, 15 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E4%B8%BB%E5%8A%A8%E5%AD%A6%E4%B9%A0/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
+        <link>https://assranai.github.io/cards/02-ak-mcs/</link>
+        <pubDate>Sat, 15 Aug 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/02-ak-mcs/</guid>
+        <description>&lt;h1 id=&#34;ak-mcs可靠性代理模型真正该学的其实是失效边界&#34;&gt;AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：可靠性 × Kriging/高斯过程 × 主动学习&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 7 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;AK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：&lt;/p&gt;
+\[
+\boxed{\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}}
+\]&lt;p&gt;这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-可靠性问题其实不是普通回归问题&#34;&gt;1. 可靠性问题其实不是普通回归问题
+&lt;/h2&gt;&lt;p&gt;设极限状态函数为：&lt;/p&gt;
+\[
+g(\mathbf x)
+\]&lt;p&gt;通常规定：&lt;/p&gt;
+\[
+g(\mathbf x)&gt;0 \quad \text{安全}
+\]\[
+g(\mathbf x)\le 0 \quad \text{失效}.
+\]&lt;p&gt;失效概率：&lt;/p&gt;
+\[
+P_f=P[g(\mathbf X)\le0].
+\]&lt;p&gt;如果直接用 Monte Carlo：&lt;/p&gt;
+&lt;h1 id=&#34;hat-p_f&#34;&gt;[
+\hat P_f
+&lt;/h1&gt;&lt;p&gt;\frac{1}{N}
+\sum_{i=1}^N
+I[g(\mathbf x_i)\le0].
+]&lt;/p&gt;
+&lt;p&gt;真正昂贵的是：&lt;/p&gt;
+\[
+g(\mathbf x_i)
+\]&lt;p&gt;可能意味着一次完整的 FEM、CFD 或多体动力学仿真。&lt;/p&gt;
+&lt;p&gt;假设：&lt;/p&gt;
+\[
+P_f=10^{-4},
+\]&lt;p&gt;为了稳定估计这个概率，通常需要大量样本。&lt;/p&gt;
+&lt;p&gt;问题随之出现：&lt;/p&gt;
+\[
+10^5\sim10^7
+\]&lt;p&gt;次高保真模型调用往往不可接受。&lt;/p&gt;
+&lt;p&gt;于是自然想到：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;用 Kriging 代替真实模型。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;但这里很容易掉进一个坑。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-全局--高不代表可靠度准确&#34;&gt;2. 全局 \(R^2\) 高，不代表可靠度准确
+&lt;/h1&gt;&lt;p&gt;假设真实极限状态面是：&lt;/p&gt;
+\[
+g(x_1,x_2)=0.
+\]&lt;p&gt;你训练出一个 Kriging：&lt;/p&gt;
+\[
+\hat g(\mathbf x).
+\]&lt;p&gt;普通代理建模通常优化：&lt;/p&gt;
+&lt;h1 id=&#34;mathrmrmse&#34;&gt;[
+\mathrm{RMSE}
+&lt;/h1&gt;&lt;p&gt;\sqrt{
+\frac1N
+\sum_i
+(g_i-\hat g_i)^2
+}
+]&lt;/p&gt;
+&lt;p&gt;或者追求：&lt;/p&gt;
+\[
+R^2\rightarrow1.
+\]&lt;p&gt;但可靠性计算实际上只关心：&lt;/p&gt;
+\[
+\boxed{\operatorname{sign}g(\mathbf x)}
+\]&lt;p&gt;尤其是在：&lt;/p&gt;
+\[
+g(\mathbf x)\approx0
+\]&lt;p&gt;附近。&lt;/p&gt;
+&lt;p&gt;举个极端例子。&lt;/p&gt;
+&lt;p&gt;两个区域：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;区域 A：g = 100
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;区域 B：g = 0.02
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;代理模型预测：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;A：ĝ = 90
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;B：ĝ = -0.01
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;A 的误差：&lt;/p&gt;
+\[
+|100-90|=10
+\]&lt;p&gt;很大，但可靠性分类仍正确：&lt;/p&gt;
+\[
+100&gt;0,\qquad90&gt;0.
+\]&lt;p&gt;B 的误差：&lt;/p&gt;
+\[
+|0.02-(-0.01)|=0.03
+\]&lt;p&gt;非常小，但：&lt;/p&gt;
+\[
++\rightarrow-
+\]&lt;p&gt;安全样本被直接判成失效。&lt;/p&gt;
+&lt;p&gt;对于 \(P_f\) 来说，第二个误差可能远比第一个严重。&lt;/p&gt;
+&lt;p&gt;因此可靠性问题真正对应的是：&lt;/p&gt;
+\[
+\boxed{\text{classification accuracy near }g=0}
+\]&lt;p&gt;而不是：&lt;/p&gt;
+\[
+\text{global regression accuracy}.
+\]&lt;p&gt;这就是 AK-MCS 的思想起点。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-kriging-恰好提供了主动学习需要的两个量&#34;&gt;3. Kriging 恰好提供了主动学习需要的两个量
+&lt;/h1&gt;&lt;p&gt;Kriging 对某个输入 \(\mathbf x\) 给出：&lt;/p&gt;
+\[
+G(\mathbf x)
+\sim
+\mathcal N
+\left(
+\mu(\mathbf x),
+\sigma^2(\mathbf x)
+\right).
+\]&lt;p&gt;其中：&lt;/p&gt;
+\[
+\mu(\mathbf x)
+\]&lt;p&gt;是预测均值，&lt;/p&gt;
+\[
+\sigma(\mathbf x)
+\]&lt;p&gt;是预测不确定性。&lt;/p&gt;
+&lt;p&gt;于是我们可以问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;这个点被错误分类的可能性有多大？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;如果&lt;/p&gt;
+\[
+|\mu|\gg\sigma,
+\]&lt;p&gt;例如：&lt;/p&gt;
+\[
+\mu=10,\qquad\sigma=0.1,
+\]&lt;p&gt;那么几乎肯定：&lt;/p&gt;
+\[
+g&gt;0.
+\]&lt;p&gt;没有必要再花一次昂贵 FEM。&lt;/p&gt;
+&lt;p&gt;反过来，如果：&lt;/p&gt;
+\[
+\mu=0.05,\qquad\sigma=0.1,
+\]&lt;p&gt;那么这个点到底属于：&lt;/p&gt;
+\[
+g&gt;0
+\]&lt;p&gt;还是&lt;/p&gt;
+\[
+g&lt;0
+\]&lt;p&gt;非常不确定。&lt;/p&gt;
+&lt;p&gt;于是 Echard 等提出非常简单的学习函数：&lt;/p&gt;
+&lt;h1 id=&#34;umathbf-x&#34;&gt;[
+\boxed{
+U(\mathbf x)
+&lt;/h1&gt;&lt;p&gt;\frac{|\mu(\mathbf x)|}
+{\sigma(\mathbf x)}
+}
+]&lt;/p&gt;
+&lt;p&gt;AK-MCS 每轮寻找：&lt;/p&gt;
+&lt;h1 id=&#34;mathbf-x&#34;&gt;[
+\mathbf x^*
+&lt;/h1&gt;&lt;p&gt;\arg\min U(\mathbf x).
+]&lt;/p&gt;
+&lt;p&gt;也就是优先计算：&lt;/p&gt;
+\[
+\boxed{
+\text{离失效面近}
++
+\text{预测又不确定}
+}
+\]&lt;p&gt;的样本。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-为什么--函数这么聪明&#34;&gt;4. 为什么 \(U\) 函数这么聪明？
+&lt;/h1&gt;&lt;p&gt;这个式子看起来非常简单：&lt;/p&gt;
+\[
+U=\frac{|\mu|}{\sigma}.
+\]&lt;p&gt;但它同时编码了两个需求。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[
+|\mu|\rightarrow0,
+\]&lt;p&gt;说明预测点靠近：&lt;/p&gt;
+\[
+g=0.
+\]&lt;p&gt;这是 &lt;strong&gt;exploitation&lt;/strong&gt;：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;去研究我们已经认为可能存在失效边界的位置。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[
+\sigma\rightarrow\infty,
+\]&lt;p&gt;则：&lt;/p&gt;
+\[
+U\rightarrow0.
+\]&lt;p&gt;这是 &lt;strong&gt;exploration&lt;/strong&gt;：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;去研究代理模型没有把握的位置。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;所以 U-learning 实际是在做：&lt;/p&gt;
+\[
+\boxed{
+\text{boundary exploitation}
++
+\text{uncertainty exploration}
+}
+\]&lt;p&gt;这正是主动学习 acquisition function 的核心结构。&lt;/p&gt;
+&lt;p&gt;从机器学习视角看，它和 Bayesian optimization 中 EI、UCB 的思路非常接近。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-一个更深的解释-本质上是分类置信度&#34;&gt;5. 一个更深的解释：\(U\) 本质上是“分类置信度”
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[
+G(\mathbf x)
+\sim
+N(\mu,\sigma^2).
+\]&lt;p&gt;如果：&lt;/p&gt;
+\[
+\mu&gt;0,
+\]&lt;p&gt;代理模型认为该点安全。&lt;/p&gt;
+&lt;p&gt;但真正失效的概率为：&lt;/p&gt;
+&lt;h1 id=&#34;pgle0&#34;&gt;[
+P(G\le0)
+&lt;/h1&gt;&lt;p&gt;\Phi
+\left(
+-\frac{\mu}{\sigma}
+\right).
+]&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+&lt;h1 id=&#34;p_rm-misclass&#34;&gt;[
+P_{\rm misclass}
+&lt;/h1&gt;&lt;p&gt;\Phi(-U).
+]&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[
+U=2
+\]&lt;p&gt;时：&lt;/p&gt;
+\[
+P_{\rm misclass}
+\approx2.3\%.
+\]&lt;p&gt;这解释了 AK-MCS 中经典的：&lt;/p&gt;
+\[
+U\ge2
+\]&lt;p&gt;停止思想。&lt;/p&gt;
+&lt;p&gt;当所有候选点都满足：&lt;/p&gt;
+\[
+U\ge2,
+\]&lt;p&gt;意味着每个候选样本的 Kriging 分类都有相对较高置信度。&lt;/p&gt;
+&lt;p&gt;因此它优化的目标非常明确：&lt;/p&gt;
+\[
+\boxed{
+\text{让失效/安全分类足够可靠}
+}
+\]&lt;p&gt;而不是把整个响应面磨得越来越光滑。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-ak-mcs-实际如何运行&#34;&gt;6. AK-MCS 实际如何运行
+&lt;/h1&gt;&lt;p&gt;算法结构可以压缩成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;1. 少量 DoE 样本
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;2. 调用真实 FEM / simulation
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;3. 建立 Kriging
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;4. 生成巨大 Monte Carlo candidate population
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;5. Kriging 预测全部 candidate
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;6. 找 min U(x)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;7. 真实计算这个点
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;8. 更新 Kriging
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;9. 重复
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;10. 使用 surrogate 判断 MCS 样本失效/安全
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这里有一个非常漂亮的计算分工：&lt;/p&gt;
+&lt;p&gt;真实模型负责：&lt;/p&gt;
+\[
+N_{\rm HF}\sim几十\text{到几百}
+\]&lt;p&gt;次昂贵计算。&lt;/p&gt;
+&lt;p&gt;而：&lt;/p&gt;
+\[
+10^5\sim10^7
+\]&lt;p&gt;个 Monte Carlo 点则交给极便宜的 Kriging。&lt;/p&gt;
+&lt;p&gt;因此 AK-MCS 可以理解为：&lt;/p&gt;
+\[
+\boxed{
+\text{Kriging负责降低单次成本}
++
+\text{Active Learning负责减少训练点}
++
+\text{MCS负责概率积分}
+}
+\]&lt;p&gt;这三个模块实际上相互独立。后来的统一研究框架也把主动可靠性分析拆成四个模块：&lt;/p&gt;
+\[
+\boxed{
+\text{surrogate}
++
+\text{reliability estimator}
++
+\text{learning function}
++
+\text{stopping criterion}
+}
+\]&lt;p&gt;这是一种很适合研究创新的模块化视角。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么这对有限元问题特别有效&#34;&gt;7. 为什么这对有限元问题特别有效？
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[
+x_1=\text{材料模量},
+\]\[
+x_2=\text{间隙},
+\]\[
+x_3=\text{载荷},
+\]&lt;p&gt;有限元输出最大应力：&lt;/p&gt;
+\[
+\sigma_{\max}(\mathbf x).
+\]&lt;p&gt;定义：&lt;/p&gt;
+&lt;h1 id=&#34;gmathbf-x&#34;&gt;[
+g(\mathbf x)
+&lt;/h1&gt;&lt;h2 id=&#34;sigma_rm-allow&#34;&gt;\sigma_{\rm allow}
+&lt;/h2&gt;&lt;p&gt;\sigma_{\max}(\mathbf x).
+]&lt;/p&gt;
+&lt;p&gt;普通 DoE 可能大量采样：&lt;/p&gt;
+\[
+g\gg0
+\]&lt;p&gt;的安全区域。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;         x2
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          ↑
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;安全      · · · · ·
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          · · · · ·
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;         · · × × ·
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       · · ×失效× ·
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;----------g=0----------→ x1
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;对于可靠度计算，那些远离 \(g=0\) 的：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;· · · · ·
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;其实几乎没有信息价值。&lt;/p&gt;
+&lt;p&gt;AK-MCS 会逐渐把高保真样本集中到：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;× × × × ×
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;即极限状态面附近。&lt;/p&gt;
+&lt;p&gt;因此它实际上做的是：&lt;/p&gt;
+\[
+\boxed{
+\text{information allocation}
+}
+\]&lt;p&gt;而不仅仅是 surrogate fitting。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-这也是为什么缺一个变量后--暴跌需要谨慎解释&#34;&gt;8. 这也是为什么“缺一个变量后 \(R^2\) 暴跌”需要谨慎解释
+&lt;/h1&gt;&lt;p&gt;这里有一个非常重要的研究启发。&lt;/p&gt;
+&lt;p&gt;假设完整输入：&lt;/p&gt;
+\[
+g(x_1,x_2,x_3).
+\]&lt;p&gt;删除：&lt;/p&gt;
+\[
+x_3
+\]&lt;p&gt;以后，得到：&lt;/p&gt;
+\[
+\hat g(x_1,x_2).
+\]&lt;p&gt;如果 \(R^2\)：&lt;/p&gt;
+\[
+0.96\rightarrow0.4,
+\]&lt;p&gt;通常会马上得出：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;模型坏了。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;但可靠性问题真正应该再问一步：&lt;/p&gt;
+\[
+\boxed{
+\operatorname{sign}(\hat g)
+\text{ 在 }g\approx0\text{ 区域还能不能保持正确？}
+}
+\]&lt;p&gt;可能出现两种完全不同的结果：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;情况 A&lt;/strong&gt;&lt;/p&gt;
+\[
+R^2=0.4
+\]&lt;p&gt;但 limit-state classification 很准确。&lt;/p&gt;
+&lt;p&gt;则：&lt;/p&gt;
+\[
+P_f
+\]&lt;p&gt;仍可能很好。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;情况 B&lt;/strong&gt;&lt;/p&gt;
+\[
+R^2=0.95
+\]&lt;p&gt;但少数失效边界点发生错判。&lt;/p&gt;
+&lt;p&gt;则：&lt;/p&gt;
+\[
+P_f
+\]&lt;p&gt;可能严重偏差。&lt;/p&gt;
+&lt;p&gt;因此对于可靠性代理模型，更适合关注：&lt;/p&gt;
+\[
+P_{\rm misclass},
+\]\[
+\text{limit-state error},
+\]\[
+|\Delta P_f|,
+\]&lt;p&gt;而不能只看：&lt;/p&gt;
+\[
+R^2,\quad RMSE.
+\]&lt;p&gt;这正是 AK-MCS 给出的评价范式转变。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-ak-mcs-的局限在哪里&#34;&gt;9. AK-MCS 的局限在哪里？
+&lt;/h1&gt;&lt;p&gt;AK-MCS 并非万能。&lt;/p&gt;
+&lt;p&gt;最明显的问题是：&lt;/p&gt;
+&lt;h3 id=&#34;高维&#34;&gt;高维
+&lt;/h3&gt;&lt;p&gt;随着维数增加：&lt;/p&gt;
+\[
+d\uparrow
+\]&lt;p&gt;Gaussian Process 本身训练和候选集搜索都会越来越困难。&lt;/p&gt;
+&lt;h3 id=&#34;极小失效概率&#34;&gt;极小失效概率
+&lt;/h3&gt;&lt;p&gt;如果：&lt;/p&gt;
+\[
+P_f\sim10^{-8},
+\]&lt;p&gt;crude Monte Carlo 候选池本身就会非常低效。&lt;/p&gt;
+&lt;p&gt;因此常见改进是：&lt;/p&gt;
+\[
+\text{AK}
++
+\text{Importance Sampling},
+\]&lt;p&gt;或者：&lt;/p&gt;
+\[
+\text{AK}
++
+\text{Subset Simulation}.
+\]&lt;p&gt;Echard 等随后就在 2012 年发展了结合 importance sampling 与 Kriging 的方法，用于更小失效概率。&lt;/p&gt;
+&lt;h3 id=&#34;多个失效区域&#34;&gt;多个失效区域
+&lt;/h3&gt;&lt;p&gt;如果存在多个相互分离的 failure islands：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;safe safe [failure]
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;safe safe safe
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[failure] safe safe
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;主动学习可能过早集中到其中一个边界，遗漏另一个。&lt;/p&gt;
+&lt;p&gt;因此近年来大量工作都在改：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;acquisition function；&lt;/li&gt;
+&lt;li&gt;distance penalty；&lt;/li&gt;
+&lt;li&gt;clustering；&lt;/li&gt;
+&lt;li&gt;batch sampling；&lt;/li&gt;
+&lt;li&gt;system reliability learning。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;2023–2025 年的研究仍在继续改进这一点，说明这个问题远没有彻底解决。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-一个很新的方向给-ak-mcs-加统计认证&#34;&gt;10. 一个很新的方向：给 AK-MCS 加“统计认证”
+&lt;/h1&gt;&lt;p&gt;经典 AK-MCS 中：&lt;/p&gt;
+\[
+\sigma_{\rm GP}
+\]&lt;p&gt;来自 Gaussian Process 自身的概率模型。&lt;/p&gt;
+&lt;p&gt;问题是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;如果 GP 模型假设本身错了呢？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;2026 年 6 月出现的一项工作提出 &lt;strong&gt;AK-MCS-C2&lt;/strong&gt;，把 conformal prediction 与 AK-MCS 结合，希望给 surrogate classification error 提供更弱分布假设下的统计保证，尤其针对小样本和 rare-event reliability。这个方向目前仍比较新，适合作为“代理模型不确定性如何真正进入可靠度可信度”的研究入口。&lt;/p&gt;
+&lt;p&gt;这背后实际上对应一个越来越重要的问题：&lt;/p&gt;
+\[
+\boxed{
+\text{我们不仅要估计 }P_f，
+\text{还要知道这个 }P_f\text{ 有多可信。}
+}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;今天最值得留下的一点&#34;&gt;今天最值得留下的一点
+&lt;/h1&gt;&lt;p&gt;AK-MCS 最深刻的地方可以浓缩成一句：&lt;/p&gt;
+\[
+\boxed{
+\text{采样策略应当服务于最终任务，而不是服务于代理模型本身。}
+}
+\]&lt;p&gt;如果任务是预测温度场：&lt;/p&gt;
+\[
+\text{global RMSE}
+\]&lt;p&gt;可能很重要。&lt;/p&gt;
+&lt;p&gt;如果任务是优化：&lt;/p&gt;
+\[
+\text{optimum neighborhood}
+\]&lt;p&gt;更重要。&lt;/p&gt;
+&lt;p&gt;如果任务是可靠性：&lt;/p&gt;
+\[
+\boxed{\text{limit-state surface}}
+\]&lt;p&gt;才是信息最有价值的位置。&lt;/p&gt;
+&lt;p&gt;因此在做任何代理模型之前，一个比“选什么核函数”更重要的问题是：&lt;/p&gt;
+\[
+\boxed{\text{我真正需要这个 surrogate 判断什么？}}
+\]&lt;hr&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;p&gt;原始方法首选 Echard, Gayton &amp;amp; Lemaire, &lt;em&gt;AK-MCS: An active learning reliability method combining Kriging and Monte Carlo Simulation&lt;/em&gt;, &lt;strong&gt;Structural Safety, 2011&lt;/strong&gt;。这是整个方法族最值得先读的一篇。&lt;/p&gt;
+&lt;p&gt;想建立完整知识地图，推荐 Moustapha, Marelli &amp;amp; Sudret, &lt;em&gt;Active learning for structural reliability: Survey, general framework and benchmark&lt;/em&gt;。作者把大量方法统一拆成 surrogate、reliability estimator、learning function 和 stopping criterion，并进行了大规模 benchmark。&lt;/p&gt;
+&lt;p&gt;如果想直接看实现，&lt;code&gt;mistral&lt;/code&gt; 的 AKMCS 实现以及基于 OpenTURNS 的 &lt;code&gt;otak&lt;/code&gt; 项目都提供了可参考的工程入口。&lt;/p&gt;
+&lt;p&gt;如果想追近期研究，可以看 2026 年提出的 &lt;strong&gt;AK-MCS-C2&lt;/strong&gt;：它尝试用 conformal prediction 给 AK-MCS 的代理误差增加统计意义上的认证，这条路线与“小样本代理模型可靠度可信性”关系很直接。&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>

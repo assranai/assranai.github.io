@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="IPC：把“碰撞处理”改写成一个优化问题 主题：Incremental Potential Contact（IPC，增量势接触）\n领域：有限元 × 非线性动力学 × 碰撞 × 物理引擎\n推荐阅读时间：约 8 分钟\n今天选 IPC，是因为它背后有一个很值得迁移的思想：当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。\nIPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。\n这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。\n1. IPC 在整个知识体系里的位置 先看传统软体模拟的一条典型流水线：\n\\[ \\text{弹性内力} \\rightarrow \\text{时间积分} \\rightarrow \\text{碰撞检测} \\rightarrow \\text{穿透修正} \\rightarrow \\text{速度修正} \\]这里存在一个结构性问题。\n弹性求解器可能得到一个它认为合理的位置 \\(x\\)，碰撞模块随后说：\n这个位置非法，改掉。\n于是碰撞模块把位置投影到另一个位置 \\(x'\\)。\n但 \\(x'\\) 并不一定满足原来的弹性能量最小化问题。\n下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：\n接触抖动； 大量 constraint fighting； 四面体压扁； 接触附近异常刚化； 能量注入； 极端情况下元素反转。 IPC 的关键改变是：\n接触本身也是能量。\n于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。\n">
+<title>IPC：把“碰撞处理”改写成一个优化问题</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/01-ipc/'>
+
+<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="IPC：把“碰撞处理”改写成一个优化问题">
+<meta property='og:description' content="IPC：把“碰撞处理”改写成一个优化问题 主题：Incremental Potential Contact（IPC，增量势接触）\n领域：有限元 × 非线性动力学 × 碰撞 × 物理引擎\n推荐阅读时间：约 8 分钟\n今天选 IPC，是因为它背后有一个很值得迁移的思想：当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。\nIPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。\n这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。\n1. IPC 在整个知识体系里的位置 先看传统软体模拟的一条典型流水线：\n\\[ \\text{弹性内力} \\rightarrow \\text{时间积分} \\rightarrow \\text{碰撞检测} \\rightarrow \\text{穿透修正} \\rightarrow \\text{速度修正} \\]这里存在一个结构性问题。\n弹性求解器可能得到一个它认为合理的位置 \\(x\\)，碰撞模块随后说：\n这个位置非法，改掉。\n于是碰撞模块把位置投影到另一个位置 \\(x'\\)。\n但 \\(x'\\) 并不一定满足原来的弹性能量最小化问题。\n下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：\n接触抖动； 大量 constraint fighting； 四面体压扁； 接触附近异常刚化； 能量注入； 极端情况下元素反转。 IPC 的关键改变是：\n接触本身也是能量。\n于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/01-ipc/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='非线性动力学' /><meta property='article:tag' content='碰撞' /><meta property='article:tag' content='物理引擎' /><meta property='article:published_time' content='2026-08-14T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-14T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="IPC：把“碰撞处理”改写成一个优化问题">
+<meta name="twitter:description" content="IPC：把“碰撞处理”改写成一个优化问题 主题：Incremental Potential Contact（IPC，增量势接触）\n领域：有限元 × 非线性动力学 × 碰撞 × 物理引擎\n推荐阅读时间：约 8 分钟\n今天选 IPC，是因为它背后有一个很值得迁移的思想：当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。\nIPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。\n这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。\n1. IPC 在整个知识体系里的位置 先看传统软体模拟的一条典型流水线：\n\\[ \\text{弹性内力} \\rightarrow \\text{时间积分} \\rightarrow \\text{碰撞检测} \\rightarrow \\text{穿透修正} \\rightarrow \\text{速度修正} \\]这里存在一个结构性问题。\n弹性求解器可能得到一个它认为合理的位置 \\(x\\)，碰撞模块随后说：\n这个位置非法，改掉。\n于是碰撞模块把位置投影到另一个位置 \\(x'\\)。\n但 \\(x'\\) 并不一定满足原来的弹性能量最小化问题。\n下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：\n接触抖动； 大量 constraint fighting； 四面体压扁； 接触附近异常刚化； 能量注入； 极端情况下元素反转。 IPC 的关键改变是：\n接触本身也是能量。\n于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-ipc-在整个知识体系里的位置">1. IPC 在整个知识体系里的位置</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+    <li><a href="#延伸讨论">延伸讨论</a>
+      <ol>
+        <li><a href="#1-ccd-真正保证的是什么">1. CCD 真正保证的是什么？</a></li>
+        <li><a href="#2-那-barrier-为什么仍然不可替代">2. 那 barrier 为什么仍然不可替代？</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#3-用一个简单例子就能看出来">3. 用一个简单例子就能看出来</a></li>
+        <li><a href="#4-更深一层这和你做的--barrier-很像">4. 更深一层：这和你做的 \(J\)-barrier 很像</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/01-ipc/">IPC：把“碰撞处理”改写成一个优化问题</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-14T00:00:00Z'>Aug 14, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 1 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="ipc把碰撞处理改写成一个优化问题">IPC：把“碰撞处理”改写成一个优化问题
+</h1><p><strong>主题：Incremental Potential Contact（IPC，增量势接触）</strong><br>
+<strong>领域：有限元 × 非线性动力学 × 碰撞 × 物理引擎</strong><br>
+<strong>推荐阅读时间：约 8 分钟</strong></p>
+<p>今天选 IPC，是因为它背后有一个很值得迁移的思想：<strong>当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。</strong></p>
+<p>IPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。</p>
+<p>这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。</p>
+<hr>
+<h2 id="1-ipc-在整个知识体系里的位置">1. IPC 在整个知识体系里的位置
+</h2><p>先看传统软体模拟的一条典型流水线：</p>
+\[
+\text{弹性内力}
+\rightarrow
+\text{时间积分}
+\rightarrow
+\text{碰撞检测}
+\rightarrow
+\text{穿透修正}
+\rightarrow
+\text{速度修正}
+\]<p>这里存在一个结构性问题。</p>
+<p>弹性求解器可能得到一个它认为合理的位置 \(x\)，碰撞模块随后说：</p>
+<blockquote>
+<p>这个位置非法，改掉。</p>
+</blockquote>
+<p>于是碰撞模块把位置投影到另一个位置 \(x'\)。</p>
+<p>但 \(x'\) <strong>并不一定满足原来的弹性能量最小化问题</strong>。</p>
+<p>下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：</p>
+<ul>
+<li>接触抖动；</li>
+<li>大量 constraint fighting；</li>
+<li>四面体压扁；</li>
+<li>接触附近异常刚化；</li>
+<li>能量注入；</li>
+<li>极端情况下元素反转。</li>
+</ul>
+<p>IPC 的关键改变是：</p>
+<blockquote>
+<p><strong>接触本身也是能量。</strong></p>
+</blockquote>
+<p>于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。</p>
+<p>这就是 IPC 在体系中的真正位置：</p>
+\[
+\boxed{
+\text{Time integration}
++
+\text{FEM energy}
++
+\text{Contact}
++
+\text{Friction}
+\rightarrow
+\text{Incremental potential minimization}
+}
+\]<p>它属于 <strong>variational / optimization-based dynamics</strong> 这条路线，而不只是某个更好的 collision response 算法。原论文明确将其定位为 nonlinear elastodynamics 的 robust and accurate time stepping 方法。</p>
+<hr>
+<h1 id="2-第一步把隐式时间积分写成最小化">2. 第一步：把隐式时间积分写成最小化
+</h1><p>考虑</p>
+\[
+M\ddot x=-\nabla E(x)+f_{\rm ext}.
+\]<p>这里：</p>
+<ul>
+<li>\(M\)：质量矩阵；</li>
+<li>\(E(x)\)：弹性势能；</li>
+<li>\(x\)：节点位置。</li>
+</ul>
+<p>例如 Neo-Hookean FEM 中：</p>
+\[
+E(x)=\sum_e V_e^0\Psi(F_e(x)).
+\]<p>对于 Backward Euler，可以把下一时刻的位置写成类似下面的优化问题：</p>
+<h1 id="xn1">[
+x^{n+1}
+</h1><p>\arg\min_x
+\left[
+\frac{1}{2h^2}
+|x-\tilde{x}|_M^2
++
+E(x)
+\right].
+]</p>
+<p>其中</p>
+<h1 id="tildex">[
+\tilde{x}
+</h1><p>x^n+h v^n+h^2M^{-1}f_{\rm ext}
+]</p>
+<p>可以理解为<strong>如果不存在弹性约束，节点惯性希望去的位置</strong>。</p>
+<p>因此目标函数有两个竞争项：</p>
+\[
+\underbrace{
+\frac{1}{2h^2}\|x-\tilde{x}\|_M^2
+}_{\text{惯性}}
++
+\underbrace{
+E(x)
+}_{\text{材料}}
+\]<p>系统最终选择二者折中的最低能量位置。</p>
+<p>这个思想本身并不是 IPC 发明的；IPC 的精彩之处发生在下一步。</p>
+<hr>
+<h1 id="3-把不允许穿透也变成势能">3. 把“不允许穿透”也变成势能
+</h1><p>假设两个几何 primitive 的距离为</p>
+\[
+d(x).
+\]<p>传统方法可能规定</p>
+\[
+d(x)\ge 0
+\]<p>然后在违反约束后投影。</p>
+<p>IPC 引入 <strong>barrier potential</strong>：</p>
+\[
+B(d)=
+\begin{cases}
+-\kappa(d-\hat d)^2
+\ln\left(\frac d{\hat d}\right),
+&
+0<d<\hat d
+\\
+0,
+&
+d\ge\hat d
+\end{cases}
+\]<p>其中：</p>
+<ul>
+<li>\(\hat d\)：barrier 开始作用的距离；</li>
+<li>\(\kappa\)：barrier stiffness。</li>
+</ul>
+<p>最重要的是：</p>
+\[
+\boxed{
+\lim_{d\rightarrow0^+}B(d)=+\infty
+}
+\]<p>也就是说：</p>
+<blockquote>
+<p>两个表面越接近真正的碰撞状态，继续靠近所需要支付的能量代价越大。</p>
+</blockquote>
+<p>于是新的时间步成为</p>
+<h1 id="xn1-1">[
+x^{n+1}
+</h1><p>\arg\min_x
+\left[
+\frac{1}{2h^2}
+|x-\tilde{x}|<em>M^2
++
+E</em>{\rm elastic}(x)
++
+B_{\rm contact}(x)
+\right].
+]</p>
+<p>这一步非常重要。</p>
+<p><strong>碰撞和材料现在处于同一个优化问题中。</strong></p>
+<p>不存在“FEM 算完以后 collision solver 再把结果改掉”这一层逻辑分裂。</p>
+<hr>
+<h1 id="4-为什么-barrier-比-penalty-更深一层">4. 为什么 barrier 比 penalty 更深一层？
+</h1><p>Penalty contact 常见形式：</p>
+\[
+E_p(d)=\frac12 k\min(d,0)^2.
+\]<p>它的逻辑是：</p>
+\[
+d<0
+\]<p>已经发生穿透以后，再产生恢复力。</p>
+<p>所以 penalty 方法本质允许：</p>
+\[
+\boxed{\text{先违法，再惩罚}}
+\]<p>而 barrier 的定义域直接限制在：</p>
+\[
+d>0.
+\]<p>并且：</p>
+\[
+B(d)\rightarrow\infty
+\quad(d\rightarrow0^+)
+\]<p>因此其数学结构变成：</p>
+\[
+\boxed{\text{永远不要进入非法区域}}
+\]<p>这与 interior-point optimization 中 barrier method 的思想高度一致。</p>
+<p>这也是 IPC 名字里 <strong>Potential Contact</strong> 的真正含义。</p>
+<hr>
+<h1 id="5-但仅有-barrier-仍然不够">5. 但仅有 barrier 仍然不够
+</h1><p>这里出现一个很漂亮的数值问题。</p>
+<p>假设 Newton 迭代得到：</p>
+\[
+x_{k+1}=x_k+\alpha p.
+\]<p>即使：</p>
+\[
+x_k
+\]<p>完全无穿透，也不能保证</p>
+\[
+x_k+p
+\]<p>没有穿透。</p>
+<p>例如两个三角形可能在 Newton step 中直接穿过去。</p>
+<p>所以 IPC 又引入 <strong>Continuous Collision Detection（CCD）</strong>。</p>
+<p>CCD 求的是：</p>
+<h1 id="alpha_rm-collision">[
+\alpha_{\rm collision}
+</h1><p>\min{
+\alpha:
+d(x_k+\alpha p)=0
+}.
+]</p>
+<p>然后 line search 强制：</p>
+\[
+\alpha
+<
+\alpha_{\rm collision}.
+\]<p>于是 Newton optimization 的路径本身也保持 collision-free。</p>
+<p>这形成了 IPC 最重要的组合：</p>
+\[
+\boxed{
+\text{Barrier Energy}
++
+\text{CCD}
++
+\text{Line Search}
+}
+\]<p>barrier 负责：</p>
+<p><strong>终点不能碰撞。</strong></p>
+<p>CCD 负责：</p>
+<p><strong>走向终点的路径也不能穿过去。</strong></p>
+<p>IPC 因而能够构造 intersection-free trajectories，而不仅仅是让离散帧最终看起来没有穿透。</p>
+<hr>
+<h1 id="6-一个直观例子把软体挤进细管">6. 一个直观例子：把软体挤进细管
+</h1><p>设一个 Neo-Hookean 四面体软体被刚体活塞压进比自身窄很多的管道。</p>
+<p>传统求解器可能经历：</p>
+\[
+\text{compression}
+\rightarrow
+\text{penetration}
+\rightarrow
+\text{projection}
+\rightarrow
+\text{tet distortion}
+\rightarrow
+J\downarrow
+\rightarrow
+\text{inversion}.
+\]<p>IPC 则同时考虑：</p>
+\[
+E_{\rm inertia}
++
+E_{\rm NH}
++
+E_{\rm contact}.
+\]<p>Newton optimizer 会寻找：</p>
+<blockquote>
+<p>在保持材料响应的同时，又不进入 collision barrier 的最低增量势状态。</p>
+</blockquote>
+<p>IPC 项目主页展示的代表性 stress test 就包括：一个板将大量复杂 Neo-Hookean 四面体模型压入狭窄障碍物中，并保持无相交、无反转。</p>
+<p>所以 IPC 的强项尤其集中在：</p>
+\[
+\boxed{
+\text{large deformation}
++
+\text{dense contact}
++
+\text{high stiffness}
+}
+\]<p>这恰恰是很多实时软体方法最容易崩掉的区域。</p>
+<hr>
+<h1 id="7-一个值得记住的思想feasibility-和-accuracy-分离">7. 一个值得记住的思想：feasibility 和 accuracy 分离
+</h1><p>IPC 有一个很有工程价值的设计哲学：</p>
+<blockquote>
+<p><strong>数值精度可以降低，但几何可行性尽量不能降低。</strong></p>
+</blockquote>
+<p>论文专门测试了较宽松求解容差；在动画等低精度需求下，即使降低优化精度，也仍可以维持 feasibility 和 plausible behavior。</p>
+<p>这实际上给物理引擎设计提供了一种很有价值的层次：</p>
+\[
+\text{Hard invariant}
+\]<p>例如：</p>
+\[
+d>0,\qquad J>0
+\]<p>与</p>
+\[
+\text{Soft accuracy target}
+\]<p>例如：</p>
+\[
+\|\nabla E\|<\epsilon
+\]<p>应该分开。</p>
+<p>实时引擎完全可以允许：</p>
+\[
+\epsilon=10^{-3}
+\]<p>而不是：</p>
+\[
+10^{-8},
+\]<p>但最好不要允许：</p>
+\[
+J<0.
+\]<p>这是比“所有东西都调 tolerance”更清晰的求解器设计原则。</p>
+<hr>
+<h1 id="8-ipc-与-xpbd-的根本区别">8. IPC 与 XPBD 的根本区别
+</h1><p>XPBD 更接近：</p>
+\[
+C_i(x)=0
+\]<p>然后依次更新：</p>
+\[
+x\leftarrow x+\Delta x_i.
+\]<p>也就是 <strong>constraint projection / iterative constraint solving</strong>。</p>
+<p>它的优势非常明显：</p>
+<ul>
+<li>算法简单；</li>
+<li>易实时化；</li>
+<li>易并行；</li>
+<li>iteration budget 可控；</li>
+<li>非常适合游戏。</li>
+</ul>
+<p>IPC 更接近：</p>
+<h1 id="x">[
+x^*
+</h1><p>\arg\min E_{\rm total}(x).
+]</p>
+<p>然后使用 Newton 类优化：</p>
+\[
+H\Delta x=-g.
+\]<p>所以 IPC 的代价也很明显：</p>
+<ul>
+<li>Hessian 构造复杂；</li>
+<li>broad phase + CCD 成本高；</li>
+<li>sparse linear solve 很重；</li>
+<li>barrier conditioning 会变差；</li>
+<li>相比 XPBD 更难满足严格实时预算。</li>
+</ul>
+<p>因此 IPC 未必是“下一代游戏 XPBD”。</p>
+<p>它更像一个<strong>高鲁棒性的参照系</strong>：</p>
+<blockquote>
+<p>如果一个接触问题理论上应该怎么处理，IPC 给出了非常干净的答案；实时物理引擎则可以研究如何近似这个答案。</p>
+</blockquote>
+<p>这也是为什么它特别值得物理引擎开发者读。</p>
+<hr>
+<h1 id="9-一个更值得继续追的方向ipc-本身也在演化">9. 一个更值得继续追的方向：IPC 本身也在演化
+</h1><p>IPC 并没有停在 2020 年。</p>
+<p>2021 年的 **Codimensional IPC（C-IPC）**进一步统一了：</p>
+<ul>
+<li>volumetric solids；</li>
+<li>shells / cloth；</li>
+<li>rods / hair；</li>
+<li>particles；</li>
+</ul>
+<p>并加入 thickness 与 strain limiting 等处理，使 codimension 0/1/2/3 的结构可以在统一框架中进行摩擦接触。</p>
+<p>更值得注意的是，IPC Toolkit 到 <strong>2026 年 2 月发布的 v1.5.0</strong> 又加入了：</p>
+<ul>
+<li>Geometric Contact Potential；</li>
+<li>Offset Geometric Contact；</li>
+<li>fully parallel LBVH broad phase；</li>
+<li>collision normal / signed distance / dihedral angle 的 gradient 与 Hessian utilities。</li>
+</ul>
+<p>所以 IPC 已经逐渐从“一篇 SIGGRAPH 算法”发展成一个<strong>接触动力学方法族与工程工具链</strong>。</p>
+<hr>
+<h1 id="10-对你当前求解器研究最值得迁移的一点">10. 对你当前求解器研究最值得迁移的一点
+</h1><p>如果一个软体系统出现：</p>
+\[
+J\downarrow
+\rightarrow
+\text{barrier activates}
+\rightarrow
+\text{仍继续坍缩}
+\]<p>很容易继续沿着：</p>
+\[
+\kappa\uparrow,\qquad
+compliance\downarrow,\qquad
+iterations\uparrow
+\]<p>这条路调参数。</p>
+<p>IPC 提供了另一个诊断角度：</p>
+<p><strong>检查不同物理约束是否真的属于同一个一致的离散系统。</strong></p>
+<p>尤其值得检查：</p>
+\[
+\text{elasticity}
+\leftrightarrow
+\text{contact}
+\leftrightarrow
+\text{volume/inversion prevention}
+\leftrightarrow
+\text{velocity update}.
+\]<p>如果四者分别通过不同投影、不同 λ 历史、不同速度修正机制作用，那么即使每个模块单独正确，组合后仍可能产生不一致。</p>
+<p>因此可以把 IPC 当作一个“理论上限”：</p>
+\[
+\boxed{
+\text{统一能量}
+\rightarrow
+\text{统一优化}
+\rightarrow
+\text{可行域保护}
+}
+\]<p>然后再问一个很有研究价值的问题：</p>
+<blockquote>
+<p><strong>能不能保留 IPC 的 invariant / feasibility 思想，同时获得 XPBD 的实时计算结构？</strong></p>
+</blockquote>
+<p>这条问题链会自然连接到 barrier-augmented XPBD、variational PBD、projective dynamics、ADMM、nonlinear Gauss-Seidel，以及 GPU-friendly contact optimization。</p>
+<p>这比单纯继续增加一个防反转 constraint，研究空间要大得多。</p>
+<hr>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2>\[
+\boxed{
+\text{Robustness often comes from changing the formulation, not tuning the solver.}
+}
+\]<p>当一个物理求解器开始依赖越来越多的 clamp、阈值、特殊分支和事后修正时，值得检查的可能已经不只是参数，而是<strong>问题有没有被放在正确的数学形式里。</strong></p>
+<h3 id="拓展阅读">拓展阅读
+</h3><p>原始论文和演示优先看官方 <a class="link" href="https://ipc-sim.github.io/"  target="_blank" rel="noopener"
+    >IPC Project Page</a>，其中包含论文、视频、Supplement 和代码入口；论文为 Li et al., <em>Incremental Potential Contact: Intersection- and Inversion-free Large Deformation Dynamics</em>, ACM TOG / SIGGRAPH 2020。</p>
+<p>想看真正的工程结构，可以直接读 <a class="link" href="https://github.com/ipc-sim/IPC"  target="_blank" rel="noopener"
+    >IPC Reference Implementation</a>。官方仓库同时给出了 Neo-Hookean、Fixed Corotational、Backward Euler/Newmark、CCD、稀疏线性求解等实际实现入口。</p>
+<p>进一步研究薄壳、布料、杆和毛发，推荐 <a class="link" href="https://ipc-sim.github.io/C-IPC/"  target="_blank" rel="noopener"
+    >Codimensional IPC</a>，对应 SIGGRAPH 2021。</p>
+<p>如果准备自己实现，可以进一步看现在仍在维护的 <a class="link" href="https://ipctk.xyz/"  target="_blank" rel="noopener"
+    >IPC Toolkit</a>；2026 年版本已经包含更新的 contact potential、并行 broad phase 以及大量导数工具。</p>
+<p>最后，Danny M. Kaufman 的 <a class="link" href="https://www.cs.columbia.edu/~kaufman/"  target="_blank" rel="noopener"
+    >个人主页与论文列表</a> 很适合沿着 IPC → C-IPC → intersection-free rigid body dynamics → injective deformation 这条研究脉络继续往下挖。</p>
+<hr>
+<h2 id="延伸讨论">延伸讨论
+</h2><blockquote>
+<p><strong>问：</strong> 提问：看起来ccd才是起到碰撞合法决定性作用的约束</p>
+</blockquote>
+<p>对。<strong>如果只问“是什么机制从几何上保证这一 Newton 步不会穿透”，CCD 确实是决定性的。</strong> 不过 IPC 的关键在于：CCD 和 barrier 分别解决了两个不同层次的问题。</p>
+<p>可以把它们拆开：</p>
+\[
+\boxed{\text{CCD：保证搜索路径合法}}
+\qquad
+\boxed{\text{Barrier：决定合法区域内的物理解}}
+\]<h3 id="1-ccd-真正保证的是什么">1. CCD 真正保证的是什么？
+</h3><p>假设当前状态 \(x_k\) 合法，Newton 给出方向 \(p\)：</p>
+\[
+x(\alpha)=x_k+\alpha p.
+\]<p>如果直接取 \(\alpha=1\)，两个三角形可能从彼此两侧直接穿过去。</p>
+<p>CCD 求第一次发生接触的时刻：</p>
+\[
+\alpha_c=\min\{\alpha\in(0,1]\mid d(x_k+\alpha p)=0\}.
+\]<p>然后限制：</p>
+\[
+\alpha < \alpha_c.
+\]<p>所以只要初始状态满足</p>
+\[
+d(x_k)>0,
+\]<p>CCD + line search 就可以维持</p>
+\[
+d(x_{k+1})>0.
+\]<p>从这个意义上，你的判断完全成立：</p>
+<blockquote>
+<p><strong>IPC 的“intersection-free”几何可行性，直接执行者确实是 CCD。</strong></p>
+</blockquote>
+<h3 id="2-那-barrier-为什么仍然不可替代">2. 那 barrier 为什么仍然不可替代？
+</h3><p>考虑一个极端情况：<strong>只有 CCD，没有 barrier。</strong></p>
+<p>Newton 给出的 unconstrained solution 想让两个物体穿过去：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">当前状态                  unconstrained目标
+</span></span><span class="line"><span class="cl"> A       B                   B       A
+</span></span><span class="line"><span class="cl"> |       |        →          |       |
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>CCD 发现要撞了，于是每次都截断：</p>
+\[
+\alpha\le\alpha_c.
+\]<p>问题来了：<strong>截断以后往哪里走？</strong></p>
+<p>CCD 只会告诉优化器：</p>
+<blockquote>
+<p>“你这一步最多走到这里。”</p>
+</blockquote>
+<p>它不会告诉优化器：</p>
+<blockquote>
+<p>“发生接触以后，应该沿什么方向运动、产生多大的接触反力、怎样与弹性力达到平衡。”</p>
+</blockquote>
+<p>因此 CCD 更像一个<strong>可行域守门员</strong>，而不是接触力模型。</p>
+<p>Barrier 则提供</p>
+\[
+f_c=-\nabla B(d),
+\]<p>以及 Newton 求解需要的</p>
+\[
+H_c=\nabla^2B(d).
+\]<p>随着</p>
+\[
+d\rightarrow0^+,
+\]<p>接触势能迅速增加，于是优化问题本身开始“知道”不能继续朝这个方向走。</p>
+<p>因此 Newton direction 会发生改变：</p>
+<h1 id="p">[
+p
+</h1><p>-H^{-1}g
+]</p>
+<p>其中现在</p>
+<h1 id="g">[
+g
+</h1><p>g_{\rm inertia}
++
+g_{\rm elastic}
++
+\underbrace{g_{\rm contact}}_{\nabla B}.
+]</p>
+<p>也就是说，<strong>barrier 改变的是搜索方向；CCD 限制的是沿这个方向最多能走多远。</strong></p>
+<p>这一区别非常关键。</p>
+<hr>
+<h3 id="3-用一个简单例子就能看出来">3. 用一个简单例子就能看出来
+</h3><p>一个弹性球高速撞墙。</p>
+<p><strong>只有 CCD：</strong></p>
+\[
+\text{球飞向墙}
+\rightarrow
+\text{CCD发现碰撞}
+\rightarrow
+\text{截断步长}
+\rightarrow
+???
+\]<p>它知道“不能穿墙”，但没有完整定义接触后的动力学响应。</p>
+<p><strong>Barrier + CCD：</strong></p>
+\[
+\text{球飞向墙}
+\rightarrow
+B(d)\uparrow
+\rightarrow
+\nabla B\text{产生接触作用}
+\rightarrow
+\text{Newton方向改变}
+\]<p>同时 CCD 保证 Newton 迭代过程中不会因为步子太大而：</p>
+\[
+d>0\rightarrow d<0.
+\]<p>所以两者实际上形成了一个非常漂亮的分工：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>机制</th>
+					<th>回答的问题</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Barrier</td>
+					<td><strong>下一步应该往哪里走？</strong></td>
+			</tr>
+			<tr>
+					<td>CCD</td>
+					<td><strong>沿这个方向最多能走多远？</strong></td>
+			</tr>
+	</tbody>
+</table></div>
+<h3 id="4-更深一层这和你做的--barrier-很像">4. 更深一层：这和你做的 \(J\)-barrier 很像
+</h3><p>这里其实能直接联系到四面体反转。</p>
+<p>对于 tet：</p>
+\[
+J=\det F.
+\]<p>如果定义 inversion barrier：</p>
+\[
+B_J(J)\rightarrow+\infty
+\qquad (J\rightarrow0^+),
+\]<p>它会让优化器产生“远离 \(J=0\)”的方向。</p>
+<p>但如果 Newton/XPBD 的一次更新特别大：</p>
+\[
+J=0.5
+\quad\xrightarrow{\Delta x}\quad
+J=-0.3,
+\]<p><strong>仅仅存在 barrier 并不自动意味着离散迭代绝不会跨过 \(J=0\)。</strong></p>
+<p>IPC 在碰撞问题上解决的正是这一层：</p>
+\[
+\boxed{
+\text{Barrier负责形成正确的排斥趋势}
++
+\text{CCD负责不让有限步长跨越奇异边界}
+}
+\]<p>这对软体求解器设计有一个很重要的启发：</p>
+<p>如果你的目标是建立真正的</p>
+\[
+J>0
+\]<p><strong>hard invariant</strong>，那么单纯把 \(J\)-barrier 调得越来越硬未必是最漂亮的方案。</p>
+<p>更系统的结构可能是：</p>
+\[
+\underbrace{B_J(J)}_{\text{改变求解方向}}
++
+\underbrace{\text{step-size / line-search feasibility}}_{\text{禁止跨越 }J=0}.
+\]<p>所以你刚才抓到的点很关键：<strong>IPC 的鲁棒性不能简单归功于 barrier。真正把“永不穿透”从软惩罚升级成几何不变量的，是 barrier + CCD/feasible line search 的组合；其中负责最后那道合法性保证的，确实是 CCD。</strong></p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E9%9D%9E%E7%BA%BF%E6%80%A7%E5%8A%A8%E5%8A%9B%E5%AD%A6/">非线性动力学</a>
+        
+            <a href="/tags/%E7%A2%B0%E6%92%9E/">碰撞</a>
+        
+            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/04-variational-integrators/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Variational Integrators：时间积分器也可以“从力学原理里推出来”</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

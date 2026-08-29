@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向 主题：Anderson Acceleration（安德森加速，AA）\n领域：非线性求解 × 有限元 × PBD/PD × 数值优化\n推荐阅读时间：约 8 分钟\nAnderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：\n\\[ \\boxed{\\text{一个迭代器本来能收敛，只是收敛得太慢。}} \\]很多求解器都可以写成固定点形式：\n\\[ x_{k+1}=G(x_k). \\]例如：\nPicard iteration； local-global Projective Dynamics； 某些 PBD/Jacobi 迭代； nonlinear FEM splitting； ADMM； 多物理场 staggered coupling。 普通固定点迭代每一步只利用当前状态：\n\\[ x_k\\rightarrow G(x_k). \\]Anderson Acceleration 多问了一件事：\n过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？\n它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。\n1. 固定点求解器到底在干什么？ 假设要求解：\n\\[ F(x)=0. \\]你构造一个容易计算的映射：\n\\[ G(x), \\]使真正答案满足：\n\\[ x^*=G(x^*). \\]然后迭代：\n">
+<title>Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/15-anderson-acceleration/'>
+
+<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向">
+<meta property='og:description' content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向 主题：Anderson Acceleration（安德森加速，AA）\n领域：非线性求解 × 有限元 × PBD/PD × 数值优化\n推荐阅读时间：约 8 分钟\nAnderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：\n\\[ \\boxed{\\text{一个迭代器本来能收敛，只是收敛得太慢。}} \\]很多求解器都可以写成固定点形式：\n\\[ x_{k+1}=G(x_k). \\]例如：\nPicard iteration； local-global Projective Dynamics； 某些 PBD/Jacobi 迭代； nonlinear FEM splitting； ADMM； 多物理场 staggered coupling。 普通固定点迭代每一步只利用当前状态：\n\\[ x_k\\rightarrow G(x_k). \\]Anderson Acceleration 多问了一件事：\n过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？\n它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。\n1. 固定点求解器到底在干什么？ 假设要求解：\n\\[ F(x)=0. \\]你构造一个容易计算的映射：\n\\[ G(x), \\]使真正答案满足：\n\\[ x^*=G(x^*). \\]然后迭代：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/15-anderson-acceleration/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='非线性求解' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='PBD' /><meta property='article:tag' content='PD' /><meta property='article:tag' content='数值优化' /><meta property='article:published_time' content='2026-08-28T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-28T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向">
+<meta name="twitter:description" content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向 主题：Anderson Acceleration（安德森加速，AA）\n领域：非线性求解 × 有限元 × PBD/PD × 数值优化\n推荐阅读时间：约 8 分钟\nAnderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：\n\\[ \\boxed{\\text{一个迭代器本来能收敛，只是收敛得太慢。}} \\]很多求解器都可以写成固定点形式：\n\\[ x_{k+1}=G(x_k). \\]例如：\nPicard iteration； local-global Projective Dynamics； 某些 PBD/Jacobi 迭代； nonlinear FEM splitting； ADMM； 多物理场 staggered coupling。 普通固定点迭代每一步只利用当前状态：\n\\[ x_k\\rightarrow G(x_k). \\]Anderson Acceleration 多问了一件事：\n过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？\n它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。\n1. 固定点求解器到底在干什么？ 假设要求解：\n\\[ F(x)=0. \\]你构造一个容易计算的映射：\n\\[ G(x), \\]使真正答案满足：\n\\[ x^*=G(x^*). \\]然后迭代：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-固定点求解器到底在干什么">1. 固定点求解器到底在干什么？</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#x_kr_k">x_k+r_k</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#x_k">x_k</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#x_k-1">x_k</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/15-anderson-acceleration/">Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-28T00:00:00Z'>Aug 28, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 6 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="anderson-acceleration把过去几次迭代为什么没收敛变成下一步的搜索方向">Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向
+</h1><p><strong>主题：Anderson Acceleration（安德森加速，AA）</strong><br>
+<strong>领域：非线性求解 × 有限元 × PBD/PD × 数值优化</strong><br>
+<strong>推荐阅读时间：约 8 分钟</strong></p>
+<p>Anderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：</p>
+\[
+\boxed{\text{一个迭代器本来能收敛，只是收敛得太慢。}}
+\]<p>很多求解器都可以写成固定点形式：</p>
+\[
+x_{k+1}=G(x_k).
+\]<p>例如：</p>
+<ul>
+<li>Picard iteration；</li>
+<li>local-global Projective Dynamics；</li>
+<li>某些 PBD/Jacobi 迭代；</li>
+<li>nonlinear FEM splitting；</li>
+<li>ADMM；</li>
+<li>多物理场 staggered coupling。</li>
+</ul>
+<p>普通固定点迭代每一步只利用当前状态：</p>
+\[
+x_k\rightarrow G(x_k).
+\]<p>Anderson Acceleration 多问了一件事：</p>
+<blockquote>
+<p><strong>过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？</strong></p>
+</blockquote>
+<p>它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。</p>
+<hr>
+<h2 id="1-固定点求解器到底在干什么">1. 固定点求解器到底在干什么？
+</h2><p>假设要求解：</p>
+\[
+F(x)=0.
+\]<p>你构造一个容易计算的映射：</p>
+\[
+G(x),
+\]<p>使真正答案满足：</p>
+\[
+x^*=G(x^*).
+\]<p>然后迭代：</p>
+\[
+x_{k+1}=G(x_k).
+\]<p>定义 fixed-point residual：</p>
+\[
+\boxed{
+r_k=G(x_k)-x_k.
+}
+\]<p>如果：</p>
+\[
+r_k=0,
+\]<p>那么：</p>
+\[
+G(x_k)=x_k,
+\]<p>问题解决。</p>
+<p>所以固定点迭代实际上是在反复做：</p>
+\[
+x_{k+1}=x_k+r_k.
+\]<p>这非常便宜。</p>
+<p>问题是，如果：</p>
+\[
+G'(x^*)
+\]<p>的谱半径接近 1：</p>
+\[
+\rho(G')\lesssim1,
+\]<p>那么误差：</p>
+\[
+e_{k+1}\approx G'(x^*)e_k
+\]<p>每一步只减少一点。</p>
+<p>例如：</p>
+\[
+\|e_{k+1}\|=0.95\|e_k\|.
+\]<p>100 次以后还有：</p>
+\[
+0.95^{100}\approx0.006.
+\]<p>对于一个每次迭代都要做：</p>
+<ul>
+<li>constraint projection；</li>
+<li>sparse solve；</li>
+<li>collision；</li>
+<li>constitutive update</li>
+</ul>
+<p>的物理求解器，这已经很贵。</p>
+<hr>
+<h1 id="2-anderson-的核心残差历史其实包含了局部-jacobian-信息">2. Anderson 的核心：残差历史其实包含了局部 Jacobian 信息
+</h1><p>现在假设已经得到：</p>
+\[
+x_{k-m},\ldots,x_k.
+\]<p>同时有：</p>
+\[
+r_{k-m},\ldots,r_k.
+\]<p>如果残差从：</p>
+\[
+r_{k-1}
+\]<p>变成：</p>
+\[
+r_k,
+\]<p>那么：</p>
+\[
+\Delta r_k=r_k-r_{k-1}.
+\]<p>而状态变化：</p>
+\[
+\Delta x_k=x_k-x_{k-1}.
+\]<p>局部线性化下：</p>
+\[
+\Delta r
+\approx
+J_r\,\Delta x.
+\]<p>于是每一组：</p>
+\[
+(\Delta x,\Delta r)
+\]<p>其实都在告诉你：</p>
+\[
+\boxed{
+\text{未知 residual Jacobian 在某个方向上大概是什么样子。}
+}
+\]<p>Newton 法会直接计算：</p>
+\[
+J_r.
+\]<p>Anderson 不计算它。</p>
+<p>它从最近几步：</p>
+\[
+\Delta x_1,\Delta r_1,\dots
+\]<p>反推局部行为。</p>
+<p>这就是它与：</p>
+\[
+\boxed{\text{quasi-Newton / multisecant}}
+\]<p>联系起来的原因。Walker–Ni 对这一关系进行了系统讨论，并引用 Fang–Saad 的 multisecant 解释。</p>
+<hr>
+<h1 id="3-算法核心其实只是一个很小的最小二乘">3. 算法核心其实只是一个很小的最小二乘
+</h1><p>定义最近 \(m\) 次 residual difference：</p>
+\[
+\Delta R_k=
+[
+\Delta r_{k-m+1},\ldots,\Delta r_k
+]
+\]<p>以及：</p>
+\[
+\Delta X_k=
+[
+\Delta x_{k-m+1},\ldots,\Delta x_k
+].
+\]<p>先解：</p>
+<h1 id="gamma">[
+\boxed{
+\gamma
+</h1><p>\arg\min_\gamma
+|
+r_k-\Delta R_k\gamma
+|_2
+}
+]</p>
+<p>意思是：</p>
+<blockquote>
+<p>能不能用过去残差变化的线性组合，尽可能解释当前 residual？</p>
+</blockquote>
+<p>然后使用一种常见 AA 更新：</p>
+<h1 id="x_k1">[
+\boxed{
+x_{k+1}
+</h1><h2 id="x_kr_k">x_k+r_k
+</h2><p>(\Delta X_k+\Delta R_k)\gamma.
+}
+]</p>
+<p>普通 fixed-point：</p>
+\[
+x_{k+1}=x_k+r_k.
+\]<p>AA 则额外增加：</p>
+\[
+-(\Delta X+\Delta R)\gamma.
+\]<p>也就是：</p>
+\[
+\boxed{
+\text{利用历史信息修正当前 fixed-point direction。}
+}
+\]<p>而这个 least-squares 的维度只有：</p>
+\[
+m.
+\]<p>实践中：</p>
+\[
+m=3\sim10
+\]<p>就很常见。</p>
+<p>所以即使：</p>
+\[
+x\in\mathbb R^{10^6},
+\]<p>真正新增的核心优化问题可能只是一个：</p>
+\[
+5\times5
+\]<p>级别的小问题。</p>
+<hr>
+<h1 id="4-一个二维直觉普通迭代为什么会之字形">4. 一个二维直觉：普通迭代为什么会“之字形”
+</h1><p>假设你在二维状态空间里迭代：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">x0
+</span></span><span class="line"><span class="cl"> ↘
+</span></span><span class="line"><span class="cl">   x1
+</span></span><span class="line"><span class="cl">  ↙
+</span></span><span class="line"><span class="cl"> x2
+</span></span><span class="line"><span class="cl">  ↘
+</span></span><span class="line"><span class="cl">   x3
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>每一次 fixed-point map 都在纠正误差，但两个方向的收缩速度不同，于是出现：</p>
+\[
+\boxed{\text{zig-zag}}
+\]<p>过去几次 residual：</p>
+\[
+r_{k-2},r_{k-1},r_k
+\]<p>已经透露出：</p>
+<blockquote>
+<p>“我每次都在这两个方向之间来回过度修正。”</p>
+</blockquote>
+<p>Anderson 做的事情近似是：</p>
+\[
+\boxed{
+\text{寻找这些历史更新的一个组合，使预测 residual 最小。}
+}
+\]<p>于是可能直接得到：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">x0
+</span></span><span class="line"><span class="cl"> ↘
+</span></span><span class="line"><span class="cl">   x1
+</span></span><span class="line"><span class="cl">  ↙
+</span></span><span class="line"><span class="cl"> x2
+</span></span><span class="line"><span class="cl">   ↘────────→ x*
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这非常像 Krylov 方法为什么能够比简单 stationary iteration 快。</p>
+<p>实际上在线性 fixed-point 问题上，Walker 与 Ni 证明了无截断 AA 与 GMRES 存在本质等价关系。</p>
+<hr>
+<h1 id="5-为什么这个-gmres-联系这么重要">5. 为什么这个 GMRES 联系这么重要？
+</h1><p>考虑线性系统：</p>
+\[
+Ax=b.
+\]<p>Jacobi / Richardson 一类迭代可以写成：</p>
+\[
+x_{k+1}=Gx_k+c.
+\]<p>普通 fixed-point 每次只能：</p>
+\[
+e_{k+1}=Ge_k.
+\]<p>因此误差方向受到：</p>
+\[
+G^k e_0
+\]<p>控制。</p>
+<p>GMRES 则在 Krylov 子空间：</p>
+<h1 id="mathcal-k_m">[
+\mathcal K_m
+</h1><p>\operatorname{span}
+{
+r_0,Ar_0,A^2r_0,\dots
+}
+]</p>
+<p>中寻找最小 residual 的解。</p>
+<p>Anderson 虽然没显式建立 Krylov basis，却通过：</p>
+\[
+\boxed{\text{历史 residual 的线性组合}}
+\]<p>实现了类似的 residual minimization。</p>
+<p>因此可以把它粗略理解成：</p>
+\[
+\boxed{
+\text{nonlinear fixed-point iteration 上的“轻量 Krylov 化”。}
+}
+\]<p>这个理解比“给迭代加个 momentum”更接近它的数值本质。</p>
+<hr>
+<h1 id="6-它为什么特别适合-projective-dynamics--local-global-solver">6. 它为什么特别适合 Projective Dynamics / local-global solver？
+</h1><p>回忆 PD：</p>
+\[
+x_k
+\xrightarrow{\text{local}}
+p_k
+\xrightarrow{\text{global}}
+x_{k+1}.
+\]<p>整个 local-global iteration 可以视为：</p>
+\[
+\boxed{
+x_{k+1}=G(x_k).
+}
+\]<p>PD 的优势：</p>
+<ul>
+<li>每次 iteration 很便宜；</li>
+<li>固定 global matrix 可预分解；</li>
+<li>稳定；</li>
+</ul>
+<p>但缺点之一是：</p>
+\[
+\boxed{\text{高精度收敛阶段可能很慢。}}
+\]<p>2018 年 Peng 等在 ACM TOG/SIGGRAPH 工作中，直接把每个 local-global step 当作固定点映射，用 Anderson acceleration 加速 geometry optimization 和 physics simulation；论文报告，AA 能显著减少达到高精度所需的迭代次数，而单次迭代只增加很小额外成本。</p>
+<p>这正好解释为什么 AA 和 PD 很般配：</p>
+\[
+\boxed{
+\text{PD 提供一个便宜但线性收敛的 }G(x)
+}
+\]\[
++
+\]\[
+\boxed{
+\text{AA 用历史信息提高这个 }G\text{ 的有效收敛速度}
+}
+\]<p>而不必把整个 solver 改写成 Newton FEM。</p>
+<hr>
+<h1 id="7-这对-pbdxpbd-有什么潜在意义">7. 这对 PBD/XPBD 有什么潜在意义？
+</h1><p>如果一个 constraint solve 是：</p>
+<h1 id="xk1">[
+x^{(k+1)}
+</h1><p>G(x^{(k)}),
+]</p>
+<p>那么原则上也可以做 AA。</p>
+<p>例如 GPU Jacobi PBD：</p>
+\[
+x^{k}
+\rightarrow
+\text{all constraint corrections}
+\rightarrow
+x^{k+1}.
+\]<p>如果 stiff material 下需要：</p>
+\[
+30\sim100
+\]<p>轮 Jacobi 才足够硬，AA 可以尝试用最近几轮的位置/residual 历史提高收敛。</p>
+<p>2019 年一项面向交互式软体的工作就将 Anderson acceleration 加入 PBD/Jacobi 框架，以改善 stiff material 的收敛，同时使用 graph coloring 等方法实现 GPU 实时计算。</p>
+<p>不过这里有一个重要条件：</p>
+\[
+\boxed{
+\text{最好加速“完整一轮 solver map”，
+而不是随便加速单个 constraint correction。}
+}
+\]<p>因为 AA 假设你有一个相对稳定的：</p>
+\[
+G:x\mapsto x'.
+\]<p>如果 Gauss-Seidel 顺序、active contact set、clamp 状态每次剧烈变化，那么：</p>
+\[
+G
+\]<p>本身就在跳变，历史信息就可能失去意义。</p>
+<hr>
+<h1 id="8-为什么-anderson-有时反而会把-solver-搞炸">8. 为什么 Anderson 有时反而会把 solver 搞炸？
+</h1><p>这是它最需要警惕的地方。</p>
+<p>普通 fixed-point 假设：</p>
+\[
+G(x_k)
+\]<p>本身有某种稳定性。</p>
+<p>Anderson 却做：</p>
+\[
+\boxed{\text{extrapolation}}
+\]<p>也就是说：</p>
+\[
+x_{k+1}
+\]<p>可能落在历史状态的凸包之外。</p>
+<p>如果非线性很强，例如：</p>
+<ul>
+<li>contact active set 改变；</li>
+<li>tet 接近 inversion；</li>
+<li>friction stick/slip 切换；</li>
+<li>barrier 快速变陡；</li>
+</ul>
+<p>历史线性模型可能完全失效。</p>
+<p>于是：</p>
+\[
+\gamma
+\]<p>可能非常大，</p>
+<p>导致：</p>
+\[
+\|x_{k+1}-x_k\|\gg1.
+\]<p>这也是为什么 graphics 中真正实用的 AA 往往需要：</p>
+\[
+\boxed{\text{safeguard}}
+\]<p>Peng 等 2018 年的方法并没有盲目接受 AA step，而是加入目标能量下降判据，从而解决经典 AA 的稳定性问题并保证其 local-global 框架的全局收敛性质。</p>
+<hr>
+<h1 id="9-一个非常重要的工程原则aa-应该是加速器不是基础稳定器">9. 一个非常重要的工程原则：AA 应该是“加速器”，不是“基础稳定器”
+</h1><p>假设原始 iteration：</p>
+\[
+x_{k+1}=G(x_k)
+\]<p>本身会发散：</p>
+\[
+\rho(G')>1.
+\]<p>不要期待 AA 一定把它救回来。</p>
+<p>它有时确实能扩大实际收敛区，但工程上更合理的顺序仍然是：</p>
+\[
+\boxed{
+\text{先有一个靠谱的 baseline iteration}
+}
+\]<p>然后：</p>
+\[
+\boxed{
+\text{再用 Anderson 降低 iteration count。}
+}
+\]<p>也就是说，如果 XPBD 出现：</p>
+<ul>
+<li>四面体反转；</li>
+<li>NaN；</li>
+<li>contact explosion；</li>
+<li>compliance 定义错误；</li>
+</ul>
+<p>AA 几乎肯定不是第一治疗手段。</p>
+<p>它解决的是：</p>
+\[
+\boxed{\text{slow convergence}}
+\]<p>而不是：</p>
+\[
+\boxed{\text{wrong formulation}}.
+\]<p>这一区分很重要。</p>
+<hr>
+<h1 id="10-history-length--为什么不能无限加">10. History length \(m\) 为什么不能无限加？
+</h1><p>乍看：</p>
+\[
+m\uparrow
+\]<p>拥有更多信息，似乎越好。</p>
+<p>但 residual differences：</p>
+\[
+\Delta r_i
+\]<p>可能逐渐变得近似线性相关。</p>
+<p>于是 least-squares matrix：</p>
+\[
+\Delta R
+\]<p>条件数：</p>
+\[
+\kappa(\Delta R)\uparrow.
+\]<p>此时：</p>
+\[
+\gamma
+\]<p>会非常敏感。</p>
+<p>同时：</p>
+<ul>
+<li>内存增加；</li>
+<li>dot product/reduction 增加；</li>
+<li>旧历史越来越不代表当前局部非线性。</li>
+</ul>
+<p>因此 practical AA 通常只保存：</p>
+\[
+\boxed{m\approx3\sim10}
+\]<p>步历史，并可能：</p>
+<ul>
+<li>restart；</li>
+<li>regularize；</li>
+<li>删除近线性相关方向；</li>
+<li>对 \(\gamma\) 加限制。</li>
+</ul>
+<p>近年的理论工作也仍在研究 restarted AA 的收敛性质，说明“历史到底保留多少”并不是已经完全解决的问题。</p>
+<hr>
+<h1 id="11-它和-newton-的真正关系在哪里">11. 它和 Newton 的真正关系在哪里？
+</h1><p>Newton：</p>
+<h1 id="x_k1-1">[
+x_{k+1}
+</h1><h2 id="x_k">x_k
+</h2><p>J_r(x_k)^{-1}r_k.
+]</p>
+<p>优点：</p>
+\[
+\boxed{\text{利用完整局部导数}}
+\]<p>缺点：</p>
+\[
+J_r
+\]<p>可能：</p>
+<ul>
+<li>很贵；</li>
+<li>难推；</li>
+<li>难 assemble；</li>
+<li>难 factorize。</li>
+</ul>
+<p>Anderson 近似在做：</p>
+<h1 id="x_k1-2">[
+x_{k+1}
+</h1><h2 id="x_k-1">x_k
+</h2><p>H_k r_k,
+]</p>
+<p>其中：</p>
+\[
+H_k
+\]<p>不是显式构造的完整矩阵，而是通过历史：</p>
+\[
+(\Delta x_i,\Delta r_i)
+\]<p>满足若干 secant conditions。</p>
+<p>所以可以把三类方法排成：</p>
+\[
+\boxed{
+\text{Fixed point}
+}
+\]<p>几乎不利用导数信息；</p>
+\[
+\boxed{
+\text{Anderson / multisecant}
+}
+\]<p>从历史中低成本推断部分 Jacobian 信息；</p>
+\[
+\boxed{
+\text{Newton}
+}
+\]<p>显式使用完整 Jacobian/Hessian。</p>
+<p>AA 正好卡在两者中间。</p>
+<p>这也是它特别适合实时求解器的原因之一。</p>
+<hr>
+<h1 id="12-一个很有价值的类比aa-是solver-的短期记忆">12. 一个很有价值的类比：AA 是“solver 的短期记忆”
+</h1><p>普通迭代是：</p>
+\[
+\boxed{\text{memoryless}}
+\]<p>每一步只看：</p>
+\[
+x_k.
+\]<p>Anderson 有：</p>
+\[
+\boxed{\text{short-term memory}}
+\]<p>它记住：</p>
+\[
+(x_{k-j},r_{k-j}).
+\]<p>这些历史不是用来“平均答案”，而是用来估计：</p>
+\[
+\boxed{
+\text{当前 nonlinear map 的局部响应结构。}
+}
+\]<p>所以 AA 揭示了一个很普遍的设计原则：</p>
+<blockquote>
+<p><strong>如果求解器每轮都产生昂贵的信息，不要在下一轮全部丢掉。</strong></p>
+</blockquote>
+<p>这一原则会再次出现在：</p>
+<ul>
+<li>BFGS/L-BFGS；</li>
+<li>Krylov subspace；</li>
+<li>warm starting；</li>
+<li>contact impulse caching；</li>
+<li>temporal coherence；</li>
+<li>recurrent optimization。</li>
+</ul>
+<hr>
+<h1 id="13-对接触问题为什么要更谨慎">13. 对接触问题为什么要更谨慎？
+</h1><p>假设：</p>
+\[
+G(x)
+\]<p>中包含 contact projection。</p>
+<p>上一轮：</p>
+\[
+\text{contact A active}
+\]<p>下一轮：</p>
+\[
+\text{contact A inactive},
+\quad
+\text{contact B active}.
+\]<p>那么 residual map 可能是非光滑的。</p>
+<p>经典 AA 理论最舒服的场景还是：</p>
+\[
+G
+\]<p>足够平滑、局部 contractive。</p>
+<p>不过后续研究已经把理论推进到某些 nonsmooth fixed-point 问题，并证明在“平滑 contraction + Lipschitz 较小的 nonsmooth component”等条件下仍能建立收敛结果。</p>
+<p>但对物理引擎而言，这仍然意味着：</p>
+\[
+\boxed{
+\text{contact-heavy iteration 应配合 restart / safeguard。}
+}
+\]<p>例如检测：</p>
+\[
+\text{active set 大幅变化}
+\]<p>时直接清空 AA history，通常是很合理的工程策略。</p>
+<hr>
+<h1 id="14-一个很适合自研求解器的最小实现">14. 一个很适合自研求解器的最小实现
+</h1><p>假设已经有：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">x_next = solver_iteration(x)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>那么可以先完全不改底层 solver。</p>
+<p>每轮：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">g = solver_iteration(x)
+</span></span><span class="line"><span class="cl">r = g - x
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">存储最近 m 组:
+</span></span><span class="line"><span class="cl">    x
+</span></span><span class="line"><span class="cl">    r
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">解小型 least-squares:
+</span></span><span class="line"><span class="cl">    gamma = argmin ||r - ΔR gamma||
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">构造 accelerated candidate:
+</span></span><span class="line"><span class="cl">    x_AA = x + r - (ΔX + ΔR) gamma
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>然后做 safeguard：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">if energy(x_AA) &lt; energy(g)
+</span></span><span class="line"><span class="cl">   and feasibility(x_AA):
+</span></span><span class="line"><span class="cl">       x = x_AA
+</span></span><span class="line"><span class="cl">else:
+</span></span><span class="line"><span class="cl">       x = g
+</span></span><span class="line"><span class="cl">       必要时 restart history
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这种结构非常吸引人，因为 AA 可以成为：</p>
+\[
+\boxed{\text{solver wrapper}}
+\]<p>而不是侵入：</p>
+<ul>
+<li>constraint kernel；</li>
+<li>FEM constitutive law；</li>
+<li>GPU collision kernel；</li>
+</ul>
+<p>内部。</p>
+<p>这正是 Peng 等强调它适合加速已有 iterative algorithms 的原因之一。</p>
+<hr>
+<h1 id="15-对-xpbdpd-求解器最值得做的实验">15. 对 XPBD/PD 求解器最值得做的实验
+</h1><p>如果要判断 AA 是否值得加入，不要一开始看 FPS。</p>
+<p>先选一个<strong>没有碰撞、没有塑性、确定能收敛</strong>的 stiff soft-body case。</p>
+<p>记录：</p>
+\[
+\|r_k\|
+\]<p>随 iteration：</p>
+\[
+k
+\]<p>的变化。</p>
+<p>比较：</p>
+\[
+\text{baseline}
+\]<p>与：</p>
+\[
+m=2,\ 4,\ 6
+\]<p>的 AA。</p>
+<p>最值得看的不是：</p>
+\[
+\text{最终形状}
+\]<p>而是：</p>
+\[
+\log\|r_k\|
+\]<p>曲线。</p>
+<p>如果 baseline：</p>
+\[
+\|r_{k+1}\|\approx0.92\|r_k\|,
+\]<p>而 AA 很快变成明显更陡的下降曲线，就说明：</p>
+\[
+\boxed{\text{问题主要是 fixed-point convergence rate。}}
+\]<p>如果 residual 本来就在：</p>
+\[
+\text{oscillate / diverge / NaN},
+\]<p>那么应该先修 formulation。</p>
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Anderson Acceleration 最值得记住的不是那个 least-squares 公式，而是：</p>
+\[
+\boxed{
+\text{迭代历史本身就是对未知 Jacobian 的观测数据。}
+}
+\]<p>普通 fixed-point solver 每轮算完：</p>
+\[
+x_k\rightarrow x_{k+1}
+\]<p>以后，把之前的信息全部扔掉。</p>
+<p>AA 则利用最近几轮：</p>
+\[
+\Delta x,\Delta r
+\]<p>构造一个非常廉价的局部模型。</p>
+<p>所以它在整个知识体系中的位置非常漂亮：</p>
+\[
+\text{Fixed-point / PBD / PD}
+\]\[
+\downarrow
+\]\[
+\boxed{\text{Anderson / multisecant acceleration}}
+\]\[
+\downarrow
+\]\[
+\text{quasi-Newton}
+\]\[
+\downarrow
+\]\[
+\text{full Newton / Newton-Krylov}.
+\]<p>对于实时物理求解器而言，这条路线尤其值得学，因为它代表一种非常实用的工程哲学：</p>
+\[
+\boxed{
+\text{如果单次迭代已经足够便宜和鲁棒，
+优先想办法让它少迭代几次，
+而不一定要把整个 solver 换成更昂贵的方法。}
+}
+\]<h3 id="拓展阅读">拓展阅读
+</h3><ol>
+<li>
+<p><strong>Walker &amp; Ni, <em>Anderson Acceleration for Fixed-Point Iterations</em>, SIAM Journal on Numerical Analysis, 2011</strong>。最重要的理论入口，尤其值得看 AA 与 GMRES、quasi-Newton 的关系以及 implementation considerations。<br>
+<a class="link" href="https://epubs.siam.org/doi/10.1137/10078356X"  target="_blank" rel="noopener"
+    >SIAM 论文页</a></p>
+</li>
+<li>
+<p><strong>Peng et al., <em>Anderson Acceleration for Geometry Optimization and Physics Simulation</em>, ACM TOG / SIGGRAPH 2018</strong>。如果重点是物理求解器，这篇最值得先读：直接把 local-global solver 写成 fixed-point map，并增加 energy safeguard。<br>
+<a class="link" href="https://orca.cardiff.ac.uk/id/eprint/111400/"  target="_blank" rel="noopener"
+    >作者存档与论文入口</a></p>
+</li>
+<li>
+<p><strong>Fang &amp; Saad, <em>Two Classes of Multisecant Methods for Nonlinear Acceleration</em>, 2009</strong>。适合进一步理解 AA 为什么可以解释成 multisecant quasi-Newton，而不仅仅是一种经验 extrapolation。该论文也是 Walker–Ni 2011 理论框架的重要前置工作。</p>
+</li>
+<li>
+<p><strong>Bian, Chen &amp; Kelley, <em>Anderson Acceleration for a Class of Nonsmooth Fixed-Point Problems</em>, SIAM JSC, 2021</strong>。如果想把 AA 和 contact、projection 等非光滑问题联系起来，这篇适合理解理论边界。</p>
+</li>
+<li>
+<p><strong>Krzysik, De Sterck &amp; Smith, <em>Asymptotic Convergence of Restarted Anderson Acceleration for Certain Normal Linear Systems</em>, SIAM JSC, 2025</strong>。适合追近期理论：为什么 restart、有限 history 对实际 AA 如此重要。</p>
+</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E9%9D%9E%E7%BA%BF%E6%80%A7%E6%B1%82%E8%A7%A3/">非线性求解</a>
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/pbd/">PBD</a>
+        
+            <a href="/tags/pd/">PD</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/">数值优化</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

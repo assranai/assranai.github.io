@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Complementarity：为什么刚体接触本质上是一个“二选一”问题 主题：Complementarity formulation（互补约束）与 LCP/NCP 接触动力学\n领域：刚体动力学 × 接触力学 × 物理引擎 × 数值优化\n推荐阅读时间：约 8 分钟\n这期值得学，因为它把很多物理引擎里看似零散的东西统一起来了：\n\\[ \\boxed{ \\text{接触力} +\\text{非穿透} +\\text{摩擦} +\\text{约束求解} } \\]它们背后有一个很深的共同结构：\n\\[ \\boxed{\\text{某两个量不能同时“活跃”}} \\]这就是 complementarity（互补性）。\n经典刚体接触时间步进工作中，Stewart–Trinkle 直接用 impulse–momentum 和互补约束描述多体接触与 Coulomb 摩擦，从而避免逐个精确解析瞬时冲击事件，并能处理 simultaneous impacts。\n1. 接触为什么天然是一个“互补问题”？ 考虑两个刚体。\n定义法向间隙：\n\\[ g(q)\\ge 0. \\]其中：\n\\(g>0\\)：分离； \\(g=0\\)：接触； \\(g<0\\)：穿透，不允许。 再定义法向接触力：\n\\[ \\lambda_n\\ge0. \\]接触力只能推，不能拉。\n现在真正关键的是第三条：\n\\[ \\boxed{ g(q)\\lambda_n=0 } \\]合起来：\n\\[ \\boxed{ g\\ge0,\\qquad \\lambda_n\\ge0,\\qquad g\\lambda_n=0 } \\]常写作：\n\\[ \\boxed{ 0\\le g\\perp\\lambda_n\\ge0 } \\]这就是最基本的 complementarity condition。David Stewart 对刚体接触的经典说明正是这样表述：间隙非负，法向接触力非负，并且两者乘积为零。\n">
+<title>Complementarity：为什么刚体接触本质上是一个“二选一”问题</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/10-complementarity/'>
+
+<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="Complementarity：为什么刚体接触本质上是一个“二选一”问题">
+<meta property='og:description' content="Complementarity：为什么刚体接触本质上是一个“二选一”问题 主题：Complementarity formulation（互补约束）与 LCP/NCP 接触动力学\n领域：刚体动力学 × 接触力学 × 物理引擎 × 数值优化\n推荐阅读时间：约 8 分钟\n这期值得学，因为它把很多物理引擎里看似零散的东西统一起来了：\n\\[ \\boxed{ \\text{接触力} +\\text{非穿透} +\\text{摩擦} +\\text{约束求解} } \\]它们背后有一个很深的共同结构：\n\\[ \\boxed{\\text{某两个量不能同时“活跃”}} \\]这就是 complementarity（互补性）。\n经典刚体接触时间步进工作中，Stewart–Trinkle 直接用 impulse–momentum 和互补约束描述多体接触与 Coulomb 摩擦，从而避免逐个精确解析瞬时冲击事件，并能处理 simultaneous impacts。\n1. 接触为什么天然是一个“互补问题”？ 考虑两个刚体。\n定义法向间隙：\n\\[ g(q)\\ge 0. \\]其中：\n\\(g>0\\)：分离； \\(g=0\\)：接触； \\(g<0\\)：穿透，不允许。 再定义法向接触力：\n\\[ \\lambda_n\\ge0. \\]接触力只能推，不能拉。\n现在真正关键的是第三条：\n\\[ \\boxed{ g(q)\\lambda_n=0 } \\]合起来：\n\\[ \\boxed{ g\\ge0,\\qquad \\lambda_n\\ge0,\\qquad g\\lambda_n=0 } \\]常写作：\n\\[ \\boxed{ 0\\le g\\perp\\lambda_n\\ge0 } \\]这就是最基本的 complementarity condition。David Stewart 对刚体接触的经典说明正是这样表述：间隙非负，法向接触力非负，并且两者乘积为零。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/10-complementarity/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='刚体动力学' /><meta property='article:tag' content='接触力学' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='数值优化' /><meta property='article:published_time' content='2026-08-23T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-23T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Complementarity：为什么刚体接触本质上是一个“二选一”问题">
+<meta name="twitter:description" content="Complementarity：为什么刚体接触本质上是一个“二选一”问题 主题：Complementarity formulation（互补约束）与 LCP/NCP 接触动力学\n领域：刚体动力学 × 接触力学 × 物理引擎 × 数值优化\n推荐阅读时间：约 8 分钟\n这期值得学，因为它把很多物理引擎里看似零散的东西统一起来了：\n\\[ \\boxed{ \\text{接触力} +\\text{非穿透} +\\text{摩擦} +\\text{约束求解} } \\]它们背后有一个很深的共同结构：\n\\[ \\boxed{\\text{某两个量不能同时“活跃”}} \\]这就是 complementarity（互补性）。\n经典刚体接触时间步进工作中，Stewart–Trinkle 直接用 impulse–momentum 和互补约束描述多体接触与 Coulomb 摩擦，从而避免逐个精确解析瞬时冲击事件，并能处理 simultaneous impacts。\n1. 接触为什么天然是一个“互补问题”？ 考虑两个刚体。\n定义法向间隙：\n\\[ g(q)\\ge 0. \\]其中：\n\\(g>0\\)：分离； \\(g=0\\)：接触； \\(g<0\\)：穿透，不允许。 再定义法向接触力：\n\\[ \\lambda_n\\ge0. \\]接触力只能推，不能拉。\n现在真正关键的是第三条：\n\\[ \\boxed{ g(q)\\lambda_n=0 } \\]合起来：\n\\[ \\boxed{ g\\ge0,\\qquad \\lambda_n\\ge0,\\qquad g\\lambda_n=0 } \\]常写作：\n\\[ \\boxed{ 0\\le g\\perp\\lambda_n\\ge0 } \\]这就是最基本的 complementarity condition。David Stewart 对刚体接触的经典说明正是这样表述：间隙非负，法向接触力非负，并且两者乘积为零。\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-接触为什么天然是一个互补问题">1. 接触为什么天然是一个“互补问题”？</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#一个非常实用的调试视角">一个非常实用的调试视角</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/10-complementarity/">Complementarity：为什么刚体接触本质上是一个“二选一”问题</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-23T00:00:00Z'>Aug 23, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 5 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="complementarity为什么刚体接触本质上是一个二选一问题">Complementarity：为什么刚体接触本质上是一个“二选一”问题
+</h1><p><strong>主题：Complementarity formulation（互补约束）与 LCP/NCP 接触动力学</strong><br>
+<strong>领域：刚体动力学 × 接触力学 × 物理引擎 × 数值优化</strong><br>
+<strong>推荐阅读时间：约 8 分钟</strong></p>
+<p>这期值得学，因为它把很多物理引擎里看似零散的东西统一起来了：</p>
+\[
+\boxed{
+\text{接触力}
++\text{非穿透}
++\text{摩擦}
++\text{约束求解}
+}
+\]<p>它们背后有一个很深的共同结构：</p>
+\[
+\boxed{\text{某两个量不能同时“活跃”}}
+\]<p>这就是 <strong>complementarity（互补性）</strong>。</p>
+<p>经典刚体接触时间步进工作中，Stewart–Trinkle 直接用 impulse–momentum 和互补约束描述多体接触与 Coulomb 摩擦，从而避免逐个精确解析瞬时冲击事件，并能处理 simultaneous impacts。</p>
+<hr>
+<h2 id="1-接触为什么天然是一个互补问题">1. 接触为什么天然是一个“互补问题”？
+</h2><p>考虑两个刚体。</p>
+<p>定义法向间隙：</p>
+\[
+g(q)\ge 0.
+\]<p>其中：</p>
+<ul>
+<li>\(g>0\)：分离；</li>
+<li>\(g=0\)：接触；</li>
+<li>\(g<0\)：穿透，不允许。</li>
+</ul>
+<p>再定义法向接触力：</p>
+\[
+\lambda_n\ge0.
+\]<p>接触力只能推，不能拉。</p>
+<p>现在真正关键的是第三条：</p>
+\[
+\boxed{
+g(q)\lambda_n=0
+}
+\]<p>合起来：</p>
+\[
+\boxed{
+g\ge0,\qquad
+\lambda_n\ge0,\qquad
+g\lambda_n=0
+}
+\]<p>常写作：</p>
+\[
+\boxed{
+0\le g\perp\lambda_n\ge0
+}
+\]<p>这就是最基本的 complementarity condition。David Stewart 对刚体接触的经典说明正是这样表述：间隙非负，法向接触力非负，并且两者乘积为零。</p>
+<hr>
+<h1 id="2-这三个式子其实完整描述了两个物理状态">2. 这三个式子其实完整描述了两个物理状态
+</h1><p>如果：</p>
+\[
+g>0,
+\]<p>由：</p>
+\[
+g\lambda_n=0
+\]<p>必须得到：</p>
+\[
+\lambda_n=0.
+\]<p>即：</p>
+\[
+\boxed{\text{物体分离}\Rightarrow\text{没有接触力}}
+\]<p>反过来，如果：</p>
+\[
+\lambda_n>0,
+\]<p>那么必须：</p>
+\[
+g=0.
+\]<p>即：</p>
+\[
+\boxed{\text{存在接触力}\Rightarrow\text{物体正在接触}}
+\]<p>因此互补约束本质上是在表达：</p>
+\[
+\boxed{
+\text{separation}
+\quad\text{OR}\quad
+\text{contact force}
+}
+\]<p>二者不能同时严格为正。</p>
+<p>这就是为什么接触问题天然带有非光滑性：系统要在不同 active set 之间切换。</p>
+<hr>
+<h1 id="3-这比-penalty-method-多了什么">3. 这比 penalty method 多了什么？
+</h1><p>Penalty 接触通常写成：</p>
+\[
+\lambda_n=k\max(-g,0).
+\]<p>于是：</p>
+\[
+g<0
+\]<p>以后才产生：</p>
+\[
+\lambda_n>0.
+\]<p>也就是说，penetration 被允许，只是被惩罚。</p>
+<p>因此：</p>
+\[
+k\uparrow
+\]<p>穿透越小，但系统越刚：</p>
+\[
+\Delta t\downarrow
+\]<p>或线性系统条件数变差。</p>
+<p>Complementarity 的思想则更直接：</p>
+\[
+\boxed{
+g\ge0
+}
+\]<p>本身就是 admissibility condition。</p>
+<p>在理想刚体模型里，接触并不需要一个人为弹簧刚度。</p>
+<p>所以从建模层面看：</p>
+\[
+\boxed{
+\text{Penalty：把非穿透近似成高刚度力}
+}
+\]<p>而：</p>
+\[
+\boxed{
+\text{Complementarity：把非穿透直接作为不等式约束}
+}
+\]<p>这两种思维差异很大。</p>
+<hr>
+<h1 id="4-但物理引擎通常不会直接解位置级">4. 但物理引擎通常不会直接解位置级 \(g\ge0\)
+</h1><p>实时刚体求解器更常处理速度或冲量层面。</p>
+<p>设接触 Jacobian：</p>
+\[
+J_n.
+\]<p>法向相对速度：</p>
+\[
+v_n=J_nv.
+\]<p>时间离散后：</p>
+<h1 id="mvn1">[
+Mv^{n+1}
+</h1><p>Mv^n
++
+h f_{\rm ext}
++
+J_n^T p_n,
+]</p>
+<p>其中：</p>
+\[
+p_n
+\]<p>是一个时间步内的法向冲量。</p>
+<p>于是：</p>
+<h1 id="vn1">[
+v^{n+1}
+</h1><p>v^*
++
+M^{-1}J_n^Tp_n.
+]</p>
+<p>这里：</p>
+<h1 id="v">[
+v^*
+</h1><p>v^n+hM^{-1}f_{\rm ext}.
+]</p>
+<p>接触点新的法向速度：</p>
+<h1 id="v_nn1">[
+v_n^{n+1}
+</h1><p>J_nv^*
++
+J_nM^{-1}J_n^Tp_n.
+]</p>
+<p>定义：</p>
+\[
+A=J_nM^{-1}J_n^T,
+\]\[
+b=J_nv^*.
+\]<p>得到：</p>
+\[
+v_n^{n+1}=Ap_n+b.
+\]<p>然后施加：</p>
+\[
+\boxed{
+0\le p_n
+\perp
+Ap_n+b
+\ge0
+}
+\]<p>这就是一个标准：</p>
+\[
+\boxed{\text{Linear Complementarity Problem，LCP}}
+\]<p>形式：</p>
+\[
+z\ge0,
+\]\[
+w=Az+b\ge0,
+\]\[
+z^Tw=0.
+\]<p>Stewart–Trinkle 系时间步进方法和后续刚体 LCP 实现都建立在这类结构上。</p>
+<hr>
+<h1 id="5-这里的--非常重要">5. 这里的 \(A=JM^{-1}J^T\) 非常重要
+</h1><p>这个矩阵有一个很值得记住的物理意义：</p>
+\[
+\boxed{
+A:
+\text{接触冲量}
+\rightarrow
+\text{接触速度变化}
+}
+\]<p>给一个接触点施加：</p>
+\[
+p_j,
+\]<p>它可能改变另一个接触点：</p>
+\[
+v_i.
+\]<p>所以：</p>
+\[
+A_{ij}
+\]<p>就是：</p>
+<blockquote>
+<p>接触 \(j\) 的冲量，对接触 \(i\) 法向速度造成多大影响。</p>
+</blockquote>
+<p>这说明多接触问题为什么必须耦合求解。</p>
+<p>例如一个箱子四个角落地。</p>
+<p>如果你独立处理四个接触：</p>
+\[
+1\rightarrow2\rightarrow3\rightarrow4,
+\]<p>每次解完一个都会改变其他三个的速度状态。</p>
+<p>所以真正的物理问题本身就是：</p>
+\[
+\boxed{\text{global coupled constraint problem}}
+\]<p>Projected Gauss–Seidel 之类的方法，本质上是在迭代求这个耦合系统的近似解。</p>
+<hr>
+<h1 id="6-这正好解释了游戏引擎里的-sequential-impulse">6. 这正好解释了游戏引擎里的 Sequential Impulse
+</h1><p>很多游戏物理教材会介绍：</p>
+\[
+\text{Sequential Impulse}
+\]<p>看起来像：</p>
+<ol>
+<li>计算一个接触冲量；</li>
+<li>clamp；</li>
+<li>更新速度；</li>
+<li>处理下一个接触；</li>
+<li>重复若干轮。</li>
+</ol>
+<p>实际上它与：</p>
+\[
+\boxed{\text{Projected Gauss-Seidel on an LCP}}
+\]<p>高度对应。</p>
+<p>单接触更新近似：</p>
+<h1 id="deltalambda">[
+\Delta\lambda
+</h1><ul>
+<li></li>
+</ul>
+<p>\frac{Jv+b}
+{JM^{-1}J^T}.
+]</p>
+<p>然后：</p>
+<h1 id="lambda_rm-new">[
+\lambda_{\rm new}
+</h1><p>\max
+(
+0,
+\lambda_{\rm old}+\Delta\lambda
+).
+]</p>
+<p>这里的：</p>
+\[
+\boxed{\max(0,\cdot)}
+\]<p>根本不是随便加的 clamp。</p>
+<p>它就是在执行：</p>
+\[
+\lambda_n\ge0.
+\]<p>所以很多物理引擎代码看起来只是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">lambda += delta_lambda
+</span></span><span class="line"><span class="cl">lambda = max(lambda, 0)
+</span></span><span class="line"><span class="cl">apply_impulse(lambda - old_lambda)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>但背后其实对应一个完整的 complementarity formulation。</p>
+<hr>
+<h1 id="7-为什么要-accumulated-impulse">7. 为什么要 accumulated impulse？
+</h1><p>这也是一个非常容易低估的细节。</p>
+<p>错误写法可能是：</p>
+<h1 id="deltalambda-1">[
+\Delta\lambda
+</h1><p>\max(0,\Delta\lambda).
+]</p>
+<p>但真正应该投影的是：</p>
+\[
+\boxed{
+\lambda_{\rm total}
+}
+\]<p>即：</p>
+<h1 id="lambda_rm-new-1">[
+\lambda_{\rm new}
+</h1><p>\max
+(
+0,
+\lambda_{\rm old}+\Delta\lambda
+).
+]</p>
+<p>然后实际施加：</p>
+\[
+\lambda_{\rm new}-\lambda_{\rm old}.
+\]<p>为什么？</p>
+<p>因为互补条件要求的是最终：</p>
+\[
+\lambda\ge0,
+\]<p>不是每一次局部修正：</p>
+\[
+\Delta\lambda\ge0.
+\]<p>有时前一次迭代冲量过大，下一次必须：</p>
+\[
+\Delta\lambda<0
+\]<p>把它减少。</p>
+<p>所以 accumulated impulse 其实对应一个很明确的数学事实：</p>
+\[
+\boxed{
+\text{projection 应作用于 solution variable，
+而不是 iteration increment}
+}
+\]<p>这是从 LCP 视角看 Sequential Impulse 后非常容易理解的一点。</p>
+<hr>
+<h1 id="8-摩擦为什么更复杂">8. 摩擦为什么更复杂？
+</h1><p>法向接触只有：</p>
+\[
+\lambda_n\ge0.
+\]<p>Coulomb 摩擦则要求切向力：</p>
+\[
+\lambda_t
+\]<p>落在摩擦圆锥内：</p>
+\[
+\boxed{
+\|\lambda_t\|
+\le
+\mu\lambda_n
+}
+\]<p>于是有两种状态。</p>
+<p>如果接触点 sticking：</p>
+\[
+v_t=0,
+\]<p>摩擦力可以在 cone 内任意选择：</p>
+\[
+\|\lambda_t\|<\mu\lambda_n.
+\]<p>如果 sliding：</p>
+\[
+v_t\ne0,
+\]<p>摩擦力达到 cone 边界：</p>
+<h1 id="lambda_t">[
+|\lambda_t|
+</h1><p>\mu\lambda_n,
+]</p>
+<p>并与滑动方向相反。</p>
+<p>所以它又是一套“状态二选一”的互补结构。</p>
+<p>在经典方法中，可以通过 maximum dissipation principle 和摩擦锥约束把 Coulomb 摩擦写成 complementarity problem。</p>
+<hr>
+<h1 id="9-为什么游戏引擎经常用-friction-pyramid">9. 为什么游戏引擎经常用 friction pyramid？
+</h1><p>真实 Coulomb cone：</p>
+\[
+\sqrt{\lambda_{t1}^2+\lambda_{t2}^2}
+\le
+\mu\lambda_n
+\]<p>是一个圆锥。</p>
+<p>如果把它离散成若干方向：</p>
+\[
+d_1,\ldots,d_k,
+\]<p>得到多面体：</p>
+\[
+\boxed{\text{friction pyramid}}
+\]<p>那么原来的 nonlinear cone constraint 就可以近似成线性不等式，从而进入 LCP 框架。</p>
+<p>Georgia Tech 的接触 LCP 实现说明就明确采用了离散 friction cone basis；MuJoCo 文档也同时区分 elliptic friction cone 与 pyramidal approximation。</p>
+<p>这里有一个典型工程折中：</p>
+\[
+\boxed{
+\text{更真实的 cone}
+\leftrightarrow
+\text{更简单的 solver}
+}
+\]<hr>
+<h1 id="10-这和-ccd-是完全不同的一层">10. 这和 CCD 是完全不同的一层
+</h1><p>这一点尤其值得与你前面关于 CCD 的讨论联系起来。</p>
+<p>CCD 回答：</p>
+\[
+\boxed{
+\text{沿当前运动路径，什么时候第一次发生几何碰撞？}
+}
+\]<p>Complementarity 回答：</p>
+\[
+\boxed{
+\text{一旦进入接触状态，什么冲量/力与运动状态彼此一致？}
+}
+\]<p>所以可以这样分层：</p>
+\[
+\boxed{
+\text{CCD：geometric feasibility}
+}
+\]\[
+\boxed{
+\text{Complementarity：contact dynamics consistency}
+}
+\]<p>CCD 可能告诉你：</p>
+\[
+t_{\rm hit}=0.006s.
+\]<p>但它不会告诉你：</p>
+\[
+p_n=?,
+\qquad
+p_t=?.
+\]<p>LCP/NCP 则负责这部分。</p>
+<p>反过来，纯 velocity-level complementarity solver 也不自动等同于精确 CCD；经典 time-stepping 方法甚至刻意避免显式逐事件 collision resolution，而是在固定时间步内用 impulse–momentum 处理 simultaneous contacts。</p>
+<p>这也是为什么不同物理引擎可以有：</p>
+\[
+\text{CCD}
++
+\text{Sequential Impulse},
+\]<p>或者：</p>
+\[
+\text{discrete collision detection}
++
+\text{LCP solver}.
+\]<p>两者是不同模块。</p>
+<hr>
+<h1 id="11-它和-xpbd-又有什么关系">11. 它和 XPBD 又有什么关系？
+</h1><p>XPBD constraint：</p>
+\[
+C(x)=0
+\]<p>对应 equality constraint。</p>
+<p>而 unilateral contact：</p>
+\[
+C(x)\ge0
+\]<p>本质上是不等式约束。</p>
+<p>其 Lagrange multiplier 需要满足：</p>
+\[
+\lambda\ge0.
+\]<p>因此理想 unilateral constraint 的 KKT 条件正是：</p>
+\[
+\boxed{
+C(x)\ge0,
+\qquad
+\lambda\ge0,
+\qquad
+\lambda C(x)=0
+}
+\]<p>所以：</p>
+\[
+\boxed{
+\text{complementarity}
+}
+\]<p>实际上就是：</p>
+\[
+\boxed{
+\text{inequality-constrained optimization 的 KKT 条件}
+}
+\]<p>这会把：</p>
+<ul>
+<li>PBD/XPBD；</li>
+<li>Lagrange multipliers；</li>
+<li>contact LCP；</li>
+<li>constrained optimization</li>
+</ul>
+<p>统一起来。</p>
+<p>从这个视角看：</p>
+\[
+\lambda
+\]<p>并不只是“一个 constraint stiffness variable”。</p>
+<p>它是：</p>
+\[
+\boxed{
+\text{约束对动力系统施加反作用的 dual variable}
+}
+\]<p>这点非常值得掌握。</p>
+<hr>
+<h1 id="12-一个更深的问题为什么现代引擎不都直接精确解-lcp">12. 一个更深的问题：为什么现代引擎不都直接精确解 LCP？
+</h1><p>因为大规模摩擦接触的精确 complementarity 求解很贵，而且数值上也并不总是友好。</p>
+<p>现实游戏场景可能有：</p>
+\[
+10^4
+\]<p>甚至更多 contact constraints。</p>
+<p>严格 pivoting：</p>
+\[
+\text{Lemke / exact LCP}
+\]<p>很难满足实时预算。</p>
+<p>于是游戏引擎更倾向：</p>
+\[
+\boxed{
+\text{iterative approximate solve}
+}
+\]<p>例如：</p>
+<ul>
+<li>Projected Gauss–Seidel；</li>
+<li>Sequential Impulse；</li>
+<li>Jacobi variants；</li>
+<li>block solvers。</li>
+</ul>
+<p>优势是：</p>
+\[
+\text{算 4 次也能给答案},
+\]\[
+\text{算 20 次答案更好}.
+\]<p>这叫：</p>
+\[
+\boxed{\text{graceful degradation}}
+\]<p>对于游戏引擎极其重要。</p>
+<p>也就是说：</p>
+\[
+\boxed{
+\text{理论问题是 complementarity，
+工程算法未必是 exact LCP solver}
+}
+\]<p>这一区别一定要分清。</p>
+<hr>
+<h1 id="13-mujoco-为什么又走了另一条路线">13. MuJoCo 为什么又走了另一条路线？
+</h1><p>这也是很好的现代对照。</p>
+<p>MuJoCo 官方文档明确指出，经典摩擦接触通常可以表述为 LCP/NCP，但 MuJoCo 采用不同的 soft-contact formulation，使问题转化为 convex optimization。</p>
+<p>它仍然保留：</p>
+<ul>
+<li>contact normal；</li>
+<li>friction cone；</li>
+<li>generalized coordinates；</li>
+<li>constraint forces；</li>
+</ul>
+<p>但改变了底层数学 formulation。</p>
+<p>这说明一个很重要的知识体系关系：</p>
+\[
+\boxed{
+\text{接触物理}
+\neq
+\text{唯一数值 formulation}
+}
+\]<p>同一个接触问题可以被写成：</p>
+\[
+\text{penalty},
+\]\[
+\text{complementarity},
+\]\[
+\text{constrained optimization},
+\]\[
+\text{barrier},
+\]\[
+\text{soft convex contact}.
+\]<p>这些方法之间真正的差异，经常不在“有没有接触力”，而在：</p>
+\[
+\boxed{
+\text{如何定义 admissible set，
+以及如何求其中的动力学状态}
+}
+\]<hr>
+<h1 id="14-对软体求解器最值得迁移的一点">14. 对软体求解器最值得迁移的一点
+</h1><p>Complementarity 最有价值的启发并不是：</p>
+\[
+0\le a\perp b\ge0
+\]<p>这个符号。</p>
+<p>而是一个求解器建模原则：</p>
+\[
+\boxed{
+\text{如果物理系统存在互斥状态，
+应该考虑把这种逻辑直接编码进数学 formulation。}
+}
+\]<p>接触就是：</p>
+\[
+\text{separated}
+\quad/\quad
+\text{loaded}.
+\]<p>摩擦就是：</p>
+\[
+\text{stick}
+\quad/\quad
+\text{slip}.
+\]<p>塑性里也有类似结构：</p>
+\[
+\text{elastic}
+\quad/\quad
+\text{yielding}.
+\]<p>damage、fracture、contact activation 中也常出现：</p>
+\[
+\boxed{\text{active-set structure}}
+\]<p>所以 complementarity 并不只是刚体游戏物理的一个技巧。</p>
+<p>它属于更大的：</p>
+\[
+\boxed{\text{nonsmooth mechanics}}
+\]<p>体系。</p>
+<hr>
+<h2 id="一个非常实用的调试视角">一个非常实用的调试视角
+</h2><p>假设你的接触求解器出现：</p>
+<ul>
+<li>箱子静止时抖动；</li>
+<li>接触冲量负值；</li>
+<li>分离物体仍有接触力；</li>
+<li>多接触堆叠逐渐漂移。</li>
+</ul>
+<p>可以直接记录每个 contact：</p>
+\[
+g_i,
+\]\[
+\lambda_i,
+\]<p>以及：</p>
+\[
+g_i\lambda_i.
+\]<p>理想状态：</p>
+\[
+g_i\ge0,
+\]\[
+\lambda_i\ge0,
+\]\[
+g_i\lambda_i\approx0.
+\]<p>如果发现：</p>
+\[
+g_i>0,
+\qquad
+\lambda_i>0,
+\]<p>说明：</p>
+\[
+\boxed{\text{分离状态仍施加接触力}}
+\]<p>如果：</p>
+\[
+\lambda_i<0,
+\]<p>则出现：</p>
+\[
+\boxed{\text{接触在“拉”物体}}
+\]<p>这样调试比只看 penetration depth 或 velocity 更有结构。</p>
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Complementarity 的本质可以浓缩成：</p>
+\[
+\boxed{
+\text{接触不是“算一个力”，
+而是在几个互斥物理状态之间求一个自洽解。}
+}
+\]<p>这也是为什么接触求解器如此难。</p>
+<p>它面对的并非普通光滑方程：</p>
+\[
+F(x)=0,
+\]<p>而是：</p>
+\[
+\boxed{
+\text{continuous dynamics}
++
+\text{inequality}
++
+\text{state switching}
+}
+\]<p>一旦理解这一层，你会发现 Sequential Impulse、PGS、LCP、KKT、摩擦锥、unilateral constraint 这些概念终于会落在同一个框架里。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><ol>
+<li>
+<p><strong>Stewart &amp; Trinkle, <em>An Implicit Time-Stepping Scheme for Rigid Body Dynamics with Inelastic Collisions and Coulomb Friction</em></strong>。这是理解 velocity-level complementarity/time-stepping 的经典入口。</p>
+</li>
+<li>
+<p><strong>Stewart, <em>Rigid Body Dynamics</em> 讲义页面</strong>。很适合先建立 \(g\ge0,\lambda\ge0,g\lambda=0\) 的基本直觉，再进入 LCP。</p>
+</li>
+<li>
+<p><strong>Tan, Siu &amp; Liu, <em>Contact Handling for Articulated Rigid Bodies Using LCP</em></strong>。这是非常适合工程实现的推导文档，从 \(M,J\) 一直推到 velocity-based LCP，本来就是为 DART 接触求解器实现准备的。</p>
+</li>
+<li>
+<p><strong>Andrews, Erleben &amp; Ferguson, <em>Contact and Friction Simulation for Computer Graphics</em></strong>。适合建立完整地图，覆盖 rigid/soft contact、LCP/NCP、碰撞检测和实际 solver。</p>
+</li>
+<li>
+<p><strong>MuJoCo 官方 Computation 文档</strong>。特别适合在理解 LCP 之后看：它展示了现代物理引擎如何改写接触 formulation，并直接比较 elliptic/pyramidal friction cones 与 convex optimization contact。</p>
+</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%88%9A%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/">刚体动力学</a>
+        
+            <a href="/tags/%E6%8E%A5%E8%A7%A6%E5%8A%9B%E5%AD%A6/">接触力学</a>
+        
+            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/">数值优化</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

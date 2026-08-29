@@ -1,0 +1,1419 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>数值优化 on Assranai&#39;s 手账</title>
+        <link>https://assranai.github.io/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/</link>
+        <description>Recent content in 数值优化 on Assranai&#39;s 手账</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en-us</language>
+        <copyright>Assranai</copyright>
+        <lastBuildDate>Fri, 28 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>Complementarity：为什么刚体接触本质上是一个“二选一”问题</title>
+        <link>https://assranai.github.io/cards/10-complementarity/</link>
+        <pubDate>Sun, 23 Aug 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/10-complementarity/</guid>
+        <description>&lt;h1 id=&#34;complementarity为什么刚体接触本质上是一个二选一问题&#34;&gt;Complementarity：为什么刚体接触本质上是一个“二选一”问题
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Complementarity formulation（互补约束）与 LCP/NCP 接触动力学&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：刚体动力学 × 接触力学 × 物理引擎 × 数值优化&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这期值得学，因为它把很多物理引擎里看似零散的东西统一起来了：&lt;/p&gt;
+\[
+\boxed{
+\text{接触力}
++\text{非穿透}
++\text{摩擦}
++\text{约束求解}
+}
+\]&lt;p&gt;它们背后有一个很深的共同结构：&lt;/p&gt;
+\[
+\boxed{\text{某两个量不能同时“活跃”}}
+\]&lt;p&gt;这就是 &lt;strong&gt;complementarity（互补性）&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;经典刚体接触时间步进工作中，Stewart–Trinkle 直接用 impulse–momentum 和互补约束描述多体接触与 Coulomb 摩擦，从而避免逐个精确解析瞬时冲击事件，并能处理 simultaneous impacts。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-接触为什么天然是一个互补问题&#34;&gt;1. 接触为什么天然是一个“互补问题”？
+&lt;/h2&gt;&lt;p&gt;考虑两个刚体。&lt;/p&gt;
+&lt;p&gt;定义法向间隙：&lt;/p&gt;
+\[
+g(q)\ge 0.
+\]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(g&gt;0\)：分离；&lt;/li&gt;
+&lt;li&gt;\(g=0\)：接触；&lt;/li&gt;
+&lt;li&gt;\(g&lt;0\)：穿透，不允许。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;再定义法向接触力：&lt;/p&gt;
+\[
+\lambda_n\ge0.
+\]&lt;p&gt;接触力只能推，不能拉。&lt;/p&gt;
+&lt;p&gt;现在真正关键的是第三条：&lt;/p&gt;
+\[
+\boxed{
+g(q)\lambda_n=0
+}
+\]&lt;p&gt;合起来：&lt;/p&gt;
+\[
+\boxed{
+g\ge0,\qquad
+\lambda_n\ge0,\qquad
+g\lambda_n=0
+}
+\]&lt;p&gt;常写作：&lt;/p&gt;
+\[
+\boxed{
+0\le g\perp\lambda_n\ge0
+}
+\]&lt;p&gt;这就是最基本的 complementarity condition。David Stewart 对刚体接触的经典说明正是这样表述：间隙非负，法向接触力非负，并且两者乘积为零。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-这三个式子其实完整描述了两个物理状态&#34;&gt;2. 这三个式子其实完整描述了两个物理状态
+&lt;/h1&gt;&lt;p&gt;如果：&lt;/p&gt;
+\[
+g&gt;0,
+\]&lt;p&gt;由：&lt;/p&gt;
+\[
+g\lambda_n=0
+\]&lt;p&gt;必须得到：&lt;/p&gt;
+\[
+\lambda_n=0.
+\]&lt;p&gt;即：&lt;/p&gt;
+\[
+\boxed{\text{物体分离}\Rightarrow\text{没有接触力}}
+\]&lt;p&gt;反过来，如果：&lt;/p&gt;
+\[
+\lambda_n&gt;0,
+\]&lt;p&gt;那么必须：&lt;/p&gt;
+\[
+g=0.
+\]&lt;p&gt;即：&lt;/p&gt;
+\[
+\boxed{\text{存在接触力}\Rightarrow\text{物体正在接触}}
+\]&lt;p&gt;因此互补约束本质上是在表达：&lt;/p&gt;
+\[
+\boxed{
+\text{separation}
+\quad\text{OR}\quad
+\text{contact force}
+}
+\]&lt;p&gt;二者不能同时严格为正。&lt;/p&gt;
+&lt;p&gt;这就是为什么接触问题天然带有非光滑性：系统要在不同 active set 之间切换。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-这比-penalty-method-多了什么&#34;&gt;3. 这比 penalty method 多了什么？
+&lt;/h1&gt;&lt;p&gt;Penalty 接触通常写成：&lt;/p&gt;
+\[
+\lambda_n=k\max(-g,0).
+\]&lt;p&gt;于是：&lt;/p&gt;
+\[
+g&lt;0
+\]&lt;p&gt;以后才产生：&lt;/p&gt;
+\[
+\lambda_n&gt;0.
+\]&lt;p&gt;也就是说，penetration 被允许，只是被惩罚。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[
+k\uparrow
+\]&lt;p&gt;穿透越小，但系统越刚：&lt;/p&gt;
+\[
+\Delta t\downarrow
+\]&lt;p&gt;或线性系统条件数变差。&lt;/p&gt;
+&lt;p&gt;Complementarity 的思想则更直接：&lt;/p&gt;
+\[
+\boxed{
+g\ge0
+}
+\]&lt;p&gt;本身就是 admissibility condition。&lt;/p&gt;
+&lt;p&gt;在理想刚体模型里，接触并不需要一个人为弹簧刚度。&lt;/p&gt;
+&lt;p&gt;所以从建模层面看：&lt;/p&gt;
+\[
+\boxed{
+\text{Penalty：把非穿透近似成高刚度力}
+}
+\]&lt;p&gt;而：&lt;/p&gt;
+\[
+\boxed{
+\text{Complementarity：把非穿透直接作为不等式约束}
+}
+\]&lt;p&gt;这两种思维差异很大。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-但物理引擎通常不会直接解位置级&#34;&gt;4. 但物理引擎通常不会直接解位置级 \(g\ge0\)
+&lt;/h1&gt;&lt;p&gt;实时刚体求解器更常处理速度或冲量层面。&lt;/p&gt;
+&lt;p&gt;设接触 Jacobian：&lt;/p&gt;
+\[
+J_n.
+\]&lt;p&gt;法向相对速度：&lt;/p&gt;
+\[
+v_n=J_nv.
+\]&lt;p&gt;时间离散后：&lt;/p&gt;
+&lt;h1 id=&#34;mvn1&#34;&gt;[
+Mv^{n+1}
+&lt;/h1&gt;&lt;p&gt;Mv^n
++
+h f_{\rm ext}
++
+J_n^T p_n,
+]&lt;/p&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+\[
+p_n
+\]&lt;p&gt;是一个时间步内的法向冲量。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+&lt;h1 id=&#34;vn1&#34;&gt;[
+v^{n+1}
+&lt;/h1&gt;&lt;p&gt;v^*
++
+M^{-1}J_n^Tp_n.
+]&lt;/p&gt;
+&lt;p&gt;这里：&lt;/p&gt;
+&lt;h1 id=&#34;v&#34;&gt;[
+v^*
+&lt;/h1&gt;&lt;p&gt;v^n+hM^{-1}f_{\rm ext}.
+]&lt;/p&gt;
+&lt;p&gt;接触点新的法向速度：&lt;/p&gt;
+&lt;h1 id=&#34;v_nn1&#34;&gt;[
+v_n^{n+1}
+&lt;/h1&gt;&lt;p&gt;J_nv^*
++
+J_nM^{-1}J_n^Tp_n.
+]&lt;/p&gt;
+&lt;p&gt;定义：&lt;/p&gt;
+\[
+A=J_nM^{-1}J_n^T,
+\]\[
+b=J_nv^*.
+\]&lt;p&gt;得到：&lt;/p&gt;
+\[
+v_n^{n+1}=Ap_n+b.
+\]&lt;p&gt;然后施加：&lt;/p&gt;
+\[
+\boxed{
+0\le p_n
+\perp
+Ap_n+b
+\ge0
+}
+\]&lt;p&gt;这就是一个标准：&lt;/p&gt;
+\[
+\boxed{\text{Linear Complementarity Problem，LCP}}
+\]&lt;p&gt;形式：&lt;/p&gt;
+\[
+z\ge0,
+\]\[
+w=Az+b\ge0,
+\]\[
+z^Tw=0.
+\]&lt;p&gt;Stewart–Trinkle 系时间步进方法和后续刚体 LCP 实现都建立在这类结构上。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-这里的--非常重要&#34;&gt;5. 这里的 \(A=JM^{-1}J^T\) 非常重要
+&lt;/h1&gt;&lt;p&gt;这个矩阵有一个很值得记住的物理意义：&lt;/p&gt;
+\[
+\boxed{
+A:
+\text{接触冲量}
+\rightarrow
+\text{接触速度变化}
+}
+\]&lt;p&gt;给一个接触点施加：&lt;/p&gt;
+\[
+p_j,
+\]&lt;p&gt;它可能改变另一个接触点：&lt;/p&gt;
+\[
+v_i.
+\]&lt;p&gt;所以：&lt;/p&gt;
+\[
+A_{ij}
+\]&lt;p&gt;就是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;接触 \(j\) 的冲量，对接触 \(i\) 法向速度造成多大影响。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这说明多接触问题为什么必须耦合求解。&lt;/p&gt;
+&lt;p&gt;例如一个箱子四个角落地。&lt;/p&gt;
+&lt;p&gt;如果你独立处理四个接触：&lt;/p&gt;
+\[
+1\rightarrow2\rightarrow3\rightarrow4,
+\]&lt;p&gt;每次解完一个都会改变其他三个的速度状态。&lt;/p&gt;
+&lt;p&gt;所以真正的物理问题本身就是：&lt;/p&gt;
+\[
+\boxed{\text{global coupled constraint problem}}
+\]&lt;p&gt;Projected Gauss–Seidel 之类的方法，本质上是在迭代求这个耦合系统的近似解。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-这正好解释了游戏引擎里的-sequential-impulse&#34;&gt;6. 这正好解释了游戏引擎里的 Sequential Impulse
+&lt;/h1&gt;&lt;p&gt;很多游戏物理教材会介绍：&lt;/p&gt;
+\[
+\text{Sequential Impulse}
+\]&lt;p&gt;看起来像：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;计算一个接触冲量；&lt;/li&gt;
+&lt;li&gt;clamp；&lt;/li&gt;
+&lt;li&gt;更新速度；&lt;/li&gt;
+&lt;li&gt;处理下一个接触；&lt;/li&gt;
+&lt;li&gt;重复若干轮。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;实际上它与：&lt;/p&gt;
+\[
+\boxed{\text{Projected Gauss-Seidel on an LCP}}
+\]&lt;p&gt;高度对应。&lt;/p&gt;
+&lt;p&gt;单接触更新近似：&lt;/p&gt;
+&lt;h1 id=&#34;deltalambda&#34;&gt;[
+\Delta\lambda
+&lt;/h1&gt;&lt;ul&gt;
+&lt;li&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;\frac{Jv+b}
+{JM^{-1}J^T}.
+]&lt;/p&gt;
+&lt;p&gt;然后：&lt;/p&gt;
+&lt;h1 id=&#34;lambda_rm-new&#34;&gt;[
+\lambda_{\rm new}
+&lt;/h1&gt;&lt;p&gt;\max
+(
+0,
+\lambda_{\rm old}+\Delta\lambda
+).
+]&lt;/p&gt;
+&lt;p&gt;这里的：&lt;/p&gt;
+\[
+\boxed{\max(0,\cdot)}
+\]&lt;p&gt;根本不是随便加的 clamp。&lt;/p&gt;
+&lt;p&gt;它就是在执行：&lt;/p&gt;
+\[
+\lambda_n\ge0.
+\]&lt;p&gt;所以很多物理引擎代码看起来只是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;lambda += delta_lambda
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;lambda = max(lambda, 0)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;apply_impulse(lambda - old_lambda)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;但背后其实对应一个完整的 complementarity formulation。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么要-accumulated-impulse&#34;&gt;7. 为什么要 accumulated impulse？
+&lt;/h1&gt;&lt;p&gt;这也是一个非常容易低估的细节。&lt;/p&gt;
+&lt;p&gt;错误写法可能是：&lt;/p&gt;
+&lt;h1 id=&#34;deltalambda-1&#34;&gt;[
+\Delta\lambda
+&lt;/h1&gt;&lt;p&gt;\max(0,\Delta\lambda).
+]&lt;/p&gt;
+&lt;p&gt;但真正应该投影的是：&lt;/p&gt;
+\[
+\boxed{
+\lambda_{\rm total}
+}
+\]&lt;p&gt;即：&lt;/p&gt;
+&lt;h1 id=&#34;lambda_rm-new-1&#34;&gt;[
+\lambda_{\rm new}
+&lt;/h1&gt;&lt;p&gt;\max
+(
+0,
+\lambda_{\rm old}+\Delta\lambda
+).
+]&lt;/p&gt;
+&lt;p&gt;然后实际施加：&lt;/p&gt;
+\[
+\lambda_{\rm new}-\lambda_{\rm old}.
+\]&lt;p&gt;为什么？&lt;/p&gt;
+&lt;p&gt;因为互补条件要求的是最终：&lt;/p&gt;
+\[
+\lambda\ge0,
+\]&lt;p&gt;不是每一次局部修正：&lt;/p&gt;
+\[
+\Delta\lambda\ge0.
+\]&lt;p&gt;有时前一次迭代冲量过大，下一次必须：&lt;/p&gt;
+\[
+\Delta\lambda&lt;0
+\]&lt;p&gt;把它减少。&lt;/p&gt;
+&lt;p&gt;所以 accumulated impulse 其实对应一个很明确的数学事实：&lt;/p&gt;
+\[
+\boxed{
+\text{projection 应作用于 solution variable，
+而不是 iteration increment}
+}
+\]&lt;p&gt;这是从 LCP 视角看 Sequential Impulse 后非常容易理解的一点。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-摩擦为什么更复杂&#34;&gt;8. 摩擦为什么更复杂？
+&lt;/h1&gt;&lt;p&gt;法向接触只有：&lt;/p&gt;
+\[
+\lambda_n\ge0.
+\]&lt;p&gt;Coulomb 摩擦则要求切向力：&lt;/p&gt;
+\[
+\lambda_t
+\]&lt;p&gt;落在摩擦圆锥内：&lt;/p&gt;
+\[
+\boxed{
+\|\lambda_t\|
+\le
+\mu\lambda_n
+}
+\]&lt;p&gt;于是有两种状态。&lt;/p&gt;
+&lt;p&gt;如果接触点 sticking：&lt;/p&gt;
+\[
+v_t=0,
+\]&lt;p&gt;摩擦力可以在 cone 内任意选择：&lt;/p&gt;
+\[
+\|\lambda_t\|&lt;\mu\lambda_n.
+\]&lt;p&gt;如果 sliding：&lt;/p&gt;
+\[
+v_t\ne0,
+\]&lt;p&gt;摩擦力达到 cone 边界：&lt;/p&gt;
+&lt;h1 id=&#34;lambda_t&#34;&gt;[
+|\lambda_t|
+&lt;/h1&gt;&lt;p&gt;\mu\lambda_n,
+]&lt;/p&gt;
+&lt;p&gt;并与滑动方向相反。&lt;/p&gt;
+&lt;p&gt;所以它又是一套“状态二选一”的互补结构。&lt;/p&gt;
+&lt;p&gt;在经典方法中，可以通过 maximum dissipation principle 和摩擦锥约束把 Coulomb 摩擦写成 complementarity problem。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么游戏引擎经常用-friction-pyramid&#34;&gt;9. 为什么游戏引擎经常用 friction pyramid？
+&lt;/h1&gt;&lt;p&gt;真实 Coulomb cone：&lt;/p&gt;
+\[
+\sqrt{\lambda_{t1}^2+\lambda_{t2}^2}
+\le
+\mu\lambda_n
+\]&lt;p&gt;是一个圆锥。&lt;/p&gt;
+&lt;p&gt;如果把它离散成若干方向：&lt;/p&gt;
+\[
+d_1,\ldots,d_k,
+\]&lt;p&gt;得到多面体：&lt;/p&gt;
+\[
+\boxed{\text{friction pyramid}}
+\]&lt;p&gt;那么原来的 nonlinear cone constraint 就可以近似成线性不等式，从而进入 LCP 框架。&lt;/p&gt;
+&lt;p&gt;Georgia Tech 的接触 LCP 实现说明就明确采用了离散 friction cone basis；MuJoCo 文档也同时区分 elliptic friction cone 与 pyramidal approximation。&lt;/p&gt;
+&lt;p&gt;这里有一个典型工程折中：&lt;/p&gt;
+\[
+\boxed{
+\text{更真实的 cone}
+\leftrightarrow
+\text{更简单的 solver}
+}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;10-这和-ccd-是完全不同的一层&#34;&gt;10. 这和 CCD 是完全不同的一层
+&lt;/h1&gt;&lt;p&gt;这一点尤其值得与你前面关于 CCD 的讨论联系起来。&lt;/p&gt;
+&lt;p&gt;CCD 回答：&lt;/p&gt;
+\[
+\boxed{
+\text{沿当前运动路径，什么时候第一次发生几何碰撞？}
+}
+\]&lt;p&gt;Complementarity 回答：&lt;/p&gt;
+\[
+\boxed{
+\text{一旦进入接触状态，什么冲量/力与运动状态彼此一致？}
+}
+\]&lt;p&gt;所以可以这样分层：&lt;/p&gt;
+\[
+\boxed{
+\text{CCD：geometric feasibility}
+}
+\]\[
+\boxed{
+\text{Complementarity：contact dynamics consistency}
+}
+\]&lt;p&gt;CCD 可能告诉你：&lt;/p&gt;
+\[
+t_{\rm hit}=0.006s.
+\]&lt;p&gt;但它不会告诉你：&lt;/p&gt;
+\[
+p_n=?,
+\qquad
+p_t=?.
+\]&lt;p&gt;LCP/NCP 则负责这部分。&lt;/p&gt;
+&lt;p&gt;反过来，纯 velocity-level complementarity solver 也不自动等同于精确 CCD；经典 time-stepping 方法甚至刻意避免显式逐事件 collision resolution，而是在固定时间步内用 impulse–momentum 处理 simultaneous contacts。&lt;/p&gt;
+&lt;p&gt;这也是为什么不同物理引擎可以有：&lt;/p&gt;
+\[
+\text{CCD}
++
+\text{Sequential Impulse},
+\]&lt;p&gt;或者：&lt;/p&gt;
+\[
+\text{discrete collision detection}
++
+\text{LCP solver}.
+\]&lt;p&gt;两者是不同模块。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-它和-xpbd-又有什么关系&#34;&gt;11. 它和 XPBD 又有什么关系？
+&lt;/h1&gt;&lt;p&gt;XPBD constraint：&lt;/p&gt;
+\[
+C(x)=0
+\]&lt;p&gt;对应 equality constraint。&lt;/p&gt;
+&lt;p&gt;而 unilateral contact：&lt;/p&gt;
+\[
+C(x)\ge0
+\]&lt;p&gt;本质上是不等式约束。&lt;/p&gt;
+&lt;p&gt;其 Lagrange multiplier 需要满足：&lt;/p&gt;
+\[
+\lambda\ge0.
+\]&lt;p&gt;因此理想 unilateral constraint 的 KKT 条件正是：&lt;/p&gt;
+\[
+\boxed{
+C(x)\ge0,
+\qquad
+\lambda\ge0,
+\qquad
+\lambda C(x)=0
+}
+\]&lt;p&gt;所以：&lt;/p&gt;
+\[
+\boxed{
+\text{complementarity}
+}
+\]&lt;p&gt;实际上就是：&lt;/p&gt;
+\[
+\boxed{
+\text{inequality-constrained optimization 的 KKT 条件}
+}
+\]&lt;p&gt;这会把：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PBD/XPBD；&lt;/li&gt;
+&lt;li&gt;Lagrange multipliers；&lt;/li&gt;
+&lt;li&gt;contact LCP；&lt;/li&gt;
+&lt;li&gt;constrained optimization&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;统一起来。&lt;/p&gt;
+&lt;p&gt;从这个视角看：&lt;/p&gt;
+\[
+\lambda
+\]&lt;p&gt;并不只是“一个 constraint stiffness variable”。&lt;/p&gt;
+&lt;p&gt;它是：&lt;/p&gt;
+\[
+\boxed{
+\text{约束对动力系统施加反作用的 dual variable}
+}
+\]&lt;p&gt;这点非常值得掌握。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-一个更深的问题为什么现代引擎不都直接精确解-lcp&#34;&gt;12. 一个更深的问题：为什么现代引擎不都直接精确解 LCP？
+&lt;/h1&gt;&lt;p&gt;因为大规模摩擦接触的精确 complementarity 求解很贵，而且数值上也并不总是友好。&lt;/p&gt;
+&lt;p&gt;现实游戏场景可能有：&lt;/p&gt;
+\[
+10^4
+\]&lt;p&gt;甚至更多 contact constraints。&lt;/p&gt;
+&lt;p&gt;严格 pivoting：&lt;/p&gt;
+\[
+\text{Lemke / exact LCP}
+\]&lt;p&gt;很难满足实时预算。&lt;/p&gt;
+&lt;p&gt;于是游戏引擎更倾向：&lt;/p&gt;
+\[
+\boxed{
+\text{iterative approximate solve}
+}
+\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Projected Gauss–Seidel；&lt;/li&gt;
+&lt;li&gt;Sequential Impulse；&lt;/li&gt;
+&lt;li&gt;Jacobi variants；&lt;/li&gt;
+&lt;li&gt;block solvers。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;优势是：&lt;/p&gt;
+\[
+\text{算 4 次也能给答案},
+\]\[
+\text{算 20 次答案更好}.
+\]&lt;p&gt;这叫：&lt;/p&gt;
+\[
+\boxed{\text{graceful degradation}}
+\]&lt;p&gt;对于游戏引擎极其重要。&lt;/p&gt;
+&lt;p&gt;也就是说：&lt;/p&gt;
+\[
+\boxed{
+\text{理论问题是 complementarity，
+工程算法未必是 exact LCP solver}
+}
+\]&lt;p&gt;这一区别一定要分清。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-mujoco-为什么又走了另一条路线&#34;&gt;13. MuJoCo 为什么又走了另一条路线？
+&lt;/h1&gt;&lt;p&gt;这也是很好的现代对照。&lt;/p&gt;
+&lt;p&gt;MuJoCo 官方文档明确指出，经典摩擦接触通常可以表述为 LCP/NCP，但 MuJoCo 采用不同的 soft-contact formulation，使问题转化为 convex optimization。&lt;/p&gt;
+&lt;p&gt;它仍然保留：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;contact normal；&lt;/li&gt;
+&lt;li&gt;friction cone；&lt;/li&gt;
+&lt;li&gt;generalized coordinates；&lt;/li&gt;
+&lt;li&gt;constraint forces；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但改变了底层数学 formulation。&lt;/p&gt;
+&lt;p&gt;这说明一个很重要的知识体系关系：&lt;/p&gt;
+\[
+\boxed{
+\text{接触物理}
+\neq
+\text{唯一数值 formulation}
+}
+\]&lt;p&gt;同一个接触问题可以被写成：&lt;/p&gt;
+\[
+\text{penalty},
+\]\[
+\text{complementarity},
+\]\[
+\text{constrained optimization},
+\]\[
+\text{barrier},
+\]\[
+\text{soft convex contact}.
+\]&lt;p&gt;这些方法之间真正的差异，经常不在“有没有接触力”，而在：&lt;/p&gt;
+\[
+\boxed{
+\text{如何定义 admissible set，
+以及如何求其中的动力学状态}
+}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;14-对软体求解器最值得迁移的一点&#34;&gt;14. 对软体求解器最值得迁移的一点
+&lt;/h1&gt;&lt;p&gt;Complementarity 最有价值的启发并不是：&lt;/p&gt;
+\[
+0\le a\perp b\ge0
+\]&lt;p&gt;这个符号。&lt;/p&gt;
+&lt;p&gt;而是一个求解器建模原则：&lt;/p&gt;
+\[
+\boxed{
+\text{如果物理系统存在互斥状态，
+应该考虑把这种逻辑直接编码进数学 formulation。}
+}
+\]&lt;p&gt;接触就是：&lt;/p&gt;
+\[
+\text{separated}
+\quad/\quad
+\text{loaded}.
+\]&lt;p&gt;摩擦就是：&lt;/p&gt;
+\[
+\text{stick}
+\quad/\quad
+\text{slip}.
+\]&lt;p&gt;塑性里也有类似结构：&lt;/p&gt;
+\[
+\text{elastic}
+\quad/\quad
+\text{yielding}.
+\]&lt;p&gt;damage、fracture、contact activation 中也常出现：&lt;/p&gt;
+\[
+\boxed{\text{active-set structure}}
+\]&lt;p&gt;所以 complementarity 并不只是刚体游戏物理的一个技巧。&lt;/p&gt;
+&lt;p&gt;它属于更大的：&lt;/p&gt;
+\[
+\boxed{\text{nonsmooth mechanics}}
+\]&lt;p&gt;体系。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一个非常实用的调试视角&#34;&gt;一个非常实用的调试视角
+&lt;/h2&gt;&lt;p&gt;假设你的接触求解器出现：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;箱子静止时抖动；&lt;/li&gt;
+&lt;li&gt;接触冲量负值；&lt;/li&gt;
+&lt;li&gt;分离物体仍有接触力；&lt;/li&gt;
+&lt;li&gt;多接触堆叠逐渐漂移。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;可以直接记录每个 contact：&lt;/p&gt;
+\[
+g_i,
+\]\[
+\lambda_i,
+\]&lt;p&gt;以及：&lt;/p&gt;
+\[
+g_i\lambda_i.
+\]&lt;p&gt;理想状态：&lt;/p&gt;
+\[
+g_i\ge0,
+\]\[
+\lambda_i\ge0,
+\]\[
+g_i\lambda_i\approx0.
+\]&lt;p&gt;如果发现：&lt;/p&gt;
+\[
+g_i&gt;0,
+\qquad
+\lambda_i&gt;0,
+\]&lt;p&gt;说明：&lt;/p&gt;
+\[
+\boxed{\text{分离状态仍施加接触力}}
+\]&lt;p&gt;如果：&lt;/p&gt;
+\[
+\lambda_i&lt;0,
+\]&lt;p&gt;则出现：&lt;/p&gt;
+\[
+\boxed{\text{接触在“拉”物体}}
+\]&lt;p&gt;这样调试比只看 penetration depth 或 velocity 更有结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Complementarity 的本质可以浓缩成：&lt;/p&gt;
+\[
+\boxed{
+\text{接触不是“算一个力”，
+而是在几个互斥物理状态之间求一个自洽解。}
+}
+\]&lt;p&gt;这也是为什么接触求解器如此难。&lt;/p&gt;
+&lt;p&gt;它面对的并非普通光滑方程：&lt;/p&gt;
+\[
+F(x)=0,
+\]&lt;p&gt;而是：&lt;/p&gt;
+\[
+\boxed{
+\text{continuous dynamics}
++
+\text{inequality}
++
+\text{state switching}
+}
+\]&lt;p&gt;一旦理解这一层，你会发现 Sequential Impulse、PGS、LCP、KKT、摩擦锥、unilateral constraint 这些概念终于会落在同一个框架里。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Stewart &amp;amp; Trinkle, &lt;em&gt;An Implicit Time-Stepping Scheme for Rigid Body Dynamics with Inelastic Collisions and Coulomb Friction&lt;/em&gt;&lt;/strong&gt;。这是理解 velocity-level complementarity/time-stepping 的经典入口。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Stewart, &lt;em&gt;Rigid Body Dynamics&lt;/em&gt; 讲义页面&lt;/strong&gt;。很适合先建立 \(g\ge0,\lambda\ge0,g\lambda=0\) 的基本直觉，再进入 LCP。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Tan, Siu &amp;amp; Liu, &lt;em&gt;Contact Handling for Articulated Rigid Bodies Using LCP&lt;/em&gt;&lt;/strong&gt;。这是非常适合工程实现的推导文档，从 \(M,J\) 一直推到 velocity-based LCP，本来就是为 DART 接触求解器实现准备的。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Andrews, Erleben &amp;amp; Ferguson, &lt;em&gt;Contact and Friction Simulation for Computer Graphics&lt;/em&gt;&lt;/strong&gt;。适合建立完整地图，覆盖 rigid/soft contact、LCP/NCP、碰撞检测和实际 solver。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;MuJoCo 官方 Computation 文档&lt;/strong&gt;。特别适合在理解 LCP 之后看：它展示了现代物理引擎如何改写接触 formulation，并直接比较 elliptic/pyramidal friction cones 与 convex optimization contact。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        <item>
+        <title>Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向</title>
+        <link>https://assranai.github.io/cards/15-anderson-acceleration/</link>
+        <pubDate>Fri, 28 Aug 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/15-anderson-acceleration/</guid>
+        <description>&lt;h1 id=&#34;anderson-acceleration把过去几次迭代为什么没收敛变成下一步的搜索方向&#34;&gt;Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Anderson Acceleration（安德森加速，AA）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：非线性求解 × 有限元 × PBD/PD × 数值优化&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Anderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：&lt;/p&gt;
+\[
+\boxed{\text{一个迭代器本来能收敛，只是收敛得太慢。}}
+\]&lt;p&gt;很多求解器都可以写成固定点形式：&lt;/p&gt;
+\[
+x_{k+1}=G(x_k).
+\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Picard iteration；&lt;/li&gt;
+&lt;li&gt;local-global Projective Dynamics；&lt;/li&gt;
+&lt;li&gt;某些 PBD/Jacobi 迭代；&lt;/li&gt;
+&lt;li&gt;nonlinear FEM splitting；&lt;/li&gt;
+&lt;li&gt;ADMM；&lt;/li&gt;
+&lt;li&gt;多物理场 staggered coupling。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;普通固定点迭代每一步只利用当前状态：&lt;/p&gt;
+\[
+x_k\rightarrow G(x_k).
+\]&lt;p&gt;Anderson Acceleration 多问了一件事：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-固定点求解器到底在干什么&#34;&gt;1. 固定点求解器到底在干什么？
+&lt;/h2&gt;&lt;p&gt;假设要求解：&lt;/p&gt;
+\[
+F(x)=0.
+\]&lt;p&gt;你构造一个容易计算的映射：&lt;/p&gt;
+\[
+G(x),
+\]&lt;p&gt;使真正答案满足：&lt;/p&gt;
+\[
+x^*=G(x^*).
+\]&lt;p&gt;然后迭代：&lt;/p&gt;
+\[
+x_{k+1}=G(x_k).
+\]&lt;p&gt;定义 fixed-point residual：&lt;/p&gt;
+\[
+\boxed{
+r_k=G(x_k)-x_k.
+}
+\]&lt;p&gt;如果：&lt;/p&gt;
+\[
+r_k=0,
+\]&lt;p&gt;那么：&lt;/p&gt;
+\[
+G(x_k)=x_k,
+\]&lt;p&gt;问题解决。&lt;/p&gt;
+&lt;p&gt;所以固定点迭代实际上是在反复做：&lt;/p&gt;
+\[
+x_{k+1}=x_k+r_k.
+\]&lt;p&gt;这非常便宜。&lt;/p&gt;
+&lt;p&gt;问题是，如果：&lt;/p&gt;
+\[
+G&#39;(x^*)
+\]&lt;p&gt;的谱半径接近 1：&lt;/p&gt;
+\[
+\rho(G&#39;)\lesssim1,
+\]&lt;p&gt;那么误差：&lt;/p&gt;
+\[
+e_{k+1}\approx G&#39;(x^*)e_k
+\]&lt;p&gt;每一步只减少一点。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[
+\|e_{k+1}\|=0.95\|e_k\|.
+\]&lt;p&gt;100 次以后还有：&lt;/p&gt;
+\[
+0.95^{100}\approx0.006.
+\]&lt;p&gt;对于一个每次迭代都要做：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;constraint projection；&lt;/li&gt;
+&lt;li&gt;sparse solve；&lt;/li&gt;
+&lt;li&gt;collision；&lt;/li&gt;
+&lt;li&gt;constitutive update&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;的物理求解器，这已经很贵。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-anderson-的核心残差历史其实包含了局部-jacobian-信息&#34;&gt;2. Anderson 的核心：残差历史其实包含了局部 Jacobian 信息
+&lt;/h1&gt;&lt;p&gt;现在假设已经得到：&lt;/p&gt;
+\[
+x_{k-m},\ldots,x_k.
+\]&lt;p&gt;同时有：&lt;/p&gt;
+\[
+r_{k-m},\ldots,r_k.
+\]&lt;p&gt;如果残差从：&lt;/p&gt;
+\[
+r_{k-1}
+\]&lt;p&gt;变成：&lt;/p&gt;
+\[
+r_k,
+\]&lt;p&gt;那么：&lt;/p&gt;
+\[
+\Delta r_k=r_k-r_{k-1}.
+\]&lt;p&gt;而状态变化：&lt;/p&gt;
+\[
+\Delta x_k=x_k-x_{k-1}.
+\]&lt;p&gt;局部线性化下：&lt;/p&gt;
+\[
+\Delta r
+\approx
+J_r\,\Delta x.
+\]&lt;p&gt;于是每一组：&lt;/p&gt;
+\[
+(\Delta x,\Delta r)
+\]&lt;p&gt;其实都在告诉你：&lt;/p&gt;
+\[
+\boxed{
+\text{未知 residual Jacobian 在某个方向上大概是什么样子。}
+}
+\]&lt;p&gt;Newton 法会直接计算：&lt;/p&gt;
+\[
+J_r.
+\]&lt;p&gt;Anderson 不计算它。&lt;/p&gt;
+&lt;p&gt;它从最近几步：&lt;/p&gt;
+\[
+\Delta x_1,\Delta r_1,\dots
+\]&lt;p&gt;反推局部行为。&lt;/p&gt;
+&lt;p&gt;这就是它与：&lt;/p&gt;
+\[
+\boxed{\text{quasi-Newton / multisecant}}
+\]&lt;p&gt;联系起来的原因。Walker–Ni 对这一关系进行了系统讨论，并引用 Fang–Saad 的 multisecant 解释。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-算法核心其实只是一个很小的最小二乘&#34;&gt;3. 算法核心其实只是一个很小的最小二乘
+&lt;/h1&gt;&lt;p&gt;定义最近 \(m\) 次 residual difference：&lt;/p&gt;
+\[
+\Delta R_k=
+[
+\Delta r_{k-m+1},\ldots,\Delta r_k
+]
+\]&lt;p&gt;以及：&lt;/p&gt;
+\[
+\Delta X_k=
+[
+\Delta x_{k-m+1},\ldots,\Delta x_k
+].
+\]&lt;p&gt;先解：&lt;/p&gt;
+&lt;h1 id=&#34;gamma&#34;&gt;[
+\boxed{
+\gamma
+&lt;/h1&gt;&lt;p&gt;\arg\min_\gamma
+|
+r_k-\Delta R_k\gamma
+|_2
+}
+]&lt;/p&gt;
+&lt;p&gt;意思是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;能不能用过去残差变化的线性组合，尽可能解释当前 residual？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;然后使用一种常见 AA 更新：&lt;/p&gt;
+&lt;h1 id=&#34;x_k1&#34;&gt;[
+\boxed{
+x_{k+1}
+&lt;/h1&gt;&lt;h2 id=&#34;x_kr_k&#34;&gt;x_k+r_k
+&lt;/h2&gt;&lt;p&gt;(\Delta X_k+\Delta R_k)\gamma.
+}
+]&lt;/p&gt;
+&lt;p&gt;普通 fixed-point：&lt;/p&gt;
+\[
+x_{k+1}=x_k+r_k.
+\]&lt;p&gt;AA 则额外增加：&lt;/p&gt;
+\[
+-(\Delta X+\Delta R)\gamma.
+\]&lt;p&gt;也就是：&lt;/p&gt;
+\[
+\boxed{
+\text{利用历史信息修正当前 fixed-point direction。}
+}
+\]&lt;p&gt;而这个 least-squares 的维度只有：&lt;/p&gt;
+\[
+m.
+\]&lt;p&gt;实践中：&lt;/p&gt;
+\[
+m=3\sim10
+\]&lt;p&gt;就很常见。&lt;/p&gt;
+&lt;p&gt;所以即使：&lt;/p&gt;
+\[
+x\in\mathbb R^{10^6},
+\]&lt;p&gt;真正新增的核心优化问题可能只是一个：&lt;/p&gt;
+\[
+5\times5
+\]&lt;p&gt;级别的小问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-一个二维直觉普通迭代为什么会之字形&#34;&gt;4. 一个二维直觉：普通迭代为什么会“之字形”
+&lt;/h1&gt;&lt;p&gt;假设你在二维状态空间里迭代：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;x0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ↘
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;   x1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↙
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; x2
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↘
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;   x3
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每一次 fixed-point map 都在纠正误差，但两个方向的收缩速度不同，于是出现：&lt;/p&gt;
+\[
+\boxed{\text{zig-zag}}
+\]&lt;p&gt;过去几次 residual：&lt;/p&gt;
+\[
+r_{k-2},r_{k-1},r_k
+\]&lt;p&gt;已经透露出：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“我每次都在这两个方向之间来回过度修正。”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Anderson 做的事情近似是：&lt;/p&gt;
+\[
+\boxed{
+\text{寻找这些历史更新的一个组合，使预测 residual 最小。}
+}
+\]&lt;p&gt;于是可能直接得到：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;x0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ↘
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;   x1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↙
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; x2
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;   ↘────────→ x*
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这非常像 Krylov 方法为什么能够比简单 stationary iteration 快。&lt;/p&gt;
+&lt;p&gt;实际上在线性 fixed-point 问题上，Walker 与 Ni 证明了无截断 AA 与 GMRES 存在本质等价关系。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么这个-gmres-联系这么重要&#34;&gt;5. 为什么这个 GMRES 联系这么重要？
+&lt;/h1&gt;&lt;p&gt;考虑线性系统：&lt;/p&gt;
+\[
+Ax=b.
+\]&lt;p&gt;Jacobi / Richardson 一类迭代可以写成：&lt;/p&gt;
+\[
+x_{k+1}=Gx_k+c.
+\]&lt;p&gt;普通 fixed-point 每次只能：&lt;/p&gt;
+\[
+e_{k+1}=Ge_k.
+\]&lt;p&gt;因此误差方向受到：&lt;/p&gt;
+\[
+G^k e_0
+\]&lt;p&gt;控制。&lt;/p&gt;
+&lt;p&gt;GMRES 则在 Krylov 子空间：&lt;/p&gt;
+&lt;h1 id=&#34;mathcal-k_m&#34;&gt;[
+\mathcal K_m
+&lt;/h1&gt;&lt;p&gt;\operatorname{span}
+{
+r_0,Ar_0,A^2r_0,\dots
+}
+]&lt;/p&gt;
+&lt;p&gt;中寻找最小 residual 的解。&lt;/p&gt;
+&lt;p&gt;Anderson 虽然没显式建立 Krylov basis，却通过：&lt;/p&gt;
+\[
+\boxed{\text{历史 residual 的线性组合}}
+\]&lt;p&gt;实现了类似的 residual minimization。&lt;/p&gt;
+&lt;p&gt;因此可以把它粗略理解成：&lt;/p&gt;
+\[
+\boxed{
+\text{nonlinear fixed-point iteration 上的“轻量 Krylov 化”。}
+}
+\]&lt;p&gt;这个理解比“给迭代加个 momentum”更接近它的数值本质。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-它为什么特别适合-projective-dynamics--local-global-solver&#34;&gt;6. 它为什么特别适合 Projective Dynamics / local-global solver？
+&lt;/h1&gt;&lt;p&gt;回忆 PD：&lt;/p&gt;
+\[
+x_k
+\xrightarrow{\text{local}}
+p_k
+\xrightarrow{\text{global}}
+x_{k+1}.
+\]&lt;p&gt;整个 local-global iteration 可以视为：&lt;/p&gt;
+\[
+\boxed{
+x_{k+1}=G(x_k).
+}
+\]&lt;p&gt;PD 的优势：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;每次 iteration 很便宜；&lt;/li&gt;
+&lt;li&gt;固定 global matrix 可预分解；&lt;/li&gt;
+&lt;li&gt;稳定；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但缺点之一是：&lt;/p&gt;
+\[
+\boxed{\text{高精度收敛阶段可能很慢。}}
+\]&lt;p&gt;2018 年 Peng 等在 ACM TOG/SIGGRAPH 工作中，直接把每个 local-global step 当作固定点映射，用 Anderson acceleration 加速 geometry optimization 和 physics simulation；论文报告，AA 能显著减少达到高精度所需的迭代次数，而单次迭代只增加很小额外成本。&lt;/p&gt;
+&lt;p&gt;这正好解释为什么 AA 和 PD 很般配：&lt;/p&gt;
+\[
+\boxed{
+\text{PD 提供一个便宜但线性收敛的 }G(x)
+}
+\]\[
++
+\]\[
+\boxed{
+\text{AA 用历史信息提高这个 }G\text{ 的有效收敛速度}
+}
+\]&lt;p&gt;而不必把整个 solver 改写成 Newton FEM。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-这对-pbdxpbd-有什么潜在意义&#34;&gt;7. 这对 PBD/XPBD 有什么潜在意义？
+&lt;/h1&gt;&lt;p&gt;如果一个 constraint solve 是：&lt;/p&gt;
+&lt;h1 id=&#34;xk1&#34;&gt;[
+x^{(k+1)}
+&lt;/h1&gt;&lt;p&gt;G(x^{(k)}),
+]&lt;/p&gt;
+&lt;p&gt;那么原则上也可以做 AA。&lt;/p&gt;
+&lt;p&gt;例如 GPU Jacobi PBD：&lt;/p&gt;
+\[
+x^{k}
+\rightarrow
+\text{all constraint corrections}
+\rightarrow
+x^{k+1}.
+\]&lt;p&gt;如果 stiff material 下需要：&lt;/p&gt;
+\[
+30\sim100
+\]&lt;p&gt;轮 Jacobi 才足够硬，AA 可以尝试用最近几轮的位置/residual 历史提高收敛。&lt;/p&gt;
+&lt;p&gt;2019 年一项面向交互式软体的工作就将 Anderson acceleration 加入 PBD/Jacobi 框架，以改善 stiff material 的收敛，同时使用 graph coloring 等方法实现 GPU 实时计算。&lt;/p&gt;
+&lt;p&gt;不过这里有一个重要条件：&lt;/p&gt;
+\[
+\boxed{
+\text{最好加速“完整一轮 solver map”，
+而不是随便加速单个 constraint correction。}
+}
+\]&lt;p&gt;因为 AA 假设你有一个相对稳定的：&lt;/p&gt;
+\[
+G:x\mapsto x&#39;.
+\]&lt;p&gt;如果 Gauss-Seidel 顺序、active contact set、clamp 状态每次剧烈变化，那么：&lt;/p&gt;
+\[
+G
+\]&lt;p&gt;本身就在跳变，历史信息就可能失去意义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-为什么-anderson-有时反而会把-solver-搞炸&#34;&gt;8. 为什么 Anderson 有时反而会把 solver 搞炸？
+&lt;/h1&gt;&lt;p&gt;这是它最需要警惕的地方。&lt;/p&gt;
+&lt;p&gt;普通 fixed-point 假设：&lt;/p&gt;
+\[
+G(x_k)
+\]&lt;p&gt;本身有某种稳定性。&lt;/p&gt;
+&lt;p&gt;Anderson 却做：&lt;/p&gt;
+\[
+\boxed{\text{extrapolation}}
+\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[
+x_{k+1}
+\]&lt;p&gt;可能落在历史状态的凸包之外。&lt;/p&gt;
+&lt;p&gt;如果非线性很强，例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;contact active set 改变；&lt;/li&gt;
+&lt;li&gt;tet 接近 inversion；&lt;/li&gt;
+&lt;li&gt;friction stick/slip 切换；&lt;/li&gt;
+&lt;li&gt;barrier 快速变陡；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;历史线性模型可能完全失效。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[
+\gamma
+\]&lt;p&gt;可能非常大，&lt;/p&gt;
+&lt;p&gt;导致：&lt;/p&gt;
+\[
+\|x_{k+1}-x_k\|\gg1.
+\]&lt;p&gt;这也是为什么 graphics 中真正实用的 AA 往往需要：&lt;/p&gt;
+\[
+\boxed{\text{safeguard}}
+\]&lt;p&gt;Peng 等 2018 年的方法并没有盲目接受 AA step，而是加入目标能量下降判据，从而解决经典 AA 的稳定性问题并保证其 local-global 框架的全局收敛性质。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-一个非常重要的工程原则aa-应该是加速器不是基础稳定器&#34;&gt;9. 一个非常重要的工程原则：AA 应该是“加速器”，不是“基础稳定器”
+&lt;/h1&gt;&lt;p&gt;假设原始 iteration：&lt;/p&gt;
+\[
+x_{k+1}=G(x_k)
+\]&lt;p&gt;本身会发散：&lt;/p&gt;
+\[
+\rho(G&#39;)&gt;1.
+\]&lt;p&gt;不要期待 AA 一定把它救回来。&lt;/p&gt;
+&lt;p&gt;它有时确实能扩大实际收敛区，但工程上更合理的顺序仍然是：&lt;/p&gt;
+\[
+\boxed{
+\text{先有一个靠谱的 baseline iteration}
+}
+\]&lt;p&gt;然后：&lt;/p&gt;
+\[
+\boxed{
+\text{再用 Anderson 降低 iteration count。}
+}
+\]&lt;p&gt;也就是说，如果 XPBD 出现：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;四面体反转；&lt;/li&gt;
+&lt;li&gt;NaN；&lt;/li&gt;
+&lt;li&gt;contact explosion；&lt;/li&gt;
+&lt;li&gt;compliance 定义错误；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;AA 几乎肯定不是第一治疗手段。&lt;/p&gt;
+&lt;p&gt;它解决的是：&lt;/p&gt;
+\[
+\boxed{\text{slow convergence}}
+\]&lt;p&gt;而不是：&lt;/p&gt;
+\[
+\boxed{\text{wrong formulation}}.
+\]&lt;p&gt;这一区分很重要。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-history-length--为什么不能无限加&#34;&gt;10. History length \(m\) 为什么不能无限加？
+&lt;/h1&gt;&lt;p&gt;乍看：&lt;/p&gt;
+\[
+m\uparrow
+\]&lt;p&gt;拥有更多信息，似乎越好。&lt;/p&gt;
+&lt;p&gt;但 residual differences：&lt;/p&gt;
+\[
+\Delta r_i
+\]&lt;p&gt;可能逐渐变得近似线性相关。&lt;/p&gt;
+&lt;p&gt;于是 least-squares matrix：&lt;/p&gt;
+\[
+\Delta R
+\]&lt;p&gt;条件数：&lt;/p&gt;
+\[
+\kappa(\Delta R)\uparrow.
+\]&lt;p&gt;此时：&lt;/p&gt;
+\[
+\gamma
+\]&lt;p&gt;会非常敏感。&lt;/p&gt;
+&lt;p&gt;同时：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;内存增加；&lt;/li&gt;
+&lt;li&gt;dot product/reduction 增加；&lt;/li&gt;
+&lt;li&gt;旧历史越来越不代表当前局部非线性。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此 practical AA 通常只保存：&lt;/p&gt;
+\[
+\boxed{m\approx3\sim10}
+\]&lt;p&gt;步历史，并可能：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;restart；&lt;/li&gt;
+&lt;li&gt;regularize；&lt;/li&gt;
+&lt;li&gt;删除近线性相关方向；&lt;/li&gt;
+&lt;li&gt;对 \(\gamma\) 加限制。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;近年的理论工作也仍在研究 restarted AA 的收敛性质，说明“历史到底保留多少”并不是已经完全解决的问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-它和-newton-的真正关系在哪里&#34;&gt;11. 它和 Newton 的真正关系在哪里？
+&lt;/h1&gt;&lt;p&gt;Newton：&lt;/p&gt;
+&lt;h1 id=&#34;x_k1-1&#34;&gt;[
+x_{k+1}
+&lt;/h1&gt;&lt;h2 id=&#34;x_k&#34;&gt;x_k
+&lt;/h2&gt;&lt;p&gt;J_r(x_k)^{-1}r_k.
+]&lt;/p&gt;
+&lt;p&gt;优点：&lt;/p&gt;
+\[
+\boxed{\text{利用完整局部导数}}
+\]&lt;p&gt;缺点：&lt;/p&gt;
+\[
+J_r
+\]&lt;p&gt;可能：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;很贵；&lt;/li&gt;
+&lt;li&gt;难推；&lt;/li&gt;
+&lt;li&gt;难 assemble；&lt;/li&gt;
+&lt;li&gt;难 factorize。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Anderson 近似在做：&lt;/p&gt;
+&lt;h1 id=&#34;x_k1-2&#34;&gt;[
+x_{k+1}
+&lt;/h1&gt;&lt;h2 id=&#34;x_k-1&#34;&gt;x_k
+&lt;/h2&gt;&lt;p&gt;H_k r_k,
+]&lt;/p&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+\[
+H_k
+\]&lt;p&gt;不是显式构造的完整矩阵，而是通过历史：&lt;/p&gt;
+\[
+(\Delta x_i,\Delta r_i)
+\]&lt;p&gt;满足若干 secant conditions。&lt;/p&gt;
+&lt;p&gt;所以可以把三类方法排成：&lt;/p&gt;
+\[
+\boxed{
+\text{Fixed point}
+}
+\]&lt;p&gt;几乎不利用导数信息；&lt;/p&gt;
+\[
+\boxed{
+\text{Anderson / multisecant}
+}
+\]&lt;p&gt;从历史中低成本推断部分 Jacobian 信息；&lt;/p&gt;
+\[
+\boxed{
+\text{Newton}
+}
+\]&lt;p&gt;显式使用完整 Jacobian/Hessian。&lt;/p&gt;
+&lt;p&gt;AA 正好卡在两者中间。&lt;/p&gt;
+&lt;p&gt;这也是它特别适合实时求解器的原因之一。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-一个很有价值的类比aa-是solver-的短期记忆&#34;&gt;12. 一个很有价值的类比：AA 是“solver 的短期记忆”
+&lt;/h1&gt;&lt;p&gt;普通迭代是：&lt;/p&gt;
+\[
+\boxed{\text{memoryless}}
+\]&lt;p&gt;每一步只看：&lt;/p&gt;
+\[
+x_k.
+\]&lt;p&gt;Anderson 有：&lt;/p&gt;
+\[
+\boxed{\text{short-term memory}}
+\]&lt;p&gt;它记住：&lt;/p&gt;
+\[
+(x_{k-j},r_{k-j}).
+\]&lt;p&gt;这些历史不是用来“平均答案”，而是用来估计：&lt;/p&gt;
+\[
+\boxed{
+\text{当前 nonlinear map 的局部响应结构。}
+}
+\]&lt;p&gt;所以 AA 揭示了一个很普遍的设计原则：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;如果求解器每轮都产生昂贵的信息，不要在下一轮全部丢掉。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这一原则会再次出现在：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;BFGS/L-BFGS；&lt;/li&gt;
+&lt;li&gt;Krylov subspace；&lt;/li&gt;
+&lt;li&gt;warm starting；&lt;/li&gt;
+&lt;li&gt;contact impulse caching；&lt;/li&gt;
+&lt;li&gt;temporal coherence；&lt;/li&gt;
+&lt;li&gt;recurrent optimization。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对接触问题为什么要更谨慎&#34;&gt;13. 对接触问题为什么要更谨慎？
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[
+G(x)
+\]&lt;p&gt;中包含 contact projection。&lt;/p&gt;
+&lt;p&gt;上一轮：&lt;/p&gt;
+\[
+\text{contact A active}
+\]&lt;p&gt;下一轮：&lt;/p&gt;
+\[
+\text{contact A inactive},
+\quad
+\text{contact B active}.
+\]&lt;p&gt;那么 residual map 可能是非光滑的。&lt;/p&gt;
+&lt;p&gt;经典 AA 理论最舒服的场景还是：&lt;/p&gt;
+\[
+G
+\]&lt;p&gt;足够平滑、局部 contractive。&lt;/p&gt;
+&lt;p&gt;不过后续研究已经把理论推进到某些 nonsmooth fixed-point 问题，并证明在“平滑 contraction + Lipschitz 较小的 nonsmooth component”等条件下仍能建立收敛结果。&lt;/p&gt;
+&lt;p&gt;但对物理引擎而言，这仍然意味着：&lt;/p&gt;
+\[
+\boxed{
+\text{contact-heavy iteration 应配合 restart / safeguard。}
+}
+\]&lt;p&gt;例如检测：&lt;/p&gt;
+\[
+\text{active set 大幅变化}
+\]&lt;p&gt;时直接清空 AA history，通常是很合理的工程策略。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-一个很适合自研求解器的最小实现&#34;&gt;14. 一个很适合自研求解器的最小实现
+&lt;/h1&gt;&lt;p&gt;假设已经有：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;x_next = solver_iteration(x)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;那么可以先完全不改底层 solver。&lt;/p&gt;
+&lt;p&gt;每轮：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;g = solver_iteration(x)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;r = g - x
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;存储最近 m 组:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    r
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;解小型 least-squares:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    gamma = argmin ||r - ΔR gamma||
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;构造 accelerated candidate:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x_AA = x + r - (ΔX + ΔR) gamma
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;然后做 safeguard：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;if energy(x_AA) &amp;lt; energy(g)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;   and feasibility(x_AA):
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       x = x_AA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;else:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       x = g
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       必要时 restart history
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这种结构非常吸引人，因为 AA 可以成为：&lt;/p&gt;
+\[
+\boxed{\text{solver wrapper}}
+\]&lt;p&gt;而不是侵入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;constraint kernel；&lt;/li&gt;
+&lt;li&gt;FEM constitutive law；&lt;/li&gt;
+&lt;li&gt;GPU collision kernel；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;内部。&lt;/p&gt;
+&lt;p&gt;这正是 Peng 等强调它适合加速已有 iterative algorithms 的原因之一。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15-对-xpbdpd-求解器最值得做的实验&#34;&gt;15. 对 XPBD/PD 求解器最值得做的实验
+&lt;/h1&gt;&lt;p&gt;如果要判断 AA 是否值得加入，不要一开始看 FPS。&lt;/p&gt;
+&lt;p&gt;先选一个&lt;strong&gt;没有碰撞、没有塑性、确定能收敛&lt;/strong&gt;的 stiff soft-body case。&lt;/p&gt;
+&lt;p&gt;记录：&lt;/p&gt;
+\[
+\|r_k\|
+\]&lt;p&gt;随 iteration：&lt;/p&gt;
+\[
+k
+\]&lt;p&gt;的变化。&lt;/p&gt;
+&lt;p&gt;比较：&lt;/p&gt;
+\[
+\text{baseline}
+\]&lt;p&gt;与：&lt;/p&gt;
+\[
+m=2,\ 4,\ 6
+\]&lt;p&gt;的 AA。&lt;/p&gt;
+&lt;p&gt;最值得看的不是：&lt;/p&gt;
+\[
+\text{最终形状}
+\]&lt;p&gt;而是：&lt;/p&gt;
+\[
+\log\|r_k\|
+\]&lt;p&gt;曲线。&lt;/p&gt;
+&lt;p&gt;如果 baseline：&lt;/p&gt;
+\[
+\|r_{k+1}\|\approx0.92\|r_k\|,
+\]&lt;p&gt;而 AA 很快变成明显更陡的下降曲线，就说明：&lt;/p&gt;
+\[
+\boxed{\text{问题主要是 fixed-point convergence rate。}}
+\]&lt;p&gt;如果 residual 本来就在：&lt;/p&gt;
+\[
+\text{oscillate / diverge / NaN},
+\]&lt;p&gt;那么应该先修 formulation。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Anderson Acceleration 最值得记住的不是那个 least-squares 公式，而是：&lt;/p&gt;
+\[
+\boxed{
+\text{迭代历史本身就是对未知 Jacobian 的观测数据。}
+}
+\]&lt;p&gt;普通 fixed-point solver 每轮算完：&lt;/p&gt;
+\[
+x_k\rightarrow x_{k+1}
+\]&lt;p&gt;以后，把之前的信息全部扔掉。&lt;/p&gt;
+&lt;p&gt;AA 则利用最近几轮：&lt;/p&gt;
+\[
+\Delta x,\Delta r
+\]&lt;p&gt;构造一个非常廉价的局部模型。&lt;/p&gt;
+&lt;p&gt;所以它在整个知识体系中的位置非常漂亮：&lt;/p&gt;
+\[
+\text{Fixed-point / PBD / PD}
+\]\[
+\downarrow
+\]\[
+\boxed{\text{Anderson / multisecant acceleration}}
+\]\[
+\downarrow
+\]\[
+\text{quasi-Newton}
+\]\[
+\downarrow
+\]\[
+\text{full Newton / Newton-Krylov}.
+\]&lt;p&gt;对于实时物理求解器而言，这条路线尤其值得学，因为它代表一种非常实用的工程哲学：&lt;/p&gt;
+\[
+\boxed{
+\text{如果单次迭代已经足够便宜和鲁棒，
+优先想办法让它少迭代几次，
+而不一定要把整个 solver 换成更昂贵的方法。}
+}
+\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Walker &amp;amp; Ni, &lt;em&gt;Anderson Acceleration for Fixed-Point Iterations&lt;/em&gt;, SIAM Journal on Numerical Analysis, 2011&lt;/strong&gt;。最重要的理论入口，尤其值得看 AA 与 GMRES、quasi-Newton 的关系以及 implementation considerations。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/10078356X&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Peng et al., &lt;em&gt;Anderson Acceleration for Geometry Optimization and Physics Simulation&lt;/em&gt;, ACM TOG / SIGGRAPH 2018&lt;/strong&gt;。如果重点是物理求解器，这篇最值得先读：直接把 local-global solver 写成 fixed-point map，并增加 energy safeguard。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://orca.cardiff.ac.uk/id/eprint/111400/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;作者存档与论文入口&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Fang &amp;amp; Saad, &lt;em&gt;Two Classes of Multisecant Methods for Nonlinear Acceleration&lt;/em&gt;, 2009&lt;/strong&gt;。适合进一步理解 AA 为什么可以解释成 multisecant quasi-Newton，而不仅仅是一种经验 extrapolation。该论文也是 Walker–Ni 2011 理论框架的重要前置工作。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Bian, Chen &amp;amp; Kelley, &lt;em&gt;Anderson Acceleration for a Class of Nonsmooth Fixed-Point Problems&lt;/em&gt;, SIAM JSC, 2021&lt;/strong&gt;。如果想把 AA 和 contact、projection 等非光滑问题联系起来，这篇适合理解理论边界。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Krzysik, De Sterck &amp;amp; Smith, &lt;em&gt;Asymptotic Convergence of Restarted Anderson Acceleration for Certain Normal Linear Systems&lt;/em&gt;, SIAM JSC, 2025&lt;/strong&gt;。适合追近期理论：为什么 restart、有限 history 对实际 AA 如此重要。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>

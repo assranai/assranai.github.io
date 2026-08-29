@@ -1,0 +1,763 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>非线性优化 on Assranai&#39;s 手账</title>
+        <link>https://assranai.github.io/tags/%E9%9D%9E%E7%BA%BF%E6%80%A7%E4%BC%98%E5%8C%96/</link>
+        <description>Recent content in 非线性优化 on Assranai&#39;s 手账</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en-us</language>
+        <copyright>Assranai</copyright>
+        <lastBuildDate>Thu, 27 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E9%9D%9E%E7%BA%BF%E6%80%A7%E4%BC%98%E5%8C%96/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>IPC：为什么“无穿透”可以被写成一个优化问题，而不是靠碰撞后修补</title>
+        <link>https://assranai.github.io/cards/14-ipc-feasibility/</link>
+        <pubDate>Thu, 27 Aug 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/14-ipc-feasibility/</guid>
+        <description>&lt;h1 id=&#34;ipc为什么无穿透可以被写成一个优化问题而不是靠碰撞后修补&#34;&gt;IPC：为什么“无穿透”可以被写成一个优化问题，而不是靠碰撞后修补
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Incremental Potential Contact（IPC，增量势接触）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 接触力学 × 非线性优化 × 物理求解器&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 IPC，因为它正好处在几个很重要的知识交叉点：&lt;/p&gt;
+\[
+\boxed{
+\text{隐式弹性动力学}
++
+\text{Barrier Method}
++
+\text{CCD}
++
+\text{Newton Optimization}
+}
+\]&lt;p&gt;它解决的核心问题非常具体：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;在大形变软体仿真里，怎样让接触从算法结构上保持不相交，而不是先允许穿透、再靠 penalty 或 projection 往回推？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Li 等人在 SIGGRAPH 2020 提出的 IPC，把一个时间步的弹性动力学和接触统一进同一个增量势能最小化问题，并用局部 barrier potential 阻止几何距离降到零；项目页明确强调其目标是做到 time-step 级别的 intersection-free 与 inversion-free 大形变动力学。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看普通接触方法为什么容易变得脆弱&#34;&gt;1. 先看普通接触方法为什么容易变得脆弱
+&lt;/h2&gt;&lt;p&gt;假设两个软体表面发生接近。&lt;/p&gt;
+&lt;p&gt;Penalty contact 常见形式：&lt;/p&gt;
+\[
+f_c = k\,\max(0,-g)n
+\]&lt;p&gt;其中：&lt;/p&gt;
+\[
+g&lt;0
+\]&lt;p&gt;代表已经穿透。&lt;/p&gt;
+&lt;p&gt;这意味着接触力是在：&lt;/p&gt;
+\[
+\boxed{\text{非法状态已经发生之后}}
+\]&lt;p&gt;才开始起作用。&lt;/p&gt;
+&lt;p&gt;于是你会面对一个熟悉的三角矛盾：&lt;/p&gt;
+\[
+k\text{ 小}
+\Rightarrow
+\text{穿透大}
+\]\[
+k\text{ 大}
+\Rightarrow
+\text{系统很 stiff}
+\]\[
+\Delta t\text{ 大}
+\Rightarrow
+\text{更容易跨过接触面}
+\]&lt;p&gt;很多工程调参，本质上都在这个三角形里打转。&lt;/p&gt;
+&lt;p&gt;IPC 换了一个问题定义：&lt;/p&gt;
+\[
+\boxed{
+\text{不要允许 }d=0\text{ 被跨过去}
+}
+\]&lt;p&gt;其中：&lt;/p&gt;
+\[
+d(x)
+\]&lt;p&gt;是两个 collision primitives 的距离。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-ipc-的核心给接触距离加一个-barrier-potential&#34;&gt;2. IPC 的核心：给接触距离加一个 barrier potential
+&lt;/h1&gt;&lt;p&gt;原始隐式动力学一个时间步可以写成某种增量势：&lt;/p&gt;
+\[
+E(x)
+\]&lt;p&gt;其中包含：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;惯性项；&lt;/li&gt;
+&lt;li&gt;弹性能；&lt;/li&gt;
+&lt;li&gt;外力势。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;IPC 增加：&lt;/p&gt;
+&lt;h1 id=&#34;bx&#34;&gt;[
+\boxed{
+B(x)
+&lt;/h1&gt;&lt;p&gt;E(x)
++
+\kappa
+\sum_{k\in C}
+b(d_k(x))
+}
+]&lt;/p&gt;
+&lt;p&gt;这里：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(C\)：当前可能发生接触的 primitive pairs；&lt;/li&gt;
+&lt;li&gt;\(d_k\)：第 \(k\) 对几何元的距离；&lt;/li&gt;
+&lt;li&gt;\(b(d)\)：barrier energy；&lt;/li&gt;
+&lt;li&gt;\(\kappa\)：barrier stiffness / conditioning parameter。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;IPC Toolkit 官方文档当前仍把 contact potential 写成：&lt;/p&gt;
+\[
+B(x)=\sum_{k\in C}b(d_k(x)),
+\]&lt;p&gt;并提供势能、梯度和 Hessian 的直接计算接口。&lt;/p&gt;
+&lt;p&gt;Barrier 的关键性质可以粗略理解为：&lt;/p&gt;
+\[
+d\gg \hat d
+\Rightarrow
+b(d)=0
+\]&lt;p&gt;而当：&lt;/p&gt;
+\[
+d\rightarrow0^+
+\]&lt;p&gt;时：&lt;/p&gt;
+\[
+\boxed{
+b(d)\rightarrow+\infty
+}
+\]&lt;p&gt;因此优化器越想把两个表面推到重合，目标函数就越大。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[
+d=0
+\]&lt;p&gt;变成一个不可跨越的能量墙。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-为什么-barrier-和-penalty-的数学地位不一样&#34;&gt;3. 为什么 barrier 和 penalty 的数学地位不一样？
+&lt;/h1&gt;&lt;p&gt;Penalty 大概是：&lt;/p&gt;
+&lt;h1 id=&#34;e_pd&#34;&gt;[
+E_p(d)
+&lt;/h1&gt;&lt;p&gt;\frac{k}{2}\min(d,0)^2.
+]&lt;/p&gt;
+&lt;p&gt;它在：&lt;/p&gt;
+\[
+d&lt;0
+\]&lt;p&gt;以后才惩罚。&lt;/p&gt;
+&lt;p&gt;Barrier 则工作在：&lt;/p&gt;
+\[
+d&gt;0
+\]&lt;p&gt;区域：&lt;/p&gt;
+\[
+\boxed{
+\lim_{d\to0^+}b(d)=+\infty
+}
+\]&lt;p&gt;所以可以用一句话概括：&lt;/p&gt;
+\[
+\boxed{
+\text{Penalty 惩罚违反约束；
+Barrier 阻止迭代进入违反约束的区域。}
+}
+\]&lt;p&gt;这正是 IPC 与很多传统 soft-contact formulation 最本质的区别之一。&lt;/p&gt;
+&lt;p&gt;IPC 的原始 formulation 明确采用局部支持的 barrier，只让接近碰撞的 primitive pairs 产生势能，并使离得足够远的 pair 不受影响。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-但-barrier-本身还不够&#34;&gt;4. 但 barrier 本身还不够
+&lt;/h1&gt;&lt;p&gt;这是理解 IPC 最重要的一点。&lt;/p&gt;
+&lt;p&gt;你可能会想：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;如果 \(b(d)\to\infty\)，那不就天然不会穿透了吗？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;不完全是。&lt;/p&gt;
+&lt;p&gt;Newton iteration 会产生搜索方向：&lt;/p&gt;
+\[
+p.
+\]&lt;p&gt;然后尝试：&lt;/p&gt;
+\[
+x_{\rm trial}=x+\alpha p.
+\]&lt;p&gt;即使：&lt;/p&gt;
+\[
+x
+\]&lt;p&gt;当前合法，&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[
+\alpha
+\]&lt;p&gt;太大，trial step 完全可能从：&lt;/p&gt;
+\[
+d&gt;0
+\]&lt;p&gt;直接跨到：&lt;/p&gt;
+\[
+d&lt;0.
+\]&lt;p&gt;数学上 barrier 在：&lt;/p&gt;
+\[
+d=0
+\]&lt;p&gt;附近发散，并不代表一个离散 Newton step 不会直接“跳过墙”。&lt;/p&gt;
+&lt;p&gt;所以 IPC 必须再加入：&lt;/p&gt;
+\[
+\boxed{\text{CCD-controlled line search}}
+\]&lt;p&gt;这就是 CCD 在 IPC 中真正具有决定性地位的原因。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-ccd-在这里不是碰撞检测完再处理而是控制优化步长&#34;&gt;5. CCD 在这里不是“碰撞检测完再处理”，而是控制优化步长
+&lt;/h1&gt;&lt;p&gt;给定：&lt;/p&gt;
+\[
+x
+\]&lt;p&gt;和 Newton direction：&lt;/p&gt;
+\[
+p,
+\]&lt;p&gt;考虑轨迹：&lt;/p&gt;
+\[
+x(\alpha)=x+\alpha p,
+\qquad
+0\le\alpha\le1.
+\]&lt;p&gt;CCD 询问：&lt;/p&gt;
+\[
+\boxed{
+\text{沿这条连续运动轨迹，第一次发生接触的 }\alpha_{\rm hit}\text{ 是多少？}
+}
+\]&lt;p&gt;然后约束：&lt;/p&gt;
+\[
+\alpha&lt;\alpha_{\rm hit}.
+\]&lt;p&gt;于是新的：&lt;/p&gt;
+\[
+x+\alpha p
+\]&lt;p&gt;仍然位于：&lt;/p&gt;
+\[
+d&gt;0
+\]&lt;p&gt;的可行区域。&lt;/p&gt;
+&lt;p&gt;原始 IPC 算法把这一过程直接写进 barrier-aware Newton：先求 Newton direction，再用 CCD 得到 step-size upper bound，然后继续做能量下降 line search。&lt;/p&gt;
+&lt;p&gt;因此可以非常准确地拆成：&lt;/p&gt;
+\[
+\boxed{
+\text{Barrier：告诉优化器不要靠近边界}
+}
+\]\[
+\boxed{
+\text{CCD：保证单次离散搜索步不会跨过边界}
+}
+\]&lt;p&gt;这两者缺一不可。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-这也解释了ccd-才是合法性的决定性约束为什么只对了一半&#34;&gt;6. 这也解释了“CCD 才是合法性的决定性约束”为什么只对了一半
+&lt;/h1&gt;&lt;p&gt;如果只讨论：&lt;/p&gt;
+\[
+\boxed{
+\text{某一次 Newton step 是否会穿过去}
+}
+\]&lt;p&gt;那么确实：&lt;/p&gt;
+\[
+\text{CCD}
+\]&lt;p&gt;非常关键。&lt;/p&gt;
+&lt;p&gt;因为它直接保证 trajectory feasibility。&lt;/p&gt;
+&lt;p&gt;但如果只有 CCD，没有 barrier：&lt;/p&gt;
+&lt;p&gt;每次 Newton step 虽然不允许真正撞上，&lt;/p&gt;
+&lt;p&gt;优化器可能不断得到一个指向接触面的方向：&lt;/p&gt;
+\[
+p\rightarrow d=0.
+\]&lt;p&gt;于是：&lt;/p&gt;
+\[
+\alpha\rightarrow0
+\]&lt;p&gt;求解会越来越难推进。&lt;/p&gt;
+&lt;p&gt;Barrier 则改变目标函数梯度：&lt;/p&gt;
+&lt;h1 id=&#34;nabla-b&#34;&gt;[
+\nabla B
+&lt;/h1&gt;&lt;p&gt;\nabla E
++
+\kappa\nabla b.
+]&lt;/p&gt;
+&lt;p&gt;越靠近接触面：&lt;/p&gt;
+\[
+\nabla b
+\]&lt;p&gt;越强，&lt;/p&gt;
+&lt;p&gt;所以 Newton direction 本身会逐渐形成物理上的排斥响应。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[
+\boxed{
+\text{CCD 管“不能走到哪里”，
+Barrier 管“优化器为什么不应该往那里走”。}
+}
+\]&lt;p&gt;这一区分非常重要。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么把接触写成势能这么有价值&#34;&gt;7. 为什么把接触写成“势能”这么有价值？
+&lt;/h1&gt;&lt;p&gt;因为弹性动力学本身已经可以写成一个 optimization problem。&lt;/p&gt;
+&lt;p&gt;例如 Backward Euler / variational time integration 常可得到类似：&lt;/p&gt;
+&lt;h1 id=&#34;xn1&#34;&gt;[
+x^{n+1}
+&lt;/h1&gt;&lt;p&gt;\arg\min_x
+\left[
+\frac{1}{2h^2}
+(x-\tilde x)^TM(x-\tilde x)
++
+\Psi(x)
+\right].
+]&lt;/p&gt;
+&lt;p&gt;现在加入：&lt;/p&gt;
+\[
+\kappa B_{\rm contact}(x)
+\]&lt;p&gt;以后：&lt;/p&gt;
+&lt;h1 id=&#34;xn1-1&#34;&gt;[
+\boxed{
+x^{n+1}
+&lt;/h1&gt;&lt;p&gt;\arg\min_x
+\left[
+E_{\rm inertia}
++
+E_{\rm elastic}
++
+E_{\rm contact}
+\right].
+}
+]&lt;/p&gt;
+&lt;p&gt;于是 contact 不再是时间步后附加的：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve elasticity
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;→ detect penetration
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;→ push apart
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;→ repair velocity
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;而变成：&lt;/p&gt;
+\[
+\boxed{
+\text{整个时间步解的是一个统一的 coupled state}
+}
+\]&lt;p&gt;这正是 IPC 很强的 formulation-level 优势。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-它和上一期的-complementarity-在哪里分叉&#34;&gt;8. 它和上一期的 Complementarity 在哪里分叉？
+&lt;/h1&gt;&lt;p&gt;Complementarity 接触通常写：&lt;/p&gt;
+\[
+g\ge0,
+\qquad
+\lambda\ge0,
+\qquad
+g\lambda=0.
+\]&lt;p&gt;它显式引入 dual variable：&lt;/p&gt;
+\[
+\lambda.
+\]&lt;p&gt;IPC 原始 primal barrier formulation 则主要在位置变量：&lt;/p&gt;
+\[
+x
+\]&lt;p&gt;上优化：&lt;/p&gt;
+\[
+\min_x E(x)+\kappa B(x).
+\]&lt;p&gt;因此可以粗略比较：&lt;/p&gt;
+\[
+\boxed{
+\text{Complementarity：显式处理约束反力/冲量}
+}
+\]\[
+\boxed{
+\text{IPC：把约束效应编码进 primal energy landscape}
+}
+\]&lt;p&gt;IPC 原论文也特别讨论了为什么采用 primal barrier：如果对数量巨大的 collision primitive pair 都增加拉格朗日乘子，系统规模会大幅增加，因此他们选择了更适合大量接触约束的 primal formulation。&lt;/p&gt;
+&lt;p&gt;这是理解两条现代接触路线差异的很好切口。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么-ipc-特别适合大形变-fem&#34;&gt;9. 为什么 IPC 特别适合大形变 FEM？
+&lt;/h1&gt;&lt;p&gt;因为大形变软体接触有三个问题同时存在：&lt;/p&gt;
+\[
+\text{elastic nonlinearity}
+\]\[
+\text{contact nonlinearity}
+\]\[
+\text{geometry nonlinearity}.
+\]&lt;p&gt;如果你分别做：&lt;/p&gt;
+\[
+\text{elastic solve}
+\rightarrow
+\text{collision correction}
+\]&lt;p&gt;它们会互相打架。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;p&gt;弹性力希望继续压缩，&lt;/p&gt;
+&lt;p&gt;contact projection 又把节点推出去，&lt;/p&gt;
+&lt;p&gt;下一次 elastic solve 又拉回来。&lt;/p&gt;
+&lt;p&gt;IPC 把二者统一为：&lt;/p&gt;
+\[
+\boxed{
+\nabla
+\left(
+E_{\rm elastic}
++
+E_{\rm contact}
+\right)
+=0.
+}
+\]&lt;p&gt;于是最后状态是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;材料变形和接触排斥共同作用下的势能平衡。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;原始论文展示了 Neo-Hookean 四面体在强压缩、复杂接触甚至狭窄障碍中的稳定模拟，并强调可以在较大时间步下保持 intersection-free。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-为什么-hessian-又成了一个麻烦&#34;&gt;10. 为什么 Hessian 又成了一个麻烦？
+&lt;/h1&gt;&lt;p&gt;Newton 法需要：&lt;/p&gt;
+\[
+H=\nabla^2 B(x).
+\]&lt;p&gt;但 contact barrier 和某些非线性弹性能的 Hessian：&lt;/p&gt;
+\[
+H
+\]&lt;p&gt;并不一定处处正定。&lt;/p&gt;
+&lt;p&gt;如果直接求：&lt;/p&gt;
+\[
+Hp=-g,
+\]&lt;p&gt;可能得到：&lt;/p&gt;
+\[
+g^Tp&gt;0,
+\]&lt;p&gt;即：&lt;/p&gt;
+\[
+p
+\]&lt;p&gt;甚至不是下降方向。&lt;/p&gt;
+&lt;p&gt;所以 IPC 使用：&lt;/p&gt;
+\[
+\boxed{\text{SPD projection}}
+\]&lt;p&gt;把 Hessian 调整为正定/半正定近似，然后得到稳定 descent direction。&lt;/p&gt;
+&lt;p&gt;原始算法流程里明确包括：&lt;/p&gt;
+\[
+H\leftarrow\operatorname{SPDProject}(\nabla^2B).
+\]&lt;p&gt;这和 Projective Dynamics / quasi-Newton 的思想再次产生联系：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;Hessian 的处理方式，往往直接决定非线性物理求解器能不能稳定工作。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-ipc-的每一步大致长这样&#34;&gt;11. IPC 的每一步大致长这样
+&lt;/h1&gt;&lt;p&gt;把细节压缩后：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;21
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;22
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;23
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;24
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;25
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;26
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;27
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;28
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;29
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;x ← 当前预测状态
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;repeat:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    找到接近的 collision pairs
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    计算：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        inertia energy
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        elastic energy
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        barrier contact energy
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    求：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        gradient g
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        Hessian H
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    H ← SPD projection(H)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    Newton direction:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        p = -H⁻¹g
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    CCD:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        αmax = 最大合法步长
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    line search:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        α ≤ αmax
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        且总能量下降
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x ← x + αp
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;until convergence
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这里有三个截然不同的模块：&lt;/p&gt;
+\[
+\boxed{\text{Newton：找下降方向}}
+\]\[
+\boxed{\text{CCD：限制可行步长}}
+\]\[
+\boxed{\text{line search：保证优化进展}}
+\]&lt;p&gt;这也是为什么 IPC 不能简单概括成“barrier contact”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-ipc-为什么还需要-broad-phase--constraint-culling&#34;&gt;12. IPC 为什么还需要 broad phase / constraint culling？
+&lt;/h1&gt;&lt;p&gt;理论上所有三角形、边、点都可能碰撞。&lt;/p&gt;
+&lt;p&gt;如果有：&lt;/p&gt;
+\[
+N
+\]&lt;p&gt;个 primitives，&lt;/p&gt;
+&lt;p&gt;naive pair 数量：&lt;/p&gt;
+\[
+O(N^2).
+\]&lt;p&gt;这是完全不能接受的。&lt;/p&gt;
+&lt;p&gt;但 IPC barrier 有局部支持：&lt;/p&gt;
+\[
+d&gt;\hat d
+\Rightarrow
+b(d)=0.
+\]&lt;p&gt;因此只需要维护：&lt;/p&gt;
+\[
+\boxed{
+\text{距离足够近的 active constraint set}
+}
+\]&lt;p&gt;而不是所有几何 pair。&lt;/p&gt;
+&lt;p&gt;这也是现代 IPC Toolkit 持续优化 broad phase 的原因。2026 年 2 月发布的 v1.5.0 已加入 fully parallel LBVH broad phase，同时加入新的接触势 formulation。&lt;/p&gt;
+&lt;p&gt;所以一个实际 IPC solver 的性能并不仅由：&lt;/p&gt;
+\[
+\text{linear solver}
+\]&lt;p&gt;决定。&lt;/p&gt;
+&lt;p&gt;collision candidate generation 本身就是大头。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-c-ipc-为什么很重要&#34;&gt;13. C-IPC 为什么很重要？
+&lt;/h1&gt;&lt;p&gt;原始 IPC 主要处理实体表面接触。&lt;/p&gt;
+&lt;p&gt;但很多图形学对象是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;cloth：二维曲面；&lt;/li&gt;
+&lt;li&gt;rods：一维曲线；&lt;/li&gt;
+&lt;li&gt;particles：零维点；&lt;/li&gt;
+&lt;li&gt;volumetric solids：三维体。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;2021 年的 &lt;strong&gt;Codimensional IPC（C-IPC）&lt;/strong&gt; 把这一体系扩展到：&lt;/p&gt;
+\[
+0D,1D,2D,3D
+\]&lt;p&gt;几何组合，并加入厚度、应变限制和摩擦等处理。论文明确强调其目标是让 mixed-dimensional systems 仍保持 interpenetration-free。&lt;/p&gt;
+&lt;p&gt;它还提出 ACCD——一种 additive continuous collision detection，用 conservative advancement 逐步逼近 time of impact，主要用于薄结构极严格的碰撞精度要求。&lt;/p&gt;
+&lt;p&gt;这说明 IPC 真正形成的已经不是一个单点算法，而是一套：&lt;/p&gt;
+\[
+\boxed{
+\text{optimization-based contact simulation family}
+}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;14-ipc-的局限在哪里&#34;&gt;14. IPC 的局限在哪里？
+&lt;/h1&gt;&lt;p&gt;第一，&lt;strong&gt;它不便宜&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;每个时间步可能需要多次：&lt;/p&gt;
+\[
+\text{broad phase}
++
+\text{barrier gradient/Hessian}
++
+\text{sparse solve}
++
+\text{CCD}
++
+\text{line search}.
+\]&lt;p&gt;相比简单 XPBD/Sequential Impulse：&lt;/p&gt;
+\[
+\boxed{
+\text{鲁棒性换计算成本}
+}
+\]&lt;p&gt;非常明显。&lt;/p&gt;
+&lt;p&gt;第二，CCD 本身必须高度可靠。&lt;/p&gt;
+&lt;p&gt;如果 CCD 漏掉：&lt;/p&gt;
+\[
+\alpha_{\rm hit},
+\]&lt;p&gt;整个“可行性保证”就可能被破坏。&lt;/p&gt;
+&lt;p&gt;第三，接触距离接近 barrier 区域时会带来很强的条件数变化，因此 barrier stiffness、Hessian conditioning 和 linear solver 都非常关键。&lt;/p&gt;
+&lt;p&gt;第四，对游戏实时物理而言，“严格无穿透”并不总值得它的成本。很多场景更愿意接受：&lt;/p&gt;
+\[
+0.1\text{ mm penetration}
+\]&lt;p&gt;换取：&lt;/p&gt;
+\[
+60/120\text{ FPS}.
+\]&lt;p&gt;所以 IPC 更像：&lt;/p&gt;
+\[
+\boxed{
+\text{high-fidelity / robust simulation formulation}
+}
+\]&lt;p&gt;而非所有实时引擎都应该照搬的默认方案。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15-但它对自研求解器有一个非常强的迁移价值&#34;&gt;15. 但它对自研求解器有一个非常强的迁移价值
+&lt;/h1&gt;&lt;p&gt;IPC 最值得学的并不是具体 barrier 函数。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[
+\boxed{
+\text{把“物理合法性”放进优化路径本身。}
+}
+\]&lt;p&gt;你可以把求解器分成三个层次：&lt;/p&gt;
+&lt;h3 id=&#34;物理目标&#34;&gt;物理目标
+&lt;/h3&gt;\[
+E(x)
+\]&lt;p&gt;决定：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;系统倾向去哪里。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&#34;可行域&#34;&gt;可行域
+&lt;/h3&gt;\[
+d(x)&gt;0
+\]&lt;p&gt;决定：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;哪些状态根本不能去。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&#34;数值路径&#34;&gt;数值路径
+&lt;/h3&gt;\[
+x_k\rightarrow x_{k+1}
+\]&lt;p&gt;决定：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;求解器是否会在寻找答案途中越过非法区域。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;很多不稳定 solver 只设计了第一层。&lt;/p&gt;
+&lt;p&gt;稍好的 solver 设计：&lt;/p&gt;
+\[
+E+\text{constraint}.
+\]&lt;p&gt;IPC 更进一步考虑：&lt;/p&gt;
+\[
+\boxed{
+\text{连 optimizer trajectory 本身也必须合法。}
+}
+\]&lt;p&gt;这是非常深的一层。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-这对-tet-inversion-也有直接启发&#34;&gt;16. 这对 tet inversion 也有直接启发
+&lt;/h1&gt;&lt;p&gt;假设材料要求：&lt;/p&gt;
+\[
+J=\det F&gt;0.
+\]&lt;p&gt;普通 Neo-Hookean 在某些实现或数值路径下，可能仍然面临：&lt;/p&gt;
+\[
+J\rightarrow0
+\]&lt;p&gt;甚至跨入：&lt;/p&gt;
+\[
+J&lt;0.
+\]&lt;p&gt;IPC 类思想会促使你把问题拆成：&lt;/p&gt;
+\[
+\boxed{
+\text{材料能量是否阻止 }J\to0？
+}
+\]&lt;p&gt;以及：&lt;/p&gt;
+\[
+\boxed{
+\text{Newton / XPBD correction step 是否可能一步跨过 }J=0？
+}
+\]&lt;p&gt;这与接触完全同构：&lt;/p&gt;
+\[
+d&gt;0
+\]&lt;p&gt;对应：&lt;/p&gt;
+\[
+J&gt;0.
+\]&lt;p&gt;所以你会自然想到：&lt;/p&gt;
+\[
+\boxed{
+\text{barrier on }J
++
+\text{step-size feasibility check}
+}
+\]&lt;p&gt;这就是 IPC formulation 对软体反转问题很强的迁移启发。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-一个很实用的自研调试指标feasibility-margin&#34;&gt;17. 一个很实用的自研调试指标：Feasibility Margin
+&lt;/h1&gt;&lt;p&gt;如果做类似 IPC/Barrier 的 solver，我会建议每个 Newton/constraint iteration 都记录：&lt;/p&gt;
+\[
+d_{\min}
+\]&lt;p&gt;以及：&lt;/p&gt;
+\[
+J_{\min}.
+\]&lt;p&gt;再记录候选方向：&lt;/p&gt;
+\[
+p
+\]&lt;p&gt;对应的：&lt;/p&gt;
+\[
+\alpha_{\rm feasible}.
+\]&lt;p&gt;比如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration   d_min      J_min      alpha_CCD
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;1           4.2e-3     0.82       1.00
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;2           9.1e-4     0.61       0.74
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;3           2.6e-4     0.49       0.21
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;4           2.1e-4     0.52       0.88
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果长期出现：&lt;/p&gt;
+\[
+\alpha_{\rm feasible}\ll1,
+\]&lt;p&gt;说明你的搜索方向一直猛烈撞向可行域边界。&lt;/p&gt;
+&lt;p&gt;这时真正的问题可能并不是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;CCD 太保守。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;更可能是：&lt;/p&gt;
+\[
+\boxed{
+\text{gradient/Hessian/constraint coupling 产生了很差的优化方向。}
+}
+\]&lt;p&gt;这是一种比单看 penetration count 更有价值的 solver diagnostic。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;IPC 最值得记住的不是：&lt;/p&gt;
+&lt;h1 id=&#34;bx-1&#34;&gt;[
+B(x)
+&lt;/h1&gt;&lt;p&gt;E(x)
++
+\kappa\sum b(d_k).
+]&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[
+\boxed{
+\text{物理合法性既要体现在最终状态，也要体现在求解路径中。}
+}
+\]&lt;p&gt;进一步拆开：&lt;/p&gt;
+\[
+\boxed{
+\text{Barrier 塑造能量地形；
+CCD 守住可行域；
+Newton 找平衡点。}
+}
+\]&lt;p&gt;这三个模块各自解决不同问题。&lt;/p&gt;
+&lt;p&gt;理解这一点之后，很多看起来相近的词会彻底分开：&lt;/p&gt;
+\[
+\text{penalty}
+\neq
+\text{barrier},
+\]\[
+\text{CCD}
+\neq
+\text{contact response},
+\]\[
+\text{collision detection}
+\neq
+\text{contact solve}.
+\]&lt;p&gt;而从更大的知识体系看，IPC 是一个非常典型的例子：&lt;/p&gt;
+\[
+\boxed{
+\text{现代物理求解器正在越来越像“带几何可行域的非线性优化器”。}
+}
+\]&lt;p&gt;这条思想会继续连接到 frictional optimization、strain limiting、injectivity preservation，以及更广义的 constrained differentiable simulation。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Li et al., &lt;em&gt;Incremental Potential Contact: Intersection- and Inversion-free Large Deformation Dynamics&lt;/em&gt;, SIGGRAPH 2020&lt;/strong&gt;。原始论文和项目页，是最重要的入口；项目页同时提供代码、工具包、视频和技术补充。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://ipc-sim.github.io/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;IPC 官方项目页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;IPC Toolkit 官方文档&lt;/strong&gt;。如果想从公式直接进入实现，重点看 collision constraints、contact potential、gradient/Hessian 与 CCD API。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://ipctk.xyz/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;IPC Toolkit&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Li, Kaufman &amp;amp; Jiang, &lt;em&gt;Codimensional Incremental Potential Contact&lt;/em&gt;, SIGGRAPH 2021&lt;/strong&gt;。扩展到 rods、cloth、particles、volume 的混合维度接触，并包含 strain limiting 与 ACCD。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://ipc-sim.github.io/C-IPC/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;C-IPC 项目页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Rigid-IPC, &lt;em&gt;Intersection-free Rigid Body Dynamics&lt;/em&gt;, SIGGRAPH 2021&lt;/strong&gt;。如果想比较 IPC 思想怎样迁移到刚体接触，这篇很合适。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://ipc-sim.github.io/rigid-ipc/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Rigid IPC 项目页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;IPC Toolkit v1.5.0 Release Notes, 2026-02-05&lt;/strong&gt;。如果想跟进这套技术今天仍在怎么发展，可以看最新工具链加入的 Geometric Contact Potential、Offset Geometric Contact 和并行 LBVH broad phase。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>

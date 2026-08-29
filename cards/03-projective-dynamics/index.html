@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Projective Dynamics：把“PBD 的投影”变成真正的能量求解 主题：Projective Dynamics（PD，投影动力学）\n领域：有限元 × 软体动力学 × 实时物理引擎\n推荐阅读时间：约 8 分钟\nProjective Dynamics 值得学，因为它正好卡在两个世界中间：\n\\[ \\boxed{\\text{PBD 的几何投影}} \\quad\\longleftrightarrow\\quad \\boxed{\\text{FEM 的能量最小化}} \\]它由 Bouaziz、Martin、Liu、Kavan、Pauly 在 SIGGRAPH 2014 提出，目标就是建立一座从 nodal FEM 到 Position Based Dynamics 的桥梁：保留隐式积分的稳定性与能量解释，同时利用局部约束投影获得接近实时应用所需要的效率。原论文明确把它描述为一种 projection-based implicit Euler integrator。\n这也是理解 XPBD、quasi-Newton FEM、ADMM deformables 甚至 differentiable physics 的一个非常好的中间节点。\n1. 先看它试图解决什么问题 普通 FEM 的隐式时间积分可以写成：\n[ x^{n+1} \\arg\\min_x \\left[ \\frac{1}{2h^2} (x-y)^T M(x-y) + E(x) \\right], ]\n其中\n\\[ y=x^n+h v^n+h^2M^{-1}f_{\\rm ext} \\]可以理解为惯性预测位置。\n这个形式其实很好：\n有明确能量； 时间积分稳定； 材料模型物理意义清楚。 问题在于：\n">
+<title>Projective Dynamics：把“PBD 的投影”变成真正的能量求解</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/03-projective-dynamics/'>
+
+<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="Projective Dynamics：把“PBD 的投影”变成真正的能量求解">
+<meta property='og:description' content="Projective Dynamics：把“PBD 的投影”变成真正的能量求解 主题：Projective Dynamics（PD，投影动力学）\n领域：有限元 × 软体动力学 × 实时物理引擎\n推荐阅读时间：约 8 分钟\nProjective Dynamics 值得学，因为它正好卡在两个世界中间：\n\\[ \\boxed{\\text{PBD 的几何投影}} \\quad\\longleftrightarrow\\quad \\boxed{\\text{FEM 的能量最小化}} \\]它由 Bouaziz、Martin、Liu、Kavan、Pauly 在 SIGGRAPH 2014 提出，目标就是建立一座从 nodal FEM 到 Position Based Dynamics 的桥梁：保留隐式积分的稳定性与能量解释，同时利用局部约束投影获得接近实时应用所需要的效率。原论文明确把它描述为一种 projection-based implicit Euler integrator。\n这也是理解 XPBD、quasi-Newton FEM、ADMM deformables 甚至 differentiable physics 的一个非常好的中间节点。\n1. 先看它试图解决什么问题 普通 FEM 的隐式时间积分可以写成：\n[ x^{n+1} \\arg\\min_x \\left[ \\frac{1}{2h^2} (x-y)^T M(x-y) + E(x) \\right], ]\n其中\n\\[ y=x^n+h v^n+h^2M^{-1}f_{\\rm ext} \\]可以理解为惯性预测位置。\n这个形式其实很好：\n有明确能量； 时间积分稳定； 材料模型物理意义清楚。 问题在于：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/03-projective-dynamics/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='软体动力学' /><meta property='article:tag' content='实时物理引擎' /><meta property='article:published_time' content='2026-08-16T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-16T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Projective Dynamics：把“PBD 的投影”变成真正的能量求解">
+<meta name="twitter:description" content="Projective Dynamics：把“PBD 的投影”变成真正的能量求解 主题：Projective Dynamics（PD，投影动力学）\n领域：有限元 × 软体动力学 × 实时物理引擎\n推荐阅读时间：约 8 分钟\nProjective Dynamics 值得学，因为它正好卡在两个世界中间：\n\\[ \\boxed{\\text{PBD 的几何投影}} \\quad\\longleftrightarrow\\quad \\boxed{\\text{FEM 的能量最小化}} \\]它由 Bouaziz、Martin、Liu、Kavan、Pauly 在 SIGGRAPH 2014 提出，目标就是建立一座从 nodal FEM 到 Position Based Dynamics 的桥梁：保留隐式积分的稳定性与能量解释，同时利用局部约束投影获得接近实时应用所需要的效率。原论文明确把它描述为一种 projection-based implicit Euler integrator。\n这也是理解 XPBD、quasi-Newton FEM、ADMM deformables 甚至 differentiable physics 的一个非常好的中间节点。\n1. 先看它试图解决什么问题 普通 FEM 的隐式时间积分可以写成：\n[ x^{n+1} \\arg\\min_x \\left[ \\frac{1}{2h^2} (x-y)^T M(x-y) + E(x) \\right], ]\n其中\n\\[ y=x^n+h v^n+h^2M^{-1}f_{\\rm ext} \\]可以理解为惯性预测位置。\n这个形式其实很好：\n有明确能量； 时间积分稳定； 材料模型物理意义清楚。 问题在于：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先看它试图解决什么问题">1. 先看它试图解决什么问题</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#local-step">Local step</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#lx">[
+\frac{1}{h^2}M(x-y)
++
+Lx</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/03-projective-dynamics/">Projective Dynamics：把“PBD 的投影”变成真正的能量求解</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-16T00:00:00Z'>Aug 16, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 4 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="projective-dynamics把pbd-的投影变成真正的能量求解">Projective Dynamics：把“PBD 的投影”变成真正的能量求解
+</h1><p><strong>主题：Projective Dynamics（PD，投影动力学）</strong><br>
+<strong>领域：有限元 × 软体动力学 × 实时物理引擎</strong><br>
+<strong>推荐阅读时间：约 8 分钟</strong></p>
+<p>Projective Dynamics 值得学，因为它正好卡在两个世界中间：</p>
+\[
+\boxed{\text{PBD 的几何投影}}
+\quad\longleftrightarrow\quad
+\boxed{\text{FEM 的能量最小化}}
+\]<p>它由 Bouaziz、Martin、Liu、Kavan、Pauly 在 SIGGRAPH 2014 提出，目标就是建立一座从 nodal FEM 到 Position Based Dynamics 的桥梁：保留隐式积分的稳定性与能量解释，同时利用局部约束投影获得接近实时应用所需要的效率。原论文明确把它描述为一种 projection-based implicit Euler integrator。</p>
+<p>这也是理解 XPBD、quasi-Newton FEM、ADMM deformables 甚至 differentiable physics 的一个非常好的中间节点。</p>
+<hr>
+<h2 id="1-先看它试图解决什么问题">1. 先看它试图解决什么问题
+</h2><p>普通 FEM 的隐式时间积分可以写成：</p>
+<h1 id="xn1">[
+x^{n+1}
+</h1><p>\arg\min_x
+\left[
+\frac{1}{2h^2}
+(x-y)^T M(x-y)
++
+E(x)
+\right],
+]</p>
+<p>其中</p>
+\[
+y=x^n+h v^n+h^2M^{-1}f_{\rm ext}
+\]<p>可以理解为惯性预测位置。</p>
+<p>这个形式其实很好：</p>
+<ul>
+<li>有明确能量；</li>
+<li>时间积分稳定；</li>
+<li>材料模型物理意义清楚。</li>
+</ul>
+<p>问题在于：</p>
+\[
+E(x)
+\]<p>通常高度非线性。</p>
+<p>Newton 法需要反复处理：</p>
+\[
+H(x)\Delta x=-g(x),
+\]<p>而 Hessian</p>
+\[
+H(x)=\frac{M}{h^2}+\nabla^2E(x)
+\]<p>随着形变改变。</p>
+<p>对于大规模软体，这意味着：</p>
+\[
+\text{assembly}
++
+\text{factorization / iterative solve}
+\]<p>都很贵。</p>
+<p>PBD 走了另一条路：</p>
+\[
+C_i(x)=0
+\]<p>然后直接投影：</p>
+\[
+x\leftarrow x+\Delta x_i.
+\]<p>速度很快，鲁棒性高，但物理能量结构相对弱。</p>
+<p>PD 的问题可以浓缩成：</p>
+<blockquote>
+<p><strong>有没有办法让“投影”本身变成能量最小化的一部分？</strong></p>
+</blockquote>
+<p>答案是：可以。</p>
+<hr>
+<h1 id="2-projective-dynamics-最关键的一步引入辅助变量">2. Projective Dynamics 最关键的一步：引入辅助变量 \(p_i\)
+</h1><p>PD 对每个约束定义一种特殊能量：</p>
+<h1 id="e_ix">[
+E_i(x)
+</h1><p>\min_{p_i\in\mathcal M_i}
+w_i
+|G_i x-p_i|^2.
+]</p>
+<p>这里：</p>
+<ul>
+<li>\(G_i x\)：从当前节点状态提取某种局部形变量；</li>
+<li>\(\mathcal M_i\)：合法局部状态组成的 manifold；</li>
+<li>\(p_i\)：这个 manifold 上距离当前状态最近的点；</li>
+<li>\(w_i\)：约束权重。</li>
+</ul>
+<p>这个式子的几何意义非常漂亮：</p>
+<h1 id="text能量">[
+\boxed{
+\text{能量}
+</h1><p>\text{当前局部状态距离“理想状态集合”的平方距离}
+}
+]</p>
+<p>例如一个弹簧。</p>
+<p>设：</p>
+\[
+G_i x=x_a-x_b.
+\]<p>理想状态要求弹簧长度：</p>
+\[
+\|p_i\|=l_0.
+\]<p>那么：</p>
+\[
+\mathcal M_i=
+\{p:\|p\|=l_0\}.
+\]<p>Local step 做的事情就是：</p>
+<h1 id="p_i">[
+p_i
+</h1><p>\operatorname{proj}_{\mathcal M_i}(G_i x).
+]</p>
+<p>也就是把当前弹簧向量投影到半径：</p>
+\[
+l_0
+\]<p>的球面上。</p>
+<p>这就是 <strong>Projective</strong> 这个词真正的来源。</p>
+<hr>
+<h1 id="3-为什么这会产生一个非常高效的算法">3. 为什么这会产生一个非常高效的算法？
+</h1><p>加入所有 \(p_i\) 后，整个时间步可以写成：</p>
+<h1 id="tilde-exp">[
+\tilde E(x,p)
+</h1><p>\frac{1}{2h^2}(x-y)^TM(x-y)
++
+\sum_i
+w_i|G_i x-p_i|^2.
+]</p>
+<p>然后交替优化：</p>
+\[
+\boxed{
+\text{Local step}
+\rightarrow
+\text{Global step}
+\rightarrow
+\text{Local step}
+\rightarrow\cdots
+}
+\]<p>这就是 PD 的核心。</p>
+<hr>
+<h2 id="local-step">Local step
+</h2><p>固定 \(x\)，分别求：</p>
+<h1 id="p_i-1">[
+p_i
+</h1><p>\arg\min_{p_i\in\mathcal M_i}
+|G_i x-p_i|^2.
+]</p>
+<p>每个 constraint 都是独立的。</p>
+<p>因此：</p>
+\[
+\boxed{\text{天然并行}}
+\]<p>一个 tet、一个 spring、一个 triangle 可以各算各的。</p>
+<p>而且很多投影都有闭式解。</p>
+<p>例如 corotated 类模型中，可以把局部 deformation gradient：</p>
+\[
+F
+\]<p>投影到 rotation manifold：</p>
+\[
+SO(3),
+\]<p>得到：</p>
+\[
+R=\operatorname{polar}(F).
+\]<p>这时：</p>
+\[
+p_i\sim R.
+\]<p>所以 local step 本质上做的是：</p>
+<blockquote>
+<p><strong>这个元素如果能瞬间回到一个“理想局部状态”，它最应该变成什么？</strong></p>
+</blockquote>
+<hr>
+<h1 id="4-global-step-才是-pd-真正强大的地方">4. Global step 才是 PD 真正强大的地方
+</h1><p>固定所有 \(p_i\) 后，目标函数对 \(x\) 是<strong>纯二次函数</strong>。</p>
+<p>梯度为：</p>
+<h2 id="lx">[
+\frac{1}{h^2}M(x-y)
++
+Lx
+</h2><h1 id="jp">Jp
+</h1><ol start="0">
+<li></li>
+</ol>
+<p>]</p>
+<p>于是得到：</p>
+<h1 id="rightx">[
+\boxed{
+\left(
+\frac{M}{h^2}+L
+\right)x
+</h1><p>\frac{M}{h^2}y+Jp
+}
+]</p>
+<p>其中：</p>
+\[
+L=\sum_i w_iG_i^TG_i.
+\]<p>最关键的是：</p>
+\[
+\boxed{
+A=
+\frac{M}{h^2}+L
+}
+\]<p><strong>不依赖当前形变 \(x\)</strong>。</p>
+<p>只要：</p>
+<ul>
+<li>mesh 拓扑不变；</li>
+<li>质量不变；</li>
+<li>timestep 不变；</li>
+<li>constraint weights 不变；</li>
+</ul>
+<p>这个矩阵就一直不变。PD 后续工作的推导也明确指出，这允许预计算并重复利用稀疏 Cholesky 分解。</p>
+<p>于是：</p>
+\[
+A=LL^T
+\]<p>可以在仿真开始前 factorize 一次。</p>
+<p>每个 global step 只需要：</p>
+\[
+LL^Tx=b
+\]<p>做两个 triangular solve。</p>
+<p>这就是 PD 的计算优势来源。</p>
+<hr>
+<h1 id="5-它为什么比普通-pbd更值得从求解器角度研究">5. 它为什么比“普通 PBD”更值得从求解器角度研究？
+</h1><p>表面看，两者都在 projection。</p>
+<p>但数学地位完全不同。</p>
+<p>PBD 常见结构是：</p>
+\[
+C_1(x)\rightarrow
+C_2(x)\rightarrow
+C_3(x)
+\]<p>逐约束 Gauss-Seidel 修正。</p>
+<p>而 PD 实际在最小化一个统一目标：</p>
+\[
+E_{\rm inertia}
++
+\sum_i E_i.
+\]<p>Local projection 只是为了快速处理这个目标里的非线性部分。</p>
+<p>因此可以粗略理解为：</p>
+\[
+\boxed{
+\text{PBD：projection 本身就是 solver}
+}
+\]<p>而：</p>
+\[
+\boxed{
+\text{PD：projection 是 nonlinear optimization 的一个子步骤}
+}
+\]<p>这也是原作者所说的“bridge between nodal FEM and Position Based Dynamics”的真正含义。</p>
+<hr>
+<h1 id="6-一个更深的视角pd-其实可以解释成-quasi-newton">6. 一个更深的视角：PD 其实可以解释成 quasi-Newton
+</h1><p>这一步尤其值得记住。</p>
+<p>后来 Liu、Bouaziz、Kavan 对 PD 重新分析发现，一次 local-global iteration 可以写成：</p>
+<h1 id="d_rm-pd">[
+d_{\rm PD}
+</h1><ul>
+<li></li>
+</ul>
+<p>\left(
+\frac{M}{h^2}+L
+\right)^{-1}
+\nabla g(x).
+]</p>
+<p>对比 Newton：</p>
+<h1 id="d_n">[
+d_N
+</h1><ul>
+<li></li>
+</ul>
+<p>H(x)^{-1}
+\nabla g(x).
+]</p>
+<p>于是 PD 实际上是在用：</p>
+\[
+\boxed{
+H(x)
+\approx
+\frac{M}{h^2}+L
+}
+\]<p>作为一个<strong>固定 Hessian 近似</strong>。</p>
+<p>所以 Projective Dynamics 可以理解成：</p>
+\[
+\boxed{\text{一种特殊的 quasi-Newton 方法}}
+\]<p>这一解释非常重要，因为它把很多看起来分散的算法连接起来了。该后续工作明确给出了这一 quasi-Newton 解释，并进一步用 L-BFGS 改进其收敛。</p>
+<hr>
+<h1 id="7-这解释了-pd-为什么快也解释了它为什么会慢慢收敛">7. 这解释了 PD 为什么快，也解释了它为什么会慢慢收敛
+</h1><p>Newton 每次使用：</p>
+\[
+H(x_k),
+\]<p>所以搜索方向非常贴合当前非线性能量地形。</p>
+<p>PD 始终使用：</p>
+\[
+A=
+\frac{M}{h^2}+L.
+\]<p>优点：</p>
+\[
+\boxed{\text{矩阵固定，可以预分解}}
+\]<p>代价：</p>
+\[
+\boxed{\text{Hessian 近似可能越来越不准}}
+\]<p>如果发生强非线性：</p>
+<ul>
+<li>大旋转；</li>
+<li>强压缩；</li>
+<li>高度非线性材料；</li>
+<li>极端 deformation；</li>
+</ul>
+<p>那么：</p>
+\[
+A
+\]<p>与真实：</p>
+\[
+H(x)
+\]<p>的差距会越来越大。</p>
+<p>于是你会看到：</p>
+\[
+\text{iteration count}\uparrow.
+\]<p>这实际上就是：</p>
+\[
+\boxed{
+\text{per-iteration cost}
+\leftrightarrow
+\text{convergence rate}
+}
+\]<p>之间的经典交换。</p>
+<hr>
+<h1 id="8-一个很漂亮的后续chebyshev-acceleration">8. 一个很漂亮的后续：Chebyshev acceleration
+</h1><p>2015 年 Huamin Wang 注意到一个现象：</p>
+<p>虽然 PD 是非线性方法，但它的迭代收敛行为很像线性 stationary iteration。</p>
+<p>于是可以估计：</p>
+\[
+\rho
+\]<p>——迭代算子的 spectral radius，然后使用 Chebyshev semi-iteration 加速。</p>
+<p>其思想近似于：</p>
+<h1 id="x_k1">[
+x_{k+1}
+</h1><p>\omega_k\hat x_{k+1}
++
+(1-\omega_k)x_{k-1}.
+]</p>
+<p>通过选择：</p>
+\[
+\omega_k
+\]<p>去抑制慢收敛误差模态。</p>
+<p>论文报告，在测试中这种方法能把 PD 收敛速度提高至少一个数量级；作者还指出 direct solver 组合在 CPU 上较快，而 Jacobi + Chebyshev 很适合 GPU 并行。</p>
+<p>这件事的价值不只是一个加速技巧。</p>
+<p>它说明：</p>
+<blockquote>
+<p><strong>一个非线性物理求解器，有时可以通过研究其局部线性迭代谱来优化。</strong></p>
+</blockquote>
+<p>这对 XPBD/GS 求解器也很值得迁移。</p>
+<hr>
+<h1 id="9-pd-的一个根本限制不是所有材料都天然适配这种投影能量">9. PD 的一个根本限制：不是所有材料都天然适配这种投影能量
+</h1><p>PD 要求材料能写成类似：</p>
+<h1 id="e_ix-1">[
+E_i(x)
+</h1><p>\min_{p_i\in\mathcal M_i}
+w_i
+|G_ix-p_i|^2.
+]</p>
+<p>这是一种很特殊的能量结构。</p>
+<p>例如：</p>
+<ul>
+<li>ARAP；</li>
+<li>springs；</li>
+<li>一些 corotated 型能量；</li>
+</ul>
+<p>非常适合。</p>
+<p>但标准：</p>
+\[
+\text{Neo-Hookean}
+\]<p>并不能简单地完全塞进原始 PD 形式。</p>
+<p>这也是为什么后续出现：</p>
+<p><strong>Quasi-Newton Methods for Real-Time Simulation of Hyperelastic Materials</strong>。</p>
+<p>该工作保留 PD 的固定 Hessian 近似：</p>
+\[
+\frac{M}{h^2}+L,
+\]<p>同时把真正的：</p>
+\[
+\nabla E(x)
+\]<p>换成一般超弹性材料的梯度，从而支持 StVK、Neo-Hookean、Mooney-Rivlin 等材料，再利用 L-BFGS 改善收敛。</p>
+<p>所以知识演化路径大致是：</p>
+\[
+\boxed{
+\text{PBD}
+\rightarrow
+\text{Projective Dynamics}
+\rightarrow
+\text{Quasi-Newton PD}
+\rightarrow
+\text{general hyperelastic real-time FEM}
+}
+\]<p>这是非常值得记住的一条技术脉络。</p>
+<hr>
+<h1 id="10-它甚至连接到了可微物理">10. 它甚至连接到了可微物理
+</h1><p>2022 年 SIGGRAPH/TOG 的 <strong>DiffPD</strong> 又进一步利用了 PD 的关键结构。</p>
+<p>因为 forward simulation 已经有：</p>
+\[
+A=LL^T
+\]<p>这种预分解矩阵，那么反向传播中的线性系统也可以复用这一结构。</p>
+<p>DiffPD 因此把 PD 扩展成可微软体模拟器，用于：</p>
+<ul>
+<li>system identification；</li>
+<li>inverse design；</li>
+<li>trajectory optimization；</li>
+<li>closed-loop control。</li>
+</ul>
+<p>论文项目页报告，相比标准 Newton-based differentiable simulation，在其测试中获得约 <strong>4–19×</strong> 加速。</p>
+<p>这里可以看到一个非常清晰的工程链条：</p>
+\[
+\text{固定结构矩阵}
+\]<p>最初只是：</p>
+\[
+\text{让实时仿真更快}
+\]<p>后来却进一步变成：</p>
+\[
+\text{让反向传播更快}.
+\]<p>这就是好的数值结构所产生的“二次价值”。</p>
+<hr>
+<h1 id="对实时软体求解器最值得迁移的一点">对实时软体求解器最值得迁移的一点
+</h1><p>PD 最值得学习的其实不是 local-global 这几个步骤，而是一个更一般的设计思想：</p>
+\[
+\boxed{
+\text{把非线性放到便宜的局部问题里，
+把全局耦合压缩成固定线性系统}
+}
+\]<p>这是一类非常强大的求解器设计模式。</p>
+<p>很多计算力可以拆成：</p>
+\[
+\text{local nonlinear physics}
++
+\text{global linear coupling}.
+\]<p>如果做得好，就可以达到：</p>
+\[
+\text{local：并行}
+\]\[
+\text{global：预分解 / GPU iterative solve}
+\]<p>而不是每个 iteration 都重新构造完整 nonlinear FEM Hessian。</p>
+<p>对于四面体软体求解器，这个视角尤其值得尝试：</p>
+\[
+F_e
+\rightarrow
+\text{local constitutive operation}
+\rightarrow
+\text{global nodal reconciliation}.
+\]<p>这和 XPBD 的 constraint projection 非常接近，但 PD 给它补上了一个完整的优化解释。</p>
+<hr>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2>\[
+\boxed{
+\text{Projective Dynamics 的核心并不是“投影”，而是让非线性局部化。}
+}
+\]<p>一旦看到这一点，你会发现 PD、PBD、quasi-Newton、ADMM、differentiable simulation 之间并没有那么远。</p>
+<p>它们很多时候都在回答同一个问题：</p>
+<blockquote>
+<p><strong>怎样把一个昂贵的全局非线性问题，拆成便宜的局部非线性 + 可重复利用的全局结构？</strong></p>
+</blockquote>
+<p>这可能比单独学习某个 constraint formula 更值得记住。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><p>首选原论文 Bouaziz et al., <strong>Projective Dynamics: Fusing Constraint Projections for Fast Simulation</strong>, SIGGRAPH 2014。作者项目页包含论文和演示，并明确给出了其 FEM/PBD 桥接定位。</p>
+<p>第二篇推荐 Liu, Bouaziz &amp; Kavan, <strong>Quasi-Newton Methods for Real-Time Simulation of Hyperelastic Materials</strong>。它最值得看的部分是“PD = fixed-Hessian quasi-Newton”这一重新解释，以及如何把这一思想扩展到 Neo-Hookean 等一般材料。</p>
+<p>想理解实时加速，可以继续看 Huamin Wang, <strong>A Chebyshev Semi-Iterative Approach for Accelerating Projective and Position-Based Dynamics</strong>, SIGGRAPH Asia 2015；作者主页同时提供论文、代码和视频。</p>
+<p>如果想连接 AI / inverse design，则推荐 MIT 的 <strong>DiffPD: Differentiable Projective Dynamics</strong> 项目页和代码，它展示了 PD 的矩阵结构如何进一步服务可微模拟。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/">软体动力学</a>
+        
+            <a href="/tags/%E5%AE%9E%E6%97%B6%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">实时物理引擎</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/12-imex/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

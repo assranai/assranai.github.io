@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件” 主题：Subset Simulation（子集模拟，SuS）\n领域：可靠性 × 稀有事件模拟 × MCMC × 代理模型\n推荐阅读时间：约 8 分钟\n今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：\n\\[ \\boxed{\\text{失效越稀有，普通 Monte Carlo 越浪费计算}} \\]它的核心思想却异常简单：\n不要直接寻找一个概率为 \\(10^{-6}\\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \\(0.1\\)，最后把这些条件概率乘起来。\nAu 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。\n1. 为什么普通 Monte Carlo 遇到小失效概率会失效？ 设极限状态函数：\n\\[ g(X) \\]规定：\n\\[ g(X)\\le0 \\]为失效。\n那么：\n\\[ P_f=P[g(X)\\le0]. \\]普通 Monte Carlo 估计：\n[ \\hat P_f \\frac1N \\sum_{i=1}^{N} I[g(X_i)\\le0]. ]\n如果：\n\\[ P_f=10^{-6}, \\]那么平均：\n\\[ 10^6 \\]个样本才能看到一次失效。\n但“看到一次”远远不够。\nBernoulli estimator 的变异系数近似：\n">
+<title>Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件”</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/09-subset-simulation/'>
+
+<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件”">
+<meta property='og:description' content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件” 主题：Subset Simulation（子集模拟，SuS）\n领域：可靠性 × 稀有事件模拟 × MCMC × 代理模型\n推荐阅读时间：约 8 分钟\n今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：\n\\[ \\boxed{\\text{失效越稀有，普通 Monte Carlo 越浪费计算}} \\]它的核心思想却异常简单：\n不要直接寻找一个概率为 \\(10^{-6}\\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \\(0.1\\)，最后把这些条件概率乘起来。\nAu 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。\n1. 为什么普通 Monte Carlo 遇到小失效概率会失效？ 设极限状态函数：\n\\[ g(X) \\]规定：\n\\[ g(X)\\le0 \\]为失效。\n那么：\n\\[ P_f=P[g(X)\\le0]. \\]普通 Monte Carlo 估计：\n[ \\hat P_f \\frac1N \\sum_{i=1}^{N} I[g(X_i)\\le0]. ]\n如果：\n\\[ P_f=10^{-6}, \\]那么平均：\n\\[ 10^6 \\]个样本才能看到一次失效。\n但“看到一次”远远不够。\nBernoulli estimator 的变异系数近似：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/09-subset-simulation/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='稀有事件模拟' /><meta property='article:tag' content='MCMC' /><meta property='article:tag' content='代理模型' /><meta property='article:published_time' content='2026-08-22T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-22T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件”">
+<meta name="twitter:description" content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件” 主题：Subset Simulation（子集模拟，SuS）\n领域：可靠性 × 稀有事件模拟 × MCMC × 代理模型\n推荐阅读时间：约 8 分钟\n今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：\n\\[ \\boxed{\\text{失效越稀有，普通 Monte Carlo 越浪费计算}} \\]它的核心思想却异常简单：\n不要直接寻找一个概率为 \\(10^{-6}\\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \\(0.1\\)，最后把这些条件概率乘起来。\nAu 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。\n1. 为什么普通 Monte Carlo 遇到小失效概率会失效？ 设极限状态函数：\n\\[ g(X) \\]规定：\n\\[ g(X)\\le0 \\]为失效。\n那么：\n\\[ P_f=P[g(X)\\le0]. \\]普通 Monte Carlo 估计：\n[ \\hat P_f \\frac1N \\sum_{i=1}^{N} I[g(X_i)\\le0]. ]\n如果：\n\\[ P_f=10^{-6}, \\]那么平均：\n\\[ 10^6 \\]个样本才能看到一次失效。\n但“看到一次”远远不够。\nBernoulli estimator 的变异系数近似：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-为什么普通-monte-carlo-遇到小失效概率会失效">1. 为什么普通 Monte Carlo 遇到小失效概率会失效？</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/09-subset-simulation/">Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件”</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-22T00:00:00Z'>Aug 22, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 5 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="subset-simulation把百万分之一失效拆成一串十分之一事件">Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件”
+</h1><p><strong>主题：Subset Simulation（子集模拟，SuS）</strong><br>
+<strong>领域：可靠性 × 稀有事件模拟 × MCMC × 代理模型</strong><br>
+<strong>推荐阅读时间：约 8 分钟</strong></p>
+<p>今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：</p>
+\[
+\boxed{\text{失效越稀有，普通 Monte Carlo 越浪费计算}}
+\]<p>它的核心思想却异常简单：</p>
+<blockquote>
+<p><strong>不要直接寻找一个概率为 \(10^{-6}\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \(0.1\)，最后把这些条件概率乘起来。</strong></p>
+</blockquote>
+<p>Au 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。</p>
+<hr>
+<h2 id="1-为什么普通-monte-carlo-遇到小失效概率会失效">1. 为什么普通 Monte Carlo 遇到小失效概率会失效？
+</h2><p>设极限状态函数：</p>
+\[
+g(X)
+\]<p>规定：</p>
+\[
+g(X)\le0
+\]<p>为失效。</p>
+<p>那么：</p>
+\[
+P_f=P[g(X)\le0].
+\]<p>普通 Monte Carlo 估计：</p>
+<h1 id="hat-p_f">[
+\hat P_f
+</h1><p>\frac1N
+\sum_{i=1}^{N}
+I[g(X_i)\le0].
+]</p>
+<p>如果：</p>
+\[
+P_f=10^{-6},
+\]<p>那么平均：</p>
+\[
+10^6
+\]<p>个样本才能看到一次失效。</p>
+<p>但“看到一次”远远不够。</p>
+<p>Bernoulli estimator 的变异系数近似：</p>
+<h1 id="delta">[
+\delta
+</h1><p>\sqrt{
+\frac{1-P_f}{NP_f}
+}.
+]</p>
+<p>如果希望：</p>
+\[
+\delta=0.1,
+\]<p>那么约需要：</p>
+\[
+NP_f\approx100,
+\]<p>也就是：</p>
+\[
+N\approx10^8.
+\]<p>如果一次有限元仿真需要 10 秒：</p>
+\[
+10^8\times10\text{s}
+\]<p>已经完全没有工程意义。</p>
+<p>所以 rare-event reliability 的真正困难是：</p>
+\[
+\boxed{
+\text{绝大多数昂贵计算都浪费在“显然安全”的区域}
+}
+\]<hr>
+<h1 id="2-subset-simulation-的核心人为建立一串中间失效事件">2. Subset Simulation 的核心：人为建立一串中间失效事件
+</h1><p>假设最终失效域是：</p>
+\[
+F=\{g(X)\le0\}.
+\]<p>构造：</p>
+\[
+F_1\supset F_2\supset\cdots\supset F_m=F.
+\]<p>那么根据概率乘法：</p>
+<h1 id="pf">[
+P(F)
+</h1><p>P(F_1)
+P(F_2|F_1)
+\cdots
+P(F_m|F_{m-1}).
+]</p>
+<p>如果我们故意让每一级：</p>
+\[
+P(F_i|F_{i-1})\approx p_0,
+\]<p>比如：</p>
+\[
+p_0=0.1,
+\]<p>而：</p>
+\[
+P_f=10^{-6},
+\]<p>那么大约：</p>
+<h1 id="10-6">[
+10^{-6}
+</h1><p>0.1^6.
+]</p>
+<p>于是原本一个：</p>
+\[
+10^{-6}
+\]<p>的稀有事件，变成 6 个：</p>
+\[
+10^{-1}
+\]<p>级别的条件事件。</p>
+<p>这就是整个方法最核心的一步：</p>
+\[
+\boxed{
+\text{Rare event}
+\rightarrow
+\text{sequence of moderately rare events}
+}
+\]<p>原论文正是以这种 conditional probability decomposition 为基本思想。</p>
+<hr>
+<h1 id="3-中间事件到底是什么">3. 中间事件到底是什么？
+</h1><p>假设失效定义：</p>
+\[
+g(X)\le0.
+\]<p>Subset Simulation 不会一开始就要求：</p>
+\[
+g\le0.
+\]<p>而可能建立：</p>
+\[
+F_1=\{g(X)\le b_1\},
+\]\[
+F_2=\{g(X)\le b_2\},
+\]<p>……</p>
+\[
+F_m=\{g(X)\le0\},
+\]<p>其中：</p>
+\[
+b_1>b_2>\cdots>0.
+\]<p>例如某结构应力极限：</p>
+\[
+\sigma_{\rm allow}=500\text{ MPa}.
+\]<p>定义：</p>
+\[
+g=500-\sigma_{\max}.
+\]<p>那么 SuS 可能逐级关注：</p>
+\[
+\sigma_{\max}>300,
+\]<p>[</p>
+<blockquote>
+<p>380,
+]</p>
+</blockquote>
+<p>[</p>
+<blockquote>
+<p>440,
+]</p>
+</blockquote>
+<p>[</p>
+<blockquote>
+<p>475,
+]</p>
+</blockquote>
+<p>[</p>
+<blockquote>
+<ol start="500">
+<li></li>
+</ol>
+</blockquote>
+<p>]</p>
+<p>于是采样过程就像不断向失效域“推进”。</p>
+<hr>
+<h1 id="4-最巧妙的一步阈值通常不是提前规定的">4. 最巧妙的一步：阈值通常不是提前规定的
+</h1><p>假设每一级生成：</p>
+\[
+N=1000
+\]<p>个样本，并选择：</p>
+\[
+p_0=0.1.
+\]<p>第一轮普通随机采样后，把样本按照：</p>
+\[
+g(X)
+\]<p>排序。</p>
+<p>直接取最危险的：</p>
+\[
+100
+\]<p>个样本。</p>
+<p>第 100 个样本对应的 \(g\) 值就是：</p>
+\[
+b_1.
+\]<p>因此：</p>
+<h1 id="frac1001000">[
+P(F_1)
+\approx
+\frac{100}{1000}
+</h1><p>0.1.
+]</p>
+<p>下一层同理。</p>
+<p>于是 intermediate thresholds 是<strong>自适应生成的</strong>。</p>
+<p>你不需要提前知道失效面在哪里。</p>
+<p>这也是 Subset Simulation 在：</p>
+<ul>
+<li>高维；</li>
+<li>非线性；</li>
+<li>不规则 failure domain</li>
+</ul>
+<p>问题上相当有吸引力的原因。</p>
+<hr>
+<h1 id="5-但第二层样本从哪里来">5. 但第二层样本从哪里来？
+</h1><p>这是理解 SuS 最关键的一点。</p>
+<p>第一层：</p>
+\[
+X\sim p_X(x)
+\]<p>直接 Monte Carlo 即可。</p>
+<p>但第二层需要：</p>
+\[
+X\sim p(X|F_1).
+\]<p>也就是说：</p>
+\[
+\boxed{\text{只在 }F_1\text{ 内采样}}
+\]<p>第三层进一步要求：</p>
+\[
+X\sim p(X|F_2).
+\]<p>问题是这种条件分布一般无法直接采样。</p>
+<p>所以经典 Subset Simulation 引入：</p>
+\[
+\boxed{\text{Markov Chain Monte Carlo}}
+\]<p>来生成 conditional samples。原始 SubSim/MCMC 以及后续 benchmark 工作都采用这一结构。</p>
+<hr>
+<h1 id="6-mcmc-在这里到底干什么">6. MCMC 在这里到底干什么？
+</h1><p>第一层结束后得到：</p>
+\[
+100
+\]<p>个满足：</p>
+\[
+F_1
+\]<p>的“种子样本”。</p>
+<p>从每个 seed 出发进行 MCMC：</p>
+\[
+X^{(0)}
+\rightarrow
+X^{(1)}
+\rightarrow
+X^{(2)}
+\rightarrow\cdots
+\]<p>但只接受满足：</p>
+\[
+X\in F_1
+\]<p>的状态。</p>
+<p>于是最终生成约：</p>
+\[
+1000
+\]<p>个：</p>
+\[
+X\sim p(X|F_1)
+\]<p>样本。</p>
+<p>然后再找其中最危险的 10%：</p>
+\[
+F_2.
+\]<p>继续重复。</p>
+<p>所以整个过程更准确地说是：</p>
+\[
+\boxed{
+\text{Monte Carlo}
+\rightarrow
+\text{conditional MCMC}
+\rightarrow
+\text{conditional MCMC}
+\rightarrow\cdots
+}
+\]<hr>
+<h1 id="7-它为什么会显著降低计算量">7. 它为什么会显著降低计算量？
+</h1><p>这里有一个非常重要的信息论直觉。</p>
+<p>普通 Monte Carlo：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">安全 安全 安全 安全 安全 安全 安全 安全 ...
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>你反复花钱确认：</p>
+<blockquote>
+<p>“这个点安全。”</p>
+</blockquote>
+<p>但这对：</p>
+\[
+P_f=10^{-6}
+\]<p>几乎没有新信息。</p>
+<p>Subset Simulation 则逐层：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">总体分布
+</span></span><span class="line"><span class="cl">   ↓
+</span></span><span class="line"><span class="cl">较危险的 10%
+</span></span><span class="line"><span class="cl">   ↓
+</span></span><span class="line"><span class="cl">其中更危险的 10%
+</span></span><span class="line"><span class="cl">   ↓
+</span></span><span class="line"><span class="cl">其中更危险的 10%
+</span></span><span class="line"><span class="cl">   ↓
+</span></span><span class="line"><span class="cl">真正失效
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>也就是说后面的计算预算几乎都被集中到：</p>
+\[
+\boxed{\text{failure-relevant region}}
+\]<p>附近。</p>
+<p>这与 AK-MCS 的精神其实很接近：</p>
+<p>AK-MCS：</p>
+\[
+\text{高保真计算集中到 }g\approx0.
+\]<p>Subset Simulation：</p>
+\[
+\text{随机采样逐渐条件化到危险区域}.
+\]<p>共同原则都是：</p>
+\[
+\boxed{
+\text{不要平均地在整个输入空间浪费计算预算}
+}
+\]<hr>
+<h1 id="8-一个非常容易忽视的问题sus-的样本不再独立">8. 一个非常容易忽视的问题：SuS 的样本不再独立
+</h1><p>普通 Monte Carlo：</p>
+\[
+X_1,\ldots,X_N
+\]<p>相互独立。</p>
+<p>而 MCMC 生成：</p>
+\[
+X^{(1)},X^{(2)},\ldots
+\]<p>存在自相关。</p>
+<p>所以虽然每层名义上有：</p>
+\[
+N=1000,
+\]<p>其有效样本量可能只有：</p>
+\[
+N_{\rm eff}<1000.
+\]<p>可以粗略理解为：</p>
+\[
+N_{\rm eff}
+\approx
+\frac{N}
+{1+2\sum_{k=1}^{\infty}\rho_k}.
+\]<p>如果 chain mixing 很差：</p>
+\[
+\rho_k
+\]<p>长期很大，则：</p>
+\[
+N_{\rm eff}\ll N.
+\]<p>所以 SuS 的效率很大程度上取决于：</p>
+\[
+\boxed{\text{MCMC 能否在条件失效域中充分移动}}
+\]<p>而这也是它最大的弱点之一。</p>
+<hr>
+<h1 id="9-多个失效岛会成为严重问题">9. 多个失效岛会成为严重问题
+</h1><p>假设 failure domain 有两个彼此分离区域：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">       Failure A
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">---------------------
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">                 Failure B
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>第一层 MCMC 恰好只找到：</p>
+\[
+A
+\]<p>附近的 seed。</p>
+<p>后续：</p>
+\[
+F_1\rightarrow F_2\rightarrow F_3
+\]<p>就可能一直困在：</p>
+\[
+A
+\]<p>附近。</p>
+<p>于是：</p>
+\[
+B
+\]<p>虽然贡献了真实失效概率，却被漏掉。</p>
+<p>这就是所谓：</p>
+\[
+\boxed{\text{mode trapping / poor exploration}}
+\]<p>问题。</p>
+<p>到 2026 年，这仍然是活跃研究方向。例如 2026 年提出的 <strong>Directional Subset Simulation</strong> 就明确针对多失效模式下 MCMC 容易困在输入空间局部区域的问题，通过方向性信息帮助中间层保留多个潜在失效方向。</p>
+<p>所以：</p>
+\[
+\boxed{
+\text{SuS解决 rare-event rarity，
+但不自动解决 multimodality}
+}
+\]<hr>
+<h1 id="10-一个值得记住的参数">10. 一个值得记住的参数：\(p_0\)
+</h1><p>SuS 中通常选择：</p>
+\[
+p_0\approx0.1
+\]<p>左右。</p>
+<p>为什么不能：</p>
+\[
+p_0=0.9？
+\]<p>因为层数会非常多。</p>
+<p>为什么不能：</p>
+\[
+p_0=10^{-4}？
+\]<p>因为每层又变成了 rare-event estimation。</p>
+<p>于是存在经典折中：</p>
+\[
+\boxed{
+\text{每层足够容易采到}
++
+\text{层数不能太多}
+}
+\]<p>这也是为什么：</p>
+\[
+0.1
+\]<p>量级经常被使用。</p>
+<p>它并非神奇常数，更接近计算效率上的经验最优区域。</p>
+<hr>
+<h1 id="11-它和-form-有什么本质差异">11. 它和 FORM 有什么本质差异？
+</h1><p>FORM 寻找：</p>
+<h1 id="beta">[
+\beta
+</h1><p>\min_{g(u)=0}|u|,
+]</p>
+<p>即标准正态空间中最可能失效点。</p>
+<p>然后：</p>
+\[
+P_f\approx\Phi(-\beta).
+\]<p>本质上是：</p>
+\[
+\boxed{\text{局部几何近似}}
+\]<p>因此如果失效面比较规整，FORM 极其便宜。</p>
+<p>但遇到：</p>
+<ul>
+<li>多失效模式；</li>
+<li>强非线性；</li>
+<li>非凸失效域；</li>
+</ul>
+<p>一个 design point 很难描述完整失效概率。</p>
+<p>Subset Simulation 不需要近似失效面为一阶或二阶曲面。</p>
+<p>它直接采样：</p>
+\[
+P(F).
+\]<p>所以可以粗略记：</p>
+\[
+\boxed{
+\text{FORM：寻找最重要的失效点}
+}
+\]\[
+\boxed{
+\text{SuS：逐层探索整个失效区域}
+}
+\]<p>代价当然也更高。</p>
+<hr>
+<h1 id="12-它与-importance-sampling-又有什么区别">12. 它与 Importance Sampling 又有什么区别？
+</h1><p>Importance Sampling 需要构造：</p>
+\[
+q(x)
+\]<p>让样本更多落在失效区域。</p>
+<p>然后：</p>
+<h1 id="p_f">[
+P_f
+</h1><p>E_q
+\left[
+I_F(X)
+\frac{p(X)}{q(X)}
+\right].
+]</p>
+<p>难点在于：</p>
+\[
+\boxed{\text{怎样提前构造一个好的 }q(x)}
+\]<p>尤其高维、多峰失效域里很困难。</p>
+<p>Subset Simulation 不直接构造全局：</p>
+\[
+q(x).
+\]<p>而是逐步得到：</p>
+\[
+p(X|F_1),
+\]\[
+p(X|F_2),
+\]<p>……</p>
+<p>可以理解成一种：</p>
+\[
+\boxed{\text{自适应地学习重要区域}}
+\]<p>因此它在“不知道失效域在哪里”时尤其有优势。</p>
+<hr>
+<h1 id="13-sus-和代理模型结合时会出现一个很漂亮的结构">13. SuS 和代理模型结合时，会出现一个很漂亮的结构
+</h1><p>传统 SuS 最大成本仍然是：</p>
+\[
+g(X)
+\]<p>每个样本都要真实仿真。</p>
+<p>于是自然出现：</p>
+\[
+\boxed{
+\text{Kriging / NN}
++
+\text{Subset Simulation}
+}
+\]<p>而 SuS 有一个天然优势：</p>
+<p>它每一层产生的样本都越来越靠近失效域。</p>
+<p>因此这些 conditional samples 本身就是很有价值的：</p>
+\[
+\boxed{\text{active-learning candidate pool}}
+\]<p>2024 年已有工作直接使用 intermediate-event MCMC samples 迭代优化 metamodel；相关现代 active-learning 文献也明确把 SuS 的中间条件样本作为代理模型主动采样候选池。</p>
+<p>这形成一个很自然的循环：</p>
+\[
+\text{SuS找到危险区域}
+\]\[
+\downarrow
+\]\[
+\text{surrogate重点学习危险区域}
+\]\[
+\downarrow
+\]\[
+\text{surrogate降低下一层SuS成本}.
+\]<p>这比先在整个输入空间训练一个“全局很准”的 surrogate 更符合可靠性任务本身。</p>
+<hr>
+<h1 id="14-一个很新的发展multi-fidelity-subset-simulation">14. 一个很新的发展：Multi-fidelity Subset Simulation
+</h1><p>这也正好连接前几天讲过的 MFMC。</p>
+<p>2026 年发表的 <strong>Multi-fidelity Subset Simulation (MFSS)</strong> 把不同 fidelity 也纳入 rare-event simulation，把 fidelity 当作扩充空间中的随机变量，并通过 Bayes 关系恢复高保真失效概率，同时优化不同 fidelity 的采样预算。</p>
+<p>它试图解决：</p>
+\[
+\boxed{
+\text{SuS知道“去哪采”，
+multifidelity知道“用多贵的模型采”}
+}
+\]<p>所以可以把两类资源分配思想组合起来：</p>
+\[
+\boxed{
+\text{空间分配：在哪里算？}
+}
+\]\[
+\boxed{
+\text{精度分配：用什么模型算？}
+}
+\]<p>这是目前可靠性计算非常值得关注的一条路线。</p>
+<hr>
+<h1 id="15-对可靠性研究最值得迁移的一点">15. 对可靠性研究最值得迁移的一点
+</h1><p>Subset Simulation 最深刻的地方不只是：</p>
+<h1 id="p_f-1">[
+P_f
+</h1><p>\prod_i P(F_i|F_{i-1}).
+]</p>
+<p>真正值得记住的是：</p>
+\[
+\boxed{\text{困难概率可以通过改变采样分布来变得容易。}}
+\]<p>普通 Monte Carlo 接受原始分布：</p>
+\[
+p_X(x)
+\]<p>给你的全部样本。</p>
+<p>SuS 则不断构造：</p>
+\[
+p(X|F_i),
+\]<p>让后续计算越来越聚焦目标事件。</p>
+<p>因此它实际上在做一种：</p>
+\[
+\boxed{\text{distribution steering}}
+\]<p>这是一种非常普遍的思想。</p>
+<p>你会在很多地方再次看到：</p>
+<ul>
+<li>Importance Sampling；</li>
+<li>Sequential Monte Carlo；</li>
+<li>rare-event splitting；</li>
+<li>diffusion / particle methods；</li>
+<li>reinforcement learning exploration；</li>
+<li>adaptive sampling。</li>
+</ul>
+<p>核心问题都类似：</p>
+<blockquote>
+<p><strong>如果真正有价值的信息只存在于非常小的一块空间里，为什么还要按照原始分布平均地花计算量？</strong></p>
+</blockquote>
+<hr>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>AK-MCS 的问题是：</p>
+\[
+\boxed{\text{“哪个点最值得再做一次高保真计算？”}}
+\]<p>MFMC 的问题是：</p>
+\[
+\boxed{\text{“哪个便宜模型能帮助消除统计噪声？”}}
+\]<p>MLMC 的问题是：</p>
+\[
+\boxed{\text{“哪个精度层值得投入多少样本？”}}
+\]<p>而 Subset Simulation 问的是：</p>
+\[
+\boxed{
+\text{“怎样让采样分布本身逐渐迁移到失效区域？”}
+}
+\]<p>这四个问题其实正在组成一个完整的现代可靠性计算框架：</p>
+\[
+\text{where to sample}
++
+\text{what fidelity}
++
+\text{which surrogate}
++
+\text{how to estimate }P_f.
+\]<p>如果以后考虑做可靠性方法研究，我会特别关注这种<strong>资源分配层面的组合创新</strong>，因为它比单独把 Kriging 的 \(R^2\) 再提高一点更接近真正昂贵工程模型的核心瓶颈。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><ol>
+<li>
+<p><strong>Au &amp; Beck, <em>Estimation of small failure probabilities in high dimensions by subset simulation</em>, Probabilistic Engineering Mechanics, 2001</strong>。这是原始经典论文，建议首先读它的 conditional-probability decomposition 与 MCMC sampling 部分。<br>
+<a class="link" href="https://www.sciencedirect.com/science/article/pii/S0266892001000194"  target="_blank" rel="noopener"
+    >论文页面</a></p>
+</li>
+<li>
+<p><strong>Beck &amp; Zuev, <em>Rare-Event Simulation</em></strong>。Caltech 的综述材料，把 Monte Carlo、importance sampling 和 subset simulation 放进统一 rare-event reliability 框架，非常适合建立知识地图。<br>
+<a class="link" href="https://authors.library.caltech.edu/records/7e5ke-fzk35"  target="_blank" rel="noopener"
+    >Caltech 页面</a></p>
+</li>
+<li>
+<p><strong>Au, Ching &amp; Beck, <em>Application of subset simulation methods to reliability benchmark problems</em></strong>。适合看 SubSim/MCMC、Splitting、Hybrid 三种结构怎样落到实际 benchmark。</p>
+</li>
+<li>
+<p><strong>Kanjilal &amp; Bect, <em>Directional Subset Simulation Method for Reliability Analysis</em>, 2026</strong>。如果想追当前研究，这篇直接针对多失效模式和 MCMC trapping，是经典 SuS 局限的现代改进。</p>
+</li>
+<li>
+<p><strong>Naderi &amp; Jia, <em>Multi-fidelity Subset Simulation for rare event simulation</em>, 2026</strong>。适合继续连接前面讲过的 multifidelity 思想：同时优化“向哪里采”和“用什么 fidelity 采”。</p>
+</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/">可靠性</a>
+        
+            <a href="/tags/%E7%A8%80%E6%9C%89%E4%BA%8B%E4%BB%B6%E6%A8%A1%E6%8B%9F/">稀有事件模拟</a>
+        
+            <a href="/tags/mcmc/">MCMC</a>
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/16-active-subspaces/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Active Subspaces：真正该降的维，可能不是“变量”，而是“变量的方向组合”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/05-mfmc/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Multifidelity Monte Carlo：代理模型不一定要“替代”高保真模型，它也可以只负责降方差</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

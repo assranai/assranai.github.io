@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界 主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning\n领域：可靠性 × Kriging/高斯过程 × 主动学习\n推荐阅读时间：约 7 分钟\nAK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：\n\\[ \\boxed{\\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}} \\]这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。\n1. 可靠性问题其实不是普通回归问题 设极限状态函数为：\n\\[ g(\\mathbf x) \\]通常规定：\n\\[ g(\\mathbf x)>0 \\quad \\text{安全} \\]\\[ g(\\mathbf x)\\le 0 \\quad \\text{失效}. \\]失效概率：\n\\[ P_f=P[g(\\mathbf X)\\le0]. \\]如果直接用 Monte Carlo：\n[ \\hat P_f \\frac{1}{N} \\sum_{i=1}^N I[g(\\mathbf x_i)\\le0]. ]\n真正昂贵的是：\n\\[ g(\\mathbf x_i) \\]可能意味着一次完整的 FEM、CFD 或多体动力学仿真。\n">
+<title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/02-ak-mcs/'>
+
+<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界">
+<meta property='og:description' content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界 主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning\n领域：可靠性 × Kriging/高斯过程 × 主动学习\n推荐阅读时间：约 7 分钟\nAK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：\n\\[ \\boxed{\\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}} \\]这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。\n1. 可靠性问题其实不是普通回归问题 设极限状态函数为：\n\\[ g(\\mathbf x) \\]通常规定：\n\\[ g(\\mathbf x)>0 \\quad \\text{安全} \\]\\[ g(\\mathbf x)\\le 0 \\quad \\text{失效}. \\]失效概率：\n\\[ P_f=P[g(\\mathbf X)\\le0]. \\]如果直接用 Monte Carlo：\n[ \\hat P_f \\frac{1}{N} \\sum_{i=1}^N I[g(\\mathbf x_i)\\le0]. ]\n真正昂贵的是：\n\\[ g(\\mathbf x_i) \\]可能意味着一次完整的 FEM、CFD 或多体动力学仿真。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/02-ak-mcs/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='Kriging' /><meta property='article:tag' content='高斯过程' /><meta property='article:tag' content='主动学习' /><meta property='article:published_time' content='2026-08-15T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-15T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界">
+<meta name="twitter:description" content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界 主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning\n领域：可靠性 × Kriging/高斯过程 × 主动学习\n推荐阅读时间：约 7 分钟\nAK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：\n\\[ \\boxed{\\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}} \\]这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。\n1. 可靠性问题其实不是普通回归问题 设极限状态函数为：\n\\[ g(\\mathbf x) \\]通常规定：\n\\[ g(\\mathbf x)>0 \\quad \\text{安全} \\]\\[ g(\\mathbf x)\\le 0 \\quad \\text{失效}. \\]失效概率：\n\\[ P_f=P[g(\\mathbf X)\\le0]. \\]如果直接用 Monte Carlo：\n[ \\hat P_f \\frac{1}{N} \\sum_{i=1}^N I[g(\\mathbf x_i)\\le0]. ]\n真正昂贵的是：\n\\[ g(\\mathbf x_i) \\]可能意味着一次完整的 FEM、CFD 或多体动力学仿真。\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-可靠性问题其实不是普通回归问题">1. 可靠性问题其实不是普通回归问题</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#sigma_rm-allow">\sigma_{\rm allow}</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#高维">高维</a></li>
+        <li><a href="#极小失效概率">极小失效概率</a></li>
+        <li><a href="#多个失效区域">多个失效区域</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/02-ak-mcs/">AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-15T00:00:00Z'>Aug 15, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 4 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="ak-mcs可靠性代理模型真正该学的其实是失效边界">AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界
+</h1><p><strong>主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning</strong><br>
+<strong>领域：可靠性 × Kriging/高斯过程 × 主动学习</strong><br>
+<strong>推荐阅读时间：约 7 分钟</strong></p>
+<p>AK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：</p>
+\[
+\boxed{\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}}
+\]<p>这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。</p>
+<hr>
+<h2 id="1-可靠性问题其实不是普通回归问题">1. 可靠性问题其实不是普通回归问题
+</h2><p>设极限状态函数为：</p>
+\[
+g(\mathbf x)
+\]<p>通常规定：</p>
+\[
+g(\mathbf x)>0 \quad \text{安全}
+\]\[
+g(\mathbf x)\le 0 \quad \text{失效}.
+\]<p>失效概率：</p>
+\[
+P_f=P[g(\mathbf X)\le0].
+\]<p>如果直接用 Monte Carlo：</p>
+<h1 id="hat-p_f">[
+\hat P_f
+</h1><p>\frac{1}{N}
+\sum_{i=1}^N
+I[g(\mathbf x_i)\le0].
+]</p>
+<p>真正昂贵的是：</p>
+\[
+g(\mathbf x_i)
+\]<p>可能意味着一次完整的 FEM、CFD 或多体动力学仿真。</p>
+<p>假设：</p>
+\[
+P_f=10^{-4},
+\]<p>为了稳定估计这个概率，通常需要大量样本。</p>
+<p>问题随之出现：</p>
+\[
+10^5\sim10^7
+\]<p>次高保真模型调用往往不可接受。</p>
+<p>于是自然想到：</p>
+<blockquote>
+<p>用 Kriging 代替真实模型。</p>
+</blockquote>
+<p>但这里很容易掉进一个坑。</p>
+<hr>
+<h1 id="2-全局--高不代表可靠度准确">2. 全局 \(R^2\) 高，不代表可靠度准确
+</h1><p>假设真实极限状态面是：</p>
+\[
+g(x_1,x_2)=0.
+\]<p>你训练出一个 Kriging：</p>
+\[
+\hat g(\mathbf x).
+\]<p>普通代理建模通常优化：</p>
+<h1 id="mathrmrmse">[
+\mathrm{RMSE}
+</h1><p>\sqrt{
+\frac1N
+\sum_i
+(g_i-\hat g_i)^2
+}
+]</p>
+<p>或者追求：</p>
+\[
+R^2\rightarrow1.
+\]<p>但可靠性计算实际上只关心：</p>
+\[
+\boxed{\operatorname{sign}g(\mathbf x)}
+\]<p>尤其是在：</p>
+\[
+g(\mathbf x)\approx0
+\]<p>附近。</p>
+<p>举个极端例子。</p>
+<p>两个区域：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">区域 A：g = 100
+</span></span><span class="line"><span class="cl">区域 B：g = 0.02
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>代理模型预测：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">A：ĝ = 90
+</span></span><span class="line"><span class="cl">B：ĝ = -0.01
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>A 的误差：</p>
+\[
+|100-90|=10
+\]<p>很大，但可靠性分类仍正确：</p>
+\[
+100>0,\qquad90>0.
+\]<p>B 的误差：</p>
+\[
+|0.02-(-0.01)|=0.03
+\]<p>非常小，但：</p>
+\[
++\rightarrow-
+\]<p>安全样本被直接判成失效。</p>
+<p>对于 \(P_f\) 来说，第二个误差可能远比第一个严重。</p>
+<p>因此可靠性问题真正对应的是：</p>
+\[
+\boxed{\text{classification accuracy near }g=0}
+\]<p>而不是：</p>
+\[
+\text{global regression accuracy}.
+\]<p>这就是 AK-MCS 的思想起点。</p>
+<hr>
+<h1 id="3-kriging-恰好提供了主动学习需要的两个量">3. Kriging 恰好提供了主动学习需要的两个量
+</h1><p>Kriging 对某个输入 \(\mathbf x\) 给出：</p>
+\[
+G(\mathbf x)
+\sim
+\mathcal N
+\left(
+\mu(\mathbf x),
+\sigma^2(\mathbf x)
+\right).
+\]<p>其中：</p>
+\[
+\mu(\mathbf x)
+\]<p>是预测均值，</p>
+\[
+\sigma(\mathbf x)
+\]<p>是预测不确定性。</p>
+<p>于是我们可以问：</p>
+<blockquote>
+<p>这个点被错误分类的可能性有多大？</p>
+</blockquote>
+<p>如果</p>
+\[
+|\mu|\gg\sigma,
+\]<p>例如：</p>
+\[
+\mu=10,\qquad\sigma=0.1,
+\]<p>那么几乎肯定：</p>
+\[
+g>0.
+\]<p>没有必要再花一次昂贵 FEM。</p>
+<p>反过来，如果：</p>
+\[
+\mu=0.05,\qquad\sigma=0.1,
+\]<p>那么这个点到底属于：</p>
+\[
+g>0
+\]<p>还是</p>
+\[
+g<0
+\]<p>非常不确定。</p>
+<p>于是 Echard 等提出非常简单的学习函数：</p>
+<h1 id="umathbf-x">[
+\boxed{
+U(\mathbf x)
+</h1><p>\frac{|\mu(\mathbf x)|}
+{\sigma(\mathbf x)}
+}
+]</p>
+<p>AK-MCS 每轮寻找：</p>
+<h1 id="mathbf-x">[
+\mathbf x^*
+</h1><p>\arg\min U(\mathbf x).
+]</p>
+<p>也就是优先计算：</p>
+\[
+\boxed{
+\text{离失效面近}
++
+\text{预测又不确定}
+}
+\]<p>的样本。</p>
+<hr>
+<h1 id="4-为什么--函数这么聪明">4. 为什么 \(U\) 函数这么聪明？
+</h1><p>这个式子看起来非常简单：</p>
+\[
+U=\frac{|\mu|}{\sigma}.
+\]<p>但它同时编码了两个需求。</p>
+<p>如果：</p>
+\[
+|\mu|\rightarrow0,
+\]<p>说明预测点靠近：</p>
+\[
+g=0.
+\]<p>这是 <strong>exploitation</strong>：</p>
+<blockquote>
+<p>去研究我们已经认为可能存在失效边界的位置。</p>
+</blockquote>
+<p>如果：</p>
+\[
+\sigma\rightarrow\infty,
+\]<p>则：</p>
+\[
+U\rightarrow0.
+\]<p>这是 <strong>exploration</strong>：</p>
+<blockquote>
+<p>去研究代理模型没有把握的位置。</p>
+</blockquote>
+<p>所以 U-learning 实际是在做：</p>
+\[
+\boxed{
+\text{boundary exploitation}
++
+\text{uncertainty exploration}
+}
+\]<p>这正是主动学习 acquisition function 的核心结构。</p>
+<p>从机器学习视角看，它和 Bayesian optimization 中 EI、UCB 的思路非常接近。</p>
+<hr>
+<h1 id="5-一个更深的解释-本质上是分类置信度">5. 一个更深的解释：\(U\) 本质上是“分类置信度”
+</h1><p>假设：</p>
+\[
+G(\mathbf x)
+\sim
+N(\mu,\sigma^2).
+\]<p>如果：</p>
+\[
+\mu>0,
+\]<p>代理模型认为该点安全。</p>
+<p>但真正失效的概率为：</p>
+<h1 id="pgle0">[
+P(G\le0)
+</h1><p>\Phi
+\left(
+-\frac{\mu}{\sigma}
+\right).
+]</p>
+<p>因此：</p>
+<h1 id="p_rm-misclass">[
+P_{\rm misclass}
+</h1><p>\Phi(-U).
+]</p>
+<p>所以：</p>
+\[
+U=2
+\]<p>时：</p>
+\[
+P_{\rm misclass}
+\approx2.3\%.
+\]<p>这解释了 AK-MCS 中经典的：</p>
+\[
+U\ge2
+\]<p>停止思想。</p>
+<p>当所有候选点都满足：</p>
+\[
+U\ge2,
+\]<p>意味着每个候选样本的 Kriging 分类都有相对较高置信度。</p>
+<p>因此它优化的目标非常明确：</p>
+\[
+\boxed{
+\text{让失效/安全分类足够可靠}
+}
+\]<p>而不是把整个响应面磨得越来越光滑。</p>
+<hr>
+<h1 id="6-ak-mcs-实际如何运行">6. AK-MCS 实际如何运行
+</h1><p>算法结构可以压缩成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">1. 少量 DoE 样本
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">2. 调用真实 FEM / simulation
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">3. 建立 Kriging
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">4. 生成巨大 Monte Carlo candidate population
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">5. Kriging 预测全部 candidate
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">6. 找 min U(x)
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">7. 真实计算这个点
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">8. 更新 Kriging
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">9. 重复
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">10. 使用 surrogate 判断 MCS 样本失效/安全
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里有一个非常漂亮的计算分工：</p>
+<p>真实模型负责：</p>
+\[
+N_{\rm HF}\sim几十\text{到几百}
+\]<p>次昂贵计算。</p>
+<p>而：</p>
+\[
+10^5\sim10^7
+\]<p>个 Monte Carlo 点则交给极便宜的 Kriging。</p>
+<p>因此 AK-MCS 可以理解为：</p>
+\[
+\boxed{
+\text{Kriging负责降低单次成本}
++
+\text{Active Learning负责减少训练点}
++
+\text{MCS负责概率积分}
+}
+\]<p>这三个模块实际上相互独立。后来的统一研究框架也把主动可靠性分析拆成四个模块：</p>
+\[
+\boxed{
+\text{surrogate}
++
+\text{reliability estimator}
++
+\text{learning function}
++
+\text{stopping criterion}
+}
+\]<p>这是一种很适合研究创新的模块化视角。</p>
+<hr>
+<h1 id="7-为什么这对有限元问题特别有效">7. 为什么这对有限元问题特别有效？
+</h1><p>假设：</p>
+\[
+x_1=\text{材料模量},
+\]\[
+x_2=\text{间隙},
+\]\[
+x_3=\text{载荷},
+\]<p>有限元输出最大应力：</p>
+\[
+\sigma_{\max}(\mathbf x).
+\]<p>定义：</p>
+<h1 id="gmathbf-x">[
+g(\mathbf x)
+</h1><h2 id="sigma_rm-allow">\sigma_{\rm allow}
+</h2><p>\sigma_{\max}(\mathbf x).
+]</p>
+<p>普通 DoE 可能大量采样：</p>
+\[
+g\gg0
+\]<p>的安全区域。</p>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">         x2
+</span></span><span class="line"><span class="cl">          ↑
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">安全      · · · · ·
+</span></span><span class="line"><span class="cl">          · · · · ·
+</span></span><span class="line"><span class="cl">         · · × × ·
+</span></span><span class="line"><span class="cl">       · · ×失效× ·
+</span></span><span class="line"><span class="cl">----------g=0----------→ x1
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>对于可靠度计算，那些远离 \(g=0\) 的：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">· · · · ·
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>其实几乎没有信息价值。</p>
+<p>AK-MCS 会逐渐把高保真样本集中到：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">× × × × ×
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>即极限状态面附近。</p>
+<p>因此它实际上做的是：</p>
+\[
+\boxed{
+\text{information allocation}
+}
+\]<p>而不仅仅是 surrogate fitting。</p>
+<hr>
+<h1 id="8-这也是为什么缺一个变量后--暴跌需要谨慎解释">8. 这也是为什么“缺一个变量后 \(R^2\) 暴跌”需要谨慎解释
+</h1><p>这里有一个非常重要的研究启发。</p>
+<p>假设完整输入：</p>
+\[
+g(x_1,x_2,x_3).
+\]<p>删除：</p>
+\[
+x_3
+\]<p>以后，得到：</p>
+\[
+\hat g(x_1,x_2).
+\]<p>如果 \(R^2\)：</p>
+\[
+0.96\rightarrow0.4,
+\]<p>通常会马上得出：</p>
+<blockquote>
+<p>模型坏了。</p>
+</blockquote>
+<p>但可靠性问题真正应该再问一步：</p>
+\[
+\boxed{
+\operatorname{sign}(\hat g)
+\text{ 在 }g\approx0\text{ 区域还能不能保持正确？}
+}
+\]<p>可能出现两种完全不同的结果：</p>
+<p><strong>情况 A</strong></p>
+\[
+R^2=0.4
+\]<p>但 limit-state classification 很准确。</p>
+<p>则：</p>
+\[
+P_f
+\]<p>仍可能很好。</p>
+<p><strong>情况 B</strong></p>
+\[
+R^2=0.95
+\]<p>但少数失效边界点发生错判。</p>
+<p>则：</p>
+\[
+P_f
+\]<p>可能严重偏差。</p>
+<p>因此对于可靠性代理模型，更适合关注：</p>
+\[
+P_{\rm misclass},
+\]\[
+\text{limit-state error},
+\]\[
+|\Delta P_f|,
+\]<p>而不能只看：</p>
+\[
+R^2,\quad RMSE.
+\]<p>这正是 AK-MCS 给出的评价范式转变。</p>
+<hr>
+<h1 id="9-ak-mcs-的局限在哪里">9. AK-MCS 的局限在哪里？
+</h1><p>AK-MCS 并非万能。</p>
+<p>最明显的问题是：</p>
+<h3 id="高维">高维
+</h3><p>随着维数增加：</p>
+\[
+d\uparrow
+\]<p>Gaussian Process 本身训练和候选集搜索都会越来越困难。</p>
+<h3 id="极小失效概率">极小失效概率
+</h3><p>如果：</p>
+\[
+P_f\sim10^{-8},
+\]<p>crude Monte Carlo 候选池本身就会非常低效。</p>
+<p>因此常见改进是：</p>
+\[
+\text{AK}
++
+\text{Importance Sampling},
+\]<p>或者：</p>
+\[
+\text{AK}
++
+\text{Subset Simulation}.
+\]<p>Echard 等随后就在 2012 年发展了结合 importance sampling 与 Kriging 的方法，用于更小失效概率。</p>
+<h3 id="多个失效区域">多个失效区域
+</h3><p>如果存在多个相互分离的 failure islands：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">safe safe [failure]
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">safe safe safe
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">[failure] safe safe
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>主动学习可能过早集中到其中一个边界，遗漏另一个。</p>
+<p>因此近年来大量工作都在改：</p>
+<ul>
+<li>acquisition function；</li>
+<li>distance penalty；</li>
+<li>clustering；</li>
+<li>batch sampling；</li>
+<li>system reliability learning。</li>
+</ul>
+<p>2023–2025 年的研究仍在继续改进这一点，说明这个问题远没有彻底解决。</p>
+<hr>
+<h1 id="10-一个很新的方向给-ak-mcs-加统计认证">10. 一个很新的方向：给 AK-MCS 加“统计认证”
+</h1><p>经典 AK-MCS 中：</p>
+\[
+\sigma_{\rm GP}
+\]<p>来自 Gaussian Process 自身的概率模型。</p>
+<p>问题是：</p>
+<blockquote>
+<p>如果 GP 模型假设本身错了呢？</p>
+</blockquote>
+<p>2026 年 6 月出现的一项工作提出 <strong>AK-MCS-C2</strong>，把 conformal prediction 与 AK-MCS 结合，希望给 surrogate classification error 提供更弱分布假设下的统计保证，尤其针对小样本和 rare-event reliability。这个方向目前仍比较新，适合作为“代理模型不确定性如何真正进入可靠度可信度”的研究入口。</p>
+<p>这背后实际上对应一个越来越重要的问题：</p>
+\[
+\boxed{
+\text{我们不仅要估计 }P_f，
+\text{还要知道这个 }P_f\text{ 有多可信。}
+}
+\]<hr>
+<h1 id="今天最值得留下的一点">今天最值得留下的一点
+</h1><p>AK-MCS 最深刻的地方可以浓缩成一句：</p>
+\[
+\boxed{
+\text{采样策略应当服务于最终任务，而不是服务于代理模型本身。}
+}
+\]<p>如果任务是预测温度场：</p>
+\[
+\text{global RMSE}
+\]<p>可能很重要。</p>
+<p>如果任务是优化：</p>
+\[
+\text{optimum neighborhood}
+\]<p>更重要。</p>
+<p>如果任务是可靠性：</p>
+\[
+\boxed{\text{limit-state surface}}
+\]<p>才是信息最有价值的位置。</p>
+<p>因此在做任何代理模型之前，一个比“选什么核函数”更重要的问题是：</p>
+\[
+\boxed{\text{我真正需要这个 surrogate 判断什么？}}
+\]<hr>
+<h3 id="拓展阅读">拓展阅读
+</h3><p>原始方法首选 Echard, Gayton &amp; Lemaire, <em>AK-MCS: An active learning reliability method combining Kriging and Monte Carlo Simulation</em>, <strong>Structural Safety, 2011</strong>。这是整个方法族最值得先读的一篇。</p>
+<p>想建立完整知识地图，推荐 Moustapha, Marelli &amp; Sudret, <em>Active learning for structural reliability: Survey, general framework and benchmark</em>。作者把大量方法统一拆成 surrogate、reliability estimator、learning function 和 stopping criterion，并进行了大规模 benchmark。</p>
+<p>如果想直接看实现，<code>mistral</code> 的 AKMCS 实现以及基于 OpenTURNS 的 <code>otak</code> 项目都提供了可参考的工程入口。</p>
+<p>如果想追近期研究，可以看 2026 年提出的 <strong>AK-MCS-C2</strong>：它尝试用 conformal prediction 给 AK-MCS 的代理误差增加统计意义上的认证，这条路线与“小样本代理模型可靠度可信性”关系很直接。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/">可靠性</a>
+        
+            <a href="/tags/kriging/">Kriging</a>
+        
+            <a href="/tags/%E9%AB%98%E6%96%AF%E8%BF%87%E7%A8%8B/">高斯过程</a>
+        
+            <a href="/tags/%E4%B8%BB%E5%8A%A8%E5%AD%A6%E4%B9%A0/">主动学习</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

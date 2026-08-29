@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Variational Integrators：时间积分器也可以“从力学原理里推出来” 主题：Variational Integrators（变分积分器）\n领域：计算力学 × 有限元 × 物理引擎 × 几何数值积分\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[ \\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}} \\]传统数值积分通常先得到连续运动方程：\n\\[ M\\ddot q+\\nabla V(q)=0, \\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[ L(q,\\dot q)=T(\\dot q)-V(q). \\]真实运动满足 Hamilton 原理：\n\\[ \\delta S=0, \\]其中作用量\n[ S[q] \\int_{t_0}^{t_1} L(q,\\dot q),dt. ]\n对它做变分，就得到 Euler–Lagrange 方程：\n[ \\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} \\frac{\\partial L}{\\partial q} =0. ]\n">
+<title>Variational Integrators：时间积分器也可以“从力学原理里推出来”</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/04-variational-integrators/'>
+
+<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="Variational Integrators：时间积分器也可以“从力学原理里推出来”">
+<meta property='og:description' content="Variational Integrators：时间积分器也可以“从力学原理里推出来” 主题：Variational Integrators（变分积分器）\n领域：计算力学 × 有限元 × 物理引擎 × 几何数值积分\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[ \\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}} \\]传统数值积分通常先得到连续运动方程：\n\\[ M\\ddot q+\\nabla V(q)=0, \\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[ L(q,\\dot q)=T(\\dot q)-V(q). \\]真实运动满足 Hamilton 原理：\n\\[ \\delta S=0, \\]其中作用量\n[ S[q] \\int_{t_0}^{t_1} L(q,\\dot q),dt. ]\n对它做变分，就得到 Euler–Lagrange 方程：\n[ \\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} \\frac{\\partial L}{\\partial q} =0. ]\n">
+<meta property='og:url' content='https://assranai.github.io/cards/04-variational-integrators/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='计算力学' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='几何数值积分' /><meta property='article:published_time' content='2026-08-17T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-17T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Variational Integrators：时间积分器也可以“从力学原理里推出来”">
+<meta name="twitter:description" content="Variational Integrators：时间积分器也可以“从力学原理里推出来” 主题：Variational Integrators（变分积分器）\n领域：计算力学 × 有限元 × 物理引擎 × 几何数值积分\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[ \\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}} \\]传统数值积分通常先得到连续运动方程：\n\\[ M\\ddot q+\\nabla V(q)=0, \\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[ L(q,\\dot q)=T(\\dot q)-V(q). \\]真实运动满足 Hamilton 原理：\n\\[ \\delta S=0, \\]其中作用量\n[ S[q] \\int_{t_0}^{t_1} L(q,\\dot q),dt. ]\n对它做变分，就得到 Euler–Lagrange 方程：\n[ \\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} \\frac{\\partial L}{\\partial q} =0. ]\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-传统方法容易忽略什么">1. 传统方法容易忽略什么？</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#fracpartial-lpartial-dot-q">[
+\frac{d}{dt}
+\frac{\partial L}{\partial \dot q}</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#right2">h
+\left[
+\frac12m
+\left(
+\frac{q_{k+1}-q_k}{h}
+\right)^2</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#2q_k-q_k-1">2q_k-q_{k-1}</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#frac12dot-qtmdot-q">\frac12\dot q^TM\dot q</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#一个工程诊断例子">一个工程诊断例子</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/04-variational-integrators/">Variational Integrators：时间积分器也可以“从力学原理里推出来”</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-17T00:00:00Z'>Aug 17, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 4 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="variational-integrators时间积分器也可以从力学原理里推出来">Variational Integrators：时间积分器也可以“从力学原理里推出来”
+</h1><p><strong>主题：Variational Integrators（变分积分器）</strong><br>
+<strong>领域：计算力学 × 有限元 × 物理引擎 × 几何数值积分</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：</p>
+\[
+\boxed{\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}
+\]<p>传统数值积分通常先得到连续运动方程：</p>
+\[
+M\ddot q+\nabla V(q)=0,
+\]<p>然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。</p>
+<p><strong>Variational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。</strong></p>
+<p>Marsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。</p>
+<p>它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。</p>
+<hr>
+<h2 id="1-传统方法容易忽略什么">1. 传统方法容易忽略什么？
+</h2><p>考虑最简单的无阻尼机械系统：</p>
+\[
+L(q,\dot q)=T(\dot q)-V(q).
+\]<p>真实运动满足 Hamilton 原理：</p>
+\[
+\delta S=0,
+\]<p>其中作用量</p>
+<h1 id="sq">[
+S[q]
+</h1><p>\int_{t_0}^{t_1}
+L(q,\dot q),dt.
+]</p>
+<p>对它做变分，就得到 Euler–Lagrange 方程：</p>
+<h2 id="fracpartial-lpartial-dot-q">[
+\frac{d}{dt}
+\frac{\partial L}{\partial \dot q}
+</h2><p>\frac{\partial L}{\partial q}
+=0.
+]</p>
+<p>也就是说，连续动力学存在一条逻辑链：</p>
+\[
+\boxed{
+\text{variational principle}
+\rightarrow
+\text{Euler–Lagrange equation}
+\rightarrow
+\text{trajectory}
+}
+\]<p>普通时间积分通常在第二层才开始：</p>
+\[
+\text{Euler–Lagrange equation}
+\rightarrow
+\boxed{\text{discretize}}
+\]<p>而 VI 提前了一层：</p>
+\[
+\boxed{\text{discretize variational principle}}
+\rightarrow
+\text{discrete Euler–Lagrange equation}.
+\]<p>这两个操作一般<strong>并不等价</strong>。这一点也是离散力学和离散最优控制文献反复强调的核心区别。</p>
+<hr>
+<h1 id="2-怎么把-hamilton-原理离散化">2. 怎么把 Hamilton 原理离散化？
+</h1><p>连续作用量为：</p>
+\[
+S=\int L(q,\dot q)\,dt.
+\]<p>现在把时间切成：</p>
+\[
+t_0,t_1,\ldots,t_N,
+\qquad
+h=t_{k+1}-t_k.
+\]<p>用一个 <strong>discrete Lagrangian</strong></p>
+\[
+L_d(q_k,q_{k+1})
+\]<p>去近似一小段真实作用量：</p>
+\[
+L_d(q_k,q_{k+1})
+\approx
+\int_{t_k}^{t_{k+1}}
+L(q,\dot q)\,dt.
+\]<p>于是总作用量变成：</p>
+<h1 id="s_d">[
+S_d
+</h1><p>\sum_{k=0}^{N-1}
+L_d(q_k,q_{k+1}).
+]</p>
+<p>然后不再对连续曲线求变分，而是要求：</p>
+\[
+\delta S_d=0.
+\]<p>对内部节点 \(q_k\) 求导：</p>
+<h1 id="d_1l_dq_kq_k1">[
+D_2L_d(q_{k-1},q_k)
++
+D_1L_d(q_k,q_{k+1})
+</h1><ol start="0">
+<li></li>
+</ol>
+<p>]</p>
+<p>这就是：</p>
+\[
+\boxed{
+\text{Discrete Euler–Lagrange equation}
+}
+\]<p>它直接定义了从</p>
+\[
+(q_{k-1},q_k)
+\]<p>到</p>
+\[
+(q_k,q_{k+1})
+\]<p>的时间推进。</p>
+<p>这里最重要的思想是：</p>
+<blockquote>
+<p><strong>离散运动方程并非人为挑选出来，而是从一个离散力学原理中推导出来。</strong></p>
+</blockquote>
+<hr>
+<h1 id="3-一个惊喜熟悉的-verlet-可以从这里自然出现">3. 一个惊喜：熟悉的 Verlet 可以从这里自然出现
+</h1><p>考虑：</p>
+<h1 id="lqdot-q">[
+L(q,\dot q)
+</h1><p>\frac12m\dot q^2-V(q).
+]</p>
+<p>取一种简单 discrete Lagrangian：</p>
+<h1 id="l_dq_kq_k1">[
+L_d(q_k,q_{k+1})
+</h1><h2 id="right2">h
+\left[
+\frac12m
+\left(
+\frac{q_{k+1}-q_k}{h}
+\right)^2
+</h2><p>V(q_k)
+\right].
+]</p>
+<p>代入离散 Euler–Lagrange 方程，会得到类似：</p>
+<h1 id="fracq_k1-2q_kq_k-1h2">[
+m
+\frac{q_{k+1}-2q_k+q_{k-1}}{h^2}
+</h1><p>-\nabla V(q_k).
+]</p>
+<p>即：</p>
+<h1 id="q_k1">[
+\boxed{
+q_{k+1}
+</h1><h2 id="2q_k-q_k-1">2q_k-q_{k-1}
+</h2><p>\frac{h^2}{m}\nabla V(q_k)
+}
+]</p>
+<p>这正与 Störmer–Verlet / central-difference 家族有非常紧密的关系。</p>
+<p>所以 Verlet 的长期动力学性质并非偶然。Marsden–West 的框架把许多熟悉的辛方法统一解释成离散变分积分器。</p>
+<hr>
+<h1 id="4-为什么它比局部误差小更值得关心">4. 为什么它比“局部误差小”更值得关心？
+</h1><p>这是 VI 最核心的部分。</p>
+<p>普通数值分析经常比较：</p>
+\[
+\|q_{\rm num}(t)-q_{\rm exact}(t)\|.
+\]<p>例如：</p>
+\[
+O(h),\qquad O(h^2),\qquad O(h^4).
+\]<p>但对于需要模拟：</p>
+\[
+10^4,\ 10^5,\ 10^6
+\]<p>个时间步的动力系统，只看每一步的误差阶数可能并不够。</p>
+<p>因为机械系统有一些<strong>全局几何结构</strong>。</p>
+<p>最重要的是：</p>
+\[
+\boxed{\text{symplectic structure}}
+\]<p>对于 Hamiltonian 系统，真实流保持相空间中的辛形式：</p>
+\[
+dq\wedge dp.
+\]<p>变分积分器天然产生 symplectic map。</p>
+<p>一个直观但并不完全严格的理解是：</p>
+<blockquote>
+<p>它不会像普通数值耗散或数值反耗散方法那样，任意压缩或膨胀 Hamiltonian 相空间的动力学结构。</p>
+</blockquote>
+<p>这会直接影响长期行为。</p>
+<hr>
+<h1 id="5-一个容易误解的地方vi-通常不严格守恒能量">5. 一个容易误解的地方：VI 通常<strong>不严格守恒能量</strong>
+</h1><p>这是非常重要的区别。</p>
+<p>很多人看到：</p>
+\[
+\text{structure preserving}
+\]<p>就会理解成：</p>
+\[
+E_{k+1}=E_k.
+\]<p>一般并非如此。</p>
+<p>普通固定步长 symplectic / variational integrator 通常表现为：</p>
+<h1 id="e_k">[
+E_k
+</h1><p>E_0
++
+\text{bounded oscillatory error},
+]</p>
+<p>而不是严格：</p>
+\[
+E_k=E_0.
+\]<p>更深的 backward error analysis 告诉我们：辛积分器可以理解为<strong>精确积分了一个与原 Hamiltonian 非常接近的 modified Hamiltonian</strong>。这正是它长期能量误差往往有界、不产生系统性漂移的重要原因。Hairer–Lubich–Wanner 专门把这种长期行为作为几何积分理论的核心内容。</p>
+<p>所以一个很值得记住的区别是：</p>
+\[
+\boxed{
+\text{exact energy conservation}
+\neq
+\text{good long-term energy behavior}
+}
+\]<p>很多时候后者才是动力学仿真真正需要的东西。</p>
+<hr>
+<h1 id="6-noether-定理在离散世界里仍然存在">6. Noether 定理在离散世界里仍然存在
+</h1><p>连续力学中，Noether 定理把：</p>
+\[
+\text{symmetry}
+\]<p>与：</p>
+\[
+\text{conserved quantity}
+\]<p>连接起来。</p>
+<p>例如空间平移不改变 Lagrangian：</p>
+\[
+\Rightarrow
+\text{linear momentum conservation}.
+\]<p>旋转不变：</p>
+\[
+\Rightarrow
+\text{angular momentum conservation}.
+\]<p>时间平移：</p>
+\[
+\Rightarrow
+\text{energy relation}.
+\]<p>VI 中存在对应的 <strong>discrete Noether theorem</strong>。如果 discrete Lagrangian 保留相应对称性，对应的离散动量可以被精确保存。Marsden–West 将这一点作为 VI 理论的核心结果之一。</p>
+<p>这对物理引擎设计尤其有意义：</p>
+<p>如果一个孤立软体没有外力和外力矩，那么你希望：</p>
+\[
+P_{k+1}=P_k,
+\]\[
+L_{k+1}=L_k.
+\]<p>VI 提供了一种很强的设计原则：</p>
+<blockquote>
+<p><strong>不要事后写一个 momentum correction；从一开始就让离散公式保留对应的对称性。</strong></p>
+</blockquote>
+<hr>
+<h1 id="7-这和-fem-的关系比看起来更近">7. 这和 FEM 的关系比看起来更近
+</h1><p>空间有限元首先把连续弹性体：</p>
+\[
+x(X,t)
+\]<p>离散成节点自由度：</p>
+\[
+q(t).
+\]<p>于是得到一个半离散系统：</p>
+<h1 id="nabla-eq">[
+M\ddot q
++
+\nabla E(q)
+</h1><p>f.
+]</p>
+<p>其 Lagrangian 就是：</p>
+<h1 id="lqdot-q-1">[
+L(q,\dot q)
+</h1><h2 id="frac12dot-qtmdot-q">\frac12\dot q^TM\dot q
+</h2><p>E(q).
+]</p>
+<p>所以：</p>
+\[
+\boxed{
+\text{FEM负责空间离散}
+}
+\]<p>而：</p>
+\[
+\boxed{
+\text{VI负责时间离散}
+}
+\]<p>两者实际上天然可以组合。</p>
+<p>也就是说，一个结构保持型 FEM 可以理解为：</p>
+\[
+\text{continuum mechanics}
+\]\[
+\downarrow\quad \text{spatial discretization}
+\]\[
+L(q,\dot q)
+\]\[
+\downarrow\quad \text{variational time discretization}
+\]\[
+q_0,q_1,q_2,\ldots
+\]<p>近年来也仍有工作继续研究 Hamiltonian / symplectic FEM 的空间—时间组合。</p>
+<hr>
+<h1 id="8-为什么游戏物理里没有-everywhere-都使用-vi">8. 为什么游戏物理里没有 everywhere 都使用 VI？
+</h1><p>这里必须看到它的局限。</p>
+<p>真实游戏物理往往包含：</p>
+\[
+\text{collision}
++
+\text{Coulomb friction}
++
+\text{damping}
++
+\text{motors}
++
+\text{constraint activation/deactivation}.
+\]<p>这些东西会破坏最干净的保守 Hamiltonian 结构。</p>
+<p>尤其是摩擦：</p>
+\[
+F_f
+\]<p>本身就是耗散性的。</p>
+<p>撞击还可能包含：</p>
+\[
+v^-\rightarrow v^+
+\]<p>这种非光滑事件。</p>
+<p>所以 VI 最漂亮的理论通常建立在：</p>
+<ul>
+<li>conservative；</li>
+<li>smooth；</li>
+<li>finite-dimensional mechanical systems</li>
+</ul>
+<p>附近。</p>
+<p>不过 Marsden–West 的框架也给出了 forces、dissipation 和 constraints 的离散处理方式，因此 VI 并不局限于完全保守系统，只是理论结构会比理想 Hamiltonian 情况复杂。</p>
+<p>这也是它与 IPC、XPBD、PD 等实际图形学方法产生交汇的地方。</p>
+<hr>
+<h1 id="9-一个很值得看的近期进展variational-elastodynamic-simulation">9. 一个很值得看的近期进展：Variational Elastodynamic Simulation
+</h1><p>这个方向到现在并没有停留在 2001 年理论。</p>
+<p>SIGGRAPH 2025 的 <strong>Variational Elastodynamic Simulation</strong> 又重新处理了非线性弹性中的变分时间积分。论文指出，variational time integration 在求解时可能遭遇 ill-conditioned Hessian 和不可靠 root finding，而可靠求解又与其动量保持性质密切相关；他们进一步挖掘了问题中的“hidden convex”结构，以提高非线性弹性动力学求解的鲁棒性。</p>
+<p>这件事情很有意思，因为它说明：</p>
+\[
+\boxed{
+\text{好的离散理论}
+}
+\]<p>仍然必须配合：</p>
+\[
+\boxed{
+\text{好的 nonlinear solver}
+}
+\]<p>结构保持并不会自动消灭数值求解困难。</p>
+<p>这和 IPC 非常相似：</p>
+\[
+\text{formulation}
++
+\text{optimization algorithm}
+\]<p>必须一起设计。</p>
+<hr>
+<h1 id="10-对物理求解器最值得迁移的一点">10. 对物理求解器最值得迁移的一点
+</h1><p>VI 最值得迁移的不是某个具体积分公式，而是：</p>
+\[
+\boxed{
+\text{structure before accuracy}
+}
+\]<p>这里的 structure 可以是：</p>
+<ul>
+<li>momentum conservation；</li>
+<li>symplecticity；</li>
+<li>rotation manifold；</li>
+<li>non-penetration；</li>
+<li>\(J>0\)；</li>
+<li>constraint invariants。</li>
+</ul>
+<p>传统思路容易变成：</p>
+\[
+\text{先求一个近似答案}
+\rightarrow
+\text{再不断 correction}.
+\]<p>VI 给出另一种设计哲学：</p>
+\[
+\boxed{
+\text{从离散模型本身，就让某些正确性成为结构性质。}
+}
+\]<p>这与你前面讨论 IPC 时发现的现象其实高度一致。</p>
+<p>IPC 中：</p>
+\[
+\text{CCD}
+\]<p>让：</p>
+\[
+d>0
+\]<p>成为 trajectory feasibility。</p>
+<p>VI 中：</p>
+\[
+\text{discrete symmetry}
+\]<p>让某些 momentum conservation 成为离散动力学本身的性质。</p>
+<p>它们背后有同一个非常强的求解器思想：</p>
+\[
+\boxed{
+\text{尽量把“正确”编码进 formulation，
+而不是依赖迭代结束后的修补。}
+}
+\]<hr>
+<h2 id="一个工程诊断例子">一个工程诊断例子
+</h2><p>假设你的软体掉在没有摩擦的地面上，然后弹起。</p>
+<p>你发现：</p>
+\[
+P_x(t)
+\]<p>在没有水平外力的情况下持续漂移。</p>
+<p>典型工程做法可能是找：</p>
+<ul>
+<li>contact correction；</li>
+<li>velocity update；</li>
+<li>constraint ordering；</li>
+<li>floating-point error。</li>
+</ul>
+<p>这些当然都应该查。</p>
+<p>但 VI 提供了一个更高层的问题：</p>
+<blockquote>
+<p><strong>你的整个离散时间步是否具有水平平移对称性？</strong></p>
+</blockquote>
+<p>如果某个约束或 correction 隐式依赖：</p>
+\[
+x_{\rm world},
+\]<p>而不是仅依赖相对位置，就可能人为破坏平移不变性。</p>
+<p>于是：</p>
+\[
+\text{symmetry broken}
+\Rightarrow
+\text{momentum conservation broken}.
+\]<p>这个思考方式特别适合做复杂求解器诊断。</p>
+<p>它把问题从：</p>
+\[
+\text{哪个参数有错？}
+\]<p>提升到：</p>
+\[
+\boxed{
+\text{这个离散算法保留了哪些连续系统结构？}
+}
+\]<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1>\[
+\boxed{
+\text{不要只离散方程，也可以离散产生方程的原理。}
+}
+\]<p>更进一步：</p>
+\[
+\boxed{
+\text{一个积分器的质量，不只取决于单步误差，
+还取决于它长期保留了什么。}
+}
+\]<p>如果未来你要自己设计软体或刚体求解器，这个问题值得经常拿出来：</p>
+<blockquote>
+<p><strong>哪些性质应该由 tolerance 保证，哪些应该由算法结构保证？</strong></p>
+</blockquote>
+<p>这会自然连接到：</p>
+\[
+\text{variational integrators}
+\rightarrow
+\text{symplectic methods}
+\rightarrow
+\text{Lie-group integrators}
+\rightarrow
+\text{energy-momentum methods}
+\rightarrow
+\text{structure-preserving differentiable simulation}.
+\]<h3 id="拓展阅读">拓展阅读
+</h3><ol>
+<li>
+<p><strong>Marsden &amp; West, <em>Discrete Mechanics and Variational Integrators</em>, Acta Numerica, 2001</strong>。这是最重要的理论入口，系统讲离散作用量、离散 Euler–Lagrange 方程、symplecticity、Noether theorem、约束与外力。</p>
+</li>
+<li>
+<p><strong>Hairer, Lubich &amp; Wanner, <em>Geometric Numerical Integration</em></strong>。如果想真正理解“为什么辛积分器长期行为好”，重点看 symplectic integration 与 backward error analysis。</p>
+</li>
+<li>
+<p><strong>Kharevych et al., <em>Geometric, Variational Integrators for Computer Animation</em></strong>。这是把离散几何力学直接带进计算机动画的一篇很合适的桥梁文献。</p>
+</li>
+<li>
+<p><strong>SIGGRAPH 2025, <em>Variational Elastodynamic Simulation</em></strong>。适合继续追当前非线性弹性中的变分积分器如何与现代优化方法结合。</p>
+</li>
+<li>
+<p>如果想进一步连接机器人与控制，可看 <strong>Discrete Mechanics and Optimal Control (DMOC)</strong>：它直接离散变分描述，使最优控制离散化也继承机械系统结构。</p>
+</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E8%AE%A1%E7%AE%97%E5%8A%9B%E5%AD%A6/">计算力学</a>
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+        
+            <a href="/tags/%E5%87%A0%E4%BD%95%E6%95%B0%E5%80%BC%E7%A7%AF%E5%88%86/">几何数值积分</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/01-ipc/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IPC：把“碰撞处理”改写成一个优化问题</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

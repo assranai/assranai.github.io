@@ -1,0 +1,1929 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>不确定性量化 on Assranai&#39;s 手账</title>
+        <link>https://assranai.github.io/tags/%E4%B8%8D%E7%A1%AE%E5%AE%9A%E6%80%A7%E9%87%8F%E5%8C%96/</link>
+        <description>Recent content in 不确定性量化 on Assranai&#39;s 手账</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en-us</language>
+        <copyright>Assranai</copyright>
+        <lastBuildDate>Fri, 21 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E4%B8%8D%E7%A1%AE%E5%AE%9A%E6%80%A7%E9%87%8F%E5%8C%96/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>Multifidelity Monte Carlo：代理模型不一定要“替代”高保真模型，它也可以只负责降方差</title>
+        <link>https://assranai.github.io/cards/05-mfmc/</link>
+        <pubDate>Tue, 18 Aug 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/05-mfmc/</guid>
+        <description>&lt;h1 id=&#34;multifidelity-monte-carlo代理模型不一定要替代高保真模型它也可以只负责降方差&#34;&gt;Multifidelity Monte Carlo：代理模型不一定要“替代”高保真模型，它也可以只负责降方差
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Multifidelity Monte Carlo（MFMC，多保真蒙特卡洛）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：可靠性 × 不确定性量化 × 代理模型 × 有限元&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这期选 MFMC，是因为它提供了一种和 AK-MCS 很不同的代理模型使用方式：&lt;/p&gt;
+\[
+\boxed{\text{低保真模型不负责给最终答案，只负责让高保真统计估计更省样本}}
+\]&lt;p&gt;这点很重要。很多代理模型研究都在追求：&lt;/p&gt;
+\[
+\hat f(x)\approx f_{\rm HF}(x)
+\]&lt;p&gt;然后直接用 \(\hat f\) 替代真实模型。但一旦 surrogate 有系统偏差，最终概率、均值或尾部统计量也会被带偏。&lt;/p&gt;
+&lt;p&gt;MFMC 的思路更保守：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;始终让高保真模型留在估计器里，用低保真模型作为 control variate 降低方差。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Peherstorfer、Willcox 和 Gunzburger 的 2016 年工作给出了经典 MFMC 的最优模型分配框架，并证明在一般条件下可以构造对高保真统计量仍保持无偏的估计器；其后 2018 年 SIAM Review 综述把这类方法放进完整的 multifidelity uncertainty quantification 体系中。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-问题从哪里来&#34;&gt;1. 问题从哪里来？
+&lt;/h2&gt;&lt;p&gt;设真正关心的高保真模型为：&lt;/p&gt;
+\[
+f_0(X),
+\]&lt;p&gt;例如一次高精度非线性 FEM 输出的最大应力。&lt;/p&gt;
+&lt;p&gt;我们想估计：&lt;/p&gt;
+\[
+\mu_0=E[f_0(X)].
+\]&lt;p&gt;普通 Monte Carlo：&lt;/p&gt;
+&lt;h1 id=&#34;hatmu_rm-mc&#34;&gt;[
+\hat\mu_{\rm MC}
+&lt;/h1&gt;&lt;p&gt;\frac1N\sum_{i=1}^N f_0(X_i),
+]&lt;/p&gt;
+&lt;p&gt;其方差为：&lt;/p&gt;
+&lt;h1 id=&#34;mathrmvarhatmu_rm-mc&#34;&gt;[
+\mathrm{Var}(\hat\mu_{\rm MC})
+&lt;/h1&gt;&lt;p&gt;\frac{\sigma_0^2}{N}.
+]&lt;/p&gt;
+&lt;p&gt;问题非常直接：&lt;/p&gt;
+\[
+N\uparrow
+\Rightarrow
+\text{误差下降}
+\]&lt;p&gt;但如果一次高保真 FEM 要 10 分钟：&lt;/p&gt;
+\[
+10^5
+\]&lt;p&gt;次样本就完全不可接受。&lt;/p&gt;
+&lt;p&gt;另一方面，我们往往已经有很多“没那么准，但便宜”的东西：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;粗网格 FEM；&lt;/li&gt;
+&lt;li&gt;低阶梁/壳模型；&lt;/li&gt;
+&lt;li&gt;Reduced Order Model；&lt;/li&gt;
+&lt;li&gt;Kriging；&lt;/li&gt;
+&lt;li&gt;神经网络 surrogate；&lt;/li&gt;
+&lt;li&gt;简化接触模型；&lt;/li&gt;
+&lt;li&gt;经验公式。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;MFMC 的核心问题于是变成：&lt;/p&gt;
+\[
+\boxed{\text{怎样把这些“不完全可信”的模型安全地利用起来？}}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;2-control-variate-是整个方法的核心&#34;&gt;2. Control Variate 是整个方法的核心
+&lt;/h1&gt;&lt;p&gt;先只考虑一个低保真模型：&lt;/p&gt;
+\[
+f_1(X).
+\]&lt;p&gt;如果它与高保真模型高度相关：&lt;/p&gt;
+\[
+\rho=\mathrm{Corr}(f_0,f_1),
+\]&lt;p&gt;那么可以构造：&lt;/p&gt;
+&lt;h1 id=&#34;y&#34;&gt;[
+Y
+&lt;/h1&gt;&lt;h2 id=&#34;f_0&#34;&gt;f_0
+&lt;/h2&gt;&lt;p&gt;\alpha
+\left(
+f_1-E[f_1]
+\right).
+]&lt;/p&gt;
+&lt;p&gt;因为：&lt;/p&gt;
+\[
+E[f_1-E[f_1]]=0,
+\]&lt;p&gt;所以：&lt;/p&gt;
+\[
+E[Y]=E[f_0].
+\]&lt;p&gt;即：&lt;/p&gt;
+\[
+\boxed{\text{低保真模型不会改变目标均值}}
+\]&lt;p&gt;但它可以改变方差。&lt;/p&gt;
+&lt;p&gt;最优：&lt;/p&gt;
+&lt;h1 id=&#34;alpha&#34;&gt;[
+\alpha^*
+&lt;/h1&gt;&lt;p&gt;\frac{\mathrm{Cov}(f_0,f_1)}
+{\mathrm{Var}(f_1)}
+]&lt;/p&gt;
+&lt;p&gt;时：&lt;/p&gt;
+&lt;h1 id=&#34;mathrmvary&#34;&gt;[
+\mathrm{Var}(Y)
+&lt;/h1&gt;&lt;p&gt;\sigma_0^2(1-\rho^2).
+]&lt;/p&gt;
+&lt;p&gt;这个公式非常值得记住：&lt;/p&gt;
+\[
+\boxed{
+\text{variance reduction}
+\sim
+1-\rho^2
+}
+\]&lt;p&gt;如果：&lt;/p&gt;
+\[
+\rho=0.99,
+\]&lt;p&gt;那么：&lt;/p&gt;
+\[
+1-\rho^2\approx0.02.
+\]&lt;p&gt;即使低保真模型绝对误差并不小，只要它能&lt;strong&gt;跟随高保真模型的涨落趋势&lt;/strong&gt;，就可能非常有价值。&lt;/p&gt;
+&lt;p&gt;这和传统 surrogate evaluation 有明显区别。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-一个反直觉结论低保真模型可以很不准但仍然非常有用&#34;&gt;3. 一个反直觉结论：低保真模型可以“很不准”，但仍然非常有用
+&lt;/h1&gt;&lt;p&gt;假设真实 FEM 输出：&lt;/p&gt;
+\[
+f_0(X)=100+10X.
+\]&lt;p&gt;粗糙模型：&lt;/p&gt;
+\[
+f_1(X)=60+8X.
+\]&lt;p&gt;它存在巨大 bias：&lt;/p&gt;
+\[
+f_1-f_0\approx-40.
+\]&lt;p&gt;如果直接把它当 surrogate：&lt;/p&gt;
+\[
+E[f_1]
+\]&lt;p&gt;显然不能替代：&lt;/p&gt;
+\[
+E[f_0].
+\]&lt;p&gt;但二者几乎完全线性相关：&lt;/p&gt;
+\[
+\rho\approx1.
+\]&lt;p&gt;于是作为 control variate，它非常优秀。&lt;/p&gt;
+&lt;p&gt;这说明：&lt;/p&gt;
+\[
+\boxed{
+\text{surrogate accuracy}
+\neq
+\text{variance-reduction value}
+}
+\]&lt;p&gt;对于 MFMC，更重要的问题不是：&lt;/p&gt;
+\[
+R^2 \text{ 是否接近 1？}
+\]&lt;p&gt;而是：&lt;/p&gt;
+\[
+\boxed{
+\text{相关性有多高，以及一次低保真调用有多便宜？}
+}
+\]&lt;p&gt;这是一种非常值得迁移的模型评价方式。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-真正的-mfmc不知道低保真均值怎么办&#34;&gt;4. 真正的 MFMC：不知道低保真均值怎么办？
+&lt;/h1&gt;&lt;p&gt;经典 control variate 假设：&lt;/p&gt;
+\[
+E[f_1]
+\]&lt;p&gt;已知。&lt;/p&gt;
+&lt;p&gt;现实中通常不知道。&lt;/p&gt;
+&lt;p&gt;MFMC 的做法是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;少量样本同时计算高保真和低保真；&lt;/li&gt;
+&lt;li&gt;大量额外样本只计算低保真；&lt;/li&gt;
+&lt;li&gt;用更多低保真样本把它自己的均值估得非常准。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;对于多个低保真模型：&lt;/p&gt;
+\[
+f_1,\dots,f_k,
+\]&lt;p&gt;经典 MFMC 估计器可以写成：&lt;/p&gt;
+&lt;h1 id=&#34;hatmu_rm-mf&#34;&gt;[
+\hat\mu_{\rm MF}
+&lt;/h1&gt;&lt;h2 id=&#34;hatmu_im_i&#34;&gt;\hat\mu_0^{(m_0)}
++
+\sum_{i=1}^{k}
+\alpha_i
+\left(
+\hat\mu_i^{(m_i)}
+&lt;/h2&gt;&lt;p&gt;\hat\mu_i^{(m_{i-1})}
+\right),
+]&lt;/p&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+\[
+m_0\le m_1\le\cdots\le m_k.
+\]&lt;p&gt;高保真只计算：&lt;/p&gt;
+\[
+m_0
+\]&lt;p&gt;次，最便宜的低保真可能计算：&lt;/p&gt;
+\[
+m_k\gg m_0
+\]&lt;p&gt;次。&lt;/p&gt;
+&lt;p&gt;这个估计器的关键性质是：&lt;/p&gt;
+\[
+\boxed{E[\hat\mu_{\rm MF}]=E[f_0]}
+\]&lt;p&gt;即低保真模型即使没有误差界，也不必承担最终 bias。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-mfmc-真正精彩的地方模型价值可以量化&#34;&gt;5. MFMC 真正精彩的地方：模型价值可以量化
+&lt;/h1&gt;&lt;p&gt;假设第 \(i\) 个模型：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;成本：\(c_i\)&lt;/li&gt;
+&lt;li&gt;与高保真相关系数：\(\rho_i\)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么模型管理问题本质是：&lt;/p&gt;
+\[
+\min_{m_0,\ldots,m_k}
+\mathrm{Var}(\hat\mu_{\rm MF})
+\]&lt;p&gt;subject to：&lt;/p&gt;
+\[
+\sum_i c_i m_i\le B.
+\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[
+\boxed{
+\text{不是“哪个 surrogate 最准”，而是“每一美元计算预算买到多少方差下降”}
+}
+\]&lt;p&gt;2016 年经典工作正是围绕这个 optimal model management 问题展开，并给出了满足一定条件时的解析最优分配。数值实验中使用的低保真来源并不限于单一类型，而包括 reduced model、data-fit model、support vector machine 等。&lt;/p&gt;
+&lt;p&gt;这对工程项目非常现实。&lt;/p&gt;
+&lt;p&gt;你可能同时拥有：&lt;/p&gt;
+\[
+\begin{aligned}
+f_0 &amp;: \text{刚柔耦合高精度模型},\\
+f_1 &amp;: \text{粗网格柔性模型},\\
+f_2 &amp;: \text{刚体 Adams 模型},\\
+f_3 &amp;: \text{Kriging},\\
+f_4 &amp;: \text{经验公式}.
+\end{aligned}
+\]&lt;p&gt;MFMC 不要求它们形成严格的“物理精度等级”。&lt;/p&gt;
+&lt;p&gt;它只关心：&lt;/p&gt;
+\[
+\boxed{成本 + 相关性}
+\]&lt;p&gt;因此一个便宜但“物理上很粗”的模型，有时会比一个昂贵但略微更准确的模型更有价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-它和-multilevel-monte-carlomlmc有什么区别&#34;&gt;6. 它和 Multilevel Monte Carlo（MLMC）有什么区别？
+&lt;/h1&gt;&lt;p&gt;两者名字很像，但逻辑不同。&lt;/p&gt;
+&lt;p&gt;MLMC 通常依赖一个自然层级：&lt;/p&gt;
+\[
+h_0&gt;h_1&gt;\cdots&gt;h_L,
+\]&lt;p&gt;例如：&lt;/p&gt;
+\[
+\text{粗网格}
+\rightarrow
+\text{中网格}
+\rightarrow
+\text{细网格}.
+\]&lt;p&gt;利用 telescoping identity：&lt;/p&gt;
+&lt;h1 id=&#34;ef_l&#34;&gt;[
+E[f_L]
+&lt;/h1&gt;&lt;p&gt;E[f_0]
++
+\sum_{\ell=1}^{L}
+E[f_\ell-f_{\ell-1}].
+]&lt;/p&gt;
+&lt;p&gt;它非常适合具有明确 discretization hierarchy 的 PDE/FEM。&lt;/p&gt;
+&lt;p&gt;MFMC 更一般：&lt;/p&gt;
+\[
+\boxed{
+\text{模型之间不要求存在严格网格层级}
+}
+\]&lt;p&gt;你完全可以组合：&lt;/p&gt;
+\[
+\text{FEM}
++
+\text{ROM}
++
+\text{Kriging}
++
+\text{神经网络}.
+\]&lt;p&gt;这正是 multifidelity survey 强调的区别之一：一般的 multifidelity 模型集合未必具有明确误差衰减率和层级结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么它对可靠性问题尤其有意思&#34;&gt;7. 为什么它对可靠性问题尤其有意思？
+&lt;/h1&gt;&lt;p&gt;失效概率本身也是一个期望：&lt;/p&gt;
+&lt;h1 id=&#34;p_f&#34;&gt;[
+P_f
+&lt;/h1&gt;&lt;p&gt;E[I(g(X)\le0)].
+]&lt;/p&gt;
+&lt;p&gt;定义：&lt;/p&gt;
+&lt;h1 id=&#34;y_0&#34;&gt;[
+Y_0
+&lt;/h1&gt;&lt;p&gt;I(g_{\rm HF}(X)\le0).
+]&lt;/p&gt;
+&lt;p&gt;低保真模型也可以形成：&lt;/p&gt;
+&lt;h1 id=&#34;y_1&#34;&gt;[
+Y_1
+&lt;/h1&gt;&lt;p&gt;I(g_{\rm LF}(X)\le0).
+]&lt;/p&gt;
+&lt;p&gt;于是原则上可以把：&lt;/p&gt;
+\[
+Y_1
+\]&lt;p&gt;作为 control variate。&lt;/p&gt;
+&lt;p&gt;但这里有一个陷阱。&lt;/p&gt;
+&lt;p&gt;对于 rare event：&lt;/p&gt;
+\[
+P_f\ll1,
+\]&lt;p&gt;indicator 大多数时候都是：&lt;/p&gt;
+\[
+0.
+\]&lt;p&gt;此时相关性结构会变得比普通均值估计困难，而且 crude Monte Carlo 本身已经低效。&lt;/p&gt;
+&lt;p&gt;因此可靠性领域往往进一步组合：&lt;/p&gt;
+\[
+\boxed{
+\text{multifidelity}
++
+\text{importance sampling}
+}
+\]&lt;p&gt;Peherstorfer 等人在 2016 年也专门发展了 multifidelity importance sampling；后续工作仍在研究 control variates 与 importance sampling 的组合。&lt;/p&gt;
+&lt;p&gt;所以 MFMC 对：&lt;/p&gt;
+\[
+E[Y],\quad \mathrm{Var}(Y)
+\]&lt;p&gt;非常自然；&lt;/p&gt;
+&lt;p&gt;对极小：&lt;/p&gt;
+\[
+P_f
+\]&lt;p&gt;通常还需要 rare-event sampling 技术配合。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-它给代理模型研究一个很重要的评价范式&#34;&gt;8. 它给代理模型研究一个很重要的评价范式
+&lt;/h1&gt;&lt;p&gt;很多 surrogate 工作默认评价：&lt;/p&gt;
+\[
+R^2,\ RMSE,\ MAE.
+\]&lt;p&gt;MFMC 会提出另一个问题：&lt;/p&gt;
+\[
+\boxed{
+\mathrm{Corr}(f_{\rm HF},f_{\rm LF})
+}
+\]&lt;p&gt;以及：&lt;/p&gt;
+\[
+\boxed{
+\frac{\text{variance reduction}}
+{\text{computational cost}}
+}
+\]&lt;p&gt;可能才是最终任务真正需要的指标。&lt;/p&gt;
+&lt;p&gt;这意味着：&lt;/p&gt;
+&lt;p&gt;一个代理模型即使：&lt;/p&gt;
+\[
+R^2=0.8,
+\]&lt;p&gt;只要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;非常便宜；&lt;/li&gt;
+&lt;li&gt;与 HF 强相关；&lt;/li&gt;
+&lt;li&gt;误差结构稳定；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;它仍然可能具有巨大统计价值。&lt;/p&gt;
+&lt;p&gt;反过来，一个：&lt;/p&gt;
+\[
+R^2=0.98
+\]&lt;p&gt;但推理成本较高的复杂 surrogate，在 MFMC 框架里未必值得加入。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-一个更现代的发展approximate-control-variates&#34;&gt;9. 一个更现代的发展：Approximate Control Variates
+&lt;/h1&gt;&lt;p&gt;经典 MFMC 的 recursive sampling 结构并不是理论极限。&lt;/p&gt;
+&lt;p&gt;Gorodetsky、Geraci、Eldred 和 Jakeman 后来提出 generalized &lt;strong&gt;Approximate Control Variate（ACV）&lt;/strong&gt; 框架，并证明某些经典递归多模型策略的最大方差降低能力实际上受到限制；通过新的非递归采样结构，可以更充分利用多个低保真模型。&lt;/p&gt;
+&lt;p&gt;这使技术演化路线变成：&lt;/p&gt;
+\[
+\boxed{
+\text{Control Variates}
+\rightarrow
+\text{MFMC}
+\rightarrow
+\text{Approximate Control Variates}
+\rightarrow
+\text{现代多模型 UQ}
+}
+\]&lt;p&gt;到 2025–2026 年，NASA 等机构仍在继续研究如何自动调节 multifidelity 模型参数，使给定预算下的 estimator variance 最小化，说明“模型如何自动分配预算”仍然是活跃的工程研究问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-对工程研究最值得迁移的一点&#34;&gt;10. 对工程研究最值得迁移的一点
+&lt;/h1&gt;&lt;p&gt;MFMC 最深刻的地方，其实是一种对代理模型定位的重新理解：&lt;/p&gt;
+\[
+\boxed{
+\text{代理模型不必承担“真值模型”的责任}
+}
+\]&lt;p&gt;它可以只承担：&lt;/p&gt;
+\[
+\boxed{
+\text{information carrier / variance reducer}
+}
+\]&lt;p&gt;这非常适合现实工程，因为现实中往往存在大量：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;旧模型；&lt;/li&gt;
+&lt;li&gt;粗网格模型；&lt;/li&gt;
+&lt;li&gt;简化动力学模型；&lt;/li&gt;
+&lt;li&gt;历史 surrogate；&lt;/li&gt;
+&lt;li&gt;部分实验模型。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些模型可能都“不够准”。&lt;/p&gt;
+&lt;p&gt;传统思路容易直接丢弃它们。&lt;/p&gt;
+&lt;p&gt;MFMC 会问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;它们和真正昂贵模型之间还有没有稳定相关信息？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;只要答案是肯定的，它们就可能仍然有统计价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h2&gt;\[
+\boxed{
+\text{低保真模型的价值，不取决于它离真值有多近，
+而取决于它能以多低的成本解释多少高保真波动。}
+}
+\]&lt;p&gt;这也是 multifidelity 方法比“单纯做代理模型拟合”更值得研究的地方。&lt;/p&gt;
+&lt;p&gt;它把问题从：&lt;/p&gt;
+\[
+\text{怎样造一个更准的 surrogate？}
+\]&lt;p&gt;转成：&lt;/p&gt;
+\[
+\boxed{
+\text{怎样管理一整个模型生态，让有限计算预算产生最多信息？}
+}
+\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Peherstorfer, Willcox &amp;amp; Gunzburger, &lt;em&gt;Optimal Model Management for Multifidelity Monte Carlo Estimation&lt;/em&gt;, SIAM Journal on Scientific Computing, 2016&lt;/strong&gt;。经典 MFMC 原始框架，重点看 estimator、cost allocation 和 unbiasedness。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Peherstorfer, Willcox &amp;amp; Gunzburger, &lt;em&gt;Survey of Multifidelity Methods in Uncertainty Propagation, Inference, and Optimization&lt;/em&gt;, SIAM Review, 2018&lt;/strong&gt;。很适合建立完整知识地图，其中把 multifidelity 方法分成 adaptation、fusion 和 filtering 等策略。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;作者 Benjamin Peherstorfer 提供了经典 MFMC 的公开 MATLAB 实现，可以直接阅读模型分配和采样结构。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Gorodetsky et al., &lt;em&gt;A Generalized Approximate Control Variate Framework for Multifidelity Uncertainty Quantification&lt;/em&gt;&lt;/strong&gt;。如果想继续往现代多模型方差缩减方向走，这篇是 MFMC 之后非常关键的一步。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;想连接可靠性 rare-event 问题，可以继续看 &lt;strong&gt;multifidelity importance sampling&lt;/strong&gt; 这条路线，它把低保真模型用于构造更有效的失效域采样分布。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;延伸讨论&#34;&gt;延伸讨论
+&lt;/h2&gt;&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;问：&lt;/strong&gt; 关于mfmc，我不明白其意义：它能从低保真模型获得什么信息，用于服务哪些目的？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;你这个疑问正好触及 MFMC 最容易让人困惑的地方。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;MFMC 并不是从低保真模型里“学习高保真模型长什么样”，它主要利用的是低保真模型与高保真模型之间的“共同波动”。&lt;/strong&gt; 换句话说，它提取的是一种&lt;strong&gt;统计相关信息&lt;/strong&gt;，然后用它降低 Monte Carlo 统计量的估计噪声。经典 MFMC 正是把低保真模型作为 control variates 来估计高保真输出统计量。&lt;/p&gt;
+&lt;h2 id=&#34;1-先把问题压缩成一个最简单的例子&#34;&gt;1. 先把问题压缩成一个最简单的例子
+&lt;/h2&gt;&lt;p&gt;假设你研究某机构的不确定性传播。&lt;/p&gt;
+&lt;p&gt;输入：&lt;/p&gt;
+\[
+X=(\text{间隙},\text{杆长误差},\text{摩擦系数},\text{载荷})
+\]&lt;p&gt;高保真模型 HF 是复杂刚柔耦合 FEM/多体模型，一次 10 分钟；低保真 LF 是简化刚体模型，一次 0.01 秒。&lt;/p&gt;
+&lt;p&gt;现在你想知道：&lt;/p&gt;
+\[
+\mu_H=E[Y_H]
+\]&lt;p&gt;例如平均最大驱动力。&lt;/p&gt;
+&lt;p&gt;假设不同随机样本下结果是：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;样本&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;HF 最大驱动力&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;LF 最大驱动力&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;1&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;103&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;62&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;2&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;119&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;75&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;3&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;97&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;57&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;4&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;141&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;91&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;5&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;112&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;69&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;LF 数值明显不准。&lt;/p&gt;
+&lt;p&gt;但仔细看：&lt;/p&gt;
+\[
+HF\uparrow\Rightarrow LF\uparrow
+\]\[
+HF\downarrow\Rightarrow LF\downarrow
+\]&lt;p&gt;于是它包含一个非常重要的信息：&lt;/p&gt;
+\[
+\boxed{\text{这个随机输入是让系统响应偏高，还是偏低}}
+\]&lt;p&gt;这就是 MFMC 真正要利用的信息。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;2-它不关心-lf-是否知道答案而关心-lf-是否知道涨跌&#34;&gt;2. 它不关心 LF 是否知道“答案”，而关心 LF 是否知道“涨跌”
+&lt;/h2&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[
+Y_H=100+20X+\epsilon_H
+\]&lt;p&gt;而一个很粗的模型是：&lt;/p&gt;
+\[
+Y_L=40+10X+\epsilon_L.
+\]&lt;p&gt;显然：&lt;/p&gt;
+\[
+Y_L\neq Y_H.
+\]&lt;p&gt;拿 LF 直接做代理模型会有严重 bias。&lt;/p&gt;
+&lt;p&gt;但两者都受：&lt;/p&gt;
+\[
+X
+\]&lt;p&gt;驱动，因此可能：&lt;/p&gt;
+\[
+\rho(Y_H,Y_L)=0.95.
+\]&lt;p&gt;MFMC 利用的就是：&lt;/p&gt;
+\[
+\boxed{\rho}
+\]&lt;p&gt;而不是：&lt;/p&gt;
+\[
+Y_H-Y_L.
+\]&lt;p&gt;所以可以把低保真模型想象成一个&lt;strong&gt;廉价传感器&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;它刻度不准：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;HF 说 120 MPa，LF 可能永远只报 75 MPa。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;但它对趋势非常敏感：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;哪些随机输入让应力升高，哪些让应力降低，它基本知道。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;那么它仍然有用。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-这个信息到底怎样帮-monte-carlo&#34;&gt;3. 这个信息到底怎样帮 Monte Carlo？
+&lt;/h1&gt;&lt;p&gt;普通 Monte Carlo 用：&lt;/p&gt;
+&lt;h1 id=&#34;hatmu_h&#34;&gt;[
+\hat\mu_H
+&lt;/h1&gt;&lt;p&gt;\frac1{N_H}
+\sum_{i=1}^{N_H}Y_H^{(i)}.
+]&lt;/p&gt;
+&lt;p&gt;如果 HF 很贵，只能算 20 次。&lt;/p&gt;
+&lt;p&gt;于是这 20 个随机样本可能恰好偏高：&lt;/p&gt;
+\[
+\bar Y_H=112.
+\]&lt;p&gt;但真实均值其实可能是：&lt;/p&gt;
+\[
+E[Y_H]=105.
+\]&lt;p&gt;你不知道这次抽样到底偏了多少。&lt;/p&gt;
+&lt;p&gt;现在关键来了。&lt;/p&gt;
+&lt;p&gt;对&lt;strong&gt;同样的 20 个随机输入&lt;/strong&gt;，我们也算 LF：&lt;/p&gt;
+\[
+\bar Y_L^{20}=72.
+\]&lt;p&gt;因为 LF 极便宜，我们另外再算：&lt;/p&gt;
+\[
+N_L=1,000,000
+\]&lt;p&gt;个 LF。&lt;/p&gt;
+&lt;p&gt;于是非常准确地知道：&lt;/p&gt;
+\[
+E[Y_L]\approx65.
+\]&lt;p&gt;现在我们发现：&lt;/p&gt;
+\[
+\boxed{
+\text{这 20 个 HF 样本对应的 LF 恰好比 LF 总体均值高了 7}
+}
+\]&lt;p&gt;即：&lt;/p&gt;
+\[
+72-65=7.
+\]&lt;p&gt;由于我们已经从少量 HF/LF 配对样本知道：&lt;/p&gt;
+\[
+HF\uparrow\leftrightarrow LF\uparrow,
+\]&lt;p&gt;于是有理由判断：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;这批 HF Monte Carlo 样本大概率也抽高了。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;因此把：&lt;/p&gt;
+\[
+112
+\]&lt;p&gt;往下修正。&lt;/p&gt;
+&lt;p&gt;这就是 control variate。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-数学上其实就这么简单&#34;&gt;4. 数学上其实就这么简单
+&lt;/h1&gt;&lt;p&gt;构造：&lt;/p&gt;
+&lt;h1 id=&#34;hatmu_rm-mf-1&#34;&gt;[
+\boxed{
+\hat\mu_{\rm MF}
+&lt;/h1&gt;&lt;h2 id=&#34;bar-y_h&#34;&gt;\bar Y_H
+&lt;/h2&gt;&lt;p&gt;\alpha
+(\bar Y_L^{HF}-\bar Y_L^{large})
+}
+]&lt;/p&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+\[
+\bar Y_L^{HF}
+\]&lt;p&gt;是和 HF 使用相同随机样本得到的 LF 均值；&lt;/p&gt;
+&lt;p&gt;而：&lt;/p&gt;
+\[
+\bar Y_L^{large}
+\]&lt;p&gt;是几十万/几百万次廉价 LF 得到的精确总体均值估计。&lt;/p&gt;
+&lt;p&gt;刚才：&lt;/p&gt;
+\[
+\bar Y_H=112
+\]\[
+\bar Y_L^{HF}=72
+\]\[
+\bar Y_L^{large}=65.
+\]&lt;p&gt;假设估计得到：&lt;/p&gt;
+\[
+\alpha=1,
+\]&lt;p&gt;那么：&lt;/p&gt;
+&lt;h1 id=&#34;hatmu_rm-mf-2&#34;&gt;[
+\hat\mu_{\rm MF}
+&lt;/h1&gt;&lt;h1 id=&#34;112-72-65&#34;&gt;112-(72-65)
+&lt;/h1&gt;&lt;ol start=&#34;105&#34;&gt;
+&lt;li&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;]&lt;/p&gt;
+&lt;p&gt;注意一个非常关键的地方：&lt;/p&gt;
+&lt;h3 id=&#34;lf-从来没有告诉我们&#34;&gt;LF 从来没有告诉我们：
+&lt;/h3&gt;\[
+E[Y_H]=105.
+\]&lt;p&gt;它告诉我们的其实是：&lt;/p&gt;
+\[
+\boxed{\text{你这批昂贵 HF 样本可能抽偏了，而且大概偏向哪个方向。}}
+\]&lt;p&gt;这就是 MFMC 最核心的直觉。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-所以-mfmc-从-lf-中获得的是三类信息&#34;&gt;5. 所以 MFMC 从 LF 中获得的是三类信息
+&lt;/h1&gt;&lt;p&gt;可以更准确地归纳为：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第一，随机输入导致输出变化的共同趋势&lt;/strong&gt;&lt;/p&gt;
+\[
+X\rightarrow Y_L
+\]&lt;p&gt;可以廉价反映：&lt;/p&gt;
+\[
+X\rightarrow Y_H
+\]&lt;p&gt;的一部分规律。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第二，小规模 HF Monte Carlo 的抽样偏差信息&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;比较：&lt;/p&gt;
+\[
+\bar Y_L^{HF}
+\]&lt;p&gt;和：&lt;/p&gt;
+\[
+\bar Y_L^{large},
+\]&lt;p&gt;可以判断 HF 那几十个随机样本在统计意义上“抽高了还是抽低了”。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第三，不同模型的信息价值&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;通过：&lt;/p&gt;
+\[
+\rho_{HL}
+\]&lt;p&gt;和模型成本：&lt;/p&gt;
+\[
+c_L
+\]&lt;p&gt;判断一个 LF 值不值得使用。&lt;/p&gt;
+&lt;p&gt;经典 MFMC 甚至进一步优化各模型调用次数，使固定计算预算下 MSE 最小。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-它最终服务的不是预测而是统计量估计&#34;&gt;6. 它最终服务的不是“预测”，而是“统计量估计”
+&lt;/h1&gt;&lt;p&gt;这一点特别重要。&lt;/p&gt;
+&lt;p&gt;MFMC 的主要目的通常不是得到：&lt;/p&gt;
+\[
+\hat f(x)
+\]&lt;p&gt;然后问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;给定 \(x\)，系统输出是多少？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这是普通 surrogate modeling。&lt;/p&gt;
+&lt;p&gt;MFMC 更关心：&lt;/p&gt;
+\[
+\boxed{E[Y]}
+\]&lt;p&gt;以及扩展后的：&lt;/p&gt;
+\[
+\mathrm{Var}[Y],
+\]&lt;p&gt;Sobol sensitivity indices 等统计量；已有专门工作把 MFMC 扩展到方差和全局敏感度指标估计。&lt;/p&gt;
+&lt;p&gt;更广泛的 multifidelity UQ 还可以服务：&lt;/p&gt;
+\[
+P_f,\quad CVaR,\quad
+\text{optimization under uncertainty},
+\]&lt;p&gt;不过小失效概率通常会结合 importance sampling 等技术，而不是最基础的 MFMC。&lt;/p&gt;
+&lt;p&gt;所以最好把两类方法分开：&lt;/p&gt;
+\[
+\boxed{
+\begin{array}{c}
+\text{Kriging / NN surrogate}\\
+\downarrow\\
+\text{我要预测 }f(x)
+\end{array}
+}
+\]&lt;p&gt;和：&lt;/p&gt;
+\[
+\boxed{
+\begin{array}{c}
+\text{MFMC}\\
+\downarrow\\
+\text{我要更便宜地估计 }E[f(X)]
+\end{array}
+}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么不直接用-lf-做一个-hf-surrogate&#34;&gt;7. 为什么不直接用 LF 做一个 HF surrogate？
+&lt;/h1&gt;&lt;p&gt;这正是 MFMC 最有价值的地方。&lt;/p&gt;
+&lt;p&gt;假设 LF 有系统偏差：&lt;/p&gt;
+\[
+Y_L=0.7Y_H-20+\epsilon.
+\]&lt;p&gt;直接 surrogate：&lt;/p&gt;
+\[
+Y_H\approx Y_L
+\]&lt;p&gt;当然不可靠。&lt;/p&gt;
+&lt;p&gt;即使训练一个 correction model：&lt;/p&gt;
+\[
+Y_H=g(Y_L),
+\]&lt;p&gt;仍然必须担心 surrogate bias。&lt;/p&gt;
+&lt;p&gt;而 MFMC 不要求：&lt;/p&gt;
+\[
+Y_L\approx Y_H.
+\]&lt;p&gt;它只希望：&lt;/p&gt;
+\[
+\boxed{|\rho(Y_L,Y_H)|\text{ 足够高}}
+\]&lt;p&gt;同时：&lt;/p&gt;
+\[
+c_L\ll c_H.
+\]&lt;p&gt;经典 MFMC 保留高保真模型在估计器中，因此即使 LF 没有已知误差界，也可以构造针对 HF 统计量的无偏估计器。&lt;/p&gt;
+&lt;p&gt;这就是它的安全性来源。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-放到可靠性问题里你会更容易看出它的边界&#34;&gt;8. 放到可靠性问题里，你会更容易看出它的边界
+&lt;/h1&gt;&lt;p&gt;假设你关心：&lt;/p&gt;
+\[
+P_f=P[g_H(X)&lt;0].
+\]&lt;p&gt;定义：&lt;/p&gt;
+\[
+I_H(X)=
+\begin{cases}
+1,&amp;g_H(X)&lt;0\\
+0,&amp;g_H(X)\ge0
+\end{cases}
+\]&lt;p&gt;那么：&lt;/p&gt;
+\[
+P_f=E[I_H].
+\]&lt;p&gt;理论上 LF 可以帮助判断：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;这批有限的 HF 样本是否过度落在危险区/安全区。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;但是 rare-event reliability 会出现困难。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[
+P_f=10^{-6}.
+\]&lt;p&gt;普通随机样本中：&lt;/p&gt;
+\[
+99.9999\%
+\]&lt;p&gt;都是安全点。&lt;/p&gt;
+&lt;p&gt;那么 HF/LF 的 indicator：&lt;/p&gt;
+\[
+I_H,I_L
+\]&lt;p&gt;几乎永远同时为 0。&lt;/p&gt;
+&lt;p&gt;相关信息非常贫乏。&lt;/p&gt;
+&lt;p&gt;所以对于可靠性：&lt;/p&gt;
+\[
+\boxed{
+\text{纯 MFMC 通常不是小失效概率问题的终点}
+}
+\]&lt;p&gt;而会自然走向：&lt;/p&gt;
+\[
+\text{MFMC/control variate}
++
+\text{importance sampling}
+\]&lt;p&gt;或者其他 rare-event 方法。相关研究确实发展了 multifidelity failure-probability estimation 与 multifidelity importance sampling。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;最后用一句话把-mfmc-讲透&#34;&gt;最后用一句话把 MFMC 讲透
+&lt;/h2&gt;&lt;p&gt;你可以把普通 Monte Carlo 想成：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;我只能请 30 个昂贵专家（HF）做调查，所以样本均值波动很大。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;MFMC 相当于：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;我另外有一个不太准确但非常便宜的调查员（LF）。我让他调查 100 万人，于是知道总体趋势；然后观察他在那 30 个专家样本上相对于总体究竟偏高还是偏低，用这个信息校正 30 个专家造成的&lt;strong&gt;抽样噪声&lt;/strong&gt;。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[
+\boxed{
+\text{LF 提供的是“关于抽样误差的信息”，
+HF 提供的是“关于真实尺度的信息”。}
+}
+\]&lt;p&gt;这也是我认为理解 MFMC 最关键的一步。&lt;/p&gt;
+&lt;p&gt;它的价值场景其实很明确：&lt;strong&gt;你已经认可 HF 是真值模型，但 Monte Carlo 需要调用 HF 太多次；同时手里存在一个便宜、与 HF 响应高度相关的模型。&lt;/strong&gt; 这时候 MFMC 才真正有吸引力。SIAM 的综述也正是把这类方法定位在 UQ、推断和优化等需要反复调用模型的 outer-loop 问题中。&lt;/p&gt;
+&lt;p&gt;如果你愿意继续往下追 MFMC，我认为下一步最值得讲的是一个更尖锐的问题：&lt;strong&gt;为什么“相关性高”就能知道 HF 的 Monte Carlo 抽样误差？&lt;/strong&gt; 把 control variate 的方差公式从头推一遍之后，MFMC 基本就彻底透明了。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>MLMC：为什么“绝大多数随机样本根本没必要跑最细网格”</title>
+        <link>https://assranai.github.io/cards/07-mlmc/</link>
+        <pubDate>Thu, 20 Aug 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/07-mlmc/</guid>
+        <description>&lt;h1 id=&#34;mlmc为什么绝大多数随机样本根本没必要跑最细网格&#34;&gt;MLMC：为什么“绝大多数随机样本根本没必要跑最细网格”
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Multilevel Monte Carlo（MLMC，多层蒙特卡洛）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：可靠性 × 不确定性量化 × 有限元 × 随机 PDE&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;上一期 MFMC 的核心是：&lt;/p&gt;
+\[
+\boxed{\text{利用不同模型之间的相关性}}
+\]&lt;p&gt;今天的 MLMC 看起来名字很像，但思想更“有限元化”：&lt;/p&gt;
+\[
+\boxed{\text{利用不同离散精度之间的差值越来越小}}
+\]&lt;p&gt;它最适合这样的场景：&lt;/p&gt;
+\[
+\text{粗网格 FEM}
+\rightarrow
+\text{中网格 FEM}
+\rightarrow
+\text{细网格 FEM}.
+\]&lt;p&gt;Michael Giles 在 2008 年系统提出经典 MLMC 方法，并在 2015 年的 Acta Numerica 长篇综述中总结了其理论与大量应用。MLMC 的基本目标是：&lt;strong&gt;把大量 Monte Carlo 样本放在便宜的粗模型上，只用少量样本计算昂贵的细模型修正。&lt;/strong&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-最直接的问题为什么-monte-carlo-浪费计算量&#34;&gt;1. 最直接的问题：为什么 Monte Carlo 浪费计算量？
+&lt;/h2&gt;&lt;p&gt;假设你有一个有限元模型：&lt;/p&gt;
+\[
+Q_h(X),
+\]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(X\)：随机输入；&lt;/li&gt;
+&lt;li&gt;\(h\)：网格尺度；&lt;/li&gt;
+&lt;li&gt;\(Q_h\)：某个输出，例如最大位移、应力或固有频率。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;你真正希望得到：&lt;/p&gt;
+\[
+E[Q].
+\]&lt;p&gt;但实际上只能计算最细网格：&lt;/p&gt;
+\[
+Q_{h_L}.
+\]&lt;p&gt;普通 Monte Carlo 会做：&lt;/p&gt;
+&lt;h1 id=&#34;hat-q&#34;&gt;[
+\hat Q
+&lt;/h1&gt;&lt;p&gt;\frac1N\sum_{i=1}^{N}Q_{h_L}(X_i).
+]&lt;/p&gt;
+&lt;p&gt;这意味着：&lt;/p&gt;
+\[
+\boxed{\text{每一个随机样本都跑最贵的有限元模型}}
+\]&lt;p&gt;哪怕绝大多数样本只是为了消除 Monte Carlo 抽样噪声。&lt;/p&gt;
+&lt;p&gt;这正是 MLMC 认为非常浪费的地方。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-mlmc-的核心只是一条恒等式&#34;&gt;2. MLMC 的核心只是一条恒等式
+&lt;/h1&gt;&lt;p&gt;定义多个离散层级：&lt;/p&gt;
+\[
+Q_0,Q_1,\ldots,Q_L,
+\]&lt;p&gt;其中：&lt;/p&gt;
+\[
+Q_0=\text{很粗},
+\qquad
+Q_L=\text{最细}.
+\]&lt;p&gt;然后利用：&lt;/p&gt;
+&lt;h1 id=&#34;q_l&#34;&gt;[
+Q_L
+&lt;/h1&gt;&lt;p&gt;Q_0
++
+(Q_1-Q_0)
++
+(Q_2-Q_1)
++\cdots+
+(Q_L-Q_{L-1}).
+]&lt;/p&gt;
+&lt;p&gt;取期望：&lt;/p&gt;
+&lt;h1 id=&#34;eq_l&#34;&gt;[
+\boxed{
+E[Q_L]
+&lt;/h1&gt;&lt;p&gt;E[Q_0]
++
+\sum_{\ell=1}^{L}
+E[Q_\ell-Q_{\ell-1}]
+}
+]&lt;/p&gt;
+&lt;p&gt;这就是 MLMC 的全部数学起点。Giles 的经典论文正是利用这种 telescoping sum，将高精度期望拆成粗层统计量与逐级修正。&lt;/p&gt;
+&lt;p&gt;表面看只是代数变形，但它改变了计算资源的分配方式。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-为什么差值--特别有价值&#34;&gt;3. 为什么差值 \(Q_\ell-Q_{\ell-1}\) 特别有价值？
+&lt;/h1&gt;&lt;p&gt;假设细化网格以后模型逐渐收敛：&lt;/p&gt;
+\[
+Q_\ell\rightarrow Q.
+\]&lt;p&gt;那么相邻两层越来越接近：&lt;/p&gt;
+\[
+Q_\ell-Q_{\ell-1}\rightarrow0.
+\]&lt;p&gt;更重要的是，其随机方差通常也会下降：&lt;/p&gt;
+&lt;h1 id=&#34;v_ell&#34;&gt;[
+\boxed{
+V_\ell
+&lt;/h1&gt;&lt;p&gt;\operatorname{Var}(Q_\ell-Q_{\ell-1})
+\downarrow
+}
+]&lt;/p&gt;
+&lt;p&gt;随着：&lt;/p&gt;
+\[
+\ell\uparrow.
+\]&lt;p&gt;直观上：&lt;/p&gt;
+&lt;p&gt;粗模型可能给：&lt;/p&gt;
+\[
+Q_0=9.2,
+\]&lt;p&gt;中等网格：&lt;/p&gt;
+\[
+Q_1=10.1,
+\]&lt;p&gt;细网格：&lt;/p&gt;
+\[
+Q_2=10.3,
+\]&lt;p&gt;更细：&lt;/p&gt;
+\[
+Q_3=10.35.
+\]&lt;p&gt;那么：&lt;/p&gt;
+\[
+Q_1-Q_0=0.9,
+\]\[
+Q_2-Q_1=0.2,
+\]\[
+Q_3-Q_2=0.05.
+\]&lt;p&gt;因此最高精度层真正需要 Monte Carlo 估计的已经不是：&lt;/p&gt;
+\[
+Q_3\approx10
+\]&lt;p&gt;这样波动可能很大的量，而是：&lt;/p&gt;
+\[
+\boxed{
+Q_3-Q_2\approx0.05
+}
+\]&lt;p&gt;这样的小修正。&lt;/p&gt;
+&lt;p&gt;这就是 MLMC 能省计算的根本原因。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-最重要的一步同一随机输入必须在相邻层配对&#34;&gt;4. 最重要的一步：同一随机输入必须在相邻层配对
+&lt;/h1&gt;&lt;p&gt;计算：&lt;/p&gt;
+&lt;h1 id=&#34;y_ell&#34;&gt;[
+Y_\ell
+&lt;/h1&gt;&lt;p&gt;Q_\ell(X)-Q_{\ell-1}(X)
+]&lt;/p&gt;
+&lt;p&gt;时，要让两层使用&lt;strong&gt;同一个 \(X\)&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;例如随机 Young 模量：&lt;/p&gt;
+\[
+E=E(X),
+\]&lt;p&gt;粗网格和细网格都必须使用相同材料 realization。&lt;/p&gt;
+&lt;p&gt;因为：&lt;/p&gt;
+\[
+Q_\ell(X)
+\]&lt;p&gt;和：&lt;/p&gt;
+\[
+Q_{\ell-1}(X)
+\]&lt;p&gt;会高度相关。&lt;/p&gt;
+&lt;p&gt;于是虽然两者自身方差可能很大：&lt;/p&gt;
+\[
+\operatorname{Var}(Q_\ell)\gg0,
+\]&lt;p&gt;但：&lt;/p&gt;
+\[
+\boxed{
+\operatorname{Var}(Q_\ell-Q_{\ell-1})
+\ll
+\operatorname{Var}(Q_\ell)
+}
+\]&lt;p&gt;这其实和上一期 MFMC 中的 control variate 思想有亲缘关系：&lt;/p&gt;
+\[
+\boxed{\text{利用相关性消掉共同波动}}
+\]&lt;p&gt;只是 MLMC 的相关模型具有天然的离散层级结构。Giles 的分析正是建立在这种 coupled fine/coarse sample 上。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-然后发生一件很漂亮的事情不同层需要的样本数完全不同&#34;&gt;5. 然后发生一件很漂亮的事情：不同层需要的样本数完全不同
+&lt;/h1&gt;&lt;p&gt;MLMC 估计器：&lt;/p&gt;
+&lt;h1 id=&#34;hat-q_rm-ml&#34;&gt;[
+\hat Q_{\rm ML}
+&lt;/h1&gt;&lt;h2 id=&#34;q_elli&#34;&gt;\frac1{N_0}
+\sum_{i=1}^{N_0}Q_0^{(i)}
++
+\sum_{\ell=1}^{L}
+\frac1{N_\ell}
+\sum_{i=1}^{N_\ell}
+\left(
+Q_\ell^{(i)}
+&lt;/h2&gt;&lt;p&gt;Q_{\ell-1}^{(i)}
+\right).
+]&lt;/p&gt;
+&lt;p&gt;对于每一层：&lt;/p&gt;
+&lt;h1 id=&#34;right&#34;&gt;[
+\mathrm{Var}
+\left[
+\frac1{N_\ell}
+\sum Y_\ell
+\right]
+&lt;/h1&gt;&lt;p&gt;\frac{V_\ell}{N_\ell}.
+]&lt;/p&gt;
+&lt;p&gt;但随着网格细化：&lt;/p&gt;
+\[
+V_\ell\downarrow,
+\]&lt;p&gt;同时单次计算成本：&lt;/p&gt;
+\[
+C_\ell\uparrow.
+\]&lt;p&gt;于是最优策略自然是：&lt;/p&gt;
+\[
+\boxed{
+N_0\gg N_1\gg N_2\gg\cdots\gg N_L
+}
+\]&lt;p&gt;也就是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;最便宜的模型算很多次；最贵的模型只算少数几次。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这就是 MLMC 真正的计算结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-一个有限元例子&#34;&gt;6. 一个有限元例子
+&lt;/h1&gt;&lt;p&gt;假设有四层网格：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;层级&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;单次成本&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;correction 方差&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;样本数&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;\(L_0\)&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;1&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;10&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;100000&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;\(L_1\)&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;8&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;2&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;20000&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;\(L_2\)&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;64&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.2&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;3000&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;\(L_3\)&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;512&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.01&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;200&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;普通 Monte Carlo 如果使用：&lt;/p&gt;
+\[
+100000
+\]&lt;p&gt;个最细网格：&lt;/p&gt;
+\[
+100000\times512
+\]&lt;p&gt;计算量巨大。&lt;/p&gt;
+&lt;p&gt;MLMC 则把：&lt;/p&gt;
+\[
+10^5
+\]&lt;p&gt;级别的大样本统计交给粗网格。&lt;/p&gt;
+&lt;p&gt;最高精度：&lt;/p&gt;
+\[
+L_3
+\]&lt;p&gt;只承担：&lt;/p&gt;
+\[
+\boxed{\text{“从 }L_2\text{ 修正到 }L_3\text{”}}
+\]&lt;p&gt;这件事。&lt;/p&gt;
+&lt;p&gt;所以只需要几百次。&lt;/p&gt;
+&lt;p&gt;在结构工程有限元案例中，MLMC 已被用于静力、动力和弹塑性随机响应；相关研究报告，在其测试问题上，与经典 Monte Carlo 相比可获得从显著到数个数量级的计算加速。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-mlmc-与-mfmc-的真正区别&#34;&gt;7. MLMC 与 MFMC 的真正区别
+&lt;/h1&gt;&lt;p&gt;这是最值得理清的部分。&lt;/p&gt;
+&lt;p&gt;MFMC 可以有：&lt;/p&gt;
+\[
+\text{FEM}
++
+\text{Kriging}
++
+\text{ROM}
++
+\text{刚体模型}.
+\]&lt;p&gt;它主要关心：&lt;/p&gt;
+\[
+\rho(Q_H,Q_L)
+\]&lt;p&gt;和计算成本。&lt;/p&gt;
+&lt;p&gt;模型之间未必存在严格数学层级。&lt;/p&gt;
+&lt;p&gt;MLMC 则通常要求：&lt;/p&gt;
+\[
+\boxed{
+Q_0\rightarrow Q_1\rightarrow\cdots\rightarrow Q_L\rightarrow Q
+}
+\]&lt;p&gt;它们是对&lt;strong&gt;同一个问题的逐步收敛近似&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[
+h_\ell=2^{-\ell}h_0.
+\]&lt;p&gt;所以可以简单记：&lt;/p&gt;
+\[
+\boxed{
+\text{MFMC：不同模型的相关性}
+}
+\]\[
+\boxed{
+\text{MLMC：同一模型的离散层级}
+}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;8-mlmc-的真正目标是同时攻击两种误差&#34;&gt;8. MLMC 的真正目标是同时攻击两种误差
+&lt;/h1&gt;&lt;p&gt;普通有限元 Monte Carlo 有两类误差。&lt;/p&gt;
+&lt;h3 id=&#34;离散误差&#34;&gt;离散误差
+&lt;/h3&gt;\[
+E[Q-Q_L].
+\]&lt;p&gt;网格越细：&lt;/p&gt;
+\[
+h_L\downarrow
+\]&lt;p&gt;通常越小。&lt;/p&gt;
+&lt;h3 id=&#34;monte-carlo-统计误差&#34;&gt;Monte Carlo 统计误差
+&lt;/h3&gt;\[
+O(N^{-1/2}).
+\]&lt;p&gt;普通 MC 会遇到一个矛盾：&lt;/p&gt;
+&lt;p&gt;要减小离散误差：&lt;/p&gt;
+\[
+h\downarrow
+\]&lt;p&gt;单次样本越来越贵。&lt;/p&gt;
+&lt;p&gt;要减小统计误差：&lt;/p&gt;
+\[
+N\uparrow.
+\]&lt;p&gt;所以总成本爆炸。&lt;/p&gt;
+&lt;p&gt;MLMC 的核心就是：&lt;/p&gt;
+\[
+\boxed{
+\text{让细网格负责控制 bias，
+让粗网格负责控制 sampling variance}
+}
+\]&lt;p&gt;这句话几乎可以视为 MLMC 最重要的理解。&lt;/p&gt;
+&lt;p&gt;Giles 的复杂度理论正是分析 discretization bias、level variance 和 computational cost 三者的衰减/增长速度，并据此判断 MLMC 相比标准 MC 可以获得多大的复杂度改善。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么它特别适合-fempde&#34;&gt;9. 为什么它特别适合 FEM/PDE？
+&lt;/h1&gt;&lt;p&gt;因为有限元天然就有：&lt;/p&gt;
+\[
+\boxed{\text{mesh hierarchy}}
+\]&lt;p&gt;例如：&lt;/p&gt;
+\[
+10^3\text{ DOF}
+\rightarrow
+10^4
+\rightarrow
+10^5
+\rightarrow
+10^6.
+\]&lt;p&gt;而且随着网格收敛：&lt;/p&gt;
+\[
+Q_\ell-Q_{\ell-1}
+\]&lt;p&gt;通常越来越小。&lt;/p&gt;
+&lt;p&gt;因此 MLMC 与：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;multigrid；&lt;/li&gt;
+&lt;li&gt;adaptive FEM；&lt;/li&gt;
+&lt;li&gt;hierarchical basis；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在思想上很接近。&lt;/p&gt;
+&lt;p&gt;它们都遵循一个共同原则：&lt;/p&gt;
+\[
+\boxed{
+\text{不同尺度的问题，不应该付相同的计算成本}
+}
+\]&lt;p&gt;早期随机 PDE 工作已经把 MLMC 应用于随机系数椭圆 PDE；后续大量工作继续发展 MLMC-FEM、MLQMC 等方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-一个-2026-年仍然很活跃的方向复杂几何上的层级构造&#34;&gt;10. 一个 2026 年仍然很活跃的方向：复杂几何上的层级构造
+&lt;/h1&gt;&lt;p&gt;MLMC 理论很漂亮，但工程实现有一个实际困难：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;复杂几何模型未必容易得到漂亮的 nested mesh hierarchy。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;2026 年的一项工作把 MLMC 和 Virtual Element Method 结合，通过 mesh agglomeration 从复杂多边形/多面体网格构造粗层空间，用于随机椭圆 PDE 的 UQ。其目标仍然是减少最细层所需样本数，同时保留复杂几何适应性。&lt;/p&gt;
+&lt;p&gt;这说明现代 MLMC 一个很现实的研究方向已经从：&lt;/p&gt;
+\[
+\text{“理论上能不能省”}
+\]&lt;p&gt;进一步转向：&lt;/p&gt;
+\[
+\boxed{
+\text{“复杂工程网格里怎样自动构造好用的 level hierarchy？”}
+}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;11-mlmc-对可靠性分析有没有用&#34;&gt;11. MLMC 对可靠性分析有没有用？
+&lt;/h1&gt;&lt;p&gt;可以，但需要谨慎。&lt;/p&gt;
+&lt;p&gt;失效概率：&lt;/p&gt;
+&lt;h1 id=&#34;p_f&#34;&gt;[
+P_f
+&lt;/h1&gt;&lt;p&gt;E[I(g(X)\le0)].
+]&lt;/p&gt;
+&lt;p&gt;可以定义：&lt;/p&gt;
+&lt;h1 id=&#34;q_ell&#34;&gt;[
+Q_\ell
+&lt;/h1&gt;&lt;p&gt;I(g_\ell(X)\le0).
+]&lt;/p&gt;
+&lt;p&gt;然后：&lt;/p&gt;
+\[
+Q_\ell-Q_{\ell-1}
+\]&lt;p&gt;只有在两层对同一随机样本给出不同失效判断时才非零。&lt;/p&gt;
+&lt;p&gt;如果粗细模型对失效分类高度一致：&lt;/p&gt;
+\[
+\operatorname{Var}(Q_\ell-Q_{\ell-1})
+\]&lt;p&gt;就会非常小。&lt;/p&gt;
+&lt;p&gt;因此 MLMC 的理念依然成立：&lt;/p&gt;
+\[
+\boxed{
+\text{大量粗模型负责判断明显安全/明显失效，
+细模型只纠正边界附近的分类差异}
+}
+\]&lt;p&gt;你会发现这里和 AK-MCS 又产生了联系。&lt;/p&gt;
+&lt;p&gt;AK-MCS 是：&lt;/p&gt;
+\[
+\boxed{\text{把高保真样本集中在 }g\approx0}
+\]&lt;p&gt;MLMC reliability 则是：&lt;/p&gt;
+\[
+\boxed{
+\text{让高精度模型主要纠正 coarse/fine disagreement}
+}
+\]&lt;p&gt;二者本质上都在减少：&lt;/p&gt;
+\[
+\boxed{\text{昂贵计算用于“显然答案”的次数}}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;12-对工程研究最值得迁移的一点&#34;&gt;12. 对工程研究最值得迁移的一点
+&lt;/h1&gt;&lt;p&gt;MLMC 最深刻的地方其实不是 telescoping identity。&lt;/p&gt;
+&lt;p&gt;而是一个计算资源分配原则：&lt;/p&gt;
+\[
+\boxed{
+\text{精度应该被当作一种可分配资源。}
+}
+\]&lt;p&gt;我们常常默认一次仿真只有两种状态：&lt;/p&gt;
+\[
+\text{算}
+\quad/\quad
+\text{不算}.
+\]&lt;p&gt;MLMC 则把它改写为：&lt;/p&gt;
+\[
+\text{算到什么精度？}
+\]&lt;p&gt;对于容易判断的样本：&lt;/p&gt;
+\[
+\text{粗模型}
+\]&lt;p&gt;可能已经足够。&lt;/p&gt;
+&lt;p&gt;只有少数对最终统计量敏感的修正，需要：&lt;/p&gt;
+\[
+\text{高精度模型}.
+\]&lt;p&gt;这一思想还可以迁移到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;自适应 FEM；&lt;/li&gt;
+&lt;li&gt;surrogate-assisted reliability；&lt;/li&gt;
+&lt;li&gt;differentiable simulation；&lt;/li&gt;
+&lt;li&gt;游戏物理 LOD；&lt;/li&gt;
+&lt;li&gt;AI inference / model routing。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;本质上都是：&lt;/p&gt;
+\[
+\boxed{
+\text{不要给每个输入相同的计算预算。}
+}
+\]&lt;hr&gt;
+&lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h2&gt;&lt;p&gt;如果说 MFMC 的核心是：&lt;/p&gt;
+\[
+\boxed{
+\text{“便宜模型虽然不准，但能告诉我昂贵模型的涨跌。”}
+}
+\]&lt;p&gt;那么 MLMC 的核心就是：&lt;/p&gt;
+\[
+\boxed{
+\text{“粗模型负责大部分统计，高精度模型只负责修正粗模型不知道的那一点。”}
+}
+\]&lt;p&gt;所以它真正改变的不是 Monte Carlo 本身，而是：&lt;/p&gt;
+\[
+\boxed{\text{计算精度与采样数量之间的资源配置方式。}}
+\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Michael B. Giles, &lt;em&gt;Multilevel Monte Carlo Path Simulation&lt;/em&gt;, Operations Research, 2008&lt;/strong&gt;。经典原始论文，理解 telescoping estimator、level variance 和计算复杂度的最佳起点。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Michael B. Giles, &lt;em&gt;Multilevel Monte Carlo Methods&lt;/em&gt;, Acta Numerica, 2015&lt;/strong&gt;。约 70 页的系统综述，作者主页同时提供论文和测试代码，是建立 MLMC 完整知识体系最好的资料之一。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Cliffe et al., &lt;em&gt;Multilevel Monte Carlo Methods and Applications to Elliptic PDEs with Random Coefficients&lt;/em&gt;&lt;/strong&gt;。如果重点是 FEM、随机材料场和 PDE，这篇更贴近工程不确定性量化。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Blondeel et al., &lt;em&gt;Multilevel Monte Carlo for uncertainty quantification in structural engineering&lt;/em&gt;&lt;/strong&gt;。包含静力、动力和弹塑性结构有限元案例，适合观察 MLMC 在结构工程中到底怎样落地。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Antonietti et al., &lt;em&gt;A Multilevel Monte Carlo Virtual Element Method for UQ of Elliptic PDEs&lt;/em&gt;, 2026&lt;/strong&gt;。如果想追近期发展，这篇展示了复杂网格层级构造与 MLMC 的结合。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        <item>
+        <title>Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信”</title>
+        <link>https://assranai.github.io/cards/08-certified-reduced-basis/</link>
+        <pubDate>Fri, 21 Aug 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/08-certified-reduced-basis/</guid>
+        <description>&lt;h1 id=&#34;certified-reduced-basis代理模型最缺的往往不是更高精度而是知道自己什么时候不可信&#34;&gt;Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信”
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Certified Reduced Basis Method（带认证的降阶基方法）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 模型降阶 × 代理模型 × 不确定性量化&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天这个主题和 Kriging 很接近，但它代表了另一种完全不同的代理思想：&lt;/p&gt;
+\[
+\boxed{
+\text{Kriging：从输入输出数据学习 }f(\mu)
+}
+\]&lt;p&gt;而 Reduced Basis（RB）更像：&lt;/p&gt;
+\[
+\boxed{
+\text{从高维 PDE/FEM 解空间中学习一个低维物理解空间}
+}
+\]&lt;p&gt;更关键的是，经典 &lt;strong&gt;Certified RB&lt;/strong&gt; 不满足于给出一个近似解：&lt;/p&gt;
+\[
+u_N(\mu),
+\]&lt;p&gt;它还试图在线给出一个可计算的误差上界：&lt;/p&gt;
+\[
+\boxed{
+\|u_h(\mu)-u_N(\mu)\|
+\le
+\Delta_N(\mu)
+}
+\]&lt;p&gt;这里的 \(\Delta_N\) 就是所谓 &lt;strong&gt;a posteriori error estimator/bound&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;这件事非常值得理解，因为它代表一种和机器学习代理模型明显不同的理念：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;代理模型不仅输出预测，还输出一个由原始物理方程推导出的“这次预测是否可信”的证据。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Reduced Basis 方法长期被用于参数化 PDE 的 many-query 和 real-time 场景；经典体系把 reduced approximation、offline-online decomposition 和 rigorous/efficient a posteriori error bounds 放在一起。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-它到底在解决什么问题&#34;&gt;1. 它到底在解决什么问题？
+&lt;/h2&gt;&lt;p&gt;假设有限元离散以后得到：&lt;/p&gt;
+\[
+A(\mu)u_h(\mu)=f(\mu),
+\]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(u_h\in\mathbb R^{N_h}\)；&lt;/li&gt;
+&lt;li&gt;\(N_h\) 可能是 \(10^5\sim10^7\)；&lt;/li&gt;
+&lt;li&gt;\(\mu\) 是参数，例如材料参数、载荷、几何尺寸。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果只计算一个工况，高精度 FEM 完全没问题。&lt;/p&gt;
+&lt;p&gt;真正困难的是：&lt;/p&gt;
+\[
+\mu_1,\mu_2,\ldots,\mu_{100000}
+\]&lt;p&gt;这种 repeated-query 场景，例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Monte Carlo；&lt;/li&gt;
+&lt;li&gt;可靠性；&lt;/li&gt;
+&lt;li&gt;参数扫描；&lt;/li&gt;
+&lt;li&gt;优化；&lt;/li&gt;
+&lt;li&gt;实时数字孪生。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;每次都求：&lt;/p&gt;
+\[
+A(\mu)u=f
+\]&lt;p&gt;成本就太高。&lt;/p&gt;
+&lt;p&gt;RB 的第一步是观察：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;虽然 FEM 解有几十万个自由度，但随着几个参数变化，真正出现的所有解可能只占据高维空间中的一个很薄的低维流形。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;也就是说：&lt;/p&gt;
+&lt;h1 id=&#34;mathcal-m&#34;&gt;[
+\mathcal M
+&lt;/h1&gt;&lt;p&gt;{u_h(\mu):\mu\in\mathcal P}
+]&lt;/p&gt;
+&lt;p&gt;可能实际上具有很低的“有效维数”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-reduced-basis-到底降了什么&#34;&gt;2. Reduced Basis 到底降了什么？
+&lt;/h1&gt;&lt;p&gt;选择若干具有代表性的高保真解：&lt;/p&gt;
+\[
+u_h(\mu_1),\dots,u_h(\mu_N),
+\]&lt;p&gt;构造：&lt;/p&gt;
+&lt;h1 id=&#34;v_n&#34;&gt;[
+V_N
+&lt;/h1&gt;&lt;p&gt;\operatorname{span}
+{
+\zeta_1,\dots,\zeta_N
+}.
+]&lt;/p&gt;
+&lt;p&gt;其中通常：&lt;/p&gt;
+\[
+N\ll N_h.
+\]&lt;p&gt;例如：&lt;/p&gt;
+\[
+N_h=10^6,
+\]&lt;p&gt;而：&lt;/p&gt;
+\[
+N=30.
+\]&lt;p&gt;然后认为任意新参数下的解都可以近似为：&lt;/p&gt;
+&lt;h1 id=&#34;u_nmu&#34;&gt;[
+u_N(\mu)
+&lt;/h1&gt;&lt;p&gt;\sum_{i=1}^N a_i(\mu)\zeta_i.
+]&lt;/p&gt;
+&lt;p&gt;矩阵形式：&lt;/p&gt;
+\[
+u_N=Va.
+\]&lt;p&gt;把它代回有限元弱形式，通过 Galerkin projection：&lt;/p&gt;
+&lt;h1 id=&#34;vtamuv-a&#34;&gt;[
+V^TA(\mu)V a
+&lt;/h1&gt;&lt;p&gt;V^Tf.
+]&lt;/p&gt;
+&lt;p&gt;于是原来的：&lt;/p&gt;
+\[
+10^6\times10^6
+\]&lt;p&gt;问题变成：&lt;/p&gt;
+\[
+\boxed{
+30\times30
+}
+\]&lt;p&gt;的问题。&lt;/p&gt;
+&lt;p&gt;这也是 RB 与普通响应面最根本的区别之一：&lt;/p&gt;
+\[
+\text{Kriging通常学习输出}
+\]&lt;p&gt;而 RB 直接压缩：&lt;/p&gt;
+\[
+\boxed{\text{PDE/FEM state space}}
+\]&lt;p&gt;因此一旦得到：&lt;/p&gt;
+\[
+u_N(x;\mu),
+\]&lt;p&gt;很多物理量都可以继续从它计算。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-但这其实还不够&#34;&gt;3. 但这其实还不够
+&lt;/h1&gt;&lt;p&gt;问题马上出现：&lt;/p&gt;
+&lt;p&gt;假设：&lt;/p&gt;
+\[
+N=20
+\]&lt;p&gt;得到一个极快的 ROM。&lt;/p&gt;
+&lt;p&gt;对于某个新参数：&lt;/p&gt;
+\[
+\mu^*,
+\]&lt;p&gt;它告诉你：&lt;/p&gt;
+\[
+\sigma_{\max}=317\text{ MPa}.
+\]&lt;p&gt;那么真正关键的问题是：&lt;/p&gt;
+\[
+\boxed{
+317\text{ MPa 到底靠不靠谱？}
+}
+\]&lt;p&gt;普通 surrogate 往往依赖：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;test-set RMSE；&lt;/li&gt;
+&lt;li&gt;cross validation；&lt;/li&gt;
+&lt;li&gt;\(R^2\)；&lt;/li&gt;
+&lt;li&gt;GP predictive variance。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些指标告诉你模型的&lt;strong&gt;总体经验表现&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;但对于某个具体：&lt;/p&gt;
+\[
+\mu^*,
+\]&lt;p&gt;你通常不能因此严格推出：&lt;/p&gt;
+\[
+|f_{\rm HF}(\mu^*)-f_{\rm ROM}(\mu^*)|&lt;\epsilon.
+\]&lt;p&gt;Certified RB 的目标就是补上这一层。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-核心工具residual&#34;&gt;4. 核心工具：Residual
+&lt;/h1&gt;&lt;p&gt;已知 reduced solution：&lt;/p&gt;
+\[
+u_N(\mu),
+\]&lt;p&gt;把它重新代回原方程：&lt;/p&gt;
+&lt;h1 id=&#34;rvmu&#34;&gt;[
+r(v;\mu)
+&lt;/h1&gt;&lt;h2 id=&#34;fvmu&#34;&gt;f(v;\mu)
+&lt;/h2&gt;&lt;p&gt;a(u_N,v;\mu).
+]&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[
+r=0,
+\]&lt;p&gt;说明：&lt;/p&gt;
+\[
+u_N
+\]&lt;p&gt;已经满足完整有限元方程。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[
+r
+\]&lt;p&gt;很大，那么显然 reduced solution 有问题。&lt;/p&gt;
+&lt;p&gt;所以 residual 是一个非常自然的错误信号。&lt;/p&gt;
+&lt;p&gt;但是：&lt;/p&gt;
+\[
+\boxed{
+\text{residual 小}
+\not\Rightarrow
+\text{solution error 一定小}
+}
+\]&lt;p&gt;还差一个条件。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么还需要-coercivity&#34;&gt;5. 为什么还需要 coercivity？
+&lt;/h1&gt;&lt;p&gt;考虑线性 coercive PDE：&lt;/p&gt;
+\[
+a(u,v;\mu)=f(v).
+\]&lt;p&gt;定义 coercivity constant：&lt;/p&gt;
+&lt;h1 id=&#34;alphamu&#34;&gt;[
+\alpha(\mu)
+&lt;/h1&gt;&lt;p&gt;\inf_{v\ne0}
+\frac{a(v,v;\mu)}
+{|v|^2}.
+]&lt;/p&gt;
+&lt;p&gt;它可以粗略理解成：&lt;/p&gt;
+\[
+\boxed{\text{系统抵抗扰动的“最弱刚度”}}
+\]&lt;p&gt;如果：&lt;/p&gt;
+\[
+\alpha
+\]&lt;p&gt;很大，那么小 residual 通常意味着小 error。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[
+\alpha\rightarrow0,
+\]&lt;p&gt;系统本身接近病态：&lt;/p&gt;
+\[
+\text{很小 residual}
+\]&lt;p&gt;也可能对应：&lt;/p&gt;
+\[
+\text{很大 solution error}.
+\]&lt;p&gt;于是经典 RB 可以推出类似：&lt;/p&gt;
+\[
+\boxed{
+\|u_h-u_N\|
+\le
+\frac{\|r\|_{V&#39;}}{\alpha_{\rm LB}(\mu)}
+}
+\]&lt;p&gt;其中：&lt;/p&gt;
+\[
+\alpha_{\rm LB}(\mu)
+\le
+\alpha(\mu)
+\]&lt;p&gt;是 coercivity constant 的可计算下界。&lt;/p&gt;
+&lt;p&gt;因此误差估计器：&lt;/p&gt;
+&lt;h1 id=&#34;delta_nmu&#34;&gt;[
+\boxed{
+\Delta_N(\mu)
+&lt;/h1&gt;&lt;p&gt;\frac{|r(\cdot;\mu)|&lt;em&gt;{V&amp;rsquo;}}
+{\alpha&lt;/em&gt;{\rm LB}(\mu)}
+}
+]&lt;/p&gt;
+&lt;p&gt;这就是 Certified RB 最核心的数学结构。现代 pyMOR 的 coercive reduced-basis 实现同样要求 coercivity lower bound，并利用 residual/Riesz representative 构造 reduction error estimator。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-这里有一个非常深的解释&#34;&gt;6. 这里有一个非常深的解释
+&lt;/h1&gt;&lt;p&gt;这个公式：&lt;/p&gt;
+&lt;h1 id=&#34;delta&#34;&gt;[
+\Delta
+&lt;/h1&gt;&lt;p&gt;\frac{|r|}
+{\alpha}
+]&lt;/p&gt;
+&lt;p&gt;实际上把两个完全不同的问题分开了：&lt;/p&gt;
+&lt;h3 id=&#34;模型有没有满足方程&#34;&gt;模型有没有满足方程？
+&lt;/h3&gt;&lt;p&gt;由：&lt;/p&gt;
+\[
+\|r\|
+\]&lt;p&gt;衡量。&lt;/p&gt;
+&lt;h3 id=&#34;这个物理问题本身对误差有多敏感&#34;&gt;这个物理问题本身对误差有多敏感？
+&lt;/h3&gt;&lt;p&gt;由：&lt;/p&gt;
+\[
+\alpha
+\]&lt;p&gt;衡量。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[
+\boxed{
+\text{error}
+\approx
+\text{equation violation}
+\times
+\text{problem conditioning}
+}
+\]&lt;p&gt;这是一种非常普遍的数值分析思想。&lt;/p&gt;
+&lt;p&gt;类似结构还会出现在：&lt;/p&gt;
+\[
+\|x-x^*\|
+\lesssim
+\|A^{-1}\|
+\|Ax-b\|.
+\]&lt;p&gt;因此 residual-based certification 其实与条件数、稳定性理论是同一套语言。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么这个-error-estimator-会反过来指导学什么&#34;&gt;7. 为什么这个 error estimator 会反过来指导“学什么”？
+&lt;/h1&gt;&lt;p&gt;这是 RB 特别漂亮的地方。&lt;/p&gt;
+&lt;p&gt;假设参数空间中有：&lt;/p&gt;
+\[
+10^6
+\]&lt;p&gt;个 candidate：&lt;/p&gt;
+\[
+\mu.
+\]&lt;p&gt;显然不能全部做高保真 FEM。&lt;/p&gt;
+&lt;p&gt;但对于每一个 candidate，可以便宜地计算：&lt;/p&gt;
+\[
+\Delta_N(\mu).
+\]&lt;p&gt;然后找到：&lt;/p&gt;
+&lt;h1 id=&#34;mu&#34;&gt;[
+\boxed{
+\mu^*
+&lt;/h1&gt;&lt;p&gt;\arg\max_{\mu}
+\Delta_N(\mu)
+}
+]&lt;/p&gt;
+&lt;p&gt;意思是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;当前 reduced basis 最不可信的参数在哪里？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;接下来只对：&lt;/p&gt;
+\[
+\mu^*
+\]&lt;p&gt;跑一次高保真 FEM：&lt;/p&gt;
+\[
+u_h(\mu^*),
+\]&lt;p&gt;把它加入基：&lt;/p&gt;
+&lt;h1 id=&#34;v_n1&#34;&gt;[
+V_{N+1}
+&lt;/h1&gt;&lt;p&gt;V_N+\operatorname{span}{u_h(\mu^*)}.
+]&lt;/p&gt;
+&lt;p&gt;重复。&lt;/p&gt;
+&lt;p&gt;这就是经典：&lt;/p&gt;
+\[
+\boxed{\text{Greedy Reduced Basis}}
+\]&lt;p&gt;结构。pyMOR 当前的 &lt;code&gt;rb_greedy&lt;/code&gt; 就是按这种逻辑工作：用 reduction error estimator 在 training set 上寻找当前最差参数，只有被选中的参数才真正调用 full-order model。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-你会发现它和-ak-mcs-很像但学习目标不同&#34;&gt;8. 你会发现它和 AK-MCS 很像，但学习目标不同
+&lt;/h1&gt;&lt;p&gt;AK-MCS：&lt;/p&gt;
+&lt;h1 id=&#34;mu-1&#34;&gt;[
+\mu^*
+&lt;/h1&gt;&lt;p&gt;\arg\min U(\mu)
+]&lt;/p&gt;
+&lt;p&gt;寻找：&lt;/p&gt;
+\[
+\boxed{
+\text{最可能误判失效边界的地方}
+}
+\]&lt;p&gt;RB Greedy：&lt;/p&gt;
+&lt;h1 id=&#34;mu-2&#34;&gt;[
+\mu^*
+&lt;/h1&gt;&lt;p&gt;\arg\max\Delta_N(\mu)
+]&lt;/p&gt;
+&lt;p&gt;寻找：&lt;/p&gt;
+\[
+\boxed{
+\text{当前 PDE 解近似最差的地方}
+}
+\]&lt;p&gt;因此二者背后其实是同一种主动学习哲学：&lt;/p&gt;
+\[
+\boxed{
+\text{高保真计算应该投给当前模型最缺信息的位置}
+}
+\]&lt;p&gt;但它们依赖的信息来源不同：&lt;/p&gt;
+&lt;p&gt;AK-MCS：&lt;/p&gt;
+\[
+\text{Gaussian-process statistical uncertainty}.
+\]&lt;p&gt;Certified RB：&lt;/p&gt;
+\[
+\boxed{\text{PDE residual + stability theory}}
+\]&lt;p&gt;这一区别非常值得记住。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-certified为什么比普通-rom-更重要&#34;&gt;9. “Certified”为什么比普通 ROM 更重要？
+&lt;/h1&gt;&lt;p&gt;假设你把模型用于游戏视觉效果。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[
+3\%\text{ error}
+\]&lt;p&gt;一般没有问题。&lt;/p&gt;
+&lt;p&gt;但如果用于：&lt;/p&gt;
+\[
+\text{reliability}
+\]&lt;p&gt;问题会完全不同。&lt;/p&gt;
+&lt;p&gt;设失效条件：&lt;/p&gt;
+&lt;h1 id=&#34;gmu&#34;&gt;[
+g(\mu)
+&lt;/h1&gt;&lt;h2 id=&#34;sigma_rm-allow&#34;&gt;\sigma_{\rm allow}
+&lt;/h2&gt;&lt;p&gt;\sigma(\mu).
+]&lt;/p&gt;
+&lt;p&gt;Reduced model 得到：&lt;/p&gt;
+\[
+g_N(\mu)=5\text{ MPa}.
+\]&lt;p&gt;如果输出误差可能达到：&lt;/p&gt;
+\[
+\pm20\text{ MPa},
+\]&lt;p&gt;那么它实际上完全无法确定：&lt;/p&gt;
+\[
+\text{safe/failure}.
+\]&lt;p&gt;但如果你有：&lt;/p&gt;
+\[
+|g-g_N|
+\le2\text{ MPa},
+\]&lt;p&gt;由于：&lt;/p&gt;
+\[
+g_N=5,
+\]&lt;p&gt;立即得到：&lt;/p&gt;
+\[
+g\ge3&gt;0.
+\]&lt;p&gt;这个样本就可以&lt;strong&gt;无需 HF 计算直接认证为安全&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;反过来：&lt;/p&gt;
+\[
+g_N=-7,
+\quad
+\Delta_g=2
+\]&lt;p&gt;则：&lt;/p&gt;
+\[
+g&lt;-5&lt;0,
+\]&lt;p&gt;可以认证为失效。&lt;/p&gt;
+&lt;p&gt;只有：&lt;/p&gt;
+\[
+|g_N|\le\Delta_g
+\]&lt;p&gt;的时候：&lt;/p&gt;
+\[
+\boxed{\text{classification uncertain}}
+\]&lt;p&gt;才需要升级到高保真模型。&lt;/p&gt;
+&lt;p&gt;你可以看到这已经开始自然连接：&lt;/p&gt;
+\[
+\boxed{
+\text{Certified ROM}
++
+\text{reliability sampling}
+}
+\]&lt;hr&gt;
+&lt;h1 id=&#34;10-它与-kriging-的-uncertainty-有什么本质区别&#34;&gt;10. 它与 Kriging 的 uncertainty 有什么本质区别？
+&lt;/h1&gt;&lt;p&gt;这是今天最值得分清楚的一点。&lt;/p&gt;
+&lt;p&gt;Gaussian Process 给：&lt;/p&gt;
+\[
+\mu(x),\sigma(x).
+\]&lt;p&gt;其：&lt;/p&gt;
+\[
+\sigma(x)
+\]&lt;p&gt;来自：&lt;/p&gt;
+\[
+\boxed{\text{统计模型假设}}
+\]&lt;p&gt;包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;kernel；&lt;/li&gt;
+&lt;li&gt;GP prior；&lt;/li&gt;
+&lt;li&gt;observation assumptions；&lt;/li&gt;
+&lt;li&gt;hyperparameters。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果这些假设失配：&lt;/p&gt;
+\[
+\sigma
+\]&lt;p&gt;不一定等于实际预测误差。&lt;/p&gt;
+&lt;p&gt;Certified RB 的：&lt;/p&gt;
+\[
+\Delta_N
+\]&lt;p&gt;则来自：&lt;/p&gt;
+\[
+\boxed{\text{原始控制方程}}
+\]&lt;p&gt;在适用的数学条件下，它可以是真正的：&lt;/p&gt;
+\[
+\text{upper bound}.
+\]&lt;p&gt;因此二者对应两种完全不同的不确定性：&lt;/p&gt;
+\[
+\boxed{
+\text{GP uncertainty：epistemic/statistical}
+}
+\]\[
+\boxed{
+\text{RB certification：numerical/model-reduction error}
+}
+\]&lt;p&gt;不能简单把两者当成同一种“置信度”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-offlineonline-decomposition-才决定它是否真的快&#34;&gt;11. Offline–Online decomposition 才决定它是否真的快
+&lt;/h1&gt;&lt;p&gt;这里还有一个重要工程条件。&lt;/p&gt;
+&lt;p&gt;如果每次计算：&lt;/p&gt;
+\[
+r(\mu)
+\]&lt;p&gt;仍然需要组装一个：&lt;/p&gt;
+\[
+10^6
+\]&lt;p&gt;维 FEM 系统，那么：&lt;/p&gt;
+\[
+N=30
+\]&lt;p&gt;也没有真正解决问题。&lt;/p&gt;
+&lt;p&gt;因此 RB 通常要求参数依赖近似具有 affine decomposition：&lt;/p&gt;
+&lt;h1 id=&#34;amu&#34;&gt;[
+A(\mu)
+&lt;/h1&gt;&lt;p&gt;\sum_{q=1}^{Q}
+\theta_q(\mu)A_q.
+]&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+&lt;h3 id=&#34;offline&#34;&gt;Offline
+&lt;/h3&gt;&lt;p&gt;提前计算：&lt;/p&gt;
+\[
+V^TA_qV.
+\]&lt;h3 id=&#34;online&#34;&gt;Online
+&lt;/h3&gt;&lt;p&gt;只组装：&lt;/p&gt;
+&lt;h1 id=&#34;a_nmu&#34;&gt;[
+A_N(\mu)
+&lt;/h1&gt;&lt;p&gt;\sum_q
+\theta_q(\mu)
+V^TA_qV.
+]&lt;/p&gt;
+&lt;p&gt;此时在线复杂度主要与：&lt;/p&gt;
+\[
+N,Q
+\]&lt;p&gt;有关，而不再依赖：&lt;/p&gt;
+\[
+N_h.
+\]&lt;p&gt;这就是经典 RB 所谓：&lt;/p&gt;
+\[
+\boxed{\text{offline-online decomposition}}
+\]&lt;p&gt;也是它真正适用于 many-query / real-time applications 的条件之一。&lt;/p&gt;
+&lt;p&gt;对于非仿射和强非线性问题，则往往还需要 empirical interpolation、DEIM 等 hyper-reduction 手段；RBniCS 和 pyMOR 等工程库都实现了相关方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-一个非常现实的局限认证并不是免费的&#34;&gt;12. 一个非常现实的局限：认证并不是免费的
+&lt;/h1&gt;&lt;p&gt;Certified RB 看起来很理想，但困难集中在几个地方。&lt;/p&gt;
+&lt;p&gt;第一，复杂非线性：&lt;/p&gt;
+\[
+R(u;\mu)=0
+\]&lt;p&gt;时，误差界通常比线性 coercive PDE 难很多。已有工作把 a posteriori analysis 扩展到 nonlinear variational problems，但条件和实现复杂度都会明显提高。&lt;/p&gt;
+&lt;p&gt;第二，稳定性常数：&lt;/p&gt;
+\[
+\alpha_{\rm LB}(\mu)
+\]&lt;p&gt;本身可能不好算。&lt;/p&gt;
+&lt;p&gt;如果下界过于保守：&lt;/p&gt;
+\[
+\alpha_{\rm LB}\ll\alpha,
+\]&lt;p&gt;那么：&lt;/p&gt;
+\[
+\Delta_N
+\]&lt;p&gt;会很松：&lt;/p&gt;
+\[
+\text{真实误差}=10^{-4},
+\qquad
+\Delta=10^{-1}.
+\]&lt;p&gt;虽然“正确”，但没什么实际用途。&lt;/p&gt;
+&lt;p&gt;第三，如果解流形本身高维，例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;激波；&lt;/li&gt;
+&lt;li&gt;移动接触；&lt;/li&gt;
+&lt;li&gt;拓扑突变；&lt;/li&gt;
+&lt;li&gt;强局部化；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[
+N
+\]&lt;p&gt;可能需要增长得很快。&lt;/p&gt;
+&lt;p&gt;这也是 reduced basis 不一定适合所有非线性动力学的原因。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对代理模型研究最值得迁移的一个思想&#34;&gt;13. 对代理模型研究最值得迁移的一个思想
+&lt;/h1&gt;&lt;p&gt;很多 surrogate workflow 是：&lt;/p&gt;
+\[
+\text{train}
+\rightarrow
+\text{test}
+\rightarrow
+R^2=0.98
+\rightarrow
+\text{deploy}.
+\]&lt;p&gt;但真正工程化以后，我们更希望系统具有：&lt;/p&gt;
+\[
+\boxed{
+\text{prediction}
++
+\text{local trust metric}
++
+\text{fallback mechanism}
+}
+\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[
+\hat y(x)
+\]&lt;p&gt;之外，还应该有：&lt;/p&gt;
+\[
+c(x)
+\]&lt;p&gt;判断：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;这一个输入到底能不能信？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;于是工作流可以变成：&lt;/p&gt;
+\[
+\Delta(x)&lt;\epsilon
+\Rightarrow
+\text{接受 surrogate},
+\]\[
+\Delta(x)\ge\epsilon
+\Rightarrow
+\text{调用 HF}.
+\]&lt;p&gt;这就从一个“静态代理模型”变成：&lt;/p&gt;
+\[
+\boxed{\text{adaptive fidelity system}}
+\]&lt;p&gt;这个思想其实可以迁移到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Kriging；&lt;/li&gt;
+&lt;li&gt;神经网络 surrogate；&lt;/li&gt;
+&lt;li&gt;FEM ROM；&lt;/li&gt;
+&lt;li&gt;游戏物理 LOD；&lt;/li&gt;
+&lt;li&gt;AI model routing。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-对实时物理引擎也有一个很有意思的启发&#34;&gt;14. 对实时物理引擎也有一个很有意思的启发
+&lt;/h1&gt;&lt;p&gt;假设游戏里同时拥有：&lt;/p&gt;
+\[
+\text{cheap solver}
+\]&lt;p&gt;和：&lt;/p&gt;
+\[
+\text{expensive solver}.
+\]&lt;p&gt;最简单的 LOD 是看距离：&lt;/p&gt;
+\[
+d_{\rm camera}&gt;50m
+\Rightarrow
+\text{cheap}.
+\]&lt;p&gt;但 numerical-analysis 风格的设计会变成：&lt;/p&gt;
+\[
+\boxed{
+\text{如果 cheap solver 的在线误差指标足够小，就继续 cheap；
+否则自动升级 fidelity。}
+}
+\]&lt;p&gt;也就是说，LOD 不由：&lt;/p&gt;
+\[
+\text{距离}
+\]&lt;p&gt;决定，而由：&lt;/p&gt;
+\[
+\boxed{\text{estimated physics error}}
+\]&lt;p&gt;决定。&lt;/p&gt;
+&lt;p&gt;这其实是 Certified RB 背后的工程思想最值得迁移的地方。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h2&gt;&lt;p&gt;Reduced Basis 最有价值的部分，并不是：&lt;/p&gt;
+\[
+10^6\text{ DOF}
+\rightarrow
+30\text{ DOF}.
+\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[
+\boxed{
+\text{快速模型 + 在线误差认证}
+}
+\]&lt;p&gt;形成了一个闭环：&lt;/p&gt;
+\[
+\text{快速预测}
+\rightarrow
+\text{检查可信度}
+\rightarrow
+\text{必要时调用 HF}
+\rightarrow
+\text{扩充模型}.
+\]&lt;p&gt;因此它提出了一个比“代理模型精度多高”更成熟的问题：&lt;/p&gt;
+\[
+\boxed{
+\text{代理模型能否知道自己什么时候不应该被相信？}
+}
+\]&lt;p&gt;对可靠性分析而言，这尤其重要，因为真正危险的往往不是平均意义上的：&lt;/p&gt;
+\[
+R^2=0.95,
+\]&lt;p&gt;而是某一个极限状态附近的样本：&lt;/p&gt;
+\[
+\boxed{\text{代理模型错了，却不知道自己错了。}}
+\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Quarteroni, Manzoni &amp;amp; Negri, &lt;em&gt;Reduced Basis Methods for Partial Differential Equations: An Introduction&lt;/em&gt;&lt;/strong&gt;，以及 Hesthaven, Rozza &amp;amp; Stamm 的 &lt;strong&gt;&lt;em&gt;Certified Reduced Basis Methods for Parametrized Partial Differential Equations&lt;/em&gt;&lt;/strong&gt;。两本都是建立完整 RB / certification 体系的标准入口。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Quarteroni et al., &lt;em&gt;Certified reduced basis approximation for parametrized partial differential equations and applications&lt;/em&gt;&lt;/strong&gt;。这篇综述集中讨论 reduced approximation、a posteriori bounds 与快速可靠工程输出。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Grepl &amp;amp; Patera, &lt;em&gt;A Posteriori Error Bounds for Reduced-Basis Approximations of Parametrized Parabolic Partial Differential Equations&lt;/em&gt;&lt;/strong&gt;。如果想把概念扩展到动力学/时变 PDE，这是一篇经典工作。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;pyMOR&lt;/strong&gt; 的 Reduced Basis 文档非常适合直接看工程实现。目前文档展示了 &lt;code&gt;CoerciveRBReductor&lt;/code&gt;、coercivity estimator 和 error-estimator-driven greedy basis generation，可以从一个真实 Python 框架理解 offline/online 流程。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果想连接 UQ/可靠性，可以继续看 &lt;strong&gt;Reduced Basis Methods for Uncertainty Quantification&lt;/strong&gt;，它专门讨论如何让 RB 服务随机参数 PDE 的反复求解。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>
