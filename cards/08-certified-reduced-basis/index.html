@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信” 主题：Certified Reduced Basis Method（带认证的降阶基方法）\n领域：有限元 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天这个主题和 Kriging 很接近，但它代表了另一种完全不同的代理思想：\n\\[ \\boxed{ \\text{Kriging：从输入输出数据学习 }f(\\mu) } \\]而 Reduced Basis（RB）更像：\n\\[ \\boxed{ \\text{从高维 PDE/FEM 解空间中学习一个低维物理解空间} } \\]更关键的是，经典 Certified RB 不满足于给出一个近似解：\n\\[ u_N(\\mu), \\]它还试图在线给出一个可计算的误差上界：\n\\[ \\boxed{ \\|u_h(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) } \\]这里的 \\(\\Delta_N\\) 就是所谓 a posteriori error estimator/bound。\n这件事非常值得理解，因为它代表一种和机器学习代理模型明显不同的理念：\n代理模型不仅输出预测，还输出一个由原始物理方程推导出的“这次预测是否可信”的证据。\nReduced Basis 方法长期被用于参数化 PDE 的 many-query 和 real-time 场景；经典体系把 reduced approximation、offline-online decomposition 和 rigorous/efficient a posteriori error bounds 放在一起。\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信” 主题：Certified Reduced Basis Method（带认证的降阶基方法）\n领域：有限元 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天这个主题和 Kriging 很接近，但它代表了另一种完全不同的代理思想：\n\\[\\boxed{ \\text{Kriging：从输入输出数据学习 }f(\\mu) }\\]而 Reduced Basis（RB）更像：\n\\[\\boxed{ \\text{从高维 PDE/FEM 解空间中学习一个低维物理解空间} }\\]更关键的是，经典 Certified RB 不满足于给出一个近似解：\n\\[u_N(\\mu),\\]它还试图在线给出一个可计算的误差上界：\n\\[\\boxed{ \\|u_h(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) }\\]这里的 \\(\\Delta_N\\) 就是所谓 a posteriori error estimator/bound。\n这件事非常值得理解，因为它代表一种和机器学习代理模型明显不同的理念：\n代理模型不仅输出预测，还输出一个由原始物理方程推导出的“这次预测是否可信”的证据。\nReduced Basis 方法长期被用于参数化 PDE 的 many-query 和 real-time 场景；经典体系把 reduced approximation、offline-online decomposition 和 rigorous/efficient a posteriori error bounds 放在一起。\n1. 它到底在解决什么问题？ 假设有限元离散以后得到：\n\\[A(\\mu)u_h(\\mu)=f(\\mu),\\]其中：\n\\(u_h\\in\\mathbb R^{N_h}\\)； \\(N_h\\) 可能是 \\(10^5\\sim10^7\\)； \\(\\mu\\) 是参数，例如材料参数、载荷、几何尺寸。 如果只计算一个工况，高精度 FEM 完全没问题。\n">
 <title>Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/08-certified-reduced-basis/'>
 
 <link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信”">
-<meta property='og:description' content="Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信” 主题：Certified Reduced Basis Method（带认证的降阶基方法）\n领域：有限元 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天这个主题和 Kriging 很接近，但它代表了另一种完全不同的代理思想：\n\\[ \\boxed{ \\text{Kriging：从输入输出数据学习 }f(\\mu) } \\]而 Reduced Basis（RB）更像：\n\\[ \\boxed{ \\text{从高维 PDE/FEM 解空间中学习一个低维物理解空间} } \\]更关键的是，经典 Certified RB 不满足于给出一个近似解：\n\\[ u_N(\\mu), \\]它还试图在线给出一个可计算的误差上界：\n\\[ \\boxed{ \\|u_h(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) } \\]这里的 \\(\\Delta_N\\) 就是所谓 a posteriori error estimator/bound。\n这件事非常值得理解，因为它代表一种和机器学习代理模型明显不同的理念：\n代理模型不仅输出预测，还输出一个由原始物理方程推导出的“这次预测是否可信”的证据。\nReduced Basis 方法长期被用于参数化 PDE 的 many-query 和 real-time 场景；经典体系把 reduced approximation、offline-online decomposition 和 rigorous/efficient a posteriori error bounds 放在一起。\n">
+<meta property='og:description' content="Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信” 主题：Certified Reduced Basis Method（带认证的降阶基方法）\n领域：有限元 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天这个主题和 Kriging 很接近，但它代表了另一种完全不同的代理思想：\n\\[\\boxed{ \\text{Kriging：从输入输出数据学习 }f(\\mu) }\\]而 Reduced Basis（RB）更像：\n\\[\\boxed{ \\text{从高维 PDE/FEM 解空间中学习一个低维物理解空间} }\\]更关键的是，经典 Certified RB 不满足于给出一个近似解：\n\\[u_N(\\mu),\\]它还试图在线给出一个可计算的误差上界：\n\\[\\boxed{ \\|u_h(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) }\\]这里的 \\(\\Delta_N\\) 就是所谓 a posteriori error estimator/bound。\n这件事非常值得理解，因为它代表一种和机器学习代理模型明显不同的理念：\n代理模型不仅输出预测，还输出一个由原始物理方程推导出的“这次预测是否可信”的证据。\nReduced Basis 方法长期被用于参数化 PDE 的 many-query 和 real-time 场景；经典体系把 reduced approximation、offline-online decomposition 和 rigorous/efficient a posteriori error bounds 放在一起。\n1. 它到底在解决什么问题？ 假设有限元离散以后得到：\n\\[A(\\mu)u_h(\\mu)=f(\\mu),\\]其中：\n\\(u_h\\in\\mathbb R^{N_h}\\)； \\(N_h\\) 可能是 \\(10^5\\sim10^7\\)； \\(\\mu\\) 是参数，例如材料参数、载荷、几何尺寸。 如果只计算一个工况，高精度 FEM 完全没问题。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/08-certified-reduced-basis/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='不确定性量化' /><meta property='article:tag' content='代理模型' /><meta property='article:published_time' content='2026-08-21T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-21T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信”">
-<meta name="twitter:description" content="Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信” 主题：Certified Reduced Basis Method（带认证的降阶基方法）\n领域：有限元 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天这个主题和 Kriging 很接近，但它代表了另一种完全不同的代理思想：\n\\[ \\boxed{ \\text{Kriging：从输入输出数据学习 }f(\\mu) } \\]而 Reduced Basis（RB）更像：\n\\[ \\boxed{ \\text{从高维 PDE/FEM 解空间中学习一个低维物理解空间} } \\]更关键的是，经典 Certified RB 不满足于给出一个近似解：\n\\[ u_N(\\mu), \\]它还试图在线给出一个可计算的误差上界：\n\\[ \\boxed{ \\|u_h(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) } \\]这里的 \\(\\Delta_N\\) 就是所谓 a posteriori error estimator/bound。\n这件事非常值得理解，因为它代表一种和机器学习代理模型明显不同的理念：\n代理模型不仅输出预测，还输出一个由原始物理方程推导出的“这次预测是否可信”的证据。\nReduced Basis 方法长期被用于参数化 PDE 的 many-query 和 real-time 场景；经典体系把 reduced approximation、offline-online decomposition 和 rigorous/efficient a posteriori error bounds 放在一起。\n">
+<meta name="twitter:description" content="Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信” 主题：Certified Reduced Basis Method（带认证的降阶基方法）\n领域：有限元 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天这个主题和 Kriging 很接近，但它代表了另一种完全不同的代理思想：\n\\[\\boxed{ \\text{Kriging：从输入输出数据学习 }f(\\mu) }\\]而 Reduced Basis（RB）更像：\n\\[\\boxed{ \\text{从高维 PDE/FEM 解空间中学习一个低维物理解空间} }\\]更关键的是，经典 Certified RB 不满足于给出一个近似解：\n\\[u_N(\\mu),\\]它还试图在线给出一个可计算的误差上界：\n\\[\\boxed{ \\|u_h(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) }\\]这里的 \\(\\Delta_N\\) 就是所谓 a posteriori error estimator/bound。\n这件事非常值得理解，因为它代表一种和机器学习代理模型明显不同的理念：\n代理模型不仅输出预测，还输出一个由原始物理方程推导出的“这次预测是否可信”的证据。\nReduced Basis 方法长期被用于参数化 PDE 的 many-query 和 real-time 场景；经典体系把 reduced approximation、offline-online decomposition 和 rigorous/efficient a posteriori error bounds 放在一起。\n1. 它到底在解决什么问题？ 假设有限元离散以后得到：\n\\[A(\\mu)u_h(\\mu)=f(\\mu),\\]其中：\n\\(u_h\\in\\mathbb R^{N_h}\\)； \\(N_h\\) 可能是 \\(10^5\\sim10^7\\)； \\(\\mu\\) 是参数，例如材料参数、载荷、几何尺寸。 如果只计算一个工况，高精度 FEM 完全没问题。\n">
     </head>
     <body class="
     article-page
@@ -328,20 +328,12 @@
   </ol>
 
   <ol>
-    <li><a href="#fvmu">f(v;\mu)</a></li>
-  </ol>
-
-  <ol>
     <li>
       <ol>
         <li><a href="#模型有没有满足方程">模型有没有满足方程？</a></li>
         <li><a href="#这个物理问题本身对误差有多敏感">这个物理问题本身对误差有多敏感？</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li><a href="#sigma_rm-allow">\sigma_{\rm allow}</a></li>
   </ol>
 
   <ol>
@@ -415,7 +407,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 5 分钟
+                    阅读时长: 4 分钟
                 </time>
             </div>
         
@@ -435,26 +427,10 @@
 <strong>领域：有限元 × 不确定性量化 × 代理模型</strong><br>
 <strong>推荐阅读时间：约 8 分钟</strong></p>
 <p>今天这个主题和 Kriging 很接近，但它代表了另一种完全不同的代理思想：</p>
-\[
-\boxed{
-\text{Kriging：从输入输出数据学习 }f(\mu)
-}
-\]<p>而 Reduced Basis（RB）更像：</p>
-\[
-\boxed{
-\text{从高维 PDE/FEM 解空间中学习一个低维物理解空间}
-}
-\]<p>更关键的是，经典 <strong>Certified RB</strong> 不满足于给出一个近似解：</p>
-\[
-u_N(\mu),
-\]<p>它还试图在线给出一个可计算的误差上界：</p>
-\[
-\boxed{
-\|u_h(\mu)-u_N(\mu)\|
-\le
-\Delta_N(\mu)
-}
-\]<p>这里的 \(\Delta_N\) 就是所谓 <strong>a posteriori error estimator/bound</strong>。</p>
+\[\boxed{ \text{Kriging：从输入输出数据学习 }f(\mu) }\]<p>而 Reduced Basis（RB）更像：</p>
+\[\boxed{ \text{从高维 PDE/FEM 解空间中学习一个低维物理解空间} }\]<p>更关键的是，经典 <strong>Certified RB</strong> 不满足于给出一个近似解：</p>
+\[u_N(\mu),\]<p>它还试图在线给出一个可计算的误差上界：</p>
+\[\boxed{ \|u_h(\mu)-u_N(\mu)\| \le \Delta_N(\mu) }\]<p>这里的 \(\Delta_N\) 就是所谓 <strong>a posteriori error estimator/bound</strong>。</p>
 <p>这件事非常值得理解，因为它代表一种和机器学习代理模型明显不同的理念：</p>
 <blockquote>
 <p><strong>代理模型不仅输出预测，还输出一个由原始物理方程推导出的“这次预测是否可信”的证据。</strong></p>
@@ -463,9 +439,7 @@ u_N(\mu),
 <hr>
 <h2 id="1-它到底在解决什么问题">1. 它到底在解决什么问题？
 </h2><p>假设有限元离散以后得到：</p>
-\[
-A(\mu)u_h(\mu)=f(\mu),
-\]<p>其中：</p>
+\[A(\mu)u_h(\mu)=f(\mu),\]<p>其中：</p>
 <ul>
 <li>\(u_h\in\mathbb R^{N_h}\)；</li>
 <li>\(N_h\) 可能是 \(10^5\sim10^7\)；</li>
@@ -473,9 +447,7 @@ A(\mu)u_h(\mu)=f(\mu),
 </ul>
 <p>如果只计算一个工况，高精度 FEM 完全没问题。</p>
 <p>真正困难的是：</p>
-\[
-\mu_1,\mu_2,\ldots,\mu_{100000}
-\]<p>这种 repeated-query 场景，例如：</p>
+\[\mu_1,\mu_2,\ldots,\mu_{100000}\]<p>这种 repeated-query 场景，例如：</p>
 <ul>
 <li>Monte Carlo；</li>
 <li>可靠性；</li>
@@ -484,92 +456,39 @@ A(\mu)u_h(\mu)=f(\mu),
 <li>实时数字孪生。</li>
 </ul>
 <p>每次都求：</p>
-\[
-A(\mu)u=f
-\]<p>成本就太高。</p>
+\[A(\mu)u=f\]<p>成本就太高。</p>
 <p>RB 的第一步是观察：</p>
 <blockquote>
 <p>虽然 FEM 解有几十万个自由度，但随着几个参数变化，真正出现的所有解可能只占据高维空间中的一个很薄的低维流形。</p>
 </blockquote>
 <p>也就是说：</p>
-<h1 id="mathcal-m">[
-\mathcal M
-</h1><p>{u_h(\mu):\mu\in\mathcal P}
-]</p>
-<p>可能实际上具有很低的“有效维数”。</p>
+\[\mathcal M = \{u_h(\mu):\mu\in\mathcal P\}\]<p>可能实际上具有很低的“有效维数”。</p>
 <hr>
 <h1 id="2-reduced-basis-到底降了什么">2. Reduced Basis 到底降了什么？
 </h1><p>选择若干具有代表性的高保真解：</p>
-\[
-u_h(\mu_1),\dots,u_h(\mu_N),
-\]<p>构造：</p>
-<h1 id="v_n">[
-V_N
-</h1><p>\operatorname{span}
-{
-\zeta_1,\dots,\zeta_N
-}.
-]</p>
-<p>其中通常：</p>
-\[
-N\ll N_h.
-\]<p>例如：</p>
-\[
-N_h=10^6,
-\]<p>而：</p>
-\[
-N=30.
-\]<p>然后认为任意新参数下的解都可以近似为：</p>
-<h1 id="u_nmu">[
-u_N(\mu)
-</h1><p>\sum_{i=1}^N a_i(\mu)\zeta_i.
-]</p>
-<p>矩阵形式：</p>
-\[
-u_N=Va.
-\]<p>把它代回有限元弱形式，通过 Galerkin projection：</p>
-<h1 id="vtamuv-a">[
-V^TA(\mu)V a
-</h1><p>V^Tf.
-]</p>
-<p>于是原来的：</p>
-\[
-10^6\times10^6
-\]<p>问题变成：</p>
-\[
-\boxed{
-30\times30
-}
-\]<p>的问题。</p>
+\[u_h(\mu_1),\dots,u_h(\mu_N),\]<p>构造：</p>
+\[V_N = \operatorname{span} \{ \zeta_1,\dots,\zeta_N \}.\]<p>其中通常：</p>
+\[N\ll N_h.\]<p>例如：</p>
+\[N_h=10^6,\]<p>而：</p>
+\[N=30.\]<p>然后认为任意新参数下的解都可以近似为：</p>
+\[u_N(\mu) = \sum_{i=1}^N a_i(\mu)\zeta_i.\]<p>矩阵形式：</p>
+\[u_N=Va.\]<p>把它代回有限元弱形式，通过 Galerkin projection：</p>
+\[V^TA(\mu)V a = V^Tf.\]<p>于是原来的：</p>
+\[10^6\times10^6\]<p>问题变成：</p>
+\[\boxed{ 30\times30 }\]<p>的问题。</p>
 <p>这也是 RB 与普通响应面最根本的区别之一：</p>
-\[
-\text{Kriging通常学习输出}
-\]<p>而 RB 直接压缩：</p>
-\[
-\boxed{\text{PDE/FEM state space}}
-\]<p>因此一旦得到：</p>
-\[
-u_N(x;\mu),
-\]<p>很多物理量都可以继续从它计算。</p>
+\[\text{Kriging通常学习输出}\]<p>而 RB 直接压缩：</p>
+\[\boxed{\text{PDE/FEM state space}}\]<p>因此一旦得到：</p>
+\[u_N(x;\mu),\]<p>很多物理量都可以继续从它计算。</p>
 <hr>
 <h1 id="3-但这其实还不够">3. 但这其实还不够
 </h1><p>问题马上出现：</p>
 <p>假设：</p>
-\[
-N=20
-\]<p>得到一个极快的 ROM。</p>
+\[N=20\]<p>得到一个极快的 ROM。</p>
 <p>对于某个新参数：</p>
-\[
-\mu^*,
-\]<p>它告诉你：</p>
-\[
-\sigma_{\max}=317\text{ MPa}.
-\]<p>那么真正关键的问题是：</p>
-\[
-\boxed{
-317\text{ MPa 到底靠不靠谱？}
-}
-\]<p>普通 surrogate 往往依赖：</p>
+\[\mu^*,\]<p>它告诉你：</p>
+\[\sigma_{\max}=317\text{ MPa}.\]<p>那么真正关键的问题是：</p>
+\[\boxed{ 317\text{ MPa 到底靠不靠谱？} }\]<p>普通 surrogate 往往依赖：</p>
 <ul>
 <li>test-set RMSE；</li>
 <li>cross validation；</li>
@@ -578,278 +497,107 @@ N=20
 </ul>
 <p>这些指标告诉你模型的<strong>总体经验表现</strong>。</p>
 <p>但对于某个具体：</p>
-\[
-\mu^*,
-\]<p>你通常不能因此严格推出：</p>
-\[
-|f_{\rm HF}(\mu^*)-f_{\rm ROM}(\mu^*)|<\epsilon.
-\]<p>Certified RB 的目标就是补上这一层。</p>
+\[\mu^*,\]<p>你通常不能因此严格推出：</p>
+\[|f_{\rm HF}(\mu^*)-f_{\rm ROM}(\mu^*)|<\epsilon.\]<p>Certified RB 的目标就是补上这一层。</p>
 <hr>
 <h1 id="4-核心工具residual">4. 核心工具：Residual
 </h1><p>已知 reduced solution：</p>
-\[
-u_N(\mu),
-\]<p>把它重新代回原方程：</p>
-<h1 id="rvmu">[
-r(v;\mu)
-</h1><h2 id="fvmu">f(v;\mu)
-</h2><p>a(u_N,v;\mu).
-]</p>
+\[u_N(\mu),\]<p>把它重新代回原方程：</p>
+\[r(v;\mu) = f(v;\mu) - a(u_N,v;\mu).\]<p>如果：</p>
+\[r=0,\]<p>说明：</p>
+\[u_N\]<p>已经满足完整有限元方程。</p>
 <p>如果：</p>
-\[
-r=0,
-\]<p>说明：</p>
-\[
-u_N
-\]<p>已经满足完整有限元方程。</p>
-<p>如果：</p>
-\[
-r
-\]<p>很大，那么显然 reduced solution 有问题。</p>
+\[r\]<p>很大，那么显然 reduced solution 有问题。</p>
 <p>所以 residual 是一个非常自然的错误信号。</p>
 <p>但是：</p>
-\[
-\boxed{
-\text{residual 小}
-\not\Rightarrow
-\text{solution error 一定小}
-}
-\]<p>还差一个条件。</p>
+\[\boxed{ \text{residual 小} \not\Rightarrow \text{solution error 一定小} }\]<p>还差一个条件。</p>
 <hr>
 <h1 id="5-为什么还需要-coercivity">5. 为什么还需要 coercivity？
 </h1><p>考虑线性 coercive PDE：</p>
-\[
-a(u,v;\mu)=f(v).
-\]<p>定义 coercivity constant：</p>
-<h1 id="alphamu">[
-\alpha(\mu)
-</h1><p>\inf_{v\ne0}
-\frac{a(v,v;\mu)}
-{|v|^2}.
-]</p>
-<p>它可以粗略理解成：</p>
-\[
-\boxed{\text{系统抵抗扰动的“最弱刚度”}}
-\]<p>如果：</p>
-\[
-\alpha
-\]<p>很大，那么小 residual 通常意味着小 error。</p>
+\[a(u,v;\mu)=f(v).\]<p>定义 coercivity constant：</p>
+\[\alpha(\mu) = \inf_{v\ne0} \frac{a(v,v;\mu)} {\|v\|^2}.\]<p>它可以粗略理解成：</p>
+\[\boxed{\text{系统抵抗扰动的“最弱刚度”}}\]<p>如果：</p>
+\[\alpha\]<p>很大，那么小 residual 通常意味着小 error。</p>
 <p>如果：</p>
-\[
-\alpha\rightarrow0,
-\]<p>系统本身接近病态：</p>
-\[
-\text{很小 residual}
-\]<p>也可能对应：</p>
-\[
-\text{很大 solution error}.
-\]<p>于是经典 RB 可以推出类似：</p>
-\[
-\boxed{
-\|u_h-u_N\|
-\le
-\frac{\|r\|_{V'}}{\alpha_{\rm LB}(\mu)}
-}
-\]<p>其中：</p>
-\[
-\alpha_{\rm LB}(\mu)
-\le
-\alpha(\mu)
-\]<p>是 coercivity constant 的可计算下界。</p>
+\[\alpha\rightarrow0,\]<p>系统本身接近病态：</p>
+\[\text{很小 residual}\]<p>也可能对应：</p>
+\[\text{很大 solution error}.\]<p>于是经典 RB 可以推出类似：</p>
+\[\boxed{ \|u_h-u_N\| \le \frac{\|r\|_{V'}}{\alpha_{\rm LB}(\mu)} }\]<p>其中：</p>
+\[\alpha_{\rm LB}(\mu) \le \alpha(\mu)\]<p>是 coercivity constant 的可计算下界。</p>
 <p>因此误差估计器：</p>
-<h1 id="delta_nmu">[
-\boxed{
-\Delta_N(\mu)
-</h1><p>\frac{|r(\cdot;\mu)|<em>{V&rsquo;}}
-{\alpha</em>{\rm LB}(\mu)}
-}
-]</p>
-<p>这就是 Certified RB 最核心的数学结构。现代 pyMOR 的 coercive reduced-basis 实现同样要求 coercivity lower bound，并利用 residual/Riesz representative 构造 reduction error estimator。</p>
+\[\boxed{ \Delta_N(\mu) = \frac{\|r(\cdot;\mu)\|_{V'}} {\alpha_{\rm LB}(\mu)} }\]<p>这就是 Certified RB 最核心的数学结构。现代 pyMOR 的 coercive reduced-basis 实现同样要求 coercivity lower bound，并利用 residual/Riesz representative 构造 reduction error estimator。</p>
 <hr>
 <h1 id="6-这里有一个非常深的解释">6. 这里有一个非常深的解释
 </h1><p>这个公式：</p>
-<h1 id="delta">[
-\Delta
-</h1><p>\frac{|r|}
-{\alpha}
-]</p>
-<p>实际上把两个完全不同的问题分开了：</p>
+\[\Delta = \frac{\|r\|} {\alpha}\]<p>实际上把两个完全不同的问题分开了：</p>
 <h3 id="模型有没有满足方程">模型有没有满足方程？
 </h3><p>由：</p>
-\[
-\|r\|
-\]<p>衡量。</p>
+\[\|r\|\]<p>衡量。</p>
 <h3 id="这个物理问题本身对误差有多敏感">这个物理问题本身对误差有多敏感？
 </h3><p>由：</p>
-\[
-\alpha
-\]<p>衡量。</p>
+\[\alpha\]<p>衡量。</p>
 <p>所以：</p>
-\[
-\boxed{
-\text{error}
-\approx
-\text{equation violation}
-\times
-\text{problem conditioning}
-}
-\]<p>这是一种非常普遍的数值分析思想。</p>
+\[\boxed{ \text{error} \approx \text{equation violation} \times \text{problem conditioning} }\]<p>这是一种非常普遍的数值分析思想。</p>
 <p>类似结构还会出现在：</p>
-\[
-\|x-x^*\|
-\lesssim
-\|A^{-1}\|
-\|Ax-b\|.
-\]<p>因此 residual-based certification 其实与条件数、稳定性理论是同一套语言。</p>
+\[\|x-x^*\| \lesssim \|A^{-1}\| \|Ax-b\|.\]<p>因此 residual-based certification 其实与条件数、稳定性理论是同一套语言。</p>
 <hr>
 <h1 id="7-为什么这个-error-estimator-会反过来指导学什么">7. 为什么这个 error estimator 会反过来指导“学什么”？
 </h1><p>这是 RB 特别漂亮的地方。</p>
 <p>假设参数空间中有：</p>
-\[
-10^6
-\]<p>个 candidate：</p>
-\[
-\mu.
-\]<p>显然不能全部做高保真 FEM。</p>
+\[10^6\]<p>个 candidate：</p>
+\[\mu.\]<p>显然不能全部做高保真 FEM。</p>
 <p>但对于每一个 candidate，可以便宜地计算：</p>
-\[
-\Delta_N(\mu).
-\]<p>然后找到：</p>
-<h1 id="mu">[
-\boxed{
-\mu^*
-</h1><p>\arg\max_{\mu}
-\Delta_N(\mu)
-}
-]</p>
-<p>意思是：</p>
+\[\Delta_N(\mu).\]<p>然后找到：</p>
+\[\boxed{ \mu^* = \arg\max_{\mu} \Delta_N(\mu) }\]<p>意思是：</p>
 <blockquote>
 <p>当前 reduced basis 最不可信的参数在哪里？</p>
 </blockquote>
 <p>接下来只对：</p>
-\[
-\mu^*
-\]<p>跑一次高保真 FEM：</p>
-\[
-u_h(\mu^*),
-\]<p>把它加入基：</p>
-<h1 id="v_n1">[
-V_{N+1}
-</h1><p>V_N+\operatorname{span}{u_h(\mu^*)}.
-]</p>
-<p>重复。</p>
+\[\mu^*\]<p>跑一次高保真 FEM：</p>
+\[u_h(\mu^*),\]<p>把它加入基：</p>
+\[V_{N+1} = V_N+\operatorname{span}\{u_h(\mu^*)\}.\]<p>重复。</p>
 <p>这就是经典：</p>
-\[
-\boxed{\text{Greedy Reduced Basis}}
-\]<p>结构。pyMOR 当前的 <code>rb_greedy</code> 就是按这种逻辑工作：用 reduction error estimator 在 training set 上寻找当前最差参数，只有被选中的参数才真正调用 full-order model。</p>
+\[\boxed{\text{Greedy Reduced Basis}}\]<p>结构。pyMOR 当前的 <code>rb_greedy</code> 就是按这种逻辑工作：用 reduction error estimator 在 training set 上寻找当前最差参数，只有被选中的参数才真正调用 full-order model。</p>
 <hr>
 <h1 id="8-你会发现它和-ak-mcs-很像但学习目标不同">8. 你会发现它和 AK-MCS 很像，但学习目标不同
 </h1><p>AK-MCS：</p>
-<h1 id="mu-1">[
-\mu^*
-</h1><p>\arg\min U(\mu)
-]</p>
-<p>寻找：</p>
-\[
-\boxed{
-\text{最可能误判失效边界的地方}
-}
-\]<p>RB Greedy：</p>
-<h1 id="mu-2">[
-\mu^*
-</h1><p>\arg\max\Delta_N(\mu)
-]</p>
-<p>寻找：</p>
-\[
-\boxed{
-\text{当前 PDE 解近似最差的地方}
-}
-\]<p>因此二者背后其实是同一种主动学习哲学：</p>
-\[
-\boxed{
-\text{高保真计算应该投给当前模型最缺信息的位置}
-}
-\]<p>但它们依赖的信息来源不同：</p>
+\[\mu^* = \arg\min U(\mu)\]<p>寻找：</p>
+\[\boxed{ \text{最可能误判失效边界的地方} }\]<p>RB Greedy：</p>
+\[\mu^* = \arg\max\Delta_N(\mu)\]<p>寻找：</p>
+\[\boxed{ \text{当前 PDE 解近似最差的地方} }\]<p>因此二者背后其实是同一种主动学习哲学：</p>
+\[\boxed{ \text{高保真计算应该投给当前模型最缺信息的位置} }\]<p>但它们依赖的信息来源不同：</p>
 <p>AK-MCS：</p>
-\[
-\text{Gaussian-process statistical uncertainty}.
-\]<p>Certified RB：</p>
-\[
-\boxed{\text{PDE residual + stability theory}}
-\]<p>这一区别非常值得记住。</p>
+\[\text{Gaussian-process statistical uncertainty}.\]<p>Certified RB：</p>
+\[\boxed{\text{PDE residual + stability theory}}\]<p>这一区别非常值得记住。</p>
 <hr>
 <h1 id="9-certified为什么比普通-rom-更重要">9. “Certified”为什么比普通 ROM 更重要？
 </h1><p>假设你把模型用于游戏视觉效果。</p>
 <p>如果：</p>
-\[
-3\%\text{ error}
-\]<p>一般没有问题。</p>
+\[3\%\text{ error}\]<p>一般没有问题。</p>
 <p>但如果用于：</p>
-\[
-\text{reliability}
-\]<p>问题会完全不同。</p>
+\[\text{reliability}\]<p>问题会完全不同。</p>
 <p>设失效条件：</p>
-<h1 id="gmu">[
-g(\mu)
-</h1><h2 id="sigma_rm-allow">\sigma_{\rm allow}
-</h2><p>\sigma(\mu).
-]</p>
-<p>Reduced model 得到：</p>
-\[
-g_N(\mu)=5\text{ MPa}.
-\]<p>如果输出误差可能达到：</p>
-\[
-\pm20\text{ MPa},
-\]<p>那么它实际上完全无法确定：</p>
-\[
-\text{safe/failure}.
-\]<p>但如果你有：</p>
-\[
-|g-g_N|
-\le2\text{ MPa},
-\]<p>由于：</p>
-\[
-g_N=5,
-\]<p>立即得到：</p>
-\[
-g\ge3>0.
-\]<p>这个样本就可以<strong>无需 HF 计算直接认证为安全</strong>。</p>
+\[g(\mu) = \sigma_{\rm allow} - \sigma(\mu).\]<p>Reduced model 得到：</p>
+\[g_N(\mu)=5\text{ MPa}.\]<p>如果输出误差可能达到：</p>
+\[\pm20\text{ MPa},\]<p>那么它实际上完全无法确定：</p>
+\[\text{safe/failure}.\]<p>但如果你有：</p>
+\[|g-g_N| \le2\text{ MPa},\]<p>由于：</p>
+\[g_N=5,\]<p>立即得到：</p>
+\[g\ge3>0.\]<p>这个样本就可以<strong>无需 HF 计算直接认证为安全</strong>。</p>
 <p>反过来：</p>
-\[
-g_N=-7,
-\quad
-\Delta_g=2
-\]<p>则：</p>
-\[
-g<-5<0,
-\]<p>可以认证为失效。</p>
+\[g_N=-7, \quad \Delta_g=2\]<p>则：</p>
+\[g<-5<0,\]<p>可以认证为失效。</p>
 <p>只有：</p>
-\[
-|g_N|\le\Delta_g
-\]<p>的时候：</p>
-\[
-\boxed{\text{classification uncertain}}
-\]<p>才需要升级到高保真模型。</p>
+\[|g_N|\le\Delta_g\]<p>的时候：</p>
+\[\boxed{\text{classification uncertain}}\]<p>才需要升级到高保真模型。</p>
 <p>你可以看到这已经开始自然连接：</p>
-\[
-\boxed{
-\text{Certified ROM}
-+
-\text{reliability sampling}
-}
-\]<hr>
+\[\boxed{ \text{Certified ROM} + \text{reliability sampling} }\]<hr>
 <h1 id="10-它与-kriging-的-uncertainty-有什么本质区别">10. 它与 Kriging 的 uncertainty 有什么本质区别？
 </h1><p>这是今天最值得分清楚的一点。</p>
 <p>Gaussian Process 给：</p>
-\[
-\mu(x),\sigma(x).
-\]<p>其：</p>
-\[
-\sigma(x)
-\]<p>来自：</p>
-\[
-\boxed{\text{统计模型假设}}
-\]<p>包括：</p>
+\[\mu(x),\sigma(x).\]<p>其：</p>
+\[\sigma(x)\]<p>来自：</p>
+\[\boxed{\text{统计模型假设}}\]<p>包括：</p>
 <ul>
 <li>kernel；</li>
 <li>GP prior；</li>
@@ -857,94 +605,41 @@ g<-5<0,
 <li>hyperparameters。</li>
 </ul>
 <p>如果这些假设失配：</p>
-\[
-\sigma
-\]<p>不一定等于实际预测误差。</p>
+\[\sigma\]<p>不一定等于实际预测误差。</p>
 <p>Certified RB 的：</p>
-\[
-\Delta_N
-\]<p>则来自：</p>
-\[
-\boxed{\text{原始控制方程}}
-\]<p>在适用的数学条件下，它可以是真正的：</p>
-\[
-\text{upper bound}.
-\]<p>因此二者对应两种完全不同的不确定性：</p>
-\[
-\boxed{
-\text{GP uncertainty：epistemic/statistical}
-}
-\]\[
-\boxed{
-\text{RB certification：numerical/model-reduction error}
-}
-\]<p>不能简单把两者当成同一种“置信度”。</p>
+\[\Delta_N\]<p>则来自：</p>
+\[\boxed{\text{原始控制方程}}\]<p>在适用的数学条件下，它可以是真正的：</p>
+\[\text{upper bound}.\]<p>因此二者对应两种完全不同的不确定性：</p>
+\[\boxed{ \text{GP uncertainty：epistemic/statistical} }\]\[\boxed{ \text{RB certification：numerical/model-reduction error} }\]<p>不能简单把两者当成同一种“置信度”。</p>
 <hr>
 <h1 id="11-offlineonline-decomposition-才决定它是否真的快">11. Offline–Online decomposition 才决定它是否真的快
 </h1><p>这里还有一个重要工程条件。</p>
 <p>如果每次计算：</p>
-\[
-r(\mu)
-\]<p>仍然需要组装一个：</p>
-\[
-10^6
-\]<p>维 FEM 系统，那么：</p>
-\[
-N=30
-\]<p>也没有真正解决问题。</p>
+\[r(\mu)\]<p>仍然需要组装一个：</p>
+\[10^6\]<p>维 FEM 系统，那么：</p>
+\[N=30\]<p>也没有真正解决问题。</p>
 <p>因此 RB 通常要求参数依赖近似具有 affine decomposition：</p>
-<h1 id="amu">[
-A(\mu)
-</h1><p>\sum_{q=1}^{Q}
-\theta_q(\mu)A_q.
-]</p>
-<p>于是：</p>
+\[A(\mu) = \sum_{q=1}^{Q} \theta_q(\mu)A_q.\]<p>于是：</p>
 <h3 id="offline">Offline
 </h3><p>提前计算：</p>
-\[
-V^TA_qV.
-\]<h3 id="online">Online
+\[V^TA_qV.\]<h3 id="online">Online
 </h3><p>只组装：</p>
-<h1 id="a_nmu">[
-A_N(\mu)
-</h1><p>\sum_q
-\theta_q(\mu)
-V^TA_qV.
-]</p>
-<p>此时在线复杂度主要与：</p>
-\[
-N,Q
-\]<p>有关，而不再依赖：</p>
-\[
-N_h.
-\]<p>这就是经典 RB 所谓：</p>
-\[
-\boxed{\text{offline-online decomposition}}
-\]<p>也是它真正适用于 many-query / real-time applications 的条件之一。</p>
+\[A_N(\mu) = \sum_q \theta_q(\mu) V^TA_qV.\]<p>此时在线复杂度主要与：</p>
+\[N,Q\]<p>有关，而不再依赖：</p>
+\[N_h.\]<p>这就是经典 RB 所谓：</p>
+\[\boxed{\text{offline-online decomposition}}\]<p>也是它真正适用于 many-query / real-time applications 的条件之一。</p>
 <p>对于非仿射和强非线性问题，则往往还需要 empirical interpolation、DEIM 等 hyper-reduction 手段；RBniCS 和 pyMOR 等工程库都实现了相关方法。</p>
 <hr>
 <h1 id="12-一个非常现实的局限认证并不是免费的">12. 一个非常现实的局限：认证并不是免费的
 </h1><p>Certified RB 看起来很理想，但困难集中在几个地方。</p>
 <p>第一，复杂非线性：</p>
-\[
-R(u;\mu)=0
-\]<p>时，误差界通常比线性 coercive PDE 难很多。已有工作把 a posteriori analysis 扩展到 nonlinear variational problems，但条件和实现复杂度都会明显提高。</p>
+\[R(u;\mu)=0\]<p>时，误差界通常比线性 coercive PDE 难很多。已有工作把 a posteriori analysis 扩展到 nonlinear variational problems，但条件和实现复杂度都会明显提高。</p>
 <p>第二，稳定性常数：</p>
-\[
-\alpha_{\rm LB}(\mu)
-\]<p>本身可能不好算。</p>
+\[\alpha_{\rm LB}(\mu)\]<p>本身可能不好算。</p>
 <p>如果下界过于保守：</p>
-\[
-\alpha_{\rm LB}\ll\alpha,
-\]<p>那么：</p>
-\[
-\Delta_N
-\]<p>会很松：</p>
-\[
-\text{真实误差}=10^{-4},
-\qquad
-\Delta=10^{-1}.
-\]<p>虽然“正确”，但没什么实际用途。</p>
+\[\alpha_{\rm LB}\ll\alpha,\]<p>那么：</p>
+\[\Delta_N\]<p>会很松：</p>
+\[\text{真实误差}=10^{-4}, \qquad \Delta=10^{-1}.\]<p>虽然“正确”，但没什么实际用途。</p>
 <p>第三，如果解流形本身高维，例如：</p>
 <ul>
 <li>激波；</li>
@@ -953,53 +648,21 @@ R(u;\mu)=0
 <li>强局部化；</li>
 </ul>
 <p>那么：</p>
-\[
-N
-\]<p>可能需要增长得很快。</p>
+\[N\]<p>可能需要增长得很快。</p>
 <p>这也是 reduced basis 不一定适合所有非线性动力学的原因。</p>
 <hr>
 <h1 id="13-对代理模型研究最值得迁移的一个思想">13. 对代理模型研究最值得迁移的一个思想
 </h1><p>很多 surrogate workflow 是：</p>
-\[
-\text{train}
-\rightarrow
-\text{test}
-\rightarrow
-R^2=0.98
-\rightarrow
-\text{deploy}.
-\]<p>但真正工程化以后，我们更希望系统具有：</p>
-\[
-\boxed{
-\text{prediction}
-+
-\text{local trust metric}
-+
-\text{fallback mechanism}
-}
-\]<p>也就是说：</p>
-\[
-\hat y(x)
-\]<p>之外，还应该有：</p>
-\[
-c(x)
-\]<p>判断：</p>
+\[\text{train} \rightarrow \text{test} \rightarrow R^2=0.98 \rightarrow \text{deploy}.\]<p>但真正工程化以后，我们更希望系统具有：</p>
+\[\boxed{ \text{prediction} + \text{local trust metric} + \text{fallback mechanism} }\]<p>也就是说：</p>
+\[\hat y(x)\]<p>之外，还应该有：</p>
+\[c(x)\]<p>判断：</p>
 <blockquote>
 <p>这一个输入到底能不能信？</p>
 </blockquote>
 <p>于是工作流可以变成：</p>
-\[
-\Delta(x)<\epsilon
-\Rightarrow
-\text{接受 surrogate},
-\]\[
-\Delta(x)\ge\epsilon
-\Rightarrow
-\text{调用 HF}.
-\]<p>这就从一个“静态代理模型”变成：</p>
-\[
-\boxed{\text{adaptive fidelity system}}
-\]<p>这个思想其实可以迁移到：</p>
+\[\Delta(x)<\epsilon \Rightarrow \text{接受 surrogate},\]\[\Delta(x)\ge\epsilon \Rightarrow \text{调用 HF}.\]<p>这就从一个“静态代理模型”变成：</p>
+\[\boxed{\text{adaptive fidelity system}}\]<p>这个思想其实可以迁移到：</p>
 <ul>
 <li>Kriging；</li>
 <li>神经网络 surrogate；</li>
@@ -1010,63 +673,22 @@ c(x)
 <hr>
 <h1 id="14-对实时物理引擎也有一个很有意思的启发">14. 对实时物理引擎也有一个很有意思的启发
 </h1><p>假设游戏里同时拥有：</p>
-\[
-\text{cheap solver}
-\]<p>和：</p>
-\[
-\text{expensive solver}.
-\]<p>最简单的 LOD 是看距离：</p>
-\[
-d_{\rm camera}>50m
-\Rightarrow
-\text{cheap}.
-\]<p>但 numerical-analysis 风格的设计会变成：</p>
-\[
-\boxed{
-\text{如果 cheap solver 的在线误差指标足够小，就继续 cheap；
-否则自动升级 fidelity。}
-}
-\]<p>也就是说，LOD 不由：</p>
-\[
-\text{距离}
-\]<p>决定，而由：</p>
-\[
-\boxed{\text{estimated physics error}}
-\]<p>决定。</p>
+\[\text{cheap solver}\]<p>和：</p>
+\[\text{expensive solver}.\]<p>最简单的 LOD 是看距离：</p>
+\[d_{\rm camera}>50m \Rightarrow \text{cheap}.\]<p>但 numerical-analysis 风格的设计会变成：</p>
+\[\boxed{ \text{如果 cheap solver 的在线误差指标足够小，就继续 cheap； 否则自动升级 fidelity。} }\]<p>也就是说，LOD 不由：</p>
+\[\text{距离}\]<p>决定，而由：</p>
+\[\boxed{\text{estimated physics error}}\]<p>决定。</p>
 <p>这其实是 Certified RB 背后的工程思想最值得迁移的地方。</p>
 <hr>
 <h2 id="今天值得留下的一句话">今天值得留下的一句话
 </h2><p>Reduced Basis 最有价值的部分，并不是：</p>
-\[
-10^6\text{ DOF}
-\rightarrow
-30\text{ DOF}.
-\]<p>真正重要的是：</p>
-\[
-\boxed{
-\text{快速模型 + 在线误差认证}
-}
-\]<p>形成了一个闭环：</p>
-\[
-\text{快速预测}
-\rightarrow
-\text{检查可信度}
-\rightarrow
-\text{必要时调用 HF}
-\rightarrow
-\text{扩充模型}.
-\]<p>因此它提出了一个比“代理模型精度多高”更成熟的问题：</p>
-\[
-\boxed{
-\text{代理模型能否知道自己什么时候不应该被相信？}
-}
-\]<p>对可靠性分析而言，这尤其重要，因为真正危险的往往不是平均意义上的：</p>
-\[
-R^2=0.95,
-\]<p>而是某一个极限状态附近的样本：</p>
-\[
-\boxed{\text{代理模型错了，却不知道自己错了。}}
-\]<h3 id="拓展阅读">拓展阅读
+\[10^6\text{ DOF} \rightarrow 30\text{ DOF}.\]<p>真正重要的是：</p>
+\[\boxed{ \text{快速模型 + 在线误差认证} }\]<p>形成了一个闭环：</p>
+\[\text{快速预测} \rightarrow \text{检查可信度} \rightarrow \text{必要时调用 HF} \rightarrow \text{扩充模型}.\]<p>因此它提出了一个比“代理模型精度多高”更成熟的问题：</p>
+\[\boxed{ \text{代理模型能否知道自己什么时候不应该被相信？} }\]<p>对可靠性分析而言，这尤其重要，因为真正危险的往往不是平均意义上的：</p>
+\[R^2=0.95,\]<p>而是某一个极限状态附近的样本：</p>
+\[\boxed{\text{代理模型错了，却不知道自己错了。}}\]<h3 id="拓展阅读">拓展阅读
 </h3><ol>
 <li>
 <p><strong>Quarteroni, Manzoni &amp; Negri, <em>Reduced Basis Methods for Partial Differential Equations: An Introduction</em></strong>，以及 Hesthaven, Rozza &amp; Stamm 的 <strong><em>Certified Reduced Basis Methods for Parametrized Partial Differential Equations</em></strong>。两本都是建立完整 RB / certification 体系的标准入口。</p>

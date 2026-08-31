@@ -23,17 +23,7 @@
 &lt;hr&gt;
 &lt;h2 id=&#34;1-ipc-在整个知识体系里的位置&#34;&gt;1. IPC 在整个知识体系里的位置
 &lt;/h2&gt;&lt;p&gt;先看传统软体模拟的一条典型流水线：&lt;/p&gt;
-\[
-\text{弹性内力}
-\rightarrow
-\text{时间积分}
-\rightarrow
-\text{碰撞检测}
-\rightarrow
-\text{穿透修正}
-\rightarrow
-\text{速度修正}
-\]&lt;p&gt;这里存在一个结构性问题。&lt;/p&gt;
+\[\text{弹性内力} \rightarrow \text{时间积分} \rightarrow \text{碰撞检测} \rightarrow \text{穿透修正} \rightarrow \text{速度修正}\]&lt;p&gt;这里存在一个结构性问题。&lt;/p&gt;
 &lt;p&gt;弹性求解器可能得到一个它认为合理的位置 \(x\)，碰撞模块随后说：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;这个位置非法，改掉。&lt;/p&gt;
@@ -55,176 +45,68 @@
 &lt;/blockquote&gt;
 &lt;p&gt;于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。&lt;/p&gt;
 &lt;p&gt;这就是 IPC 在体系中的真正位置：&lt;/p&gt;
-\[
-\boxed{
-\text{Time integration}
-+
-\text{FEM energy}
-+
-\text{Contact}
-+
-\text{Friction}
-\rightarrow
-\text{Incremental potential minimization}
-}
-\]&lt;p&gt;它属于 &lt;strong&gt;variational / optimization-based dynamics&lt;/strong&gt; 这条路线，而不只是某个更好的 collision response 算法。原论文明确将其定位为 nonlinear elastodynamics 的 robust and accurate time stepping 方法。&lt;/p&gt;
+\[\boxed{ \text{Time integration} + \text{FEM energy} + \text{Contact} + \text{Friction} \rightarrow \text{Incremental potential minimization} }\]&lt;p&gt;它属于 &lt;strong&gt;variational / optimization-based dynamics&lt;/strong&gt; 这条路线，而不只是某个更好的 collision response 算法。原论文明确将其定位为 nonlinear elastodynamics 的 robust and accurate time stepping 方法。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-第一步把隐式时间积分写成最小化&#34;&gt;2. 第一步：把隐式时间积分写成最小化
 &lt;/h1&gt;&lt;p&gt;考虑&lt;/p&gt;
-\[
-M\ddot x=-\nabla E(x)+f_{\rm ext}.
-\]&lt;p&gt;这里：&lt;/p&gt;
+\[M\ddot x=-\nabla E(x)+f_{\rm ext}.\]&lt;p&gt;这里：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(M\)：质量矩阵；&lt;/li&gt;
 &lt;li&gt;\(E(x)\)：弹性势能；&lt;/li&gt;
 &lt;li&gt;\(x\)：节点位置。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;例如 Neo-Hookean FEM 中：&lt;/p&gt;
-\[
-E(x)=\sum_e V_e^0\Psi(F_e(x)).
-\]&lt;p&gt;对于 Backward Euler，可以把下一时刻的位置写成类似下面的优化问题：&lt;/p&gt;
-&lt;h1 id=&#34;xn1&#34;&gt;[
-x^{n+1}
-&lt;/h1&gt;&lt;p&gt;\arg\min_x
-\left[
-\frac{1}{2h^2}
-|x-\tilde{x}|_M^2
-+
-E(x)
-\right].
-]&lt;/p&gt;
-&lt;p&gt;其中&lt;/p&gt;
-&lt;h1 id=&#34;tildex&#34;&gt;[
-\tilde{x}
-&lt;/h1&gt;&lt;p&gt;x^n+h v^n+h^2M^{-1}f_{\rm ext}
-]&lt;/p&gt;
-&lt;p&gt;可以理解为&lt;strong&gt;如果不存在弹性约束，节点惯性希望去的位置&lt;/strong&gt;。&lt;/p&gt;
+\[E(x)=\sum_e V_e^0\Psi(F_e(x)).\]&lt;p&gt;对于 Backward Euler，可以把下一时刻的位置写成类似下面的优化问题：&lt;/p&gt;
+\[x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-\tilde{x}\|_M^2 + E(x) \right].\]&lt;p&gt;其中&lt;/p&gt;
+\[\tilde{x} = x^n+h v^n+h^2M^{-1}f_{\rm ext}\]&lt;p&gt;可以理解为&lt;strong&gt;如果不存在弹性约束，节点惯性希望去的位置&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;因此目标函数有两个竞争项：&lt;/p&gt;
-\[
-\underbrace{
-\frac{1}{2h^2}\|x-\tilde{x}\|_M^2
-}_{\text{惯性}}
-+
-\underbrace{
-E(x)
-}_{\text{材料}}
-\]&lt;p&gt;系统最终选择二者折中的最低能量位置。&lt;/p&gt;
+\[\underbrace{ \frac{1}{2h^2}\|x-\tilde{x}\|_M^2 }_{\text{惯性}} + \underbrace{ E(x) }_{\text{材料}}\]&lt;p&gt;系统最终选择二者折中的最低能量位置。&lt;/p&gt;
 &lt;p&gt;这个思想本身并不是 IPC 发明的；IPC 的精彩之处发生在下一步。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-把不允许穿透也变成势能&#34;&gt;3. 把“不允许穿透”也变成势能
 &lt;/h1&gt;&lt;p&gt;假设两个几何 primitive 的距离为&lt;/p&gt;
-\[
-d(x).
-\]&lt;p&gt;传统方法可能规定&lt;/p&gt;
-\[
-d(x)\ge 0
-\]&lt;p&gt;然后在违反约束后投影。&lt;/p&gt;
+\[d(x).\]&lt;p&gt;传统方法可能规定&lt;/p&gt;
+\[d(x)\ge 0\]&lt;p&gt;然后在违反约束后投影。&lt;/p&gt;
 &lt;p&gt;IPC 引入 &lt;strong&gt;barrier potential&lt;/strong&gt;：&lt;/p&gt;
-\[
-B(d)=
-\begin{cases}
--\kappa(d-\hat d)^2
-\ln\left(\frac d{\hat d}\right),
-&amp;
-0&lt;d&lt;\hat d
-\\
-0,
-&amp;
-d\ge\hat d
-\end{cases}
-\]&lt;p&gt;其中：&lt;/p&gt;
+\[B(d)= \begin{cases} -\kappa(d-\hat d)^2 \ln\left(\frac d{\hat d}\right), &amp; 0&lt;d&lt;\hat d \\ 0, &amp; d\ge\hat d \end{cases}\]&lt;p&gt;其中：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(\hat d\)：barrier 开始作用的距离；&lt;/li&gt;
 &lt;li&gt;\(\kappa\)：barrier stiffness。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;最重要的是：&lt;/p&gt;
-\[
-\boxed{
-\lim_{d\rightarrow0^+}B(d)=+\infty
-}
-\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \lim_{d\rightarrow0^+}B(d)=+\infty }\]&lt;p&gt;也就是说：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;两个表面越接近真正的碰撞状态，继续靠近所需要支付的能量代价越大。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;于是新的时间步成为&lt;/p&gt;
-&lt;h1 id=&#34;xn1-1&#34;&gt;[
-x^{n+1}
-&lt;/h1&gt;&lt;p&gt;\arg\min_x
-\left[
-\frac{1}{2h^2}
-|x-\tilde{x}|&lt;em&gt;M^2
-+
-E&lt;/em&gt;{\rm elastic}(x)
-+
-B_{\rm contact}(x)
-\right].
-]&lt;/p&gt;
-&lt;p&gt;这一步非常重要。&lt;/p&gt;
+\[x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-\tilde{x}\|_M^2 + E_{\rm elastic}(x) + B_{\rm contact}(x) \right].\]&lt;p&gt;这一步非常重要。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;碰撞和材料现在处于同一个优化问题中。&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;不存在“FEM 算完以后 collision solver 再把结果改掉”这一层逻辑分裂。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-为什么-barrier-比-penalty-更深一层&#34;&gt;4. 为什么 barrier 比 penalty 更深一层？
 &lt;/h1&gt;&lt;p&gt;Penalty contact 常见形式：&lt;/p&gt;
-\[
-E_p(d)=\frac12 k\min(d,0)^2.
-\]&lt;p&gt;它的逻辑是：&lt;/p&gt;
-\[
-d&lt;0
-\]&lt;p&gt;已经发生穿透以后，再产生恢复力。&lt;/p&gt;
+\[E_p(d)=\frac12 k\min(d,0)^2.\]&lt;p&gt;它的逻辑是：&lt;/p&gt;
+\[d&lt;0\]&lt;p&gt;已经发生穿透以后，再产生恢复力。&lt;/p&gt;
 &lt;p&gt;所以 penalty 方法本质允许：&lt;/p&gt;
-\[
-\boxed{\text{先违法，再惩罚}}
-\]&lt;p&gt;而 barrier 的定义域直接限制在：&lt;/p&gt;
-\[
-d&gt;0.
-\]&lt;p&gt;并且：&lt;/p&gt;
-\[
-B(d)\rightarrow\infty
-\quad(d\rightarrow0^+)
-\]&lt;p&gt;因此其数学结构变成：&lt;/p&gt;
-\[
-\boxed{\text{永远不要进入非法区域}}
-\]&lt;p&gt;这与 interior-point optimization 中 barrier method 的思想高度一致。&lt;/p&gt;
+\[\boxed{\text{先违法，再惩罚}}\]&lt;p&gt;而 barrier 的定义域直接限制在：&lt;/p&gt;
+\[d&gt;0.\]&lt;p&gt;并且：&lt;/p&gt;
+\[B(d)\rightarrow\infty \quad(d\rightarrow0^+)\]&lt;p&gt;因此其数学结构变成：&lt;/p&gt;
+\[\boxed{\text{永远不要进入非法区域}}\]&lt;p&gt;这与 interior-point optimization 中 barrier method 的思想高度一致。&lt;/p&gt;
 &lt;p&gt;这也是 IPC 名字里 &lt;strong&gt;Potential Contact&lt;/strong&gt; 的真正含义。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-但仅有-barrier-仍然不够&#34;&gt;5. 但仅有 barrier 仍然不够
 &lt;/h1&gt;&lt;p&gt;这里出现一个很漂亮的数值问题。&lt;/p&gt;
 &lt;p&gt;假设 Newton 迭代得到：&lt;/p&gt;
-\[
-x_{k+1}=x_k+\alpha p.
-\]&lt;p&gt;即使：&lt;/p&gt;
-\[
-x_k
-\]&lt;p&gt;完全无穿透，也不能保证&lt;/p&gt;
-\[
-x_k+p
-\]&lt;p&gt;没有穿透。&lt;/p&gt;
+\[x_{k+1}=x_k+\alpha p.\]&lt;p&gt;即使：&lt;/p&gt;
+\[x_k\]&lt;p&gt;完全无穿透，也不能保证&lt;/p&gt;
+\[x_k+p\]&lt;p&gt;没有穿透。&lt;/p&gt;
 &lt;p&gt;例如两个三角形可能在 Newton step 中直接穿过去。&lt;/p&gt;
 &lt;p&gt;所以 IPC 又引入 &lt;strong&gt;Continuous Collision Detection（CCD）&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;CCD 求的是：&lt;/p&gt;
-&lt;h1 id=&#34;alpha_rm-collision&#34;&gt;[
-\alpha_{\rm collision}
-&lt;/h1&gt;&lt;p&gt;\min{
-\alpha:
-d(x_k+\alpha p)=0
-}.
-]&lt;/p&gt;
-&lt;p&gt;然后 line search 强制：&lt;/p&gt;
-\[
-\alpha
-&lt;
-\alpha_{\rm collision}.
-\]&lt;p&gt;于是 Newton optimization 的路径本身也保持 collision-free。&lt;/p&gt;
+\[\alpha_{\rm collision} = \min\{ \alpha: d(x_k+\alpha p)=0 \}.\]&lt;p&gt;然后 line search 强制：&lt;/p&gt;
+\[\alpha &lt; \alpha_{\rm collision}.\]&lt;p&gt;于是 Newton optimization 的路径本身也保持 collision-free。&lt;/p&gt;
 &lt;p&gt;这形成了 IPC 最重要的组合：&lt;/p&gt;
-\[
-\boxed{
-\text{Barrier Energy}
-+
-\text{CCD}
-+
-\text{Line Search}
-}
-\]&lt;p&gt;barrier 负责：&lt;/p&gt;
+\[\boxed{ \text{Barrier Energy} + \text{CCD} + \text{Line Search} }\]&lt;p&gt;barrier 负责：&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;终点不能碰撞。&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;CCD 负责：&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;走向终点的路径也不能穿过去。&lt;/strong&gt;&lt;/p&gt;
@@ -233,40 +115,14 @@ d(x_k+\alpha p)=0
 &lt;h1 id=&#34;6-一个直观例子把软体挤进细管&#34;&gt;6. 一个直观例子：把软体挤进细管
 &lt;/h1&gt;&lt;p&gt;设一个 Neo-Hookean 四面体软体被刚体活塞压进比自身窄很多的管道。&lt;/p&gt;
 &lt;p&gt;传统求解器可能经历：&lt;/p&gt;
-\[
-\text{compression}
-\rightarrow
-\text{penetration}
-\rightarrow
-\text{projection}
-\rightarrow
-\text{tet distortion}
-\rightarrow
-J\downarrow
-\rightarrow
-\text{inversion}.
-\]&lt;p&gt;IPC 则同时考虑：&lt;/p&gt;
-\[
-E_{\rm inertia}
-+
-E_{\rm NH}
-+
-E_{\rm contact}.
-\]&lt;p&gt;Newton optimizer 会寻找：&lt;/p&gt;
+\[\text{compression} \rightarrow \text{penetration} \rightarrow \text{projection} \rightarrow \text{tet distortion} \rightarrow J\downarrow \rightarrow \text{inversion}.\]&lt;p&gt;IPC 则同时考虑：&lt;/p&gt;
+\[E_{\rm inertia} + E_{\rm NH} + E_{\rm contact}.\]&lt;p&gt;Newton optimizer 会寻找：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;在保持材料响应的同时，又不进入 collision barrier 的最低增量势状态。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;IPC 项目主页展示的代表性 stress test 就包括：一个板将大量复杂 Neo-Hookean 四面体模型压入狭窄障碍物中，并保持无相交、无反转。&lt;/p&gt;
 &lt;p&gt;所以 IPC 的强项尤其集中在：&lt;/p&gt;
-\[
-\boxed{
-\text{large deformation}
-+
-\text{dense contact}
-+
-\text{high stiffness}
-}
-\]&lt;p&gt;这恰恰是很多实时软体方法最容易崩掉的区域。&lt;/p&gt;
+\[\boxed{ \text{large deformation} + \text{dense contact} + \text{high stiffness} }\]&lt;p&gt;这恰恰是很多实时软体方法最容易崩掉的区域。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;7-一个值得记住的思想feasibility-和-accuracy-分离&#34;&gt;7. 一个值得记住的思想：feasibility 和 accuracy 分离
 &lt;/h1&gt;&lt;p&gt;IPC 有一个很有工程价值的设计哲学：&lt;/p&gt;
@@ -275,37 +131,19 @@ E_{\rm contact}.
 &lt;/blockquote&gt;
 &lt;p&gt;论文专门测试了较宽松求解容差；在动画等低精度需求下，即使降低优化精度，也仍可以维持 feasibility 和 plausible behavior。&lt;/p&gt;
 &lt;p&gt;这实际上给物理引擎设计提供了一种很有价值的层次：&lt;/p&gt;
-\[
-\text{Hard invariant}
-\]&lt;p&gt;例如：&lt;/p&gt;
-\[
-d&gt;0,\qquad J&gt;0
-\]&lt;p&gt;与&lt;/p&gt;
-\[
-\text{Soft accuracy target}
-\]&lt;p&gt;例如：&lt;/p&gt;
-\[
-\|\nabla E\|&lt;\epsilon
-\]&lt;p&gt;应该分开。&lt;/p&gt;
+\[\text{Hard invariant}\]&lt;p&gt;例如：&lt;/p&gt;
+\[d&gt;0,\qquad J&gt;0\]&lt;p&gt;与&lt;/p&gt;
+\[\text{Soft accuracy target}\]&lt;p&gt;例如：&lt;/p&gt;
+\[\|\nabla E\|&lt;\epsilon\]&lt;p&gt;应该分开。&lt;/p&gt;
 &lt;p&gt;实时引擎完全可以允许：&lt;/p&gt;
-\[
-\epsilon=10^{-3}
-\]&lt;p&gt;而不是：&lt;/p&gt;
-\[
-10^{-8},
-\]&lt;p&gt;但最好不要允许：&lt;/p&gt;
-\[
-J&lt;0.
-\]&lt;p&gt;这是比“所有东西都调 tolerance”更清晰的求解器设计原则。&lt;/p&gt;
+\[\epsilon=10^{-3}\]&lt;p&gt;而不是：&lt;/p&gt;
+\[10^{-8},\]&lt;p&gt;但最好不要允许：&lt;/p&gt;
+\[J&lt;0.\]&lt;p&gt;这是比“所有东西都调 tolerance”更清晰的求解器设计原则。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-ipc-与-xpbd-的根本区别&#34;&gt;8. IPC 与 XPBD 的根本区别
 &lt;/h1&gt;&lt;p&gt;XPBD 更接近：&lt;/p&gt;
-\[
-C_i(x)=0
-\]&lt;p&gt;然后依次更新：&lt;/p&gt;
-\[
-x\leftarrow x+\Delta x_i.
-\]&lt;p&gt;也就是 &lt;strong&gt;constraint projection / iterative constraint solving&lt;/strong&gt;。&lt;/p&gt;
+\[C_i(x)=0\]&lt;p&gt;然后依次更新：&lt;/p&gt;
+\[x\leftarrow x+\Delta x_i.\]&lt;p&gt;也就是 &lt;strong&gt;constraint projection / iterative constraint solving&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;它的优势非常明显：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;算法简单；&lt;/li&gt;
@@ -315,14 +153,8 @@ x\leftarrow x+\Delta x_i.
 &lt;li&gt;非常适合游戏。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;IPC 更接近：&lt;/p&gt;
-&lt;h1 id=&#34;x&#34;&gt;[
-x^*
-&lt;/h1&gt;&lt;p&gt;\arg\min E_{\rm total}(x).
-]&lt;/p&gt;
-&lt;p&gt;然后使用 Newton 类优化：&lt;/p&gt;
-\[
-H\Delta x=-g.
-\]&lt;p&gt;所以 IPC 的代价也很明显：&lt;/p&gt;
+\[x^* = \arg\min E_{\rm total}(x).\]&lt;p&gt;然后使用 Newton 类优化：&lt;/p&gt;
+\[H\Delta x=-g.\]&lt;p&gt;所以 IPC 的代价也很明显：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Hessian 构造复杂；&lt;/li&gt;
 &lt;li&gt;broad phase + CCD 成本高；&lt;/li&gt;
@@ -358,40 +190,14 @@ H\Delta x=-g.
 &lt;hr&gt;
 &lt;h1 id=&#34;10-对你当前求解器研究最值得迁移的一点&#34;&gt;10. 对你当前求解器研究最值得迁移的一点
 &lt;/h1&gt;&lt;p&gt;如果一个软体系统出现：&lt;/p&gt;
-\[
-J\downarrow
-\rightarrow
-\text{barrier activates}
-\rightarrow
-\text{仍继续坍缩}
-\]&lt;p&gt;很容易继续沿着：&lt;/p&gt;
-\[
-\kappa\uparrow,\qquad
-compliance\downarrow,\qquad
-iterations\uparrow
-\]&lt;p&gt;这条路调参数。&lt;/p&gt;
+\[J\downarrow \rightarrow \text{barrier activates} \rightarrow \text{仍继续坍缩}\]&lt;p&gt;很容易继续沿着：&lt;/p&gt;
+\[\kappa\uparrow,\qquad compliance\downarrow,\qquad iterations\uparrow\]&lt;p&gt;这条路调参数。&lt;/p&gt;
 &lt;p&gt;IPC 提供了另一个诊断角度：&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;检查不同物理约束是否真的属于同一个一致的离散系统。&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;尤其值得检查：&lt;/p&gt;
-\[
-\text{elasticity}
-\leftrightarrow
-\text{contact}
-\leftrightarrow
-\text{volume/inversion prevention}
-\leftrightarrow
-\text{velocity update}.
-\]&lt;p&gt;如果四者分别通过不同投影、不同 λ 历史、不同速度修正机制作用，那么即使每个模块单独正确，组合后仍可能产生不一致。&lt;/p&gt;
+\[\text{elasticity} \leftrightarrow \text{contact} \leftrightarrow \text{volume/inversion prevention} \leftrightarrow \text{velocity update}.\]&lt;p&gt;如果四者分别通过不同投影、不同 λ 历史、不同速度修正机制作用，那么即使每个模块单独正确，组合后仍可能产生不一致。&lt;/p&gt;
 &lt;p&gt;因此可以把 IPC 当作一个“理论上限”：&lt;/p&gt;
-\[
-\boxed{
-\text{统一能量}
-\rightarrow
-\text{统一优化}
-\rightarrow
-\text{可行域保护}
-}
-\]&lt;p&gt;然后再问一个很有研究价值的问题：&lt;/p&gt;
+\[\boxed{ \text{统一能量} \rightarrow \text{统一优化} \rightarrow \text{可行域保护} }\]&lt;p&gt;然后再问一个很有研究价值的问题：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;能不能保留 IPC 的 invariant / feasibility 思想，同时获得 XPBD 的实时计算结构？&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -399,11 +205,7 @@ iterations\uparrow
 &lt;p&gt;这比单纯继续增加一个防反转 constraint，研究空间要大得多。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h2&gt;\[
-\boxed{
-\text{Robustness often comes from changing the formulation, not tuning the solver.}
-}
-\]&lt;p&gt;当一个物理求解器开始依赖越来越多的 clamp、阈值、特殊分支和事后修正时，值得检查的可能已经不只是参数，而是&lt;strong&gt;问题有没有被放在正确的数学形式里。&lt;/strong&gt;&lt;/p&gt;
+&lt;/h2&gt;\[\boxed{ \text{Robustness often comes from changing the formulation, not tuning the solver.} }\]&lt;p&gt;当一个物理求解器开始依赖越来越多的 clamp、阈值、特殊分支和事后修正时，值得检查的可能已经不只是参数，而是&lt;strong&gt;问题有没有被放在正确的数学形式里。&lt;/strong&gt;&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;p&gt;原始论文和演示优先看官方 &lt;a class=&#34;link&#34; href=&#34;https://ipc-sim.github.io/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;IPC Project Page&lt;/a&gt;，其中包含论文、视频、Supplement 和代码入口；论文为 Li et al., &lt;em&gt;Incremental Potential Contact: Intersection- and Inversion-free Large Deformation Dynamics&lt;/em&gt;, ACM TOG / SIGGRAPH 2020。&lt;/p&gt;
@@ -422,28 +224,14 @@ iterations\uparrow
 &lt;/blockquote&gt;
 &lt;p&gt;对。&lt;strong&gt;如果只问“是什么机制从几何上保证这一 Newton 步不会穿透”，CCD 确实是决定性的。&lt;/strong&gt; 不过 IPC 的关键在于：CCD 和 barrier 分别解决了两个不同层次的问题。&lt;/p&gt;
 &lt;p&gt;可以把它们拆开：&lt;/p&gt;
-\[
-\boxed{\text{CCD：保证搜索路径合法}}
-\qquad
-\boxed{\text{Barrier：决定合法区域内的物理解}}
-\]&lt;h3 id=&#34;1-ccd-真正保证的是什么&#34;&gt;1. CCD 真正保证的是什么？
+\[\boxed{\text{CCD：保证搜索路径合法}} \qquad \boxed{\text{Barrier：决定合法区域内的物理解}}\]&lt;h3 id=&#34;1-ccd-真正保证的是什么&#34;&gt;1. CCD 真正保证的是什么？
 &lt;/h3&gt;&lt;p&gt;假设当前状态 \(x_k\) 合法，Newton 给出方向 \(p\)：&lt;/p&gt;
-\[
-x(\alpha)=x_k+\alpha p.
-\]&lt;p&gt;如果直接取 \(\alpha=1\)，两个三角形可能从彼此两侧直接穿过去。&lt;/p&gt;
+\[x(\alpha)=x_k+\alpha p.\]&lt;p&gt;如果直接取 \(\alpha=1\)，两个三角形可能从彼此两侧直接穿过去。&lt;/p&gt;
 &lt;p&gt;CCD 求第一次发生接触的时刻：&lt;/p&gt;
-\[
-\alpha_c=\min\{\alpha\in(0,1]\mid d(x_k+\alpha p)=0\}.
-\]&lt;p&gt;然后限制：&lt;/p&gt;
-\[
-\alpha &lt; \alpha_c.
-\]&lt;p&gt;所以只要初始状态满足&lt;/p&gt;
-\[
-d(x_k)&gt;0,
-\]&lt;p&gt;CCD + line search 就可以维持&lt;/p&gt;
-\[
-d(x_{k+1})&gt;0.
-\]&lt;p&gt;从这个意义上，你的判断完全成立：&lt;/p&gt;
+\[\alpha_c=\min\{\alpha\in(0,1]\mid d(x_k+\alpha p)=0\}.\]&lt;p&gt;然后限制：&lt;/p&gt;
+\[\alpha &lt; \alpha_c.\]&lt;p&gt;所以只要初始状态满足&lt;/p&gt;
+\[d(x_k)&gt;0,\]&lt;p&gt;CCD + line search 就可以维持&lt;/p&gt;
+\[d(x_{k+1})&gt;0.\]&lt;p&gt;从这个意义上，你的判断完全成立：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;IPC 的“intersection-free”几何可行性，直接执行者确实是 CCD。&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -463,9 +251,7 @@ d(x_{k+1})&gt;0.
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;CCD 发现要撞了，于是每次都截断：&lt;/p&gt;
-\[
-\alpha\le\alpha_c.
-\]&lt;p&gt;问题来了：&lt;strong&gt;截断以后往哪里走？&lt;/strong&gt;&lt;/p&gt;
+\[\alpha\le\alpha_c.\]&lt;p&gt;问题来了：&lt;strong&gt;截断以后往哪里走？&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;CCD 只会告诉优化器：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“你这一步最多走到这里。”&lt;/p&gt;
@@ -476,57 +262,21 @@ d(x_{k+1})&gt;0.
 &lt;/blockquote&gt;
 &lt;p&gt;因此 CCD 更像一个&lt;strong&gt;可行域守门员&lt;/strong&gt;，而不是接触力模型。&lt;/p&gt;
 &lt;p&gt;Barrier 则提供&lt;/p&gt;
-\[
-f_c=-\nabla B(d),
-\]&lt;p&gt;以及 Newton 求解需要的&lt;/p&gt;
-\[
-H_c=\nabla^2B(d).
-\]&lt;p&gt;随着&lt;/p&gt;
-\[
-d\rightarrow0^+,
-\]&lt;p&gt;接触势能迅速增加，于是优化问题本身开始“知道”不能继续朝这个方向走。&lt;/p&gt;
+\[f_c=-\nabla B(d),\]&lt;p&gt;以及 Newton 求解需要的&lt;/p&gt;
+\[H_c=\nabla^2B(d).\]&lt;p&gt;随着&lt;/p&gt;
+\[d\rightarrow0^+,\]&lt;p&gt;接触势能迅速增加，于是优化问题本身开始“知道”不能继续朝这个方向走。&lt;/p&gt;
 &lt;p&gt;因此 Newton direction 会发生改变：&lt;/p&gt;
-&lt;h1 id=&#34;p&#34;&gt;[
-p
-&lt;/h1&gt;&lt;p&gt;-H^{-1}g
-]&lt;/p&gt;
-&lt;p&gt;其中现在&lt;/p&gt;
-&lt;h1 id=&#34;g&#34;&gt;[
-g
-&lt;/h1&gt;&lt;p&gt;g_{\rm inertia}
-+
-g_{\rm elastic}
-+
-\underbrace{g_{\rm contact}}_{\nabla B}.
-]&lt;/p&gt;
-&lt;p&gt;也就是说，&lt;strong&gt;barrier 改变的是搜索方向；CCD 限制的是沿这个方向最多能走多远。&lt;/strong&gt;&lt;/p&gt;
+\[p = -H^{-1}g\]&lt;p&gt;其中现在&lt;/p&gt;
+\[g = g_{\rm inertia} + g_{\rm elastic} + \underbrace{g_{\rm contact}}_{\nabla B}.\]&lt;p&gt;也就是说，&lt;strong&gt;barrier 改变的是搜索方向；CCD 限制的是沿这个方向最多能走多远。&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;这一区别非常关键。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h3 id=&#34;3-用一个简单例子就能看出来&#34;&gt;3. 用一个简单例子就能看出来
 &lt;/h3&gt;&lt;p&gt;一个弹性球高速撞墙。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;只有 CCD：&lt;/strong&gt;&lt;/p&gt;
-\[
-\text{球飞向墙}
-\rightarrow
-\text{CCD发现碰撞}
-\rightarrow
-\text{截断步长}
-\rightarrow
-???
-\]&lt;p&gt;它知道“不能穿墙”，但没有完整定义接触后的动力学响应。&lt;/p&gt;
+\[\text{球飞向墙} \rightarrow \text{CCD发现碰撞} \rightarrow \text{截断步长} \rightarrow ???\]&lt;p&gt;它知道“不能穿墙”，但没有完整定义接触后的动力学响应。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;Barrier + CCD：&lt;/strong&gt;&lt;/p&gt;
-\[
-\text{球飞向墙}
-\rightarrow
-B(d)\uparrow
-\rightarrow
-\nabla B\text{产生接触作用}
-\rightarrow
-\text{Newton方向改变}
-\]&lt;p&gt;同时 CCD 保证 Newton 迭代过程中不会因为步子太大而：&lt;/p&gt;
-\[
-d&gt;0\rightarrow d&lt;0.
-\]&lt;p&gt;所以两者实际上形成了一个非常漂亮的分工：&lt;/p&gt;
+\[\text{球飞向墙} \rightarrow B(d)\uparrow \rightarrow \nabla B\text{产生接触作用} \rightarrow \text{Newton方向改变}\]&lt;p&gt;同时 CCD 保证 Newton 迭代过程中不会因为步子太大而：&lt;/p&gt;
+\[d&gt;0\rightarrow d&lt;0.\]&lt;p&gt;所以两者实际上形成了一个非常漂亮的分工：&lt;/p&gt;
 &lt;table&gt;
 	&lt;thead&gt;
 			&lt;tr&gt;
@@ -548,37 +298,16 @@ d&gt;0\rightarrow d&lt;0.
 &lt;h3 id=&#34;4-更深一层这和你做的--barrier-很像&#34;&gt;4. 更深一层：这和你做的 \(J\)-barrier 很像
 &lt;/h3&gt;&lt;p&gt;这里其实能直接联系到四面体反转。&lt;/p&gt;
 &lt;p&gt;对于 tet：&lt;/p&gt;
-\[
-J=\det F.
-\]&lt;p&gt;如果定义 inversion barrier：&lt;/p&gt;
-\[
-B_J(J)\rightarrow+\infty
-\qquad (J\rightarrow0^+),
-\]&lt;p&gt;它会让优化器产生“远离 \(J=0\)”的方向。&lt;/p&gt;
+\[J=\det F.\]&lt;p&gt;如果定义 inversion barrier：&lt;/p&gt;
+\[B_J(J)\rightarrow+\infty \qquad (J\rightarrow0^+),\]&lt;p&gt;它会让优化器产生“远离 \(J=0\)”的方向。&lt;/p&gt;
 &lt;p&gt;但如果 Newton/XPBD 的一次更新特别大：&lt;/p&gt;
-\[
-J=0.5
-\quad\xrightarrow{\Delta x}\quad
-J=-0.3,
-\]&lt;p&gt;&lt;strong&gt;仅仅存在 barrier 并不自动意味着离散迭代绝不会跨过 \(J=0\)。&lt;/strong&gt;&lt;/p&gt;
+\[J=0.5 \quad\xrightarrow{\Delta x}\quad J=-0.3,\]&lt;p&gt;&lt;strong&gt;仅仅存在 barrier 并不自动意味着离散迭代绝不会跨过 \(J=0\)。&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;IPC 在碰撞问题上解决的正是这一层：&lt;/p&gt;
-\[
-\boxed{
-\text{Barrier负责形成正确的排斥趋势}
-+
-\text{CCD负责不让有限步长跨越奇异边界}
-}
-\]&lt;p&gt;这对软体求解器设计有一个很重要的启发：&lt;/p&gt;
+\[\boxed{ \text{Barrier负责形成正确的排斥趋势} + \text{CCD负责不让有限步长跨越奇异边界} }\]&lt;p&gt;这对软体求解器设计有一个很重要的启发：&lt;/p&gt;
 &lt;p&gt;如果你的目标是建立真正的&lt;/p&gt;
-\[
-J&gt;0
-\]&lt;p&gt;&lt;strong&gt;hard invariant&lt;/strong&gt;，那么单纯把 \(J\)-barrier 调得越来越硬未必是最漂亮的方案。&lt;/p&gt;
+\[J&gt;0\]&lt;p&gt;&lt;strong&gt;hard invariant&lt;/strong&gt;，那么单纯把 \(J\)-barrier 调得越来越硬未必是最漂亮的方案。&lt;/p&gt;
 &lt;p&gt;更系统的结构可能是：&lt;/p&gt;
-\[
-\underbrace{B_J(J)}_{\text{改变求解方向}}
-+
-\underbrace{\text{step-size / line-search feasibility}}_{\text{禁止跨越 }J=0}.
-\]&lt;p&gt;所以你刚才抓到的点很关键：&lt;strong&gt;IPC 的鲁棒性不能简单归功于 barrier。真正把“永不穿透”从软惩罚升级成几何不变量的，是 barrier + CCD/feasible line search 的组合；其中负责最后那道合法性保证的，确实是 CCD。&lt;/strong&gt;&lt;/p&gt;
+\[\underbrace{B_J(J)}_{\text{改变求解方向}} + \underbrace{\text{step-size / line-search feasibility}}_{\text{禁止跨越 }J=0}.\]&lt;p&gt;所以你刚才抓到的点很关键：&lt;strong&gt;IPC 的鲁棒性不能简单归功于 barrier。真正把“永不穿透”从软惩罚升级成几何不变量的，是 barrier + CCD/feasible line search 的组合；其中负责最后那道合法性保证的，确实是 CCD。&lt;/strong&gt;&lt;/p&gt;
 </description>
         </item>
         <item>
@@ -592,29 +321,13 @@ J&gt;0
 &lt;strong&gt;领域：有限元 × 物理引擎 × 软体动力学&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;Projective Dynamics 值得学，因为它正好卡在两个世界中间：&lt;/p&gt;
-\[
-\boxed{\text{PBD 的几何投影}}
-\quad\longleftrightarrow\quad
-\boxed{\text{FEM 的能量最小化}}
-\]&lt;p&gt;它由 Bouaziz、Martin、Liu、Kavan、Pauly 在 SIGGRAPH 2014 提出，目标就是建立一座从 nodal FEM 到 Position Based Dynamics 的桥梁：保留隐式积分的稳定性与能量解释，同时利用局部约束投影获得接近实时应用所需要的效率。原论文明确把它描述为一种 projection-based implicit Euler integrator。&lt;/p&gt;
+\[\boxed{\text{PBD 的几何投影}} \quad\longleftrightarrow\quad \boxed{\text{FEM 的能量最小化}}\]&lt;p&gt;它由 Bouaziz、Martin、Liu、Kavan、Pauly 在 SIGGRAPH 2014 提出，目标就是建立一座从 nodal FEM 到 Position Based Dynamics 的桥梁：保留隐式积分的稳定性与能量解释，同时利用局部约束投影获得接近实时应用所需要的效率。原论文明确把它描述为一种 projection-based implicit Euler integrator。&lt;/p&gt;
 &lt;p&gt;这也是理解 XPBD、quasi-Newton FEM、ADMM deformables 甚至 differentiable physics 的一个非常好的中间节点。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-先看它试图解决什么问题&#34;&gt;1. 先看它试图解决什么问题
 &lt;/h2&gt;&lt;p&gt;普通 FEM 的隐式时间积分可以写成：&lt;/p&gt;
-&lt;h1 id=&#34;xn1&#34;&gt;[
-x^{n+1}
-&lt;/h1&gt;&lt;p&gt;\arg\min_x
-\left[
-\frac{1}{2h^2}
-(x-y)^T M(x-y)
-+
-E(x)
-\right],
-]&lt;/p&gt;
-&lt;p&gt;其中&lt;/p&gt;
-\[
-y=x^n+h v^n+h^2M^{-1}f_{\rm ext}
-\]&lt;p&gt;可以理解为惯性预测位置。&lt;/p&gt;
+\[x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} (x-y)^T M(x-y) + E(x) \right],\]&lt;p&gt;其中&lt;/p&gt;
+\[y=x^n+h v^n+h^2M^{-1}f_{\rm ext}\]&lt;p&gt;可以理解为惯性预测位置。&lt;/p&gt;
 &lt;p&gt;这个形式其实很好：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;有明确能量；&lt;/li&gt;
@@ -622,29 +335,15 @@ y=x^n+h v^n+h^2M^{-1}f_{\rm ext}
 &lt;li&gt;材料模型物理意义清楚。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;问题在于：&lt;/p&gt;
-\[
-E(x)
-\]&lt;p&gt;通常高度非线性。&lt;/p&gt;
+\[E(x)\]&lt;p&gt;通常高度非线性。&lt;/p&gt;
 &lt;p&gt;Newton 法需要反复处理：&lt;/p&gt;
-\[
-H(x)\Delta x=-g(x),
-\]&lt;p&gt;而 Hessian&lt;/p&gt;
-\[
-H(x)=\frac{M}{h^2}+\nabla^2E(x)
-\]&lt;p&gt;随着形变改变。&lt;/p&gt;
+\[H(x)\Delta x=-g(x),\]&lt;p&gt;而 Hessian&lt;/p&gt;
+\[H(x)=\frac{M}{h^2}+\nabla^2E(x)\]&lt;p&gt;随着形变改变。&lt;/p&gt;
 &lt;p&gt;对于大规模软体，这意味着：&lt;/p&gt;
-\[
-\text{assembly}
-+
-\text{factorization / iterative solve}
-\]&lt;p&gt;都很贵。&lt;/p&gt;
+\[\text{assembly} + \text{factorization / iterative solve}\]&lt;p&gt;都很贵。&lt;/p&gt;
 &lt;p&gt;PBD 走了另一条路：&lt;/p&gt;
-\[
-C_i(x)=0
-\]&lt;p&gt;然后直接投影：&lt;/p&gt;
-\[
-x\leftarrow x+\Delta x_i.
-\]&lt;p&gt;速度很快，鲁棒性高，但物理能量结构相对弱。&lt;/p&gt;
+\[C_i(x)=0\]&lt;p&gt;然后直接投影：&lt;/p&gt;
+\[x\leftarrow x+\Delta x_i.\]&lt;p&gt;速度很快，鲁棒性高，但物理能量结构相对弱。&lt;/p&gt;
 &lt;p&gt;PD 的问题可以浓缩成：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;有没有办法让“投影”本身变成能量最小化的一部分？&lt;/strong&gt;&lt;/p&gt;
@@ -653,13 +352,7 @@ x\leftarrow x+\Delta x_i.
 &lt;hr&gt;
 &lt;h1 id=&#34;2-projective-dynamics-最关键的一步引入辅助变量&#34;&gt;2. Projective Dynamics 最关键的一步：引入辅助变量 \(p_i\)
 &lt;/h1&gt;&lt;p&gt;PD 对每个约束定义一种特殊能量：&lt;/p&gt;
-&lt;h1 id=&#34;e_ix&#34;&gt;[
-E_i(x)
-&lt;/h1&gt;&lt;p&gt;\min_{p_i\in\mathcal M_i}
-w_i
-|G_i x-p_i|^2.
-]&lt;/p&gt;
-&lt;p&gt;这里：&lt;/p&gt;
+\[E_i(x) = \min_{p_i\in\mathcal M_i} w_i \|G_i x-p_i\|^2.\]&lt;p&gt;这里：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(G_i x\)：从当前节点状态提取某种局部形变量；&lt;/li&gt;
 &lt;li&gt;\(\mathcal M_i\)：合法局部状态组成的 manifold；&lt;/li&gt;
@@ -667,81 +360,31 @@ w_i
 &lt;li&gt;\(w_i\)：约束权重。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;这个式子的几何意义非常漂亮：&lt;/p&gt;
-&lt;h1 id=&#34;text能量&#34;&gt;[
-\boxed{
-\text{能量}
-&lt;/h1&gt;&lt;p&gt;\text{当前局部状态距离“理想状态集合”的平方距离}
-}
-]&lt;/p&gt;
-&lt;p&gt;例如一个弹簧。&lt;/p&gt;
+\[\boxed{ \text{能量} = \text{当前局部状态距离“理想状态集合”的平方距离} }\]&lt;p&gt;例如一个弹簧。&lt;/p&gt;
 &lt;p&gt;设：&lt;/p&gt;
-\[
-G_i x=x_a-x_b.
-\]&lt;p&gt;理想状态要求弹簧长度：&lt;/p&gt;
-\[
-\|p_i\|=l_0.
-\]&lt;p&gt;那么：&lt;/p&gt;
-\[
-\mathcal M_i=
-\{p:\|p\|=l_0\}.
-\]&lt;p&gt;Local step 做的事情就是：&lt;/p&gt;
-&lt;h1 id=&#34;p_i&#34;&gt;[
-p_i
-&lt;/h1&gt;&lt;p&gt;\operatorname{proj}_{\mathcal M_i}(G_i x).
-]&lt;/p&gt;
-&lt;p&gt;也就是把当前弹簧向量投影到半径：&lt;/p&gt;
-\[
-l_0
-\]&lt;p&gt;的球面上。&lt;/p&gt;
+\[G_i x=x_a-x_b.\]&lt;p&gt;理想状态要求弹簧长度：&lt;/p&gt;
+\[\|p_i\|=l_0.\]&lt;p&gt;那么：&lt;/p&gt;
+\[\mathcal M_i= \{p:\|p\|=l_0\}.\]&lt;p&gt;Local step 做的事情就是：&lt;/p&gt;
+\[p_i = \operatorname{proj}_{\mathcal M_i}(G_i x).\]&lt;p&gt;也就是把当前弹簧向量投影到半径：&lt;/p&gt;
+\[l_0\]&lt;p&gt;的球面上。&lt;/p&gt;
 &lt;p&gt;这就是 &lt;strong&gt;Projective&lt;/strong&gt; 这个词真正的来源。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-为什么这会产生一个非常高效的算法&#34;&gt;3. 为什么这会产生一个非常高效的算法？
 &lt;/h1&gt;&lt;p&gt;加入所有 \(p_i\) 后，整个时间步可以写成：&lt;/p&gt;
-&lt;h1 id=&#34;tilde-exp&#34;&gt;[
-\tilde E(x,p)
-&lt;/h1&gt;&lt;p&gt;\frac{1}{2h^2}(x-y)^TM(x-y)
-+
-\sum_i
-w_i|G_i x-p_i|^2.
-]&lt;/p&gt;
-&lt;p&gt;然后交替优化：&lt;/p&gt;
-\[
-\boxed{
-\text{Local step}
-\rightarrow
-\text{Global step}
-\rightarrow
-\text{Local step}
-\rightarrow\cdots
-}
-\]&lt;p&gt;这就是 PD 的核心。&lt;/p&gt;
+\[\tilde E(x,p) = \frac{1}{2h^2}(x-y)^TM(x-y) + \sum_i w_i\|G_i x-p_i\|^2.\]&lt;p&gt;然后交替优化：&lt;/p&gt;
+\[\boxed{ \text{Local step} \rightarrow \text{Global step} \rightarrow \text{Local step} \rightarrow\cdots }\]&lt;p&gt;这就是 PD 的核心。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;local-step&#34;&gt;Local step
 &lt;/h2&gt;&lt;p&gt;固定 \(x\)，分别求：&lt;/p&gt;
-&lt;h1 id=&#34;p_i-1&#34;&gt;[
-p_i
-&lt;/h1&gt;&lt;p&gt;\arg\min_{p_i\in\mathcal M_i}
-|G_i x-p_i|^2.
-]&lt;/p&gt;
-&lt;p&gt;每个 constraint 都是独立的。&lt;/p&gt;
+\[p_i = \arg\min_{p_i\in\mathcal M_i} \|G_i x-p_i\|^2.\]&lt;p&gt;每个 constraint 都是独立的。&lt;/p&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-\[
-\boxed{\text{天然并行}}
-\]&lt;p&gt;一个 tet、一个 spring、一个 triangle 可以各算各的。&lt;/p&gt;
+\[\boxed{\text{天然并行}}\]&lt;p&gt;一个 tet、一个 spring、一个 triangle 可以各算各的。&lt;/p&gt;
 &lt;p&gt;而且很多投影都有闭式解。&lt;/p&gt;
 &lt;p&gt;例如 corotated 类模型中，可以把局部 deformation gradient：&lt;/p&gt;
-\[
-F
-\]&lt;p&gt;投影到 rotation manifold：&lt;/p&gt;
-\[
-SO(3),
-\]&lt;p&gt;得到：&lt;/p&gt;
-\[
-R=\operatorname{polar}(F).
-\]&lt;p&gt;这时：&lt;/p&gt;
-\[
-p_i\sim R.
-\]&lt;p&gt;所以 local step 本质上做的是：&lt;/p&gt;
+\[F\]&lt;p&gt;投影到 rotation manifold：&lt;/p&gt;
+\[SO(3),\]&lt;p&gt;得到：&lt;/p&gt;
+\[R=\operatorname{polar}(F).\]&lt;p&gt;这时：&lt;/p&gt;
+\[p_i\sim R.\]&lt;p&gt;所以 local step 本质上做的是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;这个元素如果能瞬间回到一个“理想局部状态”，它最应该变成什么？&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -749,34 +392,10 @@ p_i\sim R.
 &lt;h1 id=&#34;4-global-step-才是-pd-真正强大的地方&#34;&gt;4. Global step 才是 PD 真正强大的地方
 &lt;/h1&gt;&lt;p&gt;固定所有 \(p_i\) 后，目标函数对 \(x\) 是&lt;strong&gt;纯二次函数&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;梯度为：&lt;/p&gt;
-&lt;h2 id=&#34;lx&#34;&gt;[
-\frac{1}{h^2}M(x-y)
-+
-Lx
-&lt;/h2&gt;&lt;h1 id=&#34;jp&#34;&gt;Jp
-&lt;/h1&gt;&lt;ol start=&#34;0&#34;&gt;
-&lt;li&gt;&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;]&lt;/p&gt;
-&lt;p&gt;于是得到：&lt;/p&gt;
-&lt;h1 id=&#34;rightx&#34;&gt;[
-\boxed{
-\left(
-\frac{M}{h^2}+L
-\right)x
-&lt;/h1&gt;&lt;p&gt;\frac{M}{h^2}y+Jp
-}
-]&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
-\[
-L=\sum_i w_iG_i^TG_i.
-\]&lt;p&gt;最关键的是：&lt;/p&gt;
-\[
-\boxed{
-A=
-\frac{M}{h^2}+L
-}
-\]&lt;p&gt;&lt;strong&gt;不依赖当前形变 \(x\)&lt;/strong&gt;。&lt;/p&gt;
+\[\frac{1}{h^2}M(x-y) + Lx - Jp = 0.\]&lt;p&gt;于是得到：&lt;/p&gt;
+\[\boxed{ \left( \frac{M}{h^2}+L \right)x = \frac{M}{h^2}y+Jp }\]&lt;p&gt;其中：&lt;/p&gt;
+\[L=\sum_i w_iG_i^TG_i.\]&lt;p&gt;最关键的是：&lt;/p&gt;
+\[\boxed{ A= \frac{M}{h^2}+L }\]&lt;p&gt;&lt;strong&gt;不依赖当前形变 \(x\)&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;只要：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;mesh 拓扑不变；&lt;/li&gt;
@@ -786,93 +405,38 @@ A=
 &lt;/ul&gt;
 &lt;p&gt;这个矩阵就一直不变。PD 后续工作的推导也明确指出，这允许预计算并重复利用稀疏 Cholesky 分解。&lt;/p&gt;
 &lt;p&gt;于是：&lt;/p&gt;
-\[
-A=LL^T
-\]&lt;p&gt;可以在仿真开始前 factorize 一次。&lt;/p&gt;
+\[A=LL^T\]&lt;p&gt;可以在仿真开始前 factorize 一次。&lt;/p&gt;
 &lt;p&gt;每个 global step 只需要：&lt;/p&gt;
-\[
-LL^Tx=b
-\]&lt;p&gt;做两个 triangular solve。&lt;/p&gt;
+\[LL^Tx=b\]&lt;p&gt;做两个 triangular solve。&lt;/p&gt;
 &lt;p&gt;这就是 PD 的计算优势来源。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-它为什么比普通-pbd更值得从求解器角度研究&#34;&gt;5. 它为什么比“普通 PBD”更值得从求解器角度研究？
 &lt;/h1&gt;&lt;p&gt;表面看，两者都在 projection。&lt;/p&gt;
 &lt;p&gt;但数学地位完全不同。&lt;/p&gt;
 &lt;p&gt;PBD 常见结构是：&lt;/p&gt;
-\[
-C_1(x)\rightarrow
-C_2(x)\rightarrow
-C_3(x)
-\]&lt;p&gt;逐约束 Gauss-Seidel 修正。&lt;/p&gt;
+\[C_1(x)\rightarrow C_2(x)\rightarrow C_3(x)\]&lt;p&gt;逐约束 Gauss-Seidel 修正。&lt;/p&gt;
 &lt;p&gt;而 PD 实际在最小化一个统一目标：&lt;/p&gt;
-\[
-E_{\rm inertia}
-+
-\sum_i E_i.
-\]&lt;p&gt;Local projection 只是为了快速处理这个目标里的非线性部分。&lt;/p&gt;
+\[E_{\rm inertia} + \sum_i E_i.\]&lt;p&gt;Local projection 只是为了快速处理这个目标里的非线性部分。&lt;/p&gt;
 &lt;p&gt;因此可以粗略理解为：&lt;/p&gt;
-\[
-\boxed{
-\text{PBD：projection 本身就是 solver}
-}
-\]&lt;p&gt;而：&lt;/p&gt;
-\[
-\boxed{
-\text{PD：projection 是 nonlinear optimization 的一个子步骤}
-}
-\]&lt;p&gt;这也是原作者所说的“bridge between nodal FEM and Position Based Dynamics”的真正含义。&lt;/p&gt;
+\[\boxed{ \text{PBD：projection 本身就是 solver} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{PD：projection 是 nonlinear optimization 的一个子步骤} }\]&lt;p&gt;这也是原作者所说的“bridge between nodal FEM and Position Based Dynamics”的真正含义。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-一个更深的视角pd-其实可以解释成-quasi-newton&#34;&gt;6. 一个更深的视角：PD 其实可以解释成 quasi-Newton
 &lt;/h1&gt;&lt;p&gt;这一步尤其值得记住。&lt;/p&gt;
 &lt;p&gt;后来 Liu、Bouaziz、Kavan 对 PD 重新分析发现，一次 local-global iteration 可以写成：&lt;/p&gt;
-&lt;h1 id=&#34;d_rm-pd&#34;&gt;[
-d_{\rm PD}
-&lt;/h1&gt;&lt;ul&gt;
-&lt;li&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;\left(
-\frac{M}{h^2}+L
-\right)^{-1}
-\nabla g(x).
-]&lt;/p&gt;
-&lt;p&gt;对比 Newton：&lt;/p&gt;
-&lt;h1 id=&#34;d_n&#34;&gt;[
-d_N
-&lt;/h1&gt;&lt;ul&gt;
-&lt;li&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;H(x)^{-1}
-\nabla g(x).
-]&lt;/p&gt;
-&lt;p&gt;于是 PD 实际上是在用：&lt;/p&gt;
-\[
-\boxed{
-H(x)
-\approx
-\frac{M}{h^2}+L
-}
-\]&lt;p&gt;作为一个&lt;strong&gt;固定 Hessian 近似&lt;/strong&gt;。&lt;/p&gt;
+\[d_{\rm PD} = - \left( \frac{M}{h^2}+L \right)^{-1} \nabla g(x).\]&lt;p&gt;对比 Newton：&lt;/p&gt;
+\[d_N = - H(x)^{-1} \nabla g(x).\]&lt;p&gt;于是 PD 实际上是在用：&lt;/p&gt;
+\[\boxed{ H(x) \approx \frac{M}{h^2}+L }\]&lt;p&gt;作为一个&lt;strong&gt;固定 Hessian 近似&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;所以 Projective Dynamics 可以理解成：&lt;/p&gt;
-\[
-\boxed{\text{一种特殊的 quasi-Newton 方法}}
-\]&lt;p&gt;这一解释非常重要，因为它把很多看起来分散的算法连接起来了。该后续工作明确给出了这一 quasi-Newton 解释，并进一步用 L-BFGS 改进其收敛。&lt;/p&gt;
+\[\boxed{\text{一种特殊的 quasi-Newton 方法}}\]&lt;p&gt;这一解释非常重要，因为它把很多看起来分散的算法连接起来了。该后续工作明确给出了这一 quasi-Newton 解释，并进一步用 L-BFGS 改进其收敛。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;7-这解释了-pd-为什么快也解释了它为什么会慢慢收敛&#34;&gt;7. 这解释了 PD 为什么快，也解释了它为什么会慢慢收敛
 &lt;/h1&gt;&lt;p&gt;Newton 每次使用：&lt;/p&gt;
-\[
-H(x_k),
-\]&lt;p&gt;所以搜索方向非常贴合当前非线性能量地形。&lt;/p&gt;
+\[H(x_k),\]&lt;p&gt;所以搜索方向非常贴合当前非线性能量地形。&lt;/p&gt;
 &lt;p&gt;PD 始终使用：&lt;/p&gt;
-\[
-A=
-\frac{M}{h^2}+L.
-\]&lt;p&gt;优点：&lt;/p&gt;
-\[
-\boxed{\text{矩阵固定，可以预分解}}
-\]&lt;p&gt;代价：&lt;/p&gt;
-\[
-\boxed{\text{Hessian 近似可能越来越不准}}
-\]&lt;p&gt;如果发生强非线性：&lt;/p&gt;
+\[A= \frac{M}{h^2}+L.\]&lt;p&gt;优点：&lt;/p&gt;
+\[\boxed{\text{矩阵固定，可以预分解}}\]&lt;p&gt;代价：&lt;/p&gt;
+\[\boxed{\text{Hessian 近似可能越来越不准}}\]&lt;p&gt;如果发生强非线性：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;大旋转；&lt;/li&gt;
 &lt;li&gt;强压缩；&lt;/li&gt;
@@ -880,42 +444,20 @@ A=
 &lt;li&gt;极端 deformation；&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;那么：&lt;/p&gt;
-\[
-A
-\]&lt;p&gt;与真实：&lt;/p&gt;
-\[
-H(x)
-\]&lt;p&gt;的差距会越来越大。&lt;/p&gt;
+\[A\]&lt;p&gt;与真实：&lt;/p&gt;
+\[H(x)\]&lt;p&gt;的差距会越来越大。&lt;/p&gt;
 &lt;p&gt;于是你会看到：&lt;/p&gt;
-\[
-\text{iteration count}\uparrow.
-\]&lt;p&gt;这实际上就是：&lt;/p&gt;
-\[
-\boxed{
-\text{per-iteration cost}
-\leftrightarrow
-\text{convergence rate}
-}
-\]&lt;p&gt;之间的经典交换。&lt;/p&gt;
+\[\text{iteration count}\uparrow.\]&lt;p&gt;这实际上就是：&lt;/p&gt;
+\[\boxed{ \text{per-iteration cost} \leftrightarrow \text{convergence rate} }\]&lt;p&gt;之间的经典交换。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-一个很漂亮的后续chebyshev-acceleration&#34;&gt;8. 一个很漂亮的后续：Chebyshev acceleration
 &lt;/h1&gt;&lt;p&gt;2015 年 Huamin Wang 注意到一个现象：&lt;/p&gt;
 &lt;p&gt;虽然 PD 是非线性方法，但它的迭代收敛行为很像线性 stationary iteration。&lt;/p&gt;
 &lt;p&gt;于是可以估计：&lt;/p&gt;
-\[
-\rho
-\]&lt;p&gt;——迭代算子的 spectral radius，然后使用 Chebyshev semi-iteration 加速。&lt;/p&gt;
+\[\rho\]&lt;p&gt;——迭代算子的 spectral radius，然后使用 Chebyshev semi-iteration 加速。&lt;/p&gt;
 &lt;p&gt;其思想近似于：&lt;/p&gt;
-&lt;h1 id=&#34;x_k1&#34;&gt;[
-x_{k+1}
-&lt;/h1&gt;&lt;p&gt;\omega_k\hat x_{k+1}
-+
-(1-\omega_k)x_{k-1}.
-]&lt;/p&gt;
-&lt;p&gt;通过选择：&lt;/p&gt;
-\[
-\omega_k
-\]&lt;p&gt;去抑制慢收敛误差模态。&lt;/p&gt;
+\[x_{k+1} = \omega_k\hat x_{k+1} + (1-\omega_k)x_{k-1}.\]&lt;p&gt;通过选择：&lt;/p&gt;
+\[\omega_k\]&lt;p&gt;去抑制慢收敛误差模态。&lt;/p&gt;
 &lt;p&gt;论文报告，在测试中这种方法能把 PD 收敛速度提高至少一个数量级；作者还指出 direct solver 组合在 CPU 上较快，而 Jacobi + Chebyshev 很适合 GPU 并行。&lt;/p&gt;
 &lt;p&gt;这件事的价值不只是一个加速技巧。&lt;/p&gt;
 &lt;p&gt;它说明：&lt;/p&gt;
@@ -926,13 +468,7 @@ x_{k+1}
 &lt;hr&gt;
 &lt;h1 id=&#34;9-pd-的一个根本限制不是所有材料都天然适配这种投影能量&#34;&gt;9. PD 的一个根本限制：不是所有材料都天然适配这种投影能量
 &lt;/h1&gt;&lt;p&gt;PD 要求材料能写成类似：&lt;/p&gt;
-&lt;h1 id=&#34;e_ix-1&#34;&gt;[
-E_i(x)
-&lt;/h1&gt;&lt;p&gt;\min_{p_i\in\mathcal M_i}
-w_i
-|G_ix-p_i|^2.
-]&lt;/p&gt;
-&lt;p&gt;这是一种很特殊的能量结构。&lt;/p&gt;
+\[E_i(x) = \min_{p_i\in\mathcal M_i} w_i \|G_ix-p_i\|^2.\]&lt;p&gt;这是一种很特殊的能量结构。&lt;/p&gt;
 &lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;ARAP；&lt;/li&gt;
@@ -941,37 +477,19 @@ w_i
 &lt;/ul&gt;
 &lt;p&gt;非常适合。&lt;/p&gt;
 &lt;p&gt;但标准：&lt;/p&gt;
-\[
-\text{Neo-Hookean}
-\]&lt;p&gt;并不能简单地完全塞进原始 PD 形式。&lt;/p&gt;
+\[\text{Neo-Hookean}\]&lt;p&gt;并不能简单地完全塞进原始 PD 形式。&lt;/p&gt;
 &lt;p&gt;这也是为什么后续出现：&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;Quasi-Newton Methods for Real-Time Simulation of Hyperelastic Materials&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;该工作保留 PD 的固定 Hessian 近似：&lt;/p&gt;
-\[
-\frac{M}{h^2}+L,
-\]&lt;p&gt;同时把真正的：&lt;/p&gt;
-\[
-\nabla E(x)
-\]&lt;p&gt;换成一般超弹性材料的梯度，从而支持 StVK、Neo-Hookean、Mooney-Rivlin 等材料，再利用 L-BFGS 改善收敛。&lt;/p&gt;
+\[\frac{M}{h^2}+L,\]&lt;p&gt;同时把真正的：&lt;/p&gt;
+\[\nabla E(x)\]&lt;p&gt;换成一般超弹性材料的梯度，从而支持 StVK、Neo-Hookean、Mooney-Rivlin 等材料，再利用 L-BFGS 改善收敛。&lt;/p&gt;
 &lt;p&gt;所以知识演化路径大致是：&lt;/p&gt;
-\[
-\boxed{
-\text{PBD}
-\rightarrow
-\text{Projective Dynamics}
-\rightarrow
-\text{Quasi-Newton PD}
-\rightarrow
-\text{general hyperelastic real-time FEM}
-}
-\]&lt;p&gt;这是非常值得记住的一条技术脉络。&lt;/p&gt;
+\[\boxed{ \text{PBD} \rightarrow \text{Projective Dynamics} \rightarrow \text{Quasi-Newton PD} \rightarrow \text{general hyperelastic real-time FEM} }\]&lt;p&gt;这是非常值得记住的一条技术脉络。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;10-它甚至连接到了可微物理&#34;&gt;10. 它甚至连接到了可微物理
 &lt;/h1&gt;&lt;p&gt;2022 年 SIGGRAPH/TOG 的 &lt;strong&gt;DiffPD&lt;/strong&gt; 又进一步利用了 PD 的关键结构。&lt;/p&gt;
 &lt;p&gt;因为 forward simulation 已经有：&lt;/p&gt;
-\[
-A=LL^T
-\]&lt;p&gt;这种预分解矩阵，那么反向传播中的线性系统也可以复用这一结构。&lt;/p&gt;
+\[A=LL^T\]&lt;p&gt;这种预分解矩阵，那么反向传播中的线性系统也可以复用这一结构。&lt;/p&gt;
 &lt;p&gt;DiffPD 因此把 PD 扩展成可微软体模拟器，用于：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;system identification；&lt;/li&gt;
@@ -981,50 +499,21 @@ A=LL^T
 &lt;/ul&gt;
 &lt;p&gt;论文项目页报告，相比标准 Newton-based differentiable simulation，在其测试中获得约 &lt;strong&gt;4–19×&lt;/strong&gt; 加速。&lt;/p&gt;
 &lt;p&gt;这里可以看到一个非常清晰的工程链条：&lt;/p&gt;
-\[
-\text{固定结构矩阵}
-\]&lt;p&gt;最初只是：&lt;/p&gt;
-\[
-\text{让实时仿真更快}
-\]&lt;p&gt;后来却进一步变成：&lt;/p&gt;
-\[
-\text{让反向传播更快}.
-\]&lt;p&gt;这就是好的数值结构所产生的“二次价值”。&lt;/p&gt;
+\[\text{固定结构矩阵}\]&lt;p&gt;最初只是：&lt;/p&gt;
+\[\text{让实时仿真更快}\]&lt;p&gt;后来却进一步变成：&lt;/p&gt;
+\[\text{让反向传播更快}.\]&lt;p&gt;这就是好的数值结构所产生的“二次价值”。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;对实时软体求解器最值得迁移的一点&#34;&gt;对实时软体求解器最值得迁移的一点
 &lt;/h1&gt;&lt;p&gt;PD 最值得学习的其实不是 local-global 这几个步骤，而是一个更一般的设计思想：&lt;/p&gt;
-\[
-\boxed{
-\text{把非线性放到便宜的局部问题里，
-把全局耦合压缩成固定线性系统}
-}
-\]&lt;p&gt;这是一类非常强大的求解器设计模式。&lt;/p&gt;
+\[\boxed{ \text{把非线性放到便宜的局部问题里， 把全局耦合压缩成固定线性系统} }\]&lt;p&gt;这是一类非常强大的求解器设计模式。&lt;/p&gt;
 &lt;p&gt;很多计算力可以拆成：&lt;/p&gt;
-\[
-\text{local nonlinear physics}
-+
-\text{global linear coupling}.
-\]&lt;p&gt;如果做得好，就可以达到：&lt;/p&gt;
-\[
-\text{local：并行}
-\]\[
-\text{global：预分解 / GPU iterative solve}
-\]&lt;p&gt;而不是每个 iteration 都重新构造完整 nonlinear FEM Hessian。&lt;/p&gt;
+\[\text{local nonlinear physics} + \text{global linear coupling}.\]&lt;p&gt;如果做得好，就可以达到：&lt;/p&gt;
+\[\text{local：并行}\]\[\text{global：预分解 / GPU iterative solve}\]&lt;p&gt;而不是每个 iteration 都重新构造完整 nonlinear FEM Hessian。&lt;/p&gt;
 &lt;p&gt;对于四面体软体求解器，这个视角尤其值得尝试：&lt;/p&gt;
-\[
-F_e
-\rightarrow
-\text{local constitutive operation}
-\rightarrow
-\text{global nodal reconciliation}.
-\]&lt;p&gt;这和 XPBD 的 constraint projection 非常接近，但 PD 给它补上了一个完整的优化解释。&lt;/p&gt;
+\[F_e \rightarrow \text{local constitutive operation} \rightarrow \text{global nodal reconciliation}.\]&lt;p&gt;这和 XPBD 的 constraint projection 非常接近，但 PD 给它补上了一个完整的优化解释。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h2&gt;\[
-\boxed{
-\text{Projective Dynamics 的核心并不是“投影”，而是让非线性局部化。}
-}
-\]&lt;p&gt;一旦看到这一点，你会发现 PD、PBD、quasi-Newton、ADMM、differentiable simulation 之间并没有那么远。&lt;/p&gt;
+&lt;/h2&gt;\[\boxed{ \text{Projective Dynamics 的核心并不是“投影”，而是让非线性局部化。} }\]&lt;p&gt;一旦看到这一点，你会发现 PD、PBD、quasi-Newton、ADMM、differentiable simulation 之间并没有那么远。&lt;/p&gt;
 &lt;p&gt;它们很多时候都在回答同一个问题：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;怎样把一个昂贵的全局非线性问题，拆成便宜的局部非线性 + 可重复利用的全局结构？&lt;/strong&gt;&lt;/p&gt;
@@ -1048,105 +537,34 @@ F_e
 &lt;strong&gt;领域：有限元 × 计算力学 × 物理引擎 × 数值方法&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：&lt;/p&gt;
-\[
-\boxed{\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}
-\]&lt;p&gt;传统数值积分通常先得到连续运动方程：&lt;/p&gt;
-\[
-M\ddot q+\nabla V(q)=0,
-\]&lt;p&gt;然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。&lt;/p&gt;
+\[\boxed{\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}\]&lt;p&gt;传统数值积分通常先得到连续运动方程：&lt;/p&gt;
+\[M\ddot q+\nabla V(q)=0,\]&lt;p&gt;然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;Variational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;Marsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。&lt;/p&gt;
 &lt;p&gt;它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-传统方法容易忽略什么&#34;&gt;1. 传统方法容易忽略什么？
 &lt;/h2&gt;&lt;p&gt;考虑最简单的无阻尼机械系统：&lt;/p&gt;
-\[
-L(q,\dot q)=T(\dot q)-V(q).
-\]&lt;p&gt;真实运动满足 Hamilton 原理：&lt;/p&gt;
-\[
-\delta S=0,
-\]&lt;p&gt;其中作用量&lt;/p&gt;
-&lt;h1 id=&#34;sq&#34;&gt;[
-S[q]
-&lt;/h1&gt;&lt;p&gt;\int_{t_0}^{t_1}
-L(q,\dot q),dt.
-]&lt;/p&gt;
-&lt;p&gt;对它做变分，就得到 Euler–Lagrange 方程：&lt;/p&gt;
-&lt;h2 id=&#34;fracpartial-lpartial-dot-q&#34;&gt;[
-\frac{d}{dt}
-\frac{\partial L}{\partial \dot q}
-&lt;/h2&gt;&lt;p&gt;\frac{\partial L}{\partial q}
-=0.
-]&lt;/p&gt;
-&lt;p&gt;也就是说，连续动力学存在一条逻辑链：&lt;/p&gt;
-\[
-\boxed{
-\text{variational principle}
-\rightarrow
-\text{Euler–Lagrange equation}
-\rightarrow
-\text{trajectory}
-}
-\]&lt;p&gt;普通时间积分通常在第二层才开始：&lt;/p&gt;
-\[
-\text{Euler–Lagrange equation}
-\rightarrow
-\boxed{\text{discretize}}
-\]&lt;p&gt;而 VI 提前了一层：&lt;/p&gt;
-\[
-\boxed{\text{discretize variational principle}}
-\rightarrow
-\text{discrete Euler–Lagrange equation}.
-\]&lt;p&gt;这两个操作一般&lt;strong&gt;并不等价&lt;/strong&gt;。这一点也是离散力学和离散最优控制文献反复强调的核心区别。&lt;/p&gt;
+\[L(q,\dot q)=T(\dot q)-V(q).\]&lt;p&gt;真实运动满足 Hamilton 原理：&lt;/p&gt;
+\[\delta S=0,\]&lt;p&gt;其中作用量&lt;/p&gt;
+\[S[q] = \int_{t_0}^{t_1} L(q,\dot q)\,dt.\]&lt;p&gt;对它做变分，就得到 Euler–Lagrange 方程：&lt;/p&gt;
+\[\frac{d}{dt} \frac{\partial L}{\partial \dot q} - \frac{\partial L}{\partial q} =0.\]&lt;p&gt;也就是说，连续动力学存在一条逻辑链：&lt;/p&gt;
+\[\boxed{ \text{variational principle} \rightarrow \text{Euler–Lagrange equation} \rightarrow \text{trajectory} }\]&lt;p&gt;普通时间积分通常在第二层才开始：&lt;/p&gt;
+\[\text{Euler–Lagrange equation} \rightarrow \boxed{\text{discretize}}\]&lt;p&gt;而 VI 提前了一层：&lt;/p&gt;
+\[\boxed{\text{discretize variational principle}} \rightarrow \text{discrete Euler–Lagrange equation}.\]&lt;p&gt;这两个操作一般&lt;strong&gt;并不等价&lt;/strong&gt;。这一点也是离散力学和离散最优控制文献反复强调的核心区别。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-怎么把-hamilton-原理离散化&#34;&gt;2. 怎么把 Hamilton 原理离散化？
 &lt;/h1&gt;&lt;p&gt;连续作用量为：&lt;/p&gt;
-\[
-S=\int L(q,\dot q)\,dt.
-\]&lt;p&gt;现在把时间切成：&lt;/p&gt;
-\[
-t_0,t_1,\ldots,t_N,
-\qquad
-h=t_{k+1}-t_k.
-\]&lt;p&gt;用一个 &lt;strong&gt;discrete Lagrangian&lt;/strong&gt;&lt;/p&gt;
-\[
-L_d(q_k,q_{k+1})
-\]&lt;p&gt;去近似一小段真实作用量：&lt;/p&gt;
-\[
-L_d(q_k,q_{k+1})
-\approx
-\int_{t_k}^{t_{k+1}}
-L(q,\dot q)\,dt.
-\]&lt;p&gt;于是总作用量变成：&lt;/p&gt;
-&lt;h1 id=&#34;s_d&#34;&gt;[
-S_d
-&lt;/h1&gt;&lt;p&gt;\sum_{k=0}^{N-1}
-L_d(q_k,q_{k+1}).
-]&lt;/p&gt;
-&lt;p&gt;然后不再对连续曲线求变分，而是要求：&lt;/p&gt;
-\[
-\delta S_d=0.
-\]&lt;p&gt;对内部节点 \(q_k\) 求导：&lt;/p&gt;
-&lt;h1 id=&#34;d_1l_dq_kq_k1&#34;&gt;[
-D_2L_d(q_{k-1},q_k)
-+
-D_1L_d(q_k,q_{k+1})
-&lt;/h1&gt;&lt;ol start=&#34;0&#34;&gt;
-&lt;li&gt;&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;]&lt;/p&gt;
-&lt;p&gt;这就是：&lt;/p&gt;
-\[
-\boxed{
-\text{Discrete Euler–Lagrange equation}
-}
-\]&lt;p&gt;它直接定义了从&lt;/p&gt;
-\[
-(q_{k-1},q_k)
-\]&lt;p&gt;到&lt;/p&gt;
-\[
-(q_k,q_{k+1})
-\]&lt;p&gt;的时间推进。&lt;/p&gt;
+\[S=\int L(q,\dot q)\,dt.\]&lt;p&gt;现在把时间切成：&lt;/p&gt;
+\[t_0,t_1,\ldots,t_N, \qquad h=t_{k+1}-t_k.\]&lt;p&gt;用一个 &lt;strong&gt;discrete Lagrangian&lt;/strong&gt;&lt;/p&gt;
+\[L_d(q_k,q_{k+1})\]&lt;p&gt;去近似一小段真实作用量：&lt;/p&gt;
+\[L_d(q_k,q_{k+1}) \approx \int_{t_k}^{t_{k+1}} L(q,\dot q)\,dt.\]&lt;p&gt;于是总作用量变成：&lt;/p&gt;
+\[S_d = \sum_{k=0}^{N-1} L_d(q_k,q_{k+1}).\]&lt;p&gt;然后不再对连续曲线求变分，而是要求：&lt;/p&gt;
+\[\delta S_d=0.\]&lt;p&gt;对内部节点 \(q_k\) 求导：&lt;/p&gt;
+\[D_2L_d(q_{k-1},q_k) + D_1L_d(q_k,q_{k+1}) = 0.\]&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{ \text{Discrete Euler–Lagrange equation} }\]&lt;p&gt;它直接定义了从&lt;/p&gt;
+\[(q_{k-1},q_k)\]&lt;p&gt;到&lt;/p&gt;
+\[(q_k,q_{k+1})\]&lt;p&gt;的时间推进。&lt;/p&gt;
 &lt;p&gt;这里最重要的思想是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;离散运动方程并非人为挑选出来，而是从一个离散力学原理中推导出来。&lt;/strong&gt;&lt;/p&gt;
@@ -1154,59 +572,22 @@ D_1L_d(q_k,q_{k+1})
 &lt;hr&gt;
 &lt;h1 id=&#34;3-一个惊喜熟悉的-verlet-可以从这里自然出现&#34;&gt;3. 一个惊喜：熟悉的 Verlet 可以从这里自然出现
 &lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
-&lt;h1 id=&#34;lqdot-q&#34;&gt;[
-L(q,\dot q)
-&lt;/h1&gt;&lt;p&gt;\frac12m\dot q^2-V(q).
-]&lt;/p&gt;
-&lt;p&gt;取一种简单 discrete Lagrangian：&lt;/p&gt;
-&lt;h1 id=&#34;l_dq_kq_k1&#34;&gt;[
-L_d(q_k,q_{k+1})
-&lt;/h1&gt;&lt;h2 id=&#34;right2&#34;&gt;h
-\left[
-\frac12m
-\left(
-\frac{q_{k+1}-q_k}{h}
-\right)^2
-&lt;/h2&gt;&lt;p&gt;V(q_k)
-\right].
-]&lt;/p&gt;
-&lt;p&gt;代入离散 Euler–Lagrange 方程，会得到类似：&lt;/p&gt;
-&lt;h1 id=&#34;fracq_k1-2q_kq_k-1h2&#34;&gt;[
-m
-\frac{q_{k+1}-2q_k+q_{k-1}}{h^2}
-&lt;/h1&gt;&lt;p&gt;-\nabla V(q_k).
-]&lt;/p&gt;
-&lt;p&gt;即：&lt;/p&gt;
-&lt;h1 id=&#34;q_k1&#34;&gt;[
-\boxed{
-q_{k+1}
-&lt;/h1&gt;&lt;h2 id=&#34;2q_k-q_k-1&#34;&gt;2q_k-q_{k-1}
-&lt;/h2&gt;&lt;p&gt;\frac{h^2}{m}\nabla V(q_k)
-}
-]&lt;/p&gt;
-&lt;p&gt;这正与 Störmer–Verlet / central-difference 家族有非常紧密的关系。&lt;/p&gt;
+\[L(q,\dot q) = \frac12m\dot q^2-V(q).\]&lt;p&gt;取一种简单 discrete Lagrangian：&lt;/p&gt;
+\[L_d(q_k,q_{k+1}) = h \left[ \frac12m \left( \frac{q_{k+1}-q_k}{h} \right)^2 - V(q_k) \right].\]&lt;p&gt;代入离散 Euler–Lagrange 方程，会得到类似：&lt;/p&gt;
+\[m \frac{q_{k+1}-2q_k+q_{k-1}}{h^2} = -\nabla V(q_k).\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{ q_{k+1} = 2q_k-q_{k-1} - \frac{h^2}{m}\nabla V(q_k) }\]&lt;p&gt;这正与 Störmer–Verlet / central-difference 家族有非常紧密的关系。&lt;/p&gt;
 &lt;p&gt;所以 Verlet 的长期动力学性质并非偶然。Marsden–West 的框架把许多熟悉的辛方法统一解释成离散变分积分器。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-为什么它比局部误差小更值得关心&#34;&gt;4. 为什么它比“局部误差小”更值得关心？
 &lt;/h1&gt;&lt;p&gt;这是 VI 最核心的部分。&lt;/p&gt;
 &lt;p&gt;普通数值分析经常比较：&lt;/p&gt;
-\[
-\|q_{\rm num}(t)-q_{\rm exact}(t)\|.
-\]&lt;p&gt;例如：&lt;/p&gt;
-\[
-O(h),\qquad O(h^2),\qquad O(h^4).
-\]&lt;p&gt;但对于需要模拟：&lt;/p&gt;
-\[
-10^4,\ 10^5,\ 10^6
-\]&lt;p&gt;个时间步的动力系统，只看每一步的误差阶数可能并不够。&lt;/p&gt;
+\[\|q_{\rm num}(t)-q_{\rm exact}(t)\|.\]&lt;p&gt;例如：&lt;/p&gt;
+\[O(h),\qquad O(h^2),\qquad O(h^4).\]&lt;p&gt;但对于需要模拟：&lt;/p&gt;
+\[10^4,\ 10^5,\ 10^6\]&lt;p&gt;个时间步的动力系统，只看每一步的误差阶数可能并不够。&lt;/p&gt;
 &lt;p&gt;因为机械系统有一些&lt;strong&gt;全局几何结构&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;最重要的是：&lt;/p&gt;
-\[
-\boxed{\text{symplectic structure}}
-\]&lt;p&gt;对于 Hamiltonian 系统，真实流保持相空间中的辛形式：&lt;/p&gt;
-\[
-dq\wedge dp.
-\]&lt;p&gt;变分积分器天然产生 symplectic map。&lt;/p&gt;
+\[\boxed{\text{symplectic structure}}\]&lt;p&gt;对于 Hamiltonian 系统，真实流保持相空间中的辛形式：&lt;/p&gt;
+\[dq\wedge dp.\]&lt;p&gt;变分积分器天然产生 symplectic map。&lt;/p&gt;
 &lt;p&gt;一个直观但并不完全严格的理解是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;它不会像普通数值耗散或数值反耗散方法那样，任意压缩或膨胀 Hamiltonian 相空间的动力学结构。&lt;/p&gt;
@@ -1216,130 +597,48 @@ dq\wedge dp.
 &lt;h1 id=&#34;5-一个容易误解的地方vi-通常不严格守恒能量&#34;&gt;5. 一个容易误解的地方：VI 通常&lt;strong&gt;不严格守恒能量&lt;/strong&gt;
 &lt;/h1&gt;&lt;p&gt;这是非常重要的区别。&lt;/p&gt;
 &lt;p&gt;很多人看到：&lt;/p&gt;
-\[
-\text{structure preserving}
-\]&lt;p&gt;就会理解成：&lt;/p&gt;
-\[
-E_{k+1}=E_k.
-\]&lt;p&gt;一般并非如此。&lt;/p&gt;
+\[\text{structure preserving}\]&lt;p&gt;就会理解成：&lt;/p&gt;
+\[E_{k+1}=E_k.\]&lt;p&gt;一般并非如此。&lt;/p&gt;
 &lt;p&gt;普通固定步长 symplectic / variational integrator 通常表现为：&lt;/p&gt;
-&lt;h1 id=&#34;e_k&#34;&gt;[
-E_k
-&lt;/h1&gt;&lt;p&gt;E_0
-+
-\text{bounded oscillatory error},
-]&lt;/p&gt;
-&lt;p&gt;而不是严格：&lt;/p&gt;
-\[
-E_k=E_0.
-\]&lt;p&gt;更深的 backward error analysis 告诉我们：辛积分器可以理解为&lt;strong&gt;精确积分了一个与原 Hamiltonian 非常接近的 modified Hamiltonian&lt;/strong&gt;。这正是它长期能量误差往往有界、不产生系统性漂移的重要原因。Hairer–Lubich–Wanner 专门把这种长期行为作为几何积分理论的核心内容。&lt;/p&gt;
+\[E_k = E_0 + \text{bounded oscillatory error},\]&lt;p&gt;而不是严格：&lt;/p&gt;
+\[E_k=E_0.\]&lt;p&gt;更深的 backward error analysis 告诉我们：辛积分器可以理解为&lt;strong&gt;精确积分了一个与原 Hamiltonian 非常接近的 modified Hamiltonian&lt;/strong&gt;。这正是它长期能量误差往往有界、不产生系统性漂移的重要原因。Hairer–Lubich–Wanner 专门把这种长期行为作为几何积分理论的核心内容。&lt;/p&gt;
 &lt;p&gt;所以一个很值得记住的区别是：&lt;/p&gt;
-\[
-\boxed{
-\text{exact energy conservation}
-\neq
-\text{good long-term energy behavior}
-}
-\]&lt;p&gt;很多时候后者才是动力学仿真真正需要的东西。&lt;/p&gt;
+\[\boxed{ \text{exact energy conservation} \neq \text{good long-term energy behavior} }\]&lt;p&gt;很多时候后者才是动力学仿真真正需要的东西。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-noether-定理在离散世界里仍然存在&#34;&gt;6. Noether 定理在离散世界里仍然存在
 &lt;/h1&gt;&lt;p&gt;连续力学中，Noether 定理把：&lt;/p&gt;
-\[
-\text{symmetry}
-\]&lt;p&gt;与：&lt;/p&gt;
-\[
-\text{conserved quantity}
-\]&lt;p&gt;连接起来。&lt;/p&gt;
+\[\text{symmetry}\]&lt;p&gt;与：&lt;/p&gt;
+\[\text{conserved quantity}\]&lt;p&gt;连接起来。&lt;/p&gt;
 &lt;p&gt;例如空间平移不改变 Lagrangian：&lt;/p&gt;
-\[
-\Rightarrow
-\text{linear momentum conservation}.
-\]&lt;p&gt;旋转不变：&lt;/p&gt;
-\[
-\Rightarrow
-\text{angular momentum conservation}.
-\]&lt;p&gt;时间平移：&lt;/p&gt;
-\[
-\Rightarrow
-\text{energy relation}.
-\]&lt;p&gt;VI 中存在对应的 &lt;strong&gt;discrete Noether theorem&lt;/strong&gt;。如果 discrete Lagrangian 保留相应对称性，对应的离散动量可以被精确保存。Marsden–West 将这一点作为 VI 理论的核心结果之一。&lt;/p&gt;
+\[\Rightarrow \text{linear momentum conservation}.\]&lt;p&gt;旋转不变：&lt;/p&gt;
+\[\Rightarrow \text{angular momentum conservation}.\]&lt;p&gt;时间平移：&lt;/p&gt;
+\[\Rightarrow \text{energy relation}.\]&lt;p&gt;VI 中存在对应的 &lt;strong&gt;discrete Noether theorem&lt;/strong&gt;。如果 discrete Lagrangian 保留相应对称性，对应的离散动量可以被精确保存。Marsden–West 将这一点作为 VI 理论的核心结果之一。&lt;/p&gt;
 &lt;p&gt;这对物理引擎设计尤其有意义：&lt;/p&gt;
 &lt;p&gt;如果一个孤立软体没有外力和外力矩，那么你希望：&lt;/p&gt;
-\[
-P_{k+1}=P_k,
-\]\[
-L_{k+1}=L_k.
-\]&lt;p&gt;VI 提供了一种很强的设计原则：&lt;/p&gt;
+\[P_{k+1}=P_k,\]\[L_{k+1}=L_k.\]&lt;p&gt;VI 提供了一种很强的设计原则：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;不要事后写一个 momentum correction；从一开始就让离散公式保留对应的对称性。&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;7-这和-fem-的关系比看起来更近&#34;&gt;7. 这和 FEM 的关系比看起来更近
 &lt;/h1&gt;&lt;p&gt;空间有限元首先把连续弹性体：&lt;/p&gt;
-\[
-x(X,t)
-\]&lt;p&gt;离散成节点自由度：&lt;/p&gt;
-\[
-q(t).
-\]&lt;p&gt;于是得到一个半离散系统：&lt;/p&gt;
-&lt;h1 id=&#34;nabla-eq&#34;&gt;[
-M\ddot q
-+
-\nabla E(q)
-&lt;/h1&gt;&lt;p&gt;f.
-]&lt;/p&gt;
-&lt;p&gt;其 Lagrangian 就是：&lt;/p&gt;
-&lt;h1 id=&#34;lqdot-q-1&#34;&gt;[
-L(q,\dot q)
-&lt;/h1&gt;&lt;h2 id=&#34;frac12dot-qtmdot-q&#34;&gt;\frac12\dot q^TM\dot q
-&lt;/h2&gt;&lt;p&gt;E(q).
-]&lt;/p&gt;
-&lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-\text{FEM负责空间离散}
-}
-\]&lt;p&gt;而：&lt;/p&gt;
-\[
-\boxed{
-\text{VI负责时间离散}
-}
-\]&lt;p&gt;两者实际上天然可以组合。&lt;/p&gt;
+\[x(X,t)\]&lt;p&gt;离散成节点自由度：&lt;/p&gt;
+\[q(t).\]&lt;p&gt;于是得到一个半离散系统：&lt;/p&gt;
+\[M\ddot q + \nabla E(q) = f.\]&lt;p&gt;其 Lagrangian 就是：&lt;/p&gt;
+\[L(q,\dot q) = \frac12\dot q^TM\dot q - E(q).\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{FEM负责空间离散} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{VI负责时间离散} }\]&lt;p&gt;两者实际上天然可以组合。&lt;/p&gt;
 &lt;p&gt;也就是说，一个结构保持型 FEM 可以理解为：&lt;/p&gt;
-\[
-\text{continuum mechanics}
-\]\[
-\downarrow\quad \text{spatial discretization}
-\]\[
-L(q,\dot q)
-\]\[
-\downarrow\quad \text{variational time discretization}
-\]\[
-q_0,q_1,q_2,\ldots
-\]&lt;p&gt;近年来也仍有工作继续研究 Hamiltonian / symplectic FEM 的空间—时间组合。&lt;/p&gt;
+\[\text{continuum mechanics}\]\[\downarrow\quad \text{spatial discretization}\]\[L(q,\dot q)\]\[\downarrow\quad \text{variational time discretization}\]\[q_0,q_1,q_2,\ldots\]&lt;p&gt;近年来也仍有工作继续研究 Hamiltonian / symplectic FEM 的空间—时间组合。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-为什么游戏物理里没有-everywhere-都使用-vi&#34;&gt;8. 为什么游戏物理里没有 everywhere 都使用 VI？
 &lt;/h1&gt;&lt;p&gt;这里必须看到它的局限。&lt;/p&gt;
 &lt;p&gt;真实游戏物理往往包含：&lt;/p&gt;
-\[
-\text{collision}
-+
-\text{Coulomb friction}
-+
-\text{damping}
-+
-\text{motors}
-+
-\text{constraint activation/deactivation}.
-\]&lt;p&gt;这些东西会破坏最干净的保守 Hamiltonian 结构。&lt;/p&gt;
+\[\text{collision} + \text{Coulomb friction} + \text{damping} + \text{motors} + \text{constraint activation/deactivation}.\]&lt;p&gt;这些东西会破坏最干净的保守 Hamiltonian 结构。&lt;/p&gt;
 &lt;p&gt;尤其是摩擦：&lt;/p&gt;
-\[
-F_f
-\]&lt;p&gt;本身就是耗散性的。&lt;/p&gt;
+\[F_f\]&lt;p&gt;本身就是耗散性的。&lt;/p&gt;
 &lt;p&gt;撞击还可能包含：&lt;/p&gt;
-\[
-v^-\rightarrow v^+
-\]&lt;p&gt;这种非光滑事件。&lt;/p&gt;
+\[v^-\rightarrow v^+\]&lt;p&gt;这种非光滑事件。&lt;/p&gt;
 &lt;p&gt;所以 VI 最漂亮的理论通常建立在：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;conservative；&lt;/li&gt;
@@ -1354,30 +653,14 @@ v^-\rightarrow v^+
 &lt;/h1&gt;&lt;p&gt;这个方向到现在并没有停留在 2001 年理论。&lt;/p&gt;
 &lt;p&gt;SIGGRAPH 2025 的 &lt;strong&gt;Variational Elastodynamic Simulation&lt;/strong&gt; 又重新处理了非线性弹性中的变分时间积分。论文指出，variational time integration 在求解时可能遭遇 ill-conditioned Hessian 和不可靠 root finding，而可靠求解又与其动量保持性质密切相关；他们进一步挖掘了问题中的“hidden convex”结构，以提高非线性弹性动力学求解的鲁棒性。&lt;/p&gt;
 &lt;p&gt;这件事情很有意思，因为它说明：&lt;/p&gt;
-\[
-\boxed{
-\text{好的离散理论}
-}
-\]&lt;p&gt;仍然必须配合：&lt;/p&gt;
-\[
-\boxed{
-\text{好的 nonlinear solver}
-}
-\]&lt;p&gt;结构保持并不会自动消灭数值求解困难。&lt;/p&gt;
+\[\boxed{ \text{好的离散理论} }\]&lt;p&gt;仍然必须配合：&lt;/p&gt;
+\[\boxed{ \text{好的 nonlinear solver} }\]&lt;p&gt;结构保持并不会自动消灭数值求解困难。&lt;/p&gt;
 &lt;p&gt;这和 IPC 非常相似：&lt;/p&gt;
-\[
-\text{formulation}
-+
-\text{optimization algorithm}
-\]&lt;p&gt;必须一起设计。&lt;/p&gt;
+\[\text{formulation} + \text{optimization algorithm}\]&lt;p&gt;必须一起设计。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;10-对物理求解器最值得迁移的一点&#34;&gt;10. 对物理求解器最值得迁移的一点
 &lt;/h1&gt;&lt;p&gt;VI 最值得迁移的不是某个具体积分公式，而是：&lt;/p&gt;
-\[
-\boxed{
-\text{structure before accuracy}
-}
-\]&lt;p&gt;这里的 structure 可以是：&lt;/p&gt;
+\[\boxed{ \text{structure before accuracy} }\]&lt;p&gt;这里的 structure 可以是：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;momentum conservation；&lt;/li&gt;
 &lt;li&gt;symplecticity；&lt;/li&gt;
@@ -1387,40 +670,19 @@ v^-\rightarrow v^+
 &lt;li&gt;constraint invariants。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;传统思路容易变成：&lt;/p&gt;
-\[
-\text{先求一个近似答案}
-\rightarrow
-\text{再不断 correction}.
-\]&lt;p&gt;VI 给出另一种设计哲学：&lt;/p&gt;
-\[
-\boxed{
-\text{从离散模型本身，就让某些正确性成为结构性质。}
-}
-\]&lt;p&gt;这与你前面讨论 IPC 时发现的现象其实高度一致。&lt;/p&gt;
+\[\text{先求一个近似答案} \rightarrow \text{再不断 correction}.\]&lt;p&gt;VI 给出另一种设计哲学：&lt;/p&gt;
+\[\boxed{ \text{从离散模型本身，就让某些正确性成为结构性质。} }\]&lt;p&gt;这与你前面讨论 IPC 时发现的现象其实高度一致。&lt;/p&gt;
 &lt;p&gt;IPC 中：&lt;/p&gt;
-\[
-\text{CCD}
-\]&lt;p&gt;让：&lt;/p&gt;
-\[
-d&gt;0
-\]&lt;p&gt;成为 trajectory feasibility。&lt;/p&gt;
+\[\text{CCD}\]&lt;p&gt;让：&lt;/p&gt;
+\[d&gt;0\]&lt;p&gt;成为 trajectory feasibility。&lt;/p&gt;
 &lt;p&gt;VI 中：&lt;/p&gt;
-\[
-\text{discrete symmetry}
-\]&lt;p&gt;让某些 momentum conservation 成为离散动力学本身的性质。&lt;/p&gt;
+\[\text{discrete symmetry}\]&lt;p&gt;让某些 momentum conservation 成为离散动力学本身的性质。&lt;/p&gt;
 &lt;p&gt;它们背后有同一个非常强的求解器思想：&lt;/p&gt;
-\[
-\boxed{
-\text{尽量把“正确”编码进 formulation，
-而不是依赖迭代结束后的修补。}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{尽量把“正确”编码进 formulation， 而不是依赖迭代结束后的修补。} }\]&lt;hr&gt;
 &lt;h2 id=&#34;一个工程诊断例子&#34;&gt;一个工程诊断例子
 &lt;/h2&gt;&lt;p&gt;假设你的软体掉在没有摩擦的地面上，然后弹起。&lt;/p&gt;
 &lt;p&gt;你发现：&lt;/p&gt;
-\[
-P_x(t)
-\]&lt;p&gt;在没有水平外力的情况下持续漂移。&lt;/p&gt;
+\[P_x(t)\]&lt;p&gt;在没有水平外力的情况下持续漂移。&lt;/p&gt;
 &lt;p&gt;典型工程做法可能是找：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;contact correction；&lt;/li&gt;
@@ -1434,51 +696,20 @@ P_x(t)
 &lt;p&gt;&lt;strong&gt;你的整个离散时间步是否具有水平平移对称性？&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;如果某个约束或 correction 隐式依赖：&lt;/p&gt;
-\[
-x_{\rm world},
-\]&lt;p&gt;而不是仅依赖相对位置，就可能人为破坏平移不变性。&lt;/p&gt;
+\[x_{\rm world},\]&lt;p&gt;而不是仅依赖相对位置，就可能人为破坏平移不变性。&lt;/p&gt;
 &lt;p&gt;于是：&lt;/p&gt;
-\[
-\text{symmetry broken}
-\Rightarrow
-\text{momentum conservation broken}.
-\]&lt;p&gt;这个思考方式特别适合做复杂求解器诊断。&lt;/p&gt;
+\[\text{symmetry broken} \Rightarrow \text{momentum conservation broken}.\]&lt;p&gt;这个思考方式特别适合做复杂求解器诊断。&lt;/p&gt;
 &lt;p&gt;它把问题从：&lt;/p&gt;
-\[
-\text{哪个参数有错？}
-\]&lt;p&gt;提升到：&lt;/p&gt;
-\[
-\boxed{
-\text{这个离散算法保留了哪些连续系统结构？}
-}
-\]&lt;hr&gt;
+\[\text{哪个参数有错？}\]&lt;p&gt;提升到：&lt;/p&gt;
+\[\boxed{ \text{这个离散算法保留了哪些连续系统结构？} }\]&lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h1&gt;\[
-\boxed{
-\text{不要只离散方程，也可以离散产生方程的原理。}
-}
-\]&lt;p&gt;更进一步：&lt;/p&gt;
-\[
-\boxed{
-\text{一个积分器的质量，不只取决于单步误差，
-还取决于它长期保留了什么。}
-}
-\]&lt;p&gt;如果未来你要自己设计软体或刚体求解器，这个问题值得经常拿出来：&lt;/p&gt;
+&lt;/h1&gt;\[\boxed{ \text{不要只离散方程，也可以离散产生方程的原理。} }\]&lt;p&gt;更进一步：&lt;/p&gt;
+\[\boxed{ \text{一个积分器的质量，不只取决于单步误差， 还取决于它长期保留了什么。} }\]&lt;p&gt;如果未来你要自己设计软体或刚体求解器，这个问题值得经常拿出来：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;哪些性质应该由 tolerance 保证，哪些应该由算法结构保证？&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;这会自然连接到：&lt;/p&gt;
-\[
-\text{variational integrators}
-\rightarrow
-\text{symplectic methods}
-\rightarrow
-\text{Lie-group integrators}
-\rightarrow
-\text{energy-momentum methods}
-\rightarrow
-\text{structure-preserving differentiable simulation}.
-\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+\[\text{variational integrators} \rightarrow \text{symplectic methods} \rightarrow \text{Lie-group integrators} \rightarrow \text{energy-momentum methods} \rightarrow \text{structure-preserving differentiable simulation}.\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Marsden &amp;amp; West, &lt;em&gt;Discrete Mechanics and Variational Integrators&lt;/em&gt;, Acta Numerica, 2001&lt;/strong&gt;。这是最重要的理论入口，系统讲离散作用量、离散 Euler–Lagrange 方程、symplecticity、Noether theorem、约束与外力。&lt;/p&gt;
@@ -1509,20 +740,14 @@ x_{\rm world},
 &lt;strong&gt;领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：&lt;/p&gt;
-\[
-\boxed{\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}}
-\]&lt;p&gt;APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。&lt;/p&gt;
+\[\boxed{\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}}\]&lt;p&gt;APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。&lt;/p&gt;
 &lt;p&gt;这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。&lt;/p&gt;
 &lt;p&gt;它只改变：&lt;/p&gt;
-\[
-\boxed{\text{particle}\leftrightarrow\text{grid}}
-\]&lt;p&gt;之间到底传递多少信息。&lt;/p&gt;
+\[\boxed{\text{particle}\leftrightarrow\text{grid}}\]&lt;p&gt;之间到底传递多少信息。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-先理解-mpmpic-为什么需要来回搬数据&#34;&gt;1. 先理解 MPM/PIC 为什么需要“来回搬数据”
 &lt;/h2&gt;&lt;p&gt;MPM 一类方法有两套表示：&lt;/p&gt;
-\[
-\boxed{\text{Particles}}
-\]&lt;p&gt;负责携带材料：&lt;/p&gt;
+\[\boxed{\text{Particles}}\]&lt;p&gt;负责携带材料：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;质量；&lt;/li&gt;
 &lt;li&gt;位置；&lt;/li&gt;
@@ -1532,9 +757,7 @@ x_{\rm world},
 &lt;li&gt;材料参数；&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;而临时背景网格：&lt;/p&gt;
-\[
-\boxed{\text{Grid}}
-\]&lt;p&gt;负责：&lt;/p&gt;
+\[\boxed{\text{Grid}}\]&lt;p&gt;负责：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;汇聚质量；&lt;/li&gt;
 &lt;li&gt;计算动量；&lt;/li&gt;
@@ -1543,15 +766,7 @@ x_{\rm world},
 &lt;li&gt;求解运动。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;一个典型时间步近似是：&lt;/p&gt;
-\[
-\text{Particles}
-\xrightarrow{\mathrm{P2G}}
-\text{Grid}
-\xrightarrow{\text{physics}}
-\text{Grid}
-\xrightarrow{\mathrm{G2P}}
-\text{Particles}.
-\]&lt;p&gt;这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。&lt;/p&gt;
+\[\text{Particles} \xrightarrow{\mathrm{P2G}} \text{Grid} \xrightarrow{\text{physics}} \text{Grid} \xrightarrow{\mathrm{G2P}} \text{Particles}.\]&lt;p&gt;这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。&lt;/p&gt;
 &lt;p&gt;于是出现了一个非常关键的问题：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;粒子上的连续速度场，被映射到网格，再映射回来以后，还剩下多少原始运动信息？&lt;/p&gt;
@@ -1560,145 +775,57 @@ x_{\rm world},
 &lt;hr&gt;
 &lt;h1 id=&#34;2-pic-的问题一个粒子只记住一个速度&#34;&gt;2. PIC 的问题：一个粒子只记住一个速度
 &lt;/h1&gt;&lt;p&gt;传统 PIC 中，每个粒子基本只携带：&lt;/p&gt;
-\[
-(x_p,v_p).
-\]&lt;p&gt;也就是说，对粒子附近的速度场，它采用：&lt;/p&gt;
-\[
-v(x)\approx v_p.
-\]&lt;p&gt;这是一个&lt;strong&gt;零阶局部模型&lt;/strong&gt;：&lt;/p&gt;
-\[
-\boxed{\text{局部速度场是常数}}
-\]&lt;p&gt;P2G 时：&lt;/p&gt;
-\[
-m_i=\sum_p w_{ip}m_p,
-\]&lt;h1 id=&#34;m_i-v_i&#34;&gt;[
-m_i v_i
-&lt;/h1&gt;&lt;p&gt;\sum_p
-w_{ip}m_pv_p.
-]&lt;/p&gt;
-&lt;p&gt;网格算完之后，再插值回来：&lt;/p&gt;
-&lt;h1 id=&#34;v_pn1&#34;&gt;[
-v_p^{n+1}
-&lt;/h1&gt;&lt;p&gt;\sum_iw_{ip}v_i^{n+1}.
-]&lt;/p&gt;
-&lt;p&gt;问题就在这里。&lt;/p&gt;
+\[(x_p,v_p).\]&lt;p&gt;也就是说，对粒子附近的速度场，它采用：&lt;/p&gt;
+\[v(x)\approx v_p.\]&lt;p&gt;这是一个&lt;strong&gt;零阶局部模型&lt;/strong&gt;：&lt;/p&gt;
+\[\boxed{\text{局部速度场是常数}}\]&lt;p&gt;P2G 时：&lt;/p&gt;
+\[m_i=\sum_p w_{ip}m_p,\]\[m_i v_i = \sum_p w_{ip}m_pv_p.\]&lt;p&gt;网格算完之后，再插值回来：&lt;/p&gt;
+\[v_p^{n+1} = \sum_iw_{ip}v_i^{n+1}.\]&lt;p&gt;问题就在这里。&lt;/p&gt;
 &lt;p&gt;假设真实局部运动是一个旋转：&lt;/p&gt;
-\[
-v(x)=\omega\times(x-x_c).
-\]&lt;p&gt;在空间不同位置：&lt;/p&gt;
-\[
-v(x_1)\neq v(x_2).
-\]&lt;p&gt;但传统 PIC 的一个粒子只留下一个：&lt;/p&gt;
-\[
-v_p.
-\]&lt;p&gt;局部速度梯度：&lt;/p&gt;
-\[
-\nabla v
-\]&lt;p&gt;就没有被粒子显式保存。&lt;/p&gt;
+\[v(x)=\omega\times(x-x_c).\]&lt;p&gt;在空间不同位置：&lt;/p&gt;
+\[v(x_1)\neq v(x_2).\]&lt;p&gt;但传统 PIC 的一个粒子只留下一个：&lt;/p&gt;
+\[v_p.\]&lt;p&gt;局部速度梯度：&lt;/p&gt;
+\[\nabla v\]&lt;p&gt;就没有被粒子显式保存。&lt;/p&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-\[
-\text{particle}
-\rightarrow
-\text{grid}
-\rightarrow
-\text{particle}
-\]&lt;p&gt;实际上包含一次信息压缩。&lt;/p&gt;
+\[\text{particle} \rightarrow \text{grid} \rightarrow \text{particle}\]&lt;p&gt;实际上包含一次信息压缩。&lt;/p&gt;
 &lt;p&gt;APIC 原论文把 PIC 耗散的核心来源直接归结为这种 transfer 中的信息损失。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-一个直观例子旋转的刚体块&#34;&gt;3. 一个直观例子：旋转的刚体块
 &lt;/h1&gt;&lt;p&gt;考虑一团材料纯刚体旋转。&lt;/p&gt;
 &lt;p&gt;真实速度：&lt;/p&gt;
-\[
-v(x)=v_c+\omega\times(x-x_c).
-\]&lt;p&gt;这个速度场不是常数，而是一个&lt;strong&gt;线性/仿射速度场&lt;/strong&gt;。&lt;/p&gt;
+\[v(x)=v_c+\omega\times(x-x_c).\]&lt;p&gt;这个速度场不是常数，而是一个&lt;strong&gt;线性/仿射速度场&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;可以写成：&lt;/p&gt;
-\[
-v(x)=v_c+C(x-x_c),
-\]&lt;p&gt;其中对于纯旋转：&lt;/p&gt;
-\[
-C=
-[\omega]_\times.
-\]&lt;p&gt;现在让 PIC 反复执行：&lt;/p&gt;
-\[
-P2G\rightarrow G2P.
-\]&lt;p&gt;粒子只记录：&lt;/p&gt;
-\[
-v_p,
-\]&lt;p&gt;于是旋转速度场中的空间变化被不断重新插值和平均。&lt;/p&gt;
+\[v(x)=v_c+C(x-x_c),\]&lt;p&gt;其中对于纯旋转：&lt;/p&gt;
+\[C= [\omega]_\times.\]&lt;p&gt;现在让 PIC 反复执行：&lt;/p&gt;
+\[P2G\rightarrow G2P.\]&lt;p&gt;粒子只记录：&lt;/p&gt;
+\[v_p,\]&lt;p&gt;于是旋转速度场中的空间变化被不断重新插值和平均。&lt;/p&gt;
 &lt;p&gt;结果表现为：&lt;/p&gt;
-\[
-\omega\downarrow
-\]&lt;p&gt;即系统逐渐丢失旋转运动。&lt;/p&gt;
+\[\omega\downarrow\]&lt;p&gt;即系统逐渐丢失旋转运动。&lt;/p&gt;
 &lt;p&gt;宏观上你看到的是：&lt;/p&gt;
-\[
-\boxed{\text{numerical dissipation}}
-\]&lt;p&gt;但微观原因实际上是：&lt;/p&gt;
-\[
-\boxed{\text{representation loss}}
-\]&lt;p&gt;而不一定是阻尼项。&lt;/p&gt;
+\[\boxed{\text{numerical dissipation}}\]&lt;p&gt;但微观原因实际上是：&lt;/p&gt;
+\[\boxed{\text{representation loss}}\]&lt;p&gt;而不一定是阻尼项。&lt;/p&gt;
 &lt;p&gt;这正是 APIC 最值得记住的洞察。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-flip-为什么没有那么耗散&#34;&gt;4. FLIP 为什么没有那么耗散？
 &lt;/h1&gt;&lt;p&gt;FLIP 采取另一种做法。&lt;/p&gt;
 &lt;p&gt;它不简单把网格的新速度覆盖粒子：&lt;/p&gt;
-&lt;h1 id=&#34;v_pn1-1&#34;&gt;[
-v_p^{n+1}
-&lt;/h1&gt;&lt;p&gt;\sum_i w_{ip}v_i^{n+1}.
-]&lt;/p&gt;
-&lt;p&gt;而是把网格上的&lt;strong&gt;速度增量&lt;/strong&gt;传给粒子：&lt;/p&gt;
-&lt;h1 id=&#34;v_pn1-2&#34;&gt;[
-v_p^{n+1}
-&lt;/h1&gt;&lt;p&gt;v_p^n
-+
-\sum_iw_{ip}
-\left(
-v_i^{n+1}-v_i^n
-\right).
-]&lt;/p&gt;
-&lt;p&gt;所以粒子原本拥有的信息：&lt;/p&gt;
-\[
-v_p^n
-\]&lt;p&gt;不会被每步重新投影掉。&lt;/p&gt;
+\[v_p^{n+1} = \sum_i w_{ip}v_i^{n+1}.\]&lt;p&gt;而是把网格上的&lt;strong&gt;速度增量&lt;/strong&gt;传给粒子：&lt;/p&gt;
+\[v_p^{n+1} = v_p^n + \sum_iw_{ip} \left( v_i^{n+1}-v_i^n \right).\]&lt;p&gt;所以粒子原本拥有的信息：&lt;/p&gt;
+\[v_p^n\]&lt;p&gt;不会被每步重新投影掉。&lt;/p&gt;
 &lt;p&gt;这就是为什么 FLIP 通常耗散更小。&lt;/p&gt;
 &lt;p&gt;但代价也随之而来。&lt;/p&gt;
 &lt;p&gt;粒子可以保存一些网格无法解析的 velocity modes；这些信息不会被 PIC 那样的投影过程过滤掉，于是可能不断积累。APIC 后续的角动量守恒分析明确指出，FLIP 缺少 PIC 的 filtering property，因此可能积累粒子速度模式并出现数值不稳定。&lt;/p&gt;
 &lt;p&gt;因此可以把两者粗略理解为：&lt;/p&gt;
-\[
-\boxed{
-\text{PIC：过滤太强}
-}
-\]\[
-\boxed{
-\text{FLIP：过滤太弱}
-}
-\]&lt;p&gt;这比简单理解成“PIC 有阻尼、FLIP 没阻尼”准确得多。&lt;/p&gt;
+\[\boxed{ \text{PIC：过滤太强} }\]\[\boxed{ \text{FLIP：过滤太弱} }\]&lt;p&gt;这比简单理解成“PIC 有阻尼、FLIP 没阻尼”准确得多。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-apic-的核心粒子多保存一个局部速度梯度&#34;&gt;5. APIC 的核心：粒子多保存一个局部速度梯度
 &lt;/h1&gt;&lt;p&gt;APIC 的突破其实很简单。&lt;/p&gt;
 &lt;p&gt;传统粒子：&lt;/p&gt;
-\[
-(x_p,v_p)
-\]&lt;p&gt;升级成：&lt;/p&gt;
-\[
-\boxed{(x_p,v_p,C_p)}
-\]&lt;p&gt;其中：&lt;/p&gt;
-\[
-C_p
-\]&lt;p&gt;描述粒子附近的 affine velocity field：&lt;/p&gt;
-&lt;h1 id=&#34;vx&#34;&gt;[
-\boxed{
-v(x)
-&lt;/h1&gt;&lt;p&gt;v_p+
-C_p(x-x_p)
-}
-]&lt;/p&gt;
-&lt;p&gt;于是传统 PIC 的局部表示：&lt;/p&gt;
-\[
-v(x)\approx v_p
-\]&lt;p&gt;从零阶升级为：&lt;/p&gt;
-\[
-v(x)\approx v_p+C_p(x-x_p).
-\]&lt;p&gt;这意味着一个粒子不只知道：&lt;/p&gt;
+\[(x_p,v_p)\]&lt;p&gt;升级成：&lt;/p&gt;
+\[\boxed{(x_p,v_p,C_p)}\]&lt;p&gt;其中：&lt;/p&gt;
+\[C_p\]&lt;p&gt;描述粒子附近的 affine velocity field：&lt;/p&gt;
+\[\boxed{ v(x) = v_p+ C_p(x-x_p) }\]&lt;p&gt;于是传统 PIC 的局部表示：&lt;/p&gt;
+\[v(x)\approx v_p\]&lt;p&gt;从零阶升级为：&lt;/p&gt;
+\[v(x)\approx v_p+C_p(x-x_p).\]&lt;p&gt;这意味着一个粒子不只知道：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“我在往哪里移动。”&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -1708,63 +835,24 @@ v(x)\approx v_p+C_p(x-x_p).
 &lt;/blockquote&gt;
 &lt;p&gt;例如：&lt;/p&gt;
 &lt;h3 id=&#34;平移&#34;&gt;平移
-&lt;/h3&gt;\[
-C_p=0.
-\]&lt;h3 id=&#34;刚体旋转&#34;&gt;刚体旋转
-&lt;/h3&gt;\[
-C_p=[\omega]_\times.
-\]&lt;h3 id=&#34;剪切&#34;&gt;剪切
+&lt;/h3&gt;\[C_p=0.\]&lt;h3 id=&#34;刚体旋转&#34;&gt;刚体旋转
+&lt;/h3&gt;\[C_p=[\omega]_\times.\]&lt;h3 id=&#34;剪切&#34;&gt;剪切
 &lt;/h3&gt;&lt;p&gt;可能有：&lt;/p&gt;
-\[
-C_p=
-\begin{bmatrix}
-0 &amp; \gamma\\
-0 &amp; 0
-\end{bmatrix}.
-\]&lt;h3 id=&#34;拉伸&#34;&gt;拉伸
+\[C_p= \begin{bmatrix} 0 &amp; \gamma\\ 0 &amp; 0 \end{bmatrix}.\]&lt;h3 id=&#34;拉伸&#34;&gt;拉伸
 &lt;/h3&gt;&lt;p&gt;可能有：&lt;/p&gt;
-\[
-C_p=
-\begin{bmatrix}
-a&amp;0\\
-0&amp;b
-\end{bmatrix}.
-\]&lt;p&gt;因此一个 APIC particle 实际上带着一个“小型局部速度场”。&lt;/p&gt;
+\[C_p= \begin{bmatrix} a&amp;0\\ 0&amp;b \end{bmatrix}.\]&lt;p&gt;因此一个 APIC particle 实际上带着一个“小型局部速度场”。&lt;/p&gt;
 &lt;p&gt;这正是作者所谓 &lt;strong&gt;locally affine rather than locally constant velocity representation&lt;/strong&gt;。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-p2g-因此发生了本质变化&#34;&gt;6. P2G 因此发生了本质变化
 &lt;/h1&gt;&lt;p&gt;传统 PIC：&lt;/p&gt;
-&lt;h1 id=&#34;m_i-v_i-1&#34;&gt;[
-m_i v_i
-&lt;/h1&gt;&lt;p&gt;\sum_p
-w_{ip}m_pv_p.
-]&lt;/p&gt;
-&lt;p&gt;APIC 则近似变成：&lt;/p&gt;
-&lt;h1 id=&#34;m_i-v_i-2&#34;&gt;[
-m_i v_i
-&lt;/h1&gt;&lt;p&gt;\sum_p
-w_{ip}m_p
-\left[
-v_p+C_p(x_i-x_p)
-\right].
-]&lt;/p&gt;
-&lt;p&gt;注意后面的：&lt;/p&gt;
-\[
-\boxed{
-C_p(x_i-x_p)
-}
-\]&lt;p&gt;就是 APIC 多出来的信息。&lt;/p&gt;
+\[m_i v_i = \sum_p w_{ip}m_pv_p.\]&lt;p&gt;APIC 则近似变成：&lt;/p&gt;
+\[m_i v_i = \sum_p w_{ip}m_p \left[ v_p+C_p(x_i-x_p) \right].\]&lt;p&gt;注意后面的：&lt;/p&gt;
+\[\boxed{ C_p(x_i-x_p) }\]&lt;p&gt;就是 APIC 多出来的信息。&lt;/p&gt;
 &lt;p&gt;假设一个粒子处于旋转速度场。&lt;/p&gt;
 &lt;p&gt;如果只传：&lt;/p&gt;
-\[
-v_p,
-\]&lt;p&gt;网格不知道该粒子周围存在旋转。&lt;/p&gt;
+\[v_p,\]&lt;p&gt;网格不知道该粒子周围存在旋转。&lt;/p&gt;
 &lt;p&gt;但 APIC 会告诉相邻节点：&lt;/p&gt;
-\[
-v_i
-\approx
-v_p+C_p(x_i-x_p).
-\]&lt;p&gt;于是网格得到的不是一块常值速度：&lt;/p&gt;
+\[v_i \approx v_p+C_p(x_i-x_p).\]&lt;p&gt;于是网格得到的不是一块常值速度：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1792,102 +880,51 @@ v_p+C_p(x_i-x_p).
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;这样的局部变化。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
-\[
-P2G
-\]&lt;p&gt;过程中不再把 affine velocity modes 全部压扁掉。&lt;/p&gt;
+\[P2G\]&lt;p&gt;过程中不再把 affine velocity modes 全部压扁掉。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;7-为什么它还能解决角动量问题&#34;&gt;7. 为什么它还能解决角动量问题？
 &lt;/h1&gt;&lt;p&gt;这是 APIC 更深的一层。&lt;/p&gt;
 &lt;p&gt;一个粒子的总运动并不只有：&lt;/p&gt;
-\[
-m_pv_p
-\]&lt;p&gt;对应的平移动量。&lt;/p&gt;
+\[m_pv_p\]&lt;p&gt;对应的平移动量。&lt;/p&gt;
 &lt;p&gt;局部 affine field：&lt;/p&gt;
-\[
-C_p
-\]&lt;p&gt;还包含粒子附近的旋转信息。&lt;/p&gt;
+\[C_p\]&lt;p&gt;还包含粒子附近的旋转信息。&lt;/p&gt;
 &lt;p&gt;因此 APIC 在 particle-grid transfer 中可以同时维护：&lt;/p&gt;
-\[
-\boxed{\text{linear momentum}}
-\]&lt;p&gt;以及：&lt;/p&gt;
-\[
-\boxed{\text{angular momentum}}.
-\]&lt;p&gt;后续严格分析证明 APIC transfer 可以精确保持线动量和角动量；结合 midpoint rule 更新 grid momentum 时，完整步骤也可以做到两者的精确守恒。&lt;/p&gt;
+\[\boxed{\text{linear momentum}}\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{\text{angular momentum}}.\]&lt;p&gt;后续严格分析证明 APIC transfer 可以精确保持线动量和角动量；结合 midpoint rule 更新 grid momentum 时，完整步骤也可以做到两者的精确守恒。&lt;/p&gt;
 &lt;p&gt;这解释了一个非常有价值的现象：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;APIC 的低耗散不是靠“少一点 damping parameter”获得的。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;它来自：&lt;/p&gt;
-\[
-\boxed{\text{状态空间变丰富}}
-\]&lt;p&gt;使原来无法表达的角动量信息有地方存储。&lt;/p&gt;
+\[\boxed{\text{状态空间变丰富}}\]&lt;p&gt;使原来无法表达的角动量信息有地方存储。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-这和-fem-中的阶次其实有相似思想&#34;&gt;8. 这和 FEM 中的“阶次”其实有相似思想
 &lt;/h1&gt;&lt;p&gt;这里有一个很适合迁移的理解。&lt;/p&gt;
 &lt;p&gt;传统 PIC particle：&lt;/p&gt;
-\[
-v(x)\approx v_p
-\]&lt;p&gt;是局部：&lt;/p&gt;
-\[
-P_0
-\]&lt;p&gt;式描述。&lt;/p&gt;
+\[v(x)\approx v_p\]&lt;p&gt;是局部：&lt;/p&gt;
+\[P_0\]&lt;p&gt;式描述。&lt;/p&gt;
 &lt;p&gt;APIC：&lt;/p&gt;
-\[
-v(x)\approx v_p+C_p(x-x_p)
-\]&lt;p&gt;加入一阶项：&lt;/p&gt;
-\[
-P_1.
-\]&lt;p&gt;于是一个自然的问题是：&lt;/p&gt;
+\[v(x)\approx v_p+C_p(x-x_p)\]&lt;p&gt;加入一阶项：&lt;/p&gt;
+\[P_1.\]&lt;p&gt;于是一个自然的问题是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;为什么停在 affine？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;完全可以继续：&lt;/p&gt;
-&lt;h1 id=&#34;vx-1&#34;&gt;[
-v(x)
-&lt;/h1&gt;&lt;p&gt;v_p+
-C_p(x-x_p)
-+
-Q_p:(x-x_p)^2+\cdots
-]&lt;/p&gt;
-&lt;p&gt;这正是后来的 &lt;strong&gt;PolyPIC（Polynomial Particle-In-Cell）&lt;/strong&gt; 思路：进一步丰富粒子携带的局部速度场表示。相关工作明确把 APIC 看成粒子局部模式扩展的一部分。&lt;/p&gt;
+\[v(x) = v_p+ C_p(x-x_p) + Q_p:(x-x_p)^2+\cdots\]&lt;p&gt;这正是后来的 &lt;strong&gt;PolyPIC（Polynomial Particle-In-Cell）&lt;/strong&gt; 思路：进一步丰富粒子携带的局部速度场表示。相关工作明确把 APIC 看成粒子局部模式扩展的一部分。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-\text{PIC}
-\rightarrow
-\text{APIC}
-\rightarrow
-\text{PolyPIC}
-}
-\]&lt;p&gt;其实可以理解为：&lt;/p&gt;
-\[
-\boxed{
-\text{particle velocity basis enrichment}
-}
-\]&lt;p&gt;与有限元里：&lt;/p&gt;
-\[
-P_1\rightarrow P_2\rightarrow P_3
-\]&lt;p&gt;提高 approximation space 的思想有相似性。&lt;/p&gt;
+\[\boxed{ \text{PIC} \rightarrow \text{APIC} \rightarrow \text{PolyPIC} }\]&lt;p&gt;其实可以理解为：&lt;/p&gt;
+\[\boxed{ \text{particle velocity basis enrichment} }\]&lt;p&gt;与有限元里：&lt;/p&gt;
+\[P_1\rightarrow P_2\rightarrow P_3\]&lt;p&gt;提高 approximation space 的思想有相似性。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-mls-mpm-又把-apic-推进了一步&#34;&gt;9. MLS-MPM 又把 APIC 推进了一步
 &lt;/h1&gt;&lt;p&gt;2018 年 Hu 等提出 &lt;strong&gt;Moving Least Squares MPM（MLS-MPM）&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;这篇工作很重要，因为它说明 APIC 不只是一个经验性的 transfer trick。&lt;/p&gt;
 &lt;p&gt;从 Moving Least Squares 的角度出发，可以自然推导出 APIC，甚至进一步得到 PolyPIC，并让 particle-grid transfer 与一种 Galerkin-style weak-form discretization 相一致。&lt;/p&gt;
 &lt;p&gt;这意味着：&lt;/p&gt;
-\[
-\boxed{
-\text{APIC transfer}
-}
-\]&lt;p&gt;可以被理解成一种：&lt;/p&gt;
-\[
-\boxed{
-\text{局部函数重构}
-}
-\]&lt;p&gt;问题。&lt;/p&gt;
+\[\boxed{ \text{APIC transfer} }\]&lt;p&gt;可以被理解成一种：&lt;/p&gt;
+\[\boxed{ \text{局部函数重构} }\]&lt;p&gt;问题。&lt;/p&gt;
 &lt;p&gt;已知粒子附近的数据，我们希望找：&lt;/p&gt;
-\[
-v(x)=v_p+C_p(x-x_p)
-\]&lt;p&gt;这样的局部函数，使它尽可能好地解释附近网格/粒子信息。&lt;/p&gt;
+\[v(x)=v_p+C_p(x-x_p)\]&lt;p&gt;这样的局部函数，使它尽可能好地解释附近网格/粒子信息。&lt;/p&gt;
 &lt;p&gt;于是 APIC 与：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;moving least squares；&lt;/li&gt;
@@ -1901,75 +938,31 @@ v(x)=v_p+C_p(x-x_p)
 &lt;h1 id=&#34;10-apic-有一个容易混淆的点-不是材料形变梯度&#34;&gt;10. APIC 有一个容易混淆的点：\(C_p\) 不是材料形变梯度 \(F_p\)
 &lt;/h1&gt;&lt;p&gt;这是实现 MPM 时特别容易混在一起的两个量。&lt;/p&gt;
 &lt;p&gt;材料形变梯度：&lt;/p&gt;
-&lt;h1 id=&#34;f_p&#34;&gt;[
-F_p
-&lt;/h1&gt;&lt;p&gt;\frac{\partial x}{\partial X}
-]&lt;/p&gt;
-&lt;p&gt;描述：&lt;/p&gt;
-\[
-\boxed{\text{material deformation}}
-\]&lt;p&gt;并进入 constitutive model：&lt;/p&gt;
-\[
-P=P(F).
-\]&lt;p&gt;例如 Neo-Hookean：&lt;/p&gt;
-&lt;h1 id=&#34;psif&#34;&gt;[
-\Psi(F)
-&lt;/h1&gt;&lt;p&gt;\frac{\mu}{2}
-(\operatorname{tr}(F^TF)-d)
--\mu\ln J
-+
-\frac{\lambda}{2}(\ln J)^2.
-]&lt;/p&gt;
-&lt;p&gt;而 APIC：&lt;/p&gt;
-\[
-C_p
-\]&lt;p&gt;描述：&lt;/p&gt;
-\[
-\boxed{\text{local velocity variation}}
-\]&lt;p&gt;近似：&lt;/p&gt;
-\[
-C_p\approx\nabla v.
-\]&lt;p&gt;二者有联系：&lt;/p&gt;
-&lt;h1 id=&#34;dot-f&#34;&gt;[
-\dot F
-&lt;/h1&gt;&lt;p&gt;(\nabla v)F,
-]&lt;/p&gt;
-&lt;p&gt;但职责不同：&lt;/p&gt;
-\[
-\boxed{
-F_p:\ \text{材料状态}
-}
-\]\[
-\boxed{
-C_p:\ \text{传输状态}
-}
-\]&lt;p&gt;这个区分非常重要。&lt;/p&gt;
+\[F_p = \frac{\partial x}{\partial X}\]&lt;p&gt;描述：&lt;/p&gt;
+\[\boxed{\text{material deformation}}\]&lt;p&gt;并进入 constitutive model：&lt;/p&gt;
+\[P=P(F).\]&lt;p&gt;例如 Neo-Hookean：&lt;/p&gt;
+\[\Psi(F) = \frac{\mu}{2} (\operatorname{tr}(F^TF)-d) -\mu\ln J + \frac{\lambda}{2}(\ln J)^2.\]&lt;p&gt;而 APIC：&lt;/p&gt;
+\[C_p\]&lt;p&gt;描述：&lt;/p&gt;
+\[\boxed{\text{local velocity variation}}\]&lt;p&gt;近似：&lt;/p&gt;
+\[C_p\approx\nabla v.\]&lt;p&gt;二者有联系：&lt;/p&gt;
+\[\dot F = (\nabla v)F,\]&lt;p&gt;但职责不同：&lt;/p&gt;
+\[\boxed{ F_p:\ \text{材料状态} }\]\[\boxed{ C_p:\ \text{传输状态} }\]&lt;p&gt;这个区分非常重要。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;11-它真正揭示的求解器设计原则&#34;&gt;11. 它真正揭示的求解器设计原则
 &lt;/h1&gt;&lt;p&gt;现在把 APIC 从 MPM 中抽出来。&lt;/p&gt;
 &lt;p&gt;假设一个模拟器不断在：&lt;/p&gt;
-\[
-A\rightarrow B\rightarrow A
-\]&lt;p&gt;两个 representation 之间转换。&lt;/p&gt;
+\[A\rightarrow B\rightarrow A\]&lt;p&gt;两个 representation 之间转换。&lt;/p&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[
-A
-\]&lt;p&gt;可以描述 100 个自由度的信息，而：&lt;/p&gt;
-\[
-B
-\]&lt;p&gt;只能表示其中 70 个，那么即使两边：&lt;/p&gt;
+\[A\]&lt;p&gt;可以描述 100 个自由度的信息，而：&lt;/p&gt;
+\[B\]&lt;p&gt;只能表示其中 70 个，那么即使两边：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;时间积分完全正确；&lt;/li&gt;
 &lt;li&gt;材料模型完全正确；&lt;/li&gt;
 &lt;li&gt;force calculation 完全正确，&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;每次：&lt;/p&gt;
-\[
-A\rightarrow B\rightarrow A
-\]&lt;p&gt;依然会发生：&lt;/p&gt;
-\[
-\boxed{\text{information loss}}
-\]&lt;p&gt;表现出来可能就是：&lt;/p&gt;
+\[A\rightarrow B\rightarrow A\]&lt;p&gt;依然会发生：&lt;/p&gt;
+\[\boxed{\text{information loss}}\]&lt;p&gt;表现出来可能就是：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;damping；&lt;/li&gt;
 &lt;li&gt;smoothing；&lt;/li&gt;
@@ -1981,92 +974,40 @@ A\rightarrow B\rightarrow A
 &lt;hr&gt;
 &lt;h1 id=&#34;12-这与你熟悉的-xpbd软体问题其实有直接联系&#34;&gt;12. 这与你熟悉的 XPBD/软体问题其实有直接联系
 &lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
-\[
-x
-\rightarrow
-\text{constraint solve}
-\rightarrow
-x&#39;
-\]&lt;p&gt;然后速度通过：&lt;/p&gt;
-&lt;h1 id=&#34;vn1&#34;&gt;[
-v^{n+1}
-&lt;/h1&gt;&lt;p&gt;\frac{x^{n+1}-x^n}{h}
-]&lt;/p&gt;
-&lt;p&gt;重建。&lt;/p&gt;
+\[x \rightarrow \text{constraint solve} \rightarrow x&#39;\]&lt;p&gt;然后速度通过：&lt;/p&gt;
+\[v^{n+1} = \frac{x^{n+1}-x^n}{h}\]&lt;p&gt;重建。&lt;/p&gt;
 &lt;p&gt;你实际上也在进行一种：&lt;/p&gt;
-\[
-\boxed{
-\text{state representation transfer}
-}
-\]&lt;p&gt;原本系统有：&lt;/p&gt;
-\[
-(x^n,v^n)
-\]&lt;p&gt;两个状态；&lt;/p&gt;
+\[\boxed{ \text{state representation transfer} }\]&lt;p&gt;原本系统有：&lt;/p&gt;
+\[(x^n,v^n)\]&lt;p&gt;两个状态；&lt;/p&gt;
 &lt;p&gt;position solve 改变：&lt;/p&gt;
-\[
-x,
-\]&lt;p&gt;最后又从位置差重新构造：&lt;/p&gt;
-\[
-v.
-\]&lt;p&gt;如果 constraint projection 中某种运动模式无法被保持，那么：&lt;/p&gt;
-\[
-v^n
-\]&lt;p&gt;中原来存在的信息可能在：&lt;/p&gt;
-\[
-x\rightarrow v
-\]&lt;p&gt;重建过程中消失。&lt;/p&gt;
+\[x,\]&lt;p&gt;最后又从位置差重新构造：&lt;/p&gt;
+\[v.\]&lt;p&gt;如果 constraint projection 中某种运动模式无法被保持，那么：&lt;/p&gt;
+\[v^n\]&lt;p&gt;中原来存在的信息可能在：&lt;/p&gt;
+\[x\rightarrow v\]&lt;p&gt;重建过程中消失。&lt;/p&gt;
 &lt;p&gt;于是你看到：&lt;/p&gt;
-\[
-KE\downarrow.
-\]&lt;p&gt;这时候继续问：&lt;/p&gt;
+\[KE\downarrow.\]&lt;p&gt;这时候继续问：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“哪个 damping parameter 太大？”&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;可能找不到答案。&lt;/p&gt;
 &lt;p&gt;更应该问：&lt;/p&gt;
-\[
-\boxed{
-\text{整个时间步的不同 representation 是否携带相同的信息空间？}
-}
-\]&lt;p&gt;这就是 APIC 能迁移到 XPBD/物理求解器设计上的真正价值。&lt;/p&gt;
+\[\boxed{ \text{整个时间步的不同 representation 是否携带相同的信息空间？} }\]&lt;p&gt;这就是 APIC 能迁移到 XPBD/物理求解器设计上的真正价值。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-一个很好的工程测试transfer-null-test&#34;&gt;13. 一个很好的工程测试：Transfer Null Test
 &lt;/h1&gt;&lt;p&gt;如果以后实现 MPM/APIC，我非常建议单独测试 transfer，而不要直接上完整材料仿真。&lt;/p&gt;
 &lt;p&gt;设置：&lt;/p&gt;
-\[
-f_{\rm internal}=0,
-\]\[
-f_{\rm external}=0,
-\]&lt;p&gt;不进行 constitutive update。&lt;/p&gt;
+\[f_{\rm internal}=0,\]\[f_{\rm external}=0,\]&lt;p&gt;不进行 constitutive update。&lt;/p&gt;
 &lt;p&gt;只不断：&lt;/p&gt;
-\[
-P2G\rightarrow G2P.
-\]&lt;p&gt;然后分别初始化：&lt;/p&gt;
+\[P2G\rightarrow G2P.\]&lt;p&gt;然后分别初始化：&lt;/p&gt;
 &lt;h3 id=&#34;test-a常速度场&#34;&gt;Test A：常速度场
-&lt;/h3&gt;\[
-v(x)=c
-\]&lt;p&gt;检查：&lt;/p&gt;
-\[
-\Delta P.
-\]&lt;h3 id=&#34;test-b刚体旋转&#34;&gt;Test B：刚体旋转
-&lt;/h3&gt;\[
-v(x)=\omega\times x
-\]&lt;p&gt;检查：&lt;/p&gt;
-\[
-\Delta L.
-\]&lt;h3 id=&#34;test-c线性速度场&#34;&gt;Test C：线性速度场
-&lt;/h3&gt;\[
-v(x)=Ax+b
-\]&lt;p&gt;检查：&lt;/p&gt;
-\[
-\|v^{(k)}-v^{(0)}\|.
-\]&lt;p&gt;如果一个方法经过：&lt;/p&gt;
-\[
-100
-\]&lt;p&gt;次纯 transfer 后，旋转逐渐停下来，那么你已经证明：&lt;/p&gt;
-\[
-\boxed{\text{耗散来自 transfer}}
-\]&lt;p&gt;而与：&lt;/p&gt;
+&lt;/h3&gt;\[v(x)=c\]&lt;p&gt;检查：&lt;/p&gt;
+\[\Delta P.\]&lt;h3 id=&#34;test-b刚体旋转&#34;&gt;Test B：刚体旋转
+&lt;/h3&gt;\[v(x)=\omega\times x\]&lt;p&gt;检查：&lt;/p&gt;
+\[\Delta L.\]&lt;h3 id=&#34;test-c线性速度场&#34;&gt;Test C：线性速度场
+&lt;/h3&gt;\[v(x)=Ax+b\]&lt;p&gt;检查：&lt;/p&gt;
+\[\|v^{(k)}-v^{(0)}\|.\]&lt;p&gt;如果一个方法经过：&lt;/p&gt;
+\[100\]&lt;p&gt;次纯 transfer 后，旋转逐渐停下来，那么你已经证明：&lt;/p&gt;
+\[\boxed{\text{耗散来自 transfer}}\]&lt;p&gt;而与：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;constitutive model；&lt;/li&gt;
 &lt;li&gt;timestep；&lt;/li&gt;
@@ -2079,9 +1020,7 @@ v(x)=Ax+b
 &lt;h1 id=&#34;14-apic-的局限&#34;&gt;14. APIC 的局限
 &lt;/h1&gt;&lt;p&gt;APIC 并没有消灭 MPM 的其他误差来源。&lt;/p&gt;
 &lt;p&gt;它主要处理的是：&lt;/p&gt;
-\[
-\boxed{\text{particle-grid velocity transfer}}
-\]&lt;p&gt;这一层。&lt;/p&gt;
+\[\boxed{\text{particle-grid velocity transfer}}\]&lt;p&gt;这一层。&lt;/p&gt;
 &lt;p&gt;MPM 仍然可能受到：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;interpolation kernel；&lt;/li&gt;
@@ -2095,41 +1034,16 @@ v(x)=Ax+b
 &lt;p&gt;等因素影响。&lt;/p&gt;
 &lt;p&gt;例如近年来对 MPM 的研究仍在处理 cell-crossing error 和 transfer kernel 连续性问题。2024 年提出的 CK-MPM 就专门针对传统 MPM kernel 的稳定性、扩散和计算支撑域之间的权衡，并明确保持与 APIC/MLS-MPM 的兼容。&lt;/p&gt;
 &lt;p&gt;因此 APIC 在知识体系中的位置更准确地说是：&lt;/p&gt;
-\[
-\boxed{
-\text{constitutive law}
-\quad\vert\quad
-\underbrace{\textbf{particle-grid transfer}}_{\text{APIC}}
-\quad\vert\quad
-\text{grid solver}
-}
-\]&lt;p&gt;它解决的是中间这一层，而不是完整 MPM 的所有数值问题。&lt;/p&gt;
+\[\boxed{ \text{constitutive law} \quad\vert\quad \underbrace{\textbf{particle-grid transfer}}_{\text{APIC}} \quad\vert\quad \text{grid solver} }\]&lt;p&gt;它解决的是中间这一层，而不是完整 MPM 的所有数值问题。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;APIC 最值得记住的其实不是：&lt;/p&gt;
-&lt;h1 id=&#34;v_i&#34;&gt;[
-v_i
-&lt;/h1&gt;&lt;p&gt;\sum_p w_{ip}
-\left[v_p+C_p(x_i-x_p)\right].
-]&lt;/p&gt;
-&lt;p&gt;而是：&lt;/p&gt;
-\[
-\boxed{
-\text{如果一个数值方法不断丢失某种物理量，
-先检查算法内部的 representation 是否有能力表示它。}
-}
-\]&lt;p&gt;PIC 的问题并不只是“参数太耗散”。&lt;/p&gt;
+\[v_i = \sum_p w_{ip} \left[v_p+C_p(x_i-x_p)\right].\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \text{如果一个数值方法不断丢失某种物理量， 先检查算法内部的 representation 是否有能力表示它。} }\]&lt;p&gt;PIC 的问题并不只是“参数太耗散”。&lt;/p&gt;
 &lt;p&gt;它原来的粒子状态：&lt;/p&gt;
-\[
-(x_p,v_p)
-\]&lt;p&gt;根本没有足够的局部自由度来携带完整的一阶速度结构。&lt;/p&gt;
+\[(x_p,v_p)\]&lt;p&gt;根本没有足够的局部自由度来携带完整的一阶速度结构。&lt;/p&gt;
 &lt;p&gt;APIC 的解决方案于是非常干净：&lt;/p&gt;
-\[
-\boxed{
-\text{不要补偿丢掉的信息，
-让状态表示从一开始就能够携带它。}
-}
-\]&lt;p&gt;这是一种比调 damping、clamp 或 blending coefficient 更深一层的求解器设计思想。&lt;/p&gt;
+\[\boxed{ \text{不要补偿丢掉的信息， 让状态表示从一开始就能够携带它。} }\]&lt;p&gt;这是一种比调 damping、clamp 或 blending coefficient 更深一层的求解器设计思想。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
@@ -2161,228 +1075,89 @@ v_i
 &lt;strong&gt;领域：物理引擎 × 刚体动力学 × 接触力学 × 数值优化&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;这期值得学，因为它把很多物理引擎里看似零散的东西统一起来了：&lt;/p&gt;
-\[
-\boxed{
-\text{接触力}
-+\text{非穿透}
-+\text{摩擦}
-+\text{约束求解}
-}
-\]&lt;p&gt;它们背后有一个很深的共同结构：&lt;/p&gt;
-\[
-\boxed{\text{某两个量不能同时“活跃”}}
-\]&lt;p&gt;这就是 &lt;strong&gt;complementarity（互补性）&lt;/strong&gt;。&lt;/p&gt;
+\[\boxed{ \text{接触力} +\text{非穿透} +\text{摩擦} +\text{约束求解} }\]&lt;p&gt;它们背后有一个很深的共同结构：&lt;/p&gt;
+\[\boxed{\text{某两个量不能同时“活跃”}}\]&lt;p&gt;这就是 &lt;strong&gt;complementarity（互补性）&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;经典刚体接触时间步进工作中，Stewart–Trinkle 直接用 impulse–momentum 和互补约束描述多体接触与 Coulomb 摩擦，从而避免逐个精确解析瞬时冲击事件，并能处理 simultaneous impacts。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-接触为什么天然是一个互补问题&#34;&gt;1. 接触为什么天然是一个“互补问题”？
 &lt;/h2&gt;&lt;p&gt;考虑两个刚体。&lt;/p&gt;
 &lt;p&gt;定义法向间隙：&lt;/p&gt;
-\[
-g(q)\ge 0.
-\]&lt;p&gt;其中：&lt;/p&gt;
+\[g(q)\ge 0.\]&lt;p&gt;其中：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(g&gt;0\)：分离；&lt;/li&gt;
 &lt;li&gt;\(g=0\)：接触；&lt;/li&gt;
 &lt;li&gt;\(g&lt;0\)：穿透，不允许。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;再定义法向接触力：&lt;/p&gt;
-\[
-\lambda_n\ge0.
-\]&lt;p&gt;接触力只能推，不能拉。&lt;/p&gt;
+\[\lambda_n\ge0.\]&lt;p&gt;接触力只能推，不能拉。&lt;/p&gt;
 &lt;p&gt;现在真正关键的是第三条：&lt;/p&gt;
-\[
-\boxed{
-g(q)\lambda_n=0
-}
-\]&lt;p&gt;合起来：&lt;/p&gt;
-\[
-\boxed{
-g\ge0,\qquad
-\lambda_n\ge0,\qquad
-g\lambda_n=0
-}
-\]&lt;p&gt;常写作：&lt;/p&gt;
-\[
-\boxed{
-0\le g\perp\lambda_n\ge0
-}
-\]&lt;p&gt;这就是最基本的 complementarity condition。David Stewart 对刚体接触的经典说明正是这样表述：间隙非负，法向接触力非负，并且两者乘积为零。&lt;/p&gt;
+\[\boxed{ g(q)\lambda_n=0 }\]&lt;p&gt;合起来：&lt;/p&gt;
+\[\boxed{ g\ge0,\qquad \lambda_n\ge0,\qquad g\lambda_n=0 }\]&lt;p&gt;常写作：&lt;/p&gt;
+\[\boxed{ 0\le g\perp\lambda_n\ge0 }\]&lt;p&gt;这就是最基本的 complementarity condition。David Stewart 对刚体接触的经典说明正是这样表述：间隙非负，法向接触力非负，并且两者乘积为零。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-这三个式子其实完整描述了两个物理状态&#34;&gt;2. 这三个式子其实完整描述了两个物理状态
 &lt;/h1&gt;&lt;p&gt;如果：&lt;/p&gt;
-\[
-g&gt;0,
-\]&lt;p&gt;由：&lt;/p&gt;
-\[
-g\lambda_n=0
-\]&lt;p&gt;必须得到：&lt;/p&gt;
-\[
-\lambda_n=0.
-\]&lt;p&gt;即：&lt;/p&gt;
-\[
-\boxed{\text{物体分离}\Rightarrow\text{没有接触力}}
-\]&lt;p&gt;反过来，如果：&lt;/p&gt;
-\[
-\lambda_n&gt;0,
-\]&lt;p&gt;那么必须：&lt;/p&gt;
-\[
-g=0.
-\]&lt;p&gt;即：&lt;/p&gt;
-\[
-\boxed{\text{存在接触力}\Rightarrow\text{物体正在接触}}
-\]&lt;p&gt;因此互补约束本质上是在表达：&lt;/p&gt;
-\[
-\boxed{
-\text{separation}
-\quad\text{OR}\quad
-\text{contact force}
-}
-\]&lt;p&gt;二者不能同时严格为正。&lt;/p&gt;
+\[g&gt;0,\]&lt;p&gt;由：&lt;/p&gt;
+\[g\lambda_n=0\]&lt;p&gt;必须得到：&lt;/p&gt;
+\[\lambda_n=0.\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{\text{物体分离}\Rightarrow\text{没有接触力}}\]&lt;p&gt;反过来，如果：&lt;/p&gt;
+\[\lambda_n&gt;0,\]&lt;p&gt;那么必须：&lt;/p&gt;
+\[g=0.\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{\text{存在接触力}\Rightarrow\text{物体正在接触}}\]&lt;p&gt;因此互补约束本质上是在表达：&lt;/p&gt;
+\[\boxed{ \text{separation} \quad\text{OR}\quad \text{contact force} }\]&lt;p&gt;二者不能同时严格为正。&lt;/p&gt;
 &lt;p&gt;这就是为什么接触问题天然带有非光滑性：系统要在不同 active set 之间切换。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-这比-penalty-method-多了什么&#34;&gt;3. 这比 penalty method 多了什么？
 &lt;/h1&gt;&lt;p&gt;Penalty 接触通常写成：&lt;/p&gt;
-\[
-\lambda_n=k\max(-g,0).
-\]&lt;p&gt;于是：&lt;/p&gt;
-\[
-g&lt;0
-\]&lt;p&gt;以后才产生：&lt;/p&gt;
-\[
-\lambda_n&gt;0.
-\]&lt;p&gt;也就是说，penetration 被允许，只是被惩罚。&lt;/p&gt;
+\[\lambda_n=k\max(-g,0).\]&lt;p&gt;于是：&lt;/p&gt;
+\[g&lt;0\]&lt;p&gt;以后才产生：&lt;/p&gt;
+\[\lambda_n&gt;0.\]&lt;p&gt;也就是说，penetration 被允许，只是被惩罚。&lt;/p&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-\[
-k\uparrow
-\]&lt;p&gt;穿透越小，但系统越刚：&lt;/p&gt;
-\[
-\Delta t\downarrow
-\]&lt;p&gt;或线性系统条件数变差。&lt;/p&gt;
+\[k\uparrow\]&lt;p&gt;穿透越小，但系统越刚：&lt;/p&gt;
+\[\Delta t\downarrow\]&lt;p&gt;或线性系统条件数变差。&lt;/p&gt;
 &lt;p&gt;Complementarity 的思想则更直接：&lt;/p&gt;
-\[
-\boxed{
-g\ge0
-}
-\]&lt;p&gt;本身就是 admissibility condition。&lt;/p&gt;
+\[\boxed{ g\ge0 }\]&lt;p&gt;本身就是 admissibility condition。&lt;/p&gt;
 &lt;p&gt;在理想刚体模型里，接触并不需要一个人为弹簧刚度。&lt;/p&gt;
 &lt;p&gt;所以从建模层面看：&lt;/p&gt;
-\[
-\boxed{
-\text{Penalty：把非穿透近似成高刚度力}
-}
-\]&lt;p&gt;而：&lt;/p&gt;
-\[
-\boxed{
-\text{Complementarity：把非穿透直接作为不等式约束}
-}
-\]&lt;p&gt;这两种思维差异很大。&lt;/p&gt;
+\[\boxed{ \text{Penalty：把非穿透近似成高刚度力} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{Complementarity：把非穿透直接作为不等式约束} }\]&lt;p&gt;这两种思维差异很大。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-但物理引擎通常不会直接解位置级&#34;&gt;4. 但物理引擎通常不会直接解位置级 \(g\ge0\)
 &lt;/h1&gt;&lt;p&gt;实时刚体求解器更常处理速度或冲量层面。&lt;/p&gt;
 &lt;p&gt;设接触 Jacobian：&lt;/p&gt;
-\[
-J_n.
-\]&lt;p&gt;法向相对速度：&lt;/p&gt;
-\[
-v_n=J_nv.
-\]&lt;p&gt;时间离散后：&lt;/p&gt;
-&lt;h1 id=&#34;mvn1&#34;&gt;[
-Mv^{n+1}
-&lt;/h1&gt;&lt;p&gt;Mv^n
-+
-h f_{\rm ext}
-+
-J_n^T p_n,
-]&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
-\[
-p_n
-\]&lt;p&gt;是一个时间步内的法向冲量。&lt;/p&gt;
+\[J_n.\]&lt;p&gt;法向相对速度：&lt;/p&gt;
+\[v_n=J_nv.\]&lt;p&gt;时间离散后：&lt;/p&gt;
+\[Mv^{n+1} = Mv^n + h f_{\rm ext} + J_n^T p_n,\]&lt;p&gt;其中：&lt;/p&gt;
+\[p_n\]&lt;p&gt;是一个时间步内的法向冲量。&lt;/p&gt;
 &lt;p&gt;于是：&lt;/p&gt;
-&lt;h1 id=&#34;vn1&#34;&gt;[
-v^{n+1}
-&lt;/h1&gt;&lt;p&gt;v^*
-+
-M^{-1}J_n^Tp_n.
-]&lt;/p&gt;
-&lt;p&gt;这里：&lt;/p&gt;
-&lt;h1 id=&#34;v&#34;&gt;[
-v^*
-&lt;/h1&gt;&lt;p&gt;v^n+hM^{-1}f_{\rm ext}.
-]&lt;/p&gt;
-&lt;p&gt;接触点新的法向速度：&lt;/p&gt;
-&lt;h1 id=&#34;v_nn1&#34;&gt;[
-v_n^{n+1}
-&lt;/h1&gt;&lt;p&gt;J_nv^*
-+
-J_nM^{-1}J_n^Tp_n.
-]&lt;/p&gt;
-&lt;p&gt;定义：&lt;/p&gt;
-\[
-A=J_nM^{-1}J_n^T,
-\]\[
-b=J_nv^*.
-\]&lt;p&gt;得到：&lt;/p&gt;
-\[
-v_n^{n+1}=Ap_n+b.
-\]&lt;p&gt;然后施加：&lt;/p&gt;
-\[
-\boxed{
-0\le p_n
-\perp
-Ap_n+b
-\ge0
-}
-\]&lt;p&gt;这就是一个标准：&lt;/p&gt;
-\[
-\boxed{\text{Linear Complementarity Problem，LCP}}
-\]&lt;p&gt;形式：&lt;/p&gt;
-\[
-z\ge0,
-\]\[
-w=Az+b\ge0,
-\]\[
-z^Tw=0.
-\]&lt;p&gt;Stewart–Trinkle 系时间步进方法和后续刚体 LCP 实现都建立在这类结构上。&lt;/p&gt;
+\[v^{n+1} = v^* + M^{-1}J_n^Tp_n.\]&lt;p&gt;这里：&lt;/p&gt;
+\[v^* = v^n+hM^{-1}f_{\rm ext}.\]&lt;p&gt;接触点新的法向速度：&lt;/p&gt;
+\[v_n^{n+1} = J_nv^* + J_nM^{-1}J_n^Tp_n.\]&lt;p&gt;定义：&lt;/p&gt;
+\[A=J_nM^{-1}J_n^T,\]\[b=J_nv^*.\]&lt;p&gt;得到：&lt;/p&gt;
+\[v_n^{n+1}=Ap_n+b.\]&lt;p&gt;然后施加：&lt;/p&gt;
+\[\boxed{ 0\le p_n \perp Ap_n+b \ge0 }\]&lt;p&gt;这就是一个标准：&lt;/p&gt;
+\[\boxed{\text{Linear Complementarity Problem，LCP}}\]&lt;p&gt;形式：&lt;/p&gt;
+\[z\ge0,\]\[w=Az+b\ge0,\]\[z^Tw=0.\]&lt;p&gt;Stewart–Trinkle 系时间步进方法和后续刚体 LCP 实现都建立在这类结构上。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-这里的--非常重要&#34;&gt;5. 这里的 \(A=JM^{-1}J^T\) 非常重要
 &lt;/h1&gt;&lt;p&gt;这个矩阵有一个很值得记住的物理意义：&lt;/p&gt;
-\[
-\boxed{
-A:
-\text{接触冲量}
-\rightarrow
-\text{接触速度变化}
-}
-\]&lt;p&gt;给一个接触点施加：&lt;/p&gt;
-\[
-p_j,
-\]&lt;p&gt;它可能改变另一个接触点：&lt;/p&gt;
-\[
-v_i.
-\]&lt;p&gt;所以：&lt;/p&gt;
-\[
-A_{ij}
-\]&lt;p&gt;就是：&lt;/p&gt;
+\[\boxed{ A: \text{接触冲量} \rightarrow \text{接触速度变化} }\]&lt;p&gt;给一个接触点施加：&lt;/p&gt;
+\[p_j,\]&lt;p&gt;它可能改变另一个接触点：&lt;/p&gt;
+\[v_i.\]&lt;p&gt;所以：&lt;/p&gt;
+\[A_{ij}\]&lt;p&gt;就是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;接触 \(j\) 的冲量，对接触 \(i\) 法向速度造成多大影响。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;这说明多接触问题为什么必须耦合求解。&lt;/p&gt;
 &lt;p&gt;例如一个箱子四个角落地。&lt;/p&gt;
 &lt;p&gt;如果你独立处理四个接触：&lt;/p&gt;
-\[
-1\rightarrow2\rightarrow3\rightarrow4,
-\]&lt;p&gt;每次解完一个都会改变其他三个的速度状态。&lt;/p&gt;
+\[1\rightarrow2\rightarrow3\rightarrow4,\]&lt;p&gt;每次解完一个都会改变其他三个的速度状态。&lt;/p&gt;
 &lt;p&gt;所以真正的物理问题本身就是：&lt;/p&gt;
-\[
-\boxed{\text{global coupled constraint problem}}
-\]&lt;p&gt;Projected Gauss–Seidel 之类的方法，本质上是在迭代求这个耦合系统的近似解。&lt;/p&gt;
+\[\boxed{\text{global coupled constraint problem}}\]&lt;p&gt;Projected Gauss–Seidel 之类的方法，本质上是在迭代求这个耦合系统的近似解。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-这正好解释了游戏引擎里的-sequential-impulse&#34;&gt;6. 这正好解释了游戏引擎里的 Sequential Impulse
 &lt;/h1&gt;&lt;p&gt;很多游戏物理教材会介绍：&lt;/p&gt;
-\[
-\text{Sequential Impulse}
-\]&lt;p&gt;看起来像：&lt;/p&gt;
+\[\text{Sequential Impulse}\]&lt;p&gt;看起来像：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;计算一个接触冲量；&lt;/li&gt;
 &lt;li&gt;clamp；&lt;/li&gt;
@@ -2391,35 +1166,13 @@ A_{ij}
 &lt;li&gt;重复若干轮。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;实际上它与：&lt;/p&gt;
-\[
-\boxed{\text{Projected Gauss-Seidel on an LCP}}
-\]&lt;p&gt;高度对应。&lt;/p&gt;
+\[\boxed{\text{Projected Gauss-Seidel on an LCP}}\]&lt;p&gt;高度对应。&lt;/p&gt;
 &lt;p&gt;单接触更新近似：&lt;/p&gt;
-&lt;h1 id=&#34;deltalambda&#34;&gt;[
-\Delta\lambda
-&lt;/h1&gt;&lt;ul&gt;
-&lt;li&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;\frac{Jv+b}
-{JM^{-1}J^T}.
-]&lt;/p&gt;
-&lt;p&gt;然后：&lt;/p&gt;
-&lt;h1 id=&#34;lambda_rm-new&#34;&gt;[
-\lambda_{\rm new}
-&lt;/h1&gt;&lt;p&gt;\max
-(
-0,
-\lambda_{\rm old}+\Delta\lambda
-).
-]&lt;/p&gt;
-&lt;p&gt;这里的：&lt;/p&gt;
-\[
-\boxed{\max(0,\cdot)}
-\]&lt;p&gt;根本不是随便加的 clamp。&lt;/p&gt;
+\[\Delta\lambda = - \frac{Jv+b} {JM^{-1}J^T}.\]&lt;p&gt;然后：&lt;/p&gt;
+\[\lambda_{\rm new} = \max ( 0, \lambda_{\rm old}+\Delta\lambda ).\]&lt;p&gt;这里的：&lt;/p&gt;
+\[\boxed{\max(0,\cdot)}\]&lt;p&gt;根本不是随便加的 clamp。&lt;/p&gt;
 &lt;p&gt;它就是在执行：&lt;/p&gt;
-\[
-\lambda_n\ge0.
-\]&lt;p&gt;所以很多物理引擎代码看起来只是：&lt;/p&gt;
+\[\lambda_n\ge0.\]&lt;p&gt;所以很多物理引擎代码看起来只是：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -2437,177 +1190,62 @@ A_{ij}
 &lt;h1 id=&#34;7-为什么要-accumulated-impulse&#34;&gt;7. 为什么要 accumulated impulse？
 &lt;/h1&gt;&lt;p&gt;这也是一个非常容易低估的细节。&lt;/p&gt;
 &lt;p&gt;错误写法可能是：&lt;/p&gt;
-&lt;h1 id=&#34;deltalambda-1&#34;&gt;[
-\Delta\lambda
-&lt;/h1&gt;&lt;p&gt;\max(0,\Delta\lambda).
-]&lt;/p&gt;
-&lt;p&gt;但真正应该投影的是：&lt;/p&gt;
-\[
-\boxed{
-\lambda_{\rm total}
-}
-\]&lt;p&gt;即：&lt;/p&gt;
-&lt;h1 id=&#34;lambda_rm-new-1&#34;&gt;[
-\lambda_{\rm new}
-&lt;/h1&gt;&lt;p&gt;\max
-(
-0,
-\lambda_{\rm old}+\Delta\lambda
-).
-]&lt;/p&gt;
-&lt;p&gt;然后实际施加：&lt;/p&gt;
-\[
-\lambda_{\rm new}-\lambda_{\rm old}.
-\]&lt;p&gt;为什么？&lt;/p&gt;
+\[\Delta\lambda = \max(0,\Delta\lambda).\]&lt;p&gt;但真正应该投影的是：&lt;/p&gt;
+\[\boxed{ \lambda_{\rm total} }\]&lt;p&gt;即：&lt;/p&gt;
+\[\lambda_{\rm new} = \max ( 0, \lambda_{\rm old}+\Delta\lambda ).\]&lt;p&gt;然后实际施加：&lt;/p&gt;
+\[\lambda_{\rm new}-\lambda_{\rm old}.\]&lt;p&gt;为什么？&lt;/p&gt;
 &lt;p&gt;因为互补条件要求的是最终：&lt;/p&gt;
-\[
-\lambda\ge0,
-\]&lt;p&gt;不是每一次局部修正：&lt;/p&gt;
-\[
-\Delta\lambda\ge0.
-\]&lt;p&gt;有时前一次迭代冲量过大，下一次必须：&lt;/p&gt;
-\[
-\Delta\lambda&lt;0
-\]&lt;p&gt;把它减少。&lt;/p&gt;
+\[\lambda\ge0,\]&lt;p&gt;不是每一次局部修正：&lt;/p&gt;
+\[\Delta\lambda\ge0.\]&lt;p&gt;有时前一次迭代冲量过大，下一次必须：&lt;/p&gt;
+\[\Delta\lambda&lt;0\]&lt;p&gt;把它减少。&lt;/p&gt;
 &lt;p&gt;所以 accumulated impulse 其实对应一个很明确的数学事实：&lt;/p&gt;
-\[
-\boxed{
-\text{projection 应作用于 solution variable，
-而不是 iteration increment}
-}
-\]&lt;p&gt;这是从 LCP 视角看 Sequential Impulse 后非常容易理解的一点。&lt;/p&gt;
+\[\boxed{ \text{projection 应作用于 solution variable， 而不是 iteration increment} }\]&lt;p&gt;这是从 LCP 视角看 Sequential Impulse 后非常容易理解的一点。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-摩擦为什么更复杂&#34;&gt;8. 摩擦为什么更复杂？
 &lt;/h1&gt;&lt;p&gt;法向接触只有：&lt;/p&gt;
-\[
-\lambda_n\ge0.
-\]&lt;p&gt;Coulomb 摩擦则要求切向力：&lt;/p&gt;
-\[
-\lambda_t
-\]&lt;p&gt;落在摩擦圆锥内：&lt;/p&gt;
-\[
-\boxed{
-\|\lambda_t\|
-\le
-\mu\lambda_n
-}
-\]&lt;p&gt;于是有两种状态。&lt;/p&gt;
+\[\lambda_n\ge0.\]&lt;p&gt;Coulomb 摩擦则要求切向力：&lt;/p&gt;
+\[\lambda_t\]&lt;p&gt;落在摩擦圆锥内：&lt;/p&gt;
+\[\boxed{ \|\lambda_t\| \le \mu\lambda_n }\]&lt;p&gt;于是有两种状态。&lt;/p&gt;
 &lt;p&gt;如果接触点 sticking：&lt;/p&gt;
-\[
-v_t=0,
-\]&lt;p&gt;摩擦力可以在 cone 内任意选择：&lt;/p&gt;
-\[
-\|\lambda_t\|&lt;\mu\lambda_n.
-\]&lt;p&gt;如果 sliding：&lt;/p&gt;
-\[
-v_t\ne0,
-\]&lt;p&gt;摩擦力达到 cone 边界：&lt;/p&gt;
-&lt;h1 id=&#34;lambda_t&#34;&gt;[
-|\lambda_t|
-&lt;/h1&gt;&lt;p&gt;\mu\lambda_n,
-]&lt;/p&gt;
-&lt;p&gt;并与滑动方向相反。&lt;/p&gt;
+\[v_t=0,\]&lt;p&gt;摩擦力可以在 cone 内任意选择：&lt;/p&gt;
+\[\|\lambda_t\|&lt;\mu\lambda_n.\]&lt;p&gt;如果 sliding：&lt;/p&gt;
+\[v_t\ne0,\]&lt;p&gt;摩擦力达到 cone 边界：&lt;/p&gt;
+\[\|\lambda_t\| = \mu\lambda_n,\]&lt;p&gt;并与滑动方向相反。&lt;/p&gt;
 &lt;p&gt;所以它又是一套“状态二选一”的互补结构。&lt;/p&gt;
 &lt;p&gt;在经典方法中，可以通过 maximum dissipation principle 和摩擦锥约束把 Coulomb 摩擦写成 complementarity problem。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-为什么游戏引擎经常用-friction-pyramid&#34;&gt;9. 为什么游戏引擎经常用 friction pyramid？
 &lt;/h1&gt;&lt;p&gt;真实 Coulomb cone：&lt;/p&gt;
-\[
-\sqrt{\lambda_{t1}^2+\lambda_{t2}^2}
-\le
-\mu\lambda_n
-\]&lt;p&gt;是一个圆锥。&lt;/p&gt;
+\[\sqrt{\lambda_{t1}^2+\lambda_{t2}^2} \le \mu\lambda_n\]&lt;p&gt;是一个圆锥。&lt;/p&gt;
 &lt;p&gt;如果把它离散成若干方向：&lt;/p&gt;
-\[
-d_1,\ldots,d_k,
-\]&lt;p&gt;得到多面体：&lt;/p&gt;
-\[
-\boxed{\text{friction pyramid}}
-\]&lt;p&gt;那么原来的 nonlinear cone constraint 就可以近似成线性不等式，从而进入 LCP 框架。&lt;/p&gt;
+\[d_1,\ldots,d_k,\]&lt;p&gt;得到多面体：&lt;/p&gt;
+\[\boxed{\text{friction pyramid}}\]&lt;p&gt;那么原来的 nonlinear cone constraint 就可以近似成线性不等式，从而进入 LCP 框架。&lt;/p&gt;
 &lt;p&gt;Georgia Tech 的接触 LCP 实现说明就明确采用了离散 friction cone basis；MuJoCo 文档也同时区分 elliptic friction cone 与 pyramidal approximation。&lt;/p&gt;
 &lt;p&gt;这里有一个典型工程折中：&lt;/p&gt;
-\[
-\boxed{
-\text{更真实的 cone}
-\leftrightarrow
-\text{更简单的 solver}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{更真实的 cone} \leftrightarrow \text{更简单的 solver} }\]&lt;hr&gt;
 &lt;h1 id=&#34;10-这和-ccd-是完全不同的一层&#34;&gt;10. 这和 CCD 是完全不同的一层
 &lt;/h1&gt;&lt;p&gt;这一点尤其值得与你前面关于 CCD 的讨论联系起来。&lt;/p&gt;
 &lt;p&gt;CCD 回答：&lt;/p&gt;
-\[
-\boxed{
-\text{沿当前运动路径，什么时候第一次发生几何碰撞？}
-}
-\]&lt;p&gt;Complementarity 回答：&lt;/p&gt;
-\[
-\boxed{
-\text{一旦进入接触状态，什么冲量/力与运动状态彼此一致？}
-}
-\]&lt;p&gt;所以可以这样分层：&lt;/p&gt;
-\[
-\boxed{
-\text{CCD：geometric feasibility}
-}
-\]\[
-\boxed{
-\text{Complementarity：contact dynamics consistency}
-}
-\]&lt;p&gt;CCD 可能告诉你：&lt;/p&gt;
-\[
-t_{\rm hit}=0.006s.
-\]&lt;p&gt;但它不会告诉你：&lt;/p&gt;
-\[
-p_n=?,
-\qquad
-p_t=?.
-\]&lt;p&gt;LCP/NCP 则负责这部分。&lt;/p&gt;
+\[\boxed{ \text{沿当前运动路径，什么时候第一次发生几何碰撞？} }\]&lt;p&gt;Complementarity 回答：&lt;/p&gt;
+\[\boxed{ \text{一旦进入接触状态，什么冲量/力与运动状态彼此一致？} }\]&lt;p&gt;所以可以这样分层：&lt;/p&gt;
+\[\boxed{ \text{CCD：geometric feasibility} }\]\[\boxed{ \text{Complementarity：contact dynamics consistency} }\]&lt;p&gt;CCD 可能告诉你：&lt;/p&gt;
+\[t_{\rm hit}=0.006s.\]&lt;p&gt;但它不会告诉你：&lt;/p&gt;
+\[p_n=?, \qquad p_t=?.\]&lt;p&gt;LCP/NCP 则负责这部分。&lt;/p&gt;
 &lt;p&gt;反过来，纯 velocity-level complementarity solver 也不自动等同于精确 CCD；经典 time-stepping 方法甚至刻意避免显式逐事件 collision resolution，而是在固定时间步内用 impulse–momentum 处理 simultaneous contacts。&lt;/p&gt;
 &lt;p&gt;这也是为什么不同物理引擎可以有：&lt;/p&gt;
-\[
-\text{CCD}
-+
-\text{Sequential Impulse},
-\]&lt;p&gt;或者：&lt;/p&gt;
-\[
-\text{discrete collision detection}
-+
-\text{LCP solver}.
-\]&lt;p&gt;两者是不同模块。&lt;/p&gt;
+\[\text{CCD} + \text{Sequential Impulse},\]&lt;p&gt;或者：&lt;/p&gt;
+\[\text{discrete collision detection} + \text{LCP solver}.\]&lt;p&gt;两者是不同模块。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;11-它和-xpbd-又有什么关系&#34;&gt;11. 它和 XPBD 又有什么关系？
 &lt;/h1&gt;&lt;p&gt;XPBD constraint：&lt;/p&gt;
-\[
-C(x)=0
-\]&lt;p&gt;对应 equality constraint。&lt;/p&gt;
+\[C(x)=0\]&lt;p&gt;对应 equality constraint。&lt;/p&gt;
 &lt;p&gt;而 unilateral contact：&lt;/p&gt;
-\[
-C(x)\ge0
-\]&lt;p&gt;本质上是不等式约束。&lt;/p&gt;
+\[C(x)\ge0\]&lt;p&gt;本质上是不等式约束。&lt;/p&gt;
 &lt;p&gt;其 Lagrange multiplier 需要满足：&lt;/p&gt;
-\[
-\lambda\ge0.
-\]&lt;p&gt;因此理想 unilateral constraint 的 KKT 条件正是：&lt;/p&gt;
-\[
-\boxed{
-C(x)\ge0,
-\qquad
-\lambda\ge0,
-\qquad
-\lambda C(x)=0
-}
-\]&lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-\text{complementarity}
-}
-\]&lt;p&gt;实际上就是：&lt;/p&gt;
-\[
-\boxed{
-\text{inequality-constrained optimization 的 KKT 条件}
-}
-\]&lt;p&gt;这会把：&lt;/p&gt;
+\[\lambda\ge0.\]&lt;p&gt;因此理想 unilateral constraint 的 KKT 条件正是：&lt;/p&gt;
+\[\boxed{ C(x)\ge0, \qquad \lambda\ge0, \qquad \lambda C(x)=0 }\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{complementarity} }\]&lt;p&gt;实际上就是：&lt;/p&gt;
+\[\boxed{ \text{inequality-constrained optimization 的 KKT 条件} }\]&lt;p&gt;这会把：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;PBD/XPBD；&lt;/li&gt;
 &lt;li&gt;Lagrange multipliers；&lt;/li&gt;
@@ -2616,32 +1254,18 @@ C(x)\ge0,
 &lt;/ul&gt;
 &lt;p&gt;统一起来。&lt;/p&gt;
 &lt;p&gt;从这个视角看：&lt;/p&gt;
-\[
-\lambda
-\]&lt;p&gt;并不只是“一个 constraint stiffness variable”。&lt;/p&gt;
+\[\lambda\]&lt;p&gt;并不只是“一个 constraint stiffness variable”。&lt;/p&gt;
 &lt;p&gt;它是：&lt;/p&gt;
-\[
-\boxed{
-\text{约束对动力系统施加反作用的 dual variable}
-}
-\]&lt;p&gt;这点非常值得掌握。&lt;/p&gt;
+\[\boxed{ \text{约束对动力系统施加反作用的 dual variable} }\]&lt;p&gt;这点非常值得掌握。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;12-一个更深的问题为什么现代引擎不都直接精确解-lcp&#34;&gt;12. 一个更深的问题：为什么现代引擎不都直接精确解 LCP？
 &lt;/h1&gt;&lt;p&gt;因为大规模摩擦接触的精确 complementarity 求解很贵，而且数值上也并不总是友好。&lt;/p&gt;
 &lt;p&gt;现实游戏场景可能有：&lt;/p&gt;
-\[
-10^4
-\]&lt;p&gt;甚至更多 contact constraints。&lt;/p&gt;
+\[10^4\]&lt;p&gt;甚至更多 contact constraints。&lt;/p&gt;
 &lt;p&gt;严格 pivoting：&lt;/p&gt;
-\[
-\text{Lemke / exact LCP}
-\]&lt;p&gt;很难满足实时预算。&lt;/p&gt;
+\[\text{Lemke / exact LCP}\]&lt;p&gt;很难满足实时预算。&lt;/p&gt;
 &lt;p&gt;于是游戏引擎更倾向：&lt;/p&gt;
-\[
-\boxed{
-\text{iterative approximate solve}
-}
-\]&lt;p&gt;例如：&lt;/p&gt;
+\[\boxed{ \text{iterative approximate solve} }\]&lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Projected Gauss–Seidel；&lt;/li&gt;
 &lt;li&gt;Sequential Impulse；&lt;/li&gt;
@@ -2649,21 +1273,10 @@ C(x)\ge0,
 &lt;li&gt;block solvers。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;优势是：&lt;/p&gt;
-\[
-\text{算 4 次也能给答案},
-\]\[
-\text{算 20 次答案更好}.
-\]&lt;p&gt;这叫：&lt;/p&gt;
-\[
-\boxed{\text{graceful degradation}}
-\]&lt;p&gt;对于游戏引擎极其重要。&lt;/p&gt;
+\[\text{算 4 次也能给答案},\]\[\text{算 20 次答案更好}.\]&lt;p&gt;这叫：&lt;/p&gt;
+\[\boxed{\text{graceful degradation}}\]&lt;p&gt;对于游戏引擎极其重要。&lt;/p&gt;
 &lt;p&gt;也就是说：&lt;/p&gt;
-\[
-\boxed{
-\text{理论问题是 complementarity，
-工程算法未必是 exact LCP solver}
-}
-\]&lt;p&gt;这一区别一定要分清。&lt;/p&gt;
+\[\boxed{ \text{理论问题是 complementarity， 工程算法未必是 exact LCP solver} }\]&lt;p&gt;这一区别一定要分清。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-mujoco-为什么又走了另一条路线&#34;&gt;13. MuJoCo 为什么又走了另一条路线？
 &lt;/h1&gt;&lt;p&gt;这也是很好的现代对照。&lt;/p&gt;
@@ -2677,64 +1290,20 @@ C(x)\ge0,
 &lt;/ul&gt;
 &lt;p&gt;但改变了底层数学 formulation。&lt;/p&gt;
 &lt;p&gt;这说明一个很重要的知识体系关系：&lt;/p&gt;
-\[
-\boxed{
-\text{接触物理}
-\neq
-\text{唯一数值 formulation}
-}
-\]&lt;p&gt;同一个接触问题可以被写成：&lt;/p&gt;
-\[
-\text{penalty},
-\]\[
-\text{complementarity},
-\]\[
-\text{constrained optimization},
-\]\[
-\text{barrier},
-\]\[
-\text{soft convex contact}.
-\]&lt;p&gt;这些方法之间真正的差异，经常不在“有没有接触力”，而在：&lt;/p&gt;
-\[
-\boxed{
-\text{如何定义 admissible set，
-以及如何求其中的动力学状态}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{接触物理} \neq \text{唯一数值 formulation} }\]&lt;p&gt;同一个接触问题可以被写成：&lt;/p&gt;
+\[\text{penalty},\]\[\text{complementarity},\]\[\text{constrained optimization},\]\[\text{barrier},\]\[\text{soft convex contact}.\]&lt;p&gt;这些方法之间真正的差异，经常不在“有没有接触力”，而在：&lt;/p&gt;
+\[\boxed{ \text{如何定义 admissible set， 以及如何求其中的动力学状态} }\]&lt;hr&gt;
 &lt;h1 id=&#34;14-对软体求解器最值得迁移的一点&#34;&gt;14. 对软体求解器最值得迁移的一点
 &lt;/h1&gt;&lt;p&gt;Complementarity 最有价值的启发并不是：&lt;/p&gt;
-\[
-0\le a\perp b\ge0
-\]&lt;p&gt;这个符号。&lt;/p&gt;
+\[0\le a\perp b\ge0\]&lt;p&gt;这个符号。&lt;/p&gt;
 &lt;p&gt;而是一个求解器建模原则：&lt;/p&gt;
-\[
-\boxed{
-\text{如果物理系统存在互斥状态，
-应该考虑把这种逻辑直接编码进数学 formulation。}
-}
-\]&lt;p&gt;接触就是：&lt;/p&gt;
-\[
-\text{separated}
-\quad/\quad
-\text{loaded}.
-\]&lt;p&gt;摩擦就是：&lt;/p&gt;
-\[
-\text{stick}
-\quad/\quad
-\text{slip}.
-\]&lt;p&gt;塑性里也有类似结构：&lt;/p&gt;
-\[
-\text{elastic}
-\quad/\quad
-\text{yielding}.
-\]&lt;p&gt;damage、fracture、contact activation 中也常出现：&lt;/p&gt;
-\[
-\boxed{\text{active-set structure}}
-\]&lt;p&gt;所以 complementarity 并不只是刚体游戏物理的一个技巧。&lt;/p&gt;
+\[\boxed{ \text{如果物理系统存在互斥状态， 应该考虑把这种逻辑直接编码进数学 formulation。} }\]&lt;p&gt;接触就是：&lt;/p&gt;
+\[\text{separated} \quad/\quad \text{loaded}.\]&lt;p&gt;摩擦就是：&lt;/p&gt;
+\[\text{stick} \quad/\quad \text{slip}.\]&lt;p&gt;塑性里也有类似结构：&lt;/p&gt;
+\[\text{elastic} \quad/\quad \text{yielding}.\]&lt;p&gt;damage、fracture、contact activation 中也常出现：&lt;/p&gt;
+\[\boxed{\text{active-set structure}}\]&lt;p&gt;所以 complementarity 并不只是刚体游戏物理的一个技巧。&lt;/p&gt;
 &lt;p&gt;它属于更大的：&lt;/p&gt;
-\[
-\boxed{\text{nonsmooth mechanics}}
-\]&lt;p&gt;体系。&lt;/p&gt;
+\[\boxed{\text{nonsmooth mechanics}}\]&lt;p&gt;体系。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;一个非常实用的调试视角&#34;&gt;一个非常实用的调试视角
 &lt;/h2&gt;&lt;p&gt;假设你的接触求解器出现：&lt;/p&gt;
@@ -2745,57 +1314,20 @@ C(x)\ge0,
 &lt;li&gt;多接触堆叠逐渐漂移。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;可以直接记录每个 contact：&lt;/p&gt;
-\[
-g_i,
-\]\[
-\lambda_i,
-\]&lt;p&gt;以及：&lt;/p&gt;
-\[
-g_i\lambda_i.
-\]&lt;p&gt;理想状态：&lt;/p&gt;
-\[
-g_i\ge0,
-\]\[
-\lambda_i\ge0,
-\]\[
-g_i\lambda_i\approx0.
-\]&lt;p&gt;如果发现：&lt;/p&gt;
-\[
-g_i&gt;0,
-\qquad
-\lambda_i&gt;0,
-\]&lt;p&gt;说明：&lt;/p&gt;
-\[
-\boxed{\text{分离状态仍施加接触力}}
-\]&lt;p&gt;如果：&lt;/p&gt;
-\[
-\lambda_i&lt;0,
-\]&lt;p&gt;则出现：&lt;/p&gt;
-\[
-\boxed{\text{接触在“拉”物体}}
-\]&lt;p&gt;这样调试比只看 penetration depth 或 velocity 更有结构。&lt;/p&gt;
+\[g_i,\]\[\lambda_i,\]&lt;p&gt;以及：&lt;/p&gt;
+\[g_i\lambda_i.\]&lt;p&gt;理想状态：&lt;/p&gt;
+\[g_i\ge0,\]\[\lambda_i\ge0,\]\[g_i\lambda_i\approx0.\]&lt;p&gt;如果发现：&lt;/p&gt;
+\[g_i&gt;0, \qquad \lambda_i&gt;0,\]&lt;p&gt;说明：&lt;/p&gt;
+\[\boxed{\text{分离状态仍施加接触力}}\]&lt;p&gt;如果：&lt;/p&gt;
+\[\lambda_i&lt;0,\]&lt;p&gt;则出现：&lt;/p&gt;
+\[\boxed{\text{接触在“拉”物体}}\]&lt;p&gt;这样调试比只看 penetration depth 或 velocity 更有结构。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Complementarity 的本质可以浓缩成：&lt;/p&gt;
-\[
-\boxed{
-\text{接触不是“算一个力”，
-而是在几个互斥物理状态之间求一个自洽解。}
-}
-\]&lt;p&gt;这也是为什么接触求解器如此难。&lt;/p&gt;
+\[\boxed{ \text{接触不是“算一个力”， 而是在几个互斥物理状态之间求一个自洽解。} }\]&lt;p&gt;这也是为什么接触求解器如此难。&lt;/p&gt;
 &lt;p&gt;它面对的并非普通光滑方程：&lt;/p&gt;
-\[
-F(x)=0,
-\]&lt;p&gt;而是：&lt;/p&gt;
-\[
-\boxed{
-\text{continuous dynamics}
-+
-\text{inequality}
-+
-\text{state switching}
-}
-\]&lt;p&gt;一旦理解这一层，你会发现 Sequential Impulse、PGS、LCP、KKT、摩擦锥、unilateral constraint 这些概念终于会落在同一个框架里。&lt;/p&gt;
+\[F(x)=0,\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \text{continuous dynamics} + \text{inequality} + \text{state switching} }\]&lt;p&gt;一旦理解这一层，你会发现 Sequential Impulse、PGS、LCP、KKT、摩擦锥、unilateral constraint 这些概念终于会落在同一个框架里。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
@@ -2827,84 +1359,34 @@ F(x)=0,
 &lt;strong&gt;领域：有限元 × 物理引擎 × 软体动力学 × 数值方法&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;IMEX 值得学，因为它针对一个非常普遍的工程矛盾：&lt;/p&gt;
-\[
-\boxed{
-\text{显式方法便宜，但受刚性限制；隐式方法稳定，但每一步太贵。}
-}
-\]&lt;p&gt;IMEX 的基本策略非常直接：&lt;/p&gt;
-\[
-\boxed{
-\text{stiff terms 隐式处理}
-+
-\text{non-stiff terms 显式处理}
-}
-\]&lt;p&gt;Ascher、Ruuth 和 Spiteri 在 1997 年的经典工作系统发展了 IMEX Runge–Kutta 方法，用于同时包含不同时间尺度、不同数值刚性的 PDE；核心出发点就是“不同类型的项应该使用不同的时间离散”。&lt;/p&gt;
+\[\boxed{ \text{显式方法便宜，但受刚性限制；隐式方法稳定，但每一步太贵。} }\]&lt;p&gt;IMEX 的基本策略非常直接：&lt;/p&gt;
+\[\boxed{ \text{stiff terms 隐式处理} + \text{non-stiff terms 显式处理} }\]&lt;p&gt;Ascher、Ruuth 和 Spiteri 在 1997 年的经典工作系统发展了 IMEX Runge–Kutta 方法，用于同时包含不同时间尺度、不同数值刚性的 PDE；核心出发点就是“不同类型的项应该使用不同的时间离散”。&lt;/p&gt;
 &lt;p&gt;这类思想至今仍活跃。2025 年的 JCP 工作仍在用 IMEX 处理 CFD 中由极小网格单元引起的 geometry-induced stiffness，因为全显式受 CFL 限制，而全隐式又需要昂贵的大规模线性化、预条件和求解。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-刚性到底是什么意思&#34;&gt;1. “刚性”到底是什么意思？
 &lt;/h2&gt;&lt;p&gt;考虑最简单的方程：&lt;/p&gt;
-\[
-\dot x=-kx.
-\]&lt;p&gt;真实解：&lt;/p&gt;
-\[
-x(t)=x_0e^{-kt}.
-\]&lt;p&gt;使用显式 Euler：&lt;/p&gt;
-&lt;h1 id=&#34;x_n1&#34;&gt;[
-x_{n+1}
-&lt;/h1&gt;&lt;p&gt;(1-kh)x_n.
-]&lt;/p&gt;
-&lt;p&gt;稳定要求：&lt;/p&gt;
-\[
-|1-kh|\le1,
-\]&lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-h\le\frac{2}{k}
-}
-\]&lt;p&gt;如果：&lt;/p&gt;
-\[
-k=10^6,
-\]&lt;p&gt;那么时间步必须大约：&lt;/p&gt;
-\[
-h&lt;2\times10^{-6}.
-\]&lt;p&gt;但系统中你真正关心的宏观运动可能只有：&lt;/p&gt;
-\[
-1\sim10\text{ Hz}.
-\]&lt;p&gt;于是出现一个很荒唐的情况：&lt;/p&gt;
+\[\dot x=-kx.\]&lt;p&gt;真实解：&lt;/p&gt;
+\[x(t)=x_0e^{-kt}.\]&lt;p&gt;使用显式 Euler：&lt;/p&gt;
+\[x_{n+1} = (1-kh)x_n.\]&lt;p&gt;稳定要求：&lt;/p&gt;
+\[|1-kh|\le1,\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ h\le\frac{2}{k} }\]&lt;p&gt;如果：&lt;/p&gt;
+\[k=10^6,\]&lt;p&gt;那么时间步必须大约：&lt;/p&gt;
+\[h&lt;2\times10^{-6}.\]&lt;p&gt;但系统中你真正关心的宏观运动可能只有：&lt;/p&gt;
+\[1\sim10\text{ Hz}.\]&lt;p&gt;于是出现一个很荒唐的情况：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;你为了追踪一个并不重要、衰减极快的高频模式，被迫把整个模拟的时间步缩小几万倍。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;这就是数值刚性最重要的直觉：&lt;/p&gt;
-\[
-\boxed{
-\text{系统中某些快速模式控制了数值稳定性，却并不控制我们关心的物理时间尺度。}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{系统中某些快速模式控制了数值稳定性，却并不控制我们关心的物理时间尺度。} }\]&lt;hr&gt;
 &lt;h1 id=&#34;2-软体有限元为什么特别容易-stiff&#34;&gt;2. 软体有限元为什么特别容易 stiff？
 &lt;/h1&gt;&lt;p&gt;空间离散以后，弹性体可以写成：&lt;/p&gt;
-\[
-M\ddot x+f_{\rm int}(x)=f_{\rm ext}.
-\]&lt;p&gt;在线性附近：&lt;/p&gt;
-\[
-M\ddot x+Kx=f.
-\]&lt;p&gt;做模态分解：&lt;/p&gt;
-&lt;h1 id=&#34;kphi_i&#34;&gt;[
-K\phi_i
-&lt;/h1&gt;&lt;p&gt;\omega_i^2M\phi_i.
-]&lt;/p&gt;
-&lt;p&gt;于是系统中存在：&lt;/p&gt;
-\[
-\omega_1,\omega_2,\ldots,\omega_{\max}.
-\]&lt;p&gt;显式中心差分一类方法通常有类似：&lt;/p&gt;
-\[
-\Delta t
-\lesssim
-\frac{2}{\omega_{\max}}
-\]&lt;p&gt;的稳定限制。&lt;/p&gt;
+\[M\ddot x+f_{\rm int}(x)=f_{\rm ext}.\]&lt;p&gt;在线性附近：&lt;/p&gt;
+\[M\ddot x+Kx=f.\]&lt;p&gt;做模态分解：&lt;/p&gt;
+\[K\phi_i = \omega_i^2M\phi_i.\]&lt;p&gt;于是系统中存在：&lt;/p&gt;
+\[\omega_1,\omega_2,\ldots,\omega_{\max}.\]&lt;p&gt;显式中心差分一类方法通常有类似：&lt;/p&gt;
+\[\Delta t \lesssim \frac{2}{\omega_{\max}}\]&lt;p&gt;的稳定限制。&lt;/p&gt;
 &lt;p&gt;问题是：&lt;/p&gt;
-\[
-\omega_{\max}
-\]&lt;p&gt;通常由最硬、最小尺度的模式决定，例如：&lt;/p&gt;
+\[\omega_{\max}\]&lt;p&gt;通常由最硬、最小尺度的模式决定，例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;极小 tet；&lt;/li&gt;
 &lt;li&gt;高 Young 模量；&lt;/li&gt;
@@ -2914,163 +1396,51 @@ K\phi_i
 &lt;li&gt;近不可压缩材料。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;所以一个局部极硬区域就可能迫使：&lt;/p&gt;
-\[
-\boxed{\text{整个世界使用极小 timestep}}
-\]&lt;p&gt;这也是显式有限元中网格最小尺寸极其敏感的原因。&lt;/p&gt;
+\[\boxed{\text{整个世界使用极小 timestep}}\]&lt;p&gt;这也是显式有限元中网格最小尺寸极其敏感的原因。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-全隐式当然可以解决稳定性问题但代价很大&#34;&gt;3. 全隐式当然可以解决稳定性问题，但代价很大
 &lt;/h1&gt;&lt;p&gt;Backward Euler 对：&lt;/p&gt;
-\[
-\dot x=f(x)
-\]&lt;p&gt;写成：&lt;/p&gt;
-&lt;h1 id=&#34;x_n1-1&#34;&gt;[
-x_{n+1}
-&lt;/h1&gt;&lt;p&gt;x_n
-+
-h f(x_{n+1}).
-]&lt;/p&gt;
-&lt;p&gt;因为未知量出现在右边，所以必须求解：&lt;/p&gt;
-\[
-F(x_{n+1})=0.
-\]&lt;p&gt;对非线性 FEM 通常意味着：&lt;/p&gt;
-\[
-\boxed{
-\text{assemble}
-+
-\text{linearize}
-+
-\text{solve sparse system}
-}
-\]&lt;p&gt;甚至每个时间步多次 Newton。&lt;/p&gt;
+\[\dot x=f(x)\]&lt;p&gt;写成：&lt;/p&gt;
+\[x_{n+1} = x_n + h f(x_{n+1}).\]&lt;p&gt;因为未知量出现在右边，所以必须求解：&lt;/p&gt;
+\[F(x_{n+1})=0.\]&lt;p&gt;对非线性 FEM 通常意味着：&lt;/p&gt;
+\[\boxed{ \text{assemble} + \text{linearize} + \text{solve sparse system} }\]&lt;p&gt;甚至每个时间步多次 Newton。&lt;/p&gt;
 &lt;p&gt;Baraff–Witkin 的经典 cloth work 之所以重要，就是因为 implicit integration 允许非常 stiff 的 cloth 使用远大于显式方法的时间步；Pixar 后来的生产级 deformable simulator Fizt 仍以 constrained backward Euler 为基础，在线性化后解：&lt;/p&gt;
-&lt;h1 id=&#34;rightdelta-v&#34;&gt;[
-\left[
-M-h\frac{\partial f}{\partial v}
--h^2\frac{\partial f}{\partial x}
-\right]\Delta v
-&lt;/h1&gt;&lt;p&gt;b.
-]&lt;/p&gt;
-&lt;p&gt;Pixar 的公开课程材料明确说明，这种隐式框架长期以来一直是其 cloth/volume simulator 的基础，但每个时间步仍要组装并迭代求解大型稀疏系统。&lt;/p&gt;
+\[\left[ M-h\frac{\partial f}{\partial v} -h^2\frac{\partial f}{\partial x} \right]\Delta v = b.\]&lt;p&gt;Pixar 的公开课程材料明确说明，这种隐式框架长期以来一直是其 cloth/volume simulator 的基础，但每个时间步仍要组装并迭代求解大型稀疏系统。&lt;/p&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-\[
-\boxed{
-\text{implicit：稳定性换计算量}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{implicit：稳定性换计算量} }\]&lt;hr&gt;
 &lt;h1 id=&#34;4-imex-问了一个更聪明的问题&#34;&gt;4. IMEX 问了一个更聪明的问题
 &lt;/h1&gt;&lt;p&gt;假设动力学可以拆成：&lt;/p&gt;
-&lt;h1 id=&#34;dot-y&#34;&gt;[
-\dot y
-&lt;/h1&gt;&lt;p&gt;f(y)+g(y).
-]&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
-\[
-f=\text{non-stiff},
-\]\[
-g=\text{stiff}.
-\]&lt;p&gt;为什么一定要：&lt;/p&gt;
-\[
-\boxed{\text{所有项都显式}}
-\]&lt;p&gt;或者：&lt;/p&gt;
-\[
-\boxed{\text{所有项都隐式？}}
-\]&lt;p&gt;IMEX 会写成类似：&lt;/p&gt;
-&lt;h1 id=&#34;fracy_n1-y_nh&#34;&gt;[
-\frac{y_{n+1}-y_n}{h}
-&lt;/h1&gt;&lt;p&gt;f(y_n)
-+
-g(y_{n+1}).
-]&lt;/p&gt;
-&lt;p&gt;即：&lt;/p&gt;
-\[
-\boxed{
-\text{cheap/non-stiff term：显式}
-}
-\]\[
-\boxed{
-\text{stiff term：隐式}
-}
-\]&lt;p&gt;于是只为真正制造稳定性问题的部分支付 implicit solve 的成本。&lt;/p&gt;
+\[\dot y = f(y)+g(y).\]&lt;p&gt;其中：&lt;/p&gt;
+\[f=\text{non-stiff},\]\[g=\text{stiff}.\]&lt;p&gt;为什么一定要：&lt;/p&gt;
+\[\boxed{\text{所有项都显式}}\]&lt;p&gt;或者：&lt;/p&gt;
+\[\boxed{\text{所有项都隐式？}}\]&lt;p&gt;IMEX 会写成类似：&lt;/p&gt;
+\[\frac{y_{n+1}-y_n}{h} = f(y_n) + g(y_{n+1}).\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{ \text{cheap/non-stiff term：显式} }\]\[\boxed{ \text{stiff term：隐式} }\]&lt;p&gt;于是只为真正制造稳定性问题的部分支付 implicit solve 的成本。&lt;/p&gt;
 &lt;p&gt;这就是 IMEX 的核心。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-一个极简单但很能说明问题的例子&#34;&gt;5. 一个极简单但很能说明问题的例子
 &lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
-&lt;h1 id=&#34;dot-x&#34;&gt;[
-\dot x
-&lt;/h1&gt;&lt;p&gt;-\underbrace{kx}&lt;em&gt;{\text{stiff}}
-+
-\underbrace{\sin t}&lt;/em&gt;{\text{non-stiff}}.
-]&lt;/p&gt;
-&lt;p&gt;IMEX Euler：&lt;/p&gt;
-&lt;h1 id=&#34;fracx_n1-x_nh&#34;&gt;[
-\frac{x_{n+1}-x_n}{h}
-&lt;/h1&gt;&lt;p&gt;-kx_{n+1}+\sin t_n.
-]&lt;/p&gt;
-&lt;p&gt;于是：&lt;/p&gt;
-&lt;h1 id=&#34;x_n1-2&#34;&gt;[
-x_{n+1}
-&lt;/h1&gt;&lt;p&gt;\frac{x_n+h\sin t_n}
-{1+hk}.
-]&lt;/p&gt;
-&lt;p&gt;即使：&lt;/p&gt;
-\[
-hk\gg1,
-\]&lt;p&gt;分母：&lt;/p&gt;
-\[
-1+hk
-\]&lt;p&gt;仍然保持稳定。&lt;/p&gt;
+\[\dot x = -\underbrace{kx}_{\text{stiff}} + \underbrace{\sin t}_{\text{non-stiff}}.\]&lt;p&gt;IMEX Euler：&lt;/p&gt;
+\[\frac{x_{n+1}-x_n}{h} = -kx_{n+1}+\sin t_n.\]&lt;p&gt;于是：&lt;/p&gt;
+\[x_{n+1} = \frac{x_n+h\sin t_n} {1+hk}.\]&lt;p&gt;即使：&lt;/p&gt;
+\[hk\gg1,\]&lt;p&gt;分母：&lt;/p&gt;
+\[1+hk\]&lt;p&gt;仍然保持稳定。&lt;/p&gt;
 &lt;p&gt;但外力：&lt;/p&gt;
-\[
-\sin t
-\]&lt;p&gt;完全不用进入隐式求解。&lt;/p&gt;
+\[\sin t\]&lt;p&gt;完全不用进入隐式求解。&lt;/p&gt;
 &lt;p&gt;这就是 IMEX 最简单的“只为 stiffness 买单”。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-放到弹性体里可以怎样拆&#34;&gt;6. 放到弹性体里，可以怎样拆？
 &lt;/h1&gt;&lt;p&gt;设：&lt;/p&gt;
-&lt;h1 id=&#34;mdot-v&#34;&gt;[
-M\dot v
-&lt;/h1&gt;&lt;p&gt;f_{\rm stiff}(x)
-+
-f_{\rm soft}(x,v)
-+
-f_{\rm ext}.
-]&lt;/p&gt;
-&lt;p&gt;一个最直观的 IMEX 设计可能是：&lt;/p&gt;
-\[
-f_{\rm stiff}
-\rightarrow
-\text{implicit},
-\]&lt;p&gt;而：&lt;/p&gt;
-\[
-f_{\rm soft},f_{\rm ext}
-\rightarrow
-\text{explicit}.
-\]&lt;p&gt;例如：&lt;/p&gt;
-\[
-\boxed{
-\text{高刚度 stretch}
-}
-\]&lt;p&gt;隐式处理；&lt;/p&gt;
+\[M\dot v = f_{\rm stiff}(x) + f_{\rm soft}(x,v) + f_{\rm ext}.\]&lt;p&gt;一个最直观的 IMEX 设计可能是：&lt;/p&gt;
+\[f_{\rm stiff} \rightarrow \text{implicit},\]&lt;p&gt;而：&lt;/p&gt;
+\[f_{\rm soft},f_{\rm ext} \rightarrow \text{explicit}.\]&lt;p&gt;例如：&lt;/p&gt;
+\[\boxed{ \text{高刚度 stretch} }\]&lt;p&gt;隐式处理；&lt;/p&gt;
 &lt;p&gt;而：&lt;/p&gt;
-\[
-\boxed{
-\text{gravity、低刚度 bending、control force}
-}
-\]&lt;p&gt;显式处理。&lt;/p&gt;
+\[\boxed{ \text{gravity、低刚度 bending、control force} }\]&lt;p&gt;显式处理。&lt;/p&gt;
 &lt;p&gt;再比如：&lt;/p&gt;
-\[
-\text{internal elasticity}
-\rightarrow\text{implicit},
-\]\[
-\text{external smooth forces}
-\rightarrow\text{explicit}.
-\]&lt;p&gt;这里的关键不是某种固定拆法。&lt;/p&gt;
+\[\text{internal elasticity} \rightarrow\text{implicit},\]\[\text{external smooth forces} \rightarrow\text{explicit}.\]&lt;p&gt;这里的关键不是某种固定拆法。&lt;/p&gt;
 &lt;p&gt;而是：&lt;/p&gt;
-\[
-\boxed{
-\text{哪个 term 决定 timestep stability？}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{哪个 term 决定 timestep stability？} }\]&lt;hr&gt;
 &lt;h1 id=&#34;7-更进一步甚至可以按空间区域拆&#34;&gt;7. 更进一步：甚至可以按空间区域拆
 &lt;/h1&gt;&lt;p&gt;假设一个 FEM 网格中：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -3083,102 +1453,40 @@ f_{\rm soft},f_{\rm ext}
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;最小 tet 只存在于右侧。&lt;/p&gt;
 &lt;p&gt;纯 explicit：&lt;/p&gt;
-\[
-\Delta t
-\]&lt;p&gt;仍然必须被那个小区域控制。&lt;/p&gt;
+\[\Delta t\]&lt;p&gt;仍然必须被那个小区域控制。&lt;/p&gt;
 &lt;p&gt;IMEX 可以考虑：&lt;/p&gt;
-\[
-\boxed{
-\Omega_{\rm stiff}\rightarrow\text{implicit}
-}
-\]&lt;p&gt;而：&lt;/p&gt;
-\[
-\boxed{
-\Omega_{\rm regular}\rightarrow\text{explicit}
-}
-\]&lt;p&gt;2025 年关于 geometry-induced stiffness 的 IMEX 工作正是在做这种思想：极小单元导致显式 CFL 过严，因此把 stiff 部分隐式处理，而其他区域保持显式，从而避免全域 implicit solve 的成本。&lt;/p&gt;
+\[\boxed{ \Omega_{\rm stiff}\rightarrow\text{implicit} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \Omega_{\rm regular}\rightarrow\text{explicit} }\]&lt;p&gt;2025 年关于 geometry-induced stiffness 的 IMEX 工作正是在做这种思想：极小单元导致显式 CFL 过严，因此把 stiff 部分隐式处理，而其他区域保持显式，从而避免全域 implicit solve 的成本。&lt;/p&gt;
 &lt;p&gt;这一点对复杂 FEM 特别有价值：&lt;/p&gt;
-\[
-\boxed{
-\text{一个坏网格单元不一定必须拖慢整个模型。}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{一个坏网格单元不一定必须拖慢整个模型。} }\]&lt;hr&gt;
 &lt;h1 id=&#34;8-imex-与-semi-implicit-euler-不是一回事&#34;&gt;8. IMEX 与 semi-implicit Euler 不是一回事
 &lt;/h1&gt;&lt;p&gt;这一点很容易混淆。&lt;/p&gt;
 &lt;p&gt;游戏物理里经常使用：&lt;/p&gt;
-&lt;h1 id=&#34;v_n1&#34;&gt;[
-v_{n+1}
-&lt;/h1&gt;&lt;p&gt;v_n+h a(x_n),
-]&lt;/p&gt;
-&lt;h1 id=&#34;x_n1-3&#34;&gt;[
-x_{n+1}
-&lt;/h1&gt;&lt;p&gt;x_n+h v_{n+1}.
-]&lt;/p&gt;
-&lt;p&gt;这通常叫：&lt;/p&gt;
-\[
-\text{semi-implicit Euler}
-\]&lt;p&gt;或：&lt;/p&gt;
-\[
-\text{symplectic Euler}.
-\]&lt;p&gt;Drake 官方文档也是这样定义的：先更新 generalized velocity，再用新的 velocity 更新 generalized coordinates。&lt;/p&gt;
+\[v_{n+1} = v_n+h a(x_n),\]\[x_{n+1} = x_n+h v_{n+1}.\]&lt;p&gt;这通常叫：&lt;/p&gt;
+\[\text{semi-implicit Euler}\]&lt;p&gt;或：&lt;/p&gt;
+\[\text{symplectic Euler}.\]&lt;p&gt;Drake 官方文档也是这样定义的：先更新 generalized velocity，再用新的 velocity 更新 generalized coordinates。&lt;/p&gt;
 &lt;p&gt;它的“semi-implicit”主要指：&lt;/p&gt;
-\[
-x
-\]&lt;p&gt;和：&lt;/p&gt;
-\[
-v
-\]&lt;p&gt;的更新顺序。&lt;/p&gt;
+\[x\]&lt;p&gt;和：&lt;/p&gt;
+\[v\]&lt;p&gt;的更新顺序。&lt;/p&gt;
 &lt;p&gt;但如果：&lt;/p&gt;
-\[
-a(x_n)
-\]&lt;p&gt;仍完全用旧位置计算，那么 force evaluation 本身仍是 explicit。&lt;/p&gt;
+\[a(x_n)\]&lt;p&gt;仍完全用旧位置计算，那么 force evaluation 本身仍是 explicit。&lt;/p&gt;
 &lt;p&gt;IMEX 的“implicit-explicit”则指：&lt;/p&gt;
-\[
-\boxed{
-\text{方程右端不同物理项使用不同离散}
-}
-\]&lt;p&gt;例如：&lt;/p&gt;
-\[
-f_{\rm stiff}(x_{n+1})
-+
-f_{\rm soft}(x_n).
-\]&lt;p&gt;因此：&lt;/p&gt;
-\[
-\boxed{
-\text{semi-implicit Euler}
-\neq
-\text{一般意义上的 IMEX}
-}
-\]&lt;p&gt;虽然两者都在混合“旧状态/新状态”。&lt;/p&gt;
+\[\boxed{ \text{方程右端不同物理项使用不同离散} }\]&lt;p&gt;例如：&lt;/p&gt;
+\[f_{\rm stiff}(x_{n+1}) + f_{\rm soft}(x_n).\]&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{semi-implicit Euler} \neq \text{一般意义上的 IMEX} }\]&lt;p&gt;虽然两者都在混合“旧状态/新状态”。&lt;/p&gt;
 &lt;p&gt;Simbody 的官方说明也特别指出，游戏中常见的 semi-explicit Euler 在没有 velocity-dependent force 时可以完全显式实现；真正含 damping、Coriolis 等项时，严格处理仍可能需要 implicit solve。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-imex-真正难的地方怎么拆&#34;&gt;9. IMEX 真正难的地方：怎么拆？
 &lt;/h1&gt;&lt;p&gt;这是它的核心局限。&lt;/p&gt;
 &lt;p&gt;不是写：&lt;/p&gt;
-\[
-f=f_E+f_I
-\]&lt;p&gt;就结束了。&lt;/p&gt;
+\[f=f_E+f_I\]&lt;p&gt;就结束了。&lt;/p&gt;
 &lt;p&gt;一个好的 decomposition 必须同时考虑：&lt;/p&gt;
-\[
-\boxed{\text{stability}}
-\]\[
-\boxed{\text{coupling}}
-\]\[
-\boxed{\text{solve cost}}
-\]&lt;p&gt;例如一个弹性材料：&lt;/p&gt;
-\[
-f=f_{\rm vol}+f_{\rm dev}.
-\]&lt;p&gt;近不可压缩时：&lt;/p&gt;
-\[
-\lambda\gg\mu.
-\]&lt;p&gt;那么 volumetric part 很 stiff：&lt;/p&gt;
-\[
-f_{\rm vol}
-\]&lt;p&gt;适合 implicit；&lt;/p&gt;
+\[\boxed{\text{stability}}\]\[\boxed{\text{coupling}}\]\[\boxed{\text{solve cost}}\]&lt;p&gt;例如一个弹性材料：&lt;/p&gt;
+\[f=f_{\rm vol}+f_{\rm dev}.\]&lt;p&gt;近不可压缩时：&lt;/p&gt;
+\[\lambda\gg\mu.\]&lt;p&gt;那么 volumetric part 很 stiff：&lt;/p&gt;
+\[f_{\rm vol}\]&lt;p&gt;适合 implicit；&lt;/p&gt;
 &lt;p&gt;而 deviatoric/shear part：&lt;/p&gt;
-\[
-f_{\rm dev}
-\]&lt;p&gt;可能相对温和。&lt;/p&gt;
+\[f_{\rm dev}\]&lt;p&gt;可能相对温和。&lt;/p&gt;
 &lt;p&gt;这和 selective reduced integration 背后的思维很相似：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;不同物理子空间不一定应该使用同一种数值处理。&lt;/strong&gt;&lt;/p&gt;
@@ -3186,35 +1494,16 @@ f_{\rm dev}
 &lt;hr&gt;
 &lt;h1 id=&#34;10-一个更深的理解stiffness-是方向相关的&#34;&gt;10. 一个更深的理解：stiffness 是“方向相关”的
 &lt;/h1&gt;&lt;p&gt;考虑 Hessian：&lt;/p&gt;
-\[
-K=\nabla^2E.
-\]&lt;p&gt;其特征值：&lt;/p&gt;
-\[
-K\phi_i=\lambda_i\phi_i.
-\]&lt;p&gt;如果：&lt;/p&gt;
-\[
-\lambda_1\ll\lambda_2\ll\cdots\ll\lambda_n,
-\]&lt;p&gt;那么真正引起显式稳定限制的只是：&lt;/p&gt;
-\[
-\lambda_{\max}
-\]&lt;p&gt;附近少量高频方向。&lt;/p&gt;
+\[K=\nabla^2E.\]&lt;p&gt;其特征值：&lt;/p&gt;
+\[K\phi_i=\lambda_i\phi_i.\]&lt;p&gt;如果：&lt;/p&gt;
+\[\lambda_1\ll\lambda_2\ll\cdots\ll\lambda_n,\]&lt;p&gt;那么真正引起显式稳定限制的只是：&lt;/p&gt;
+\[\lambda_{\max}\]&lt;p&gt;附近少量高频方向。&lt;/p&gt;
 &lt;p&gt;换句话说：&lt;/p&gt;
-\[
-\boxed{
-\text{整个系统并不是“stiff 的”；
-只是状态空间中的一部分方向很 stiff。}
-}
-\]&lt;p&gt;这是非常值得迁移的观点。&lt;/p&gt;
+\[\boxed{ \text{整个系统并不是“stiff 的”； 只是状态空间中的一部分方向很 stiff。} }\]&lt;p&gt;这是非常值得迁移的观点。&lt;/p&gt;
 &lt;p&gt;传统 implicit FEM：&lt;/p&gt;
-\[
-\text{所有 DOF}
-\]&lt;p&gt;一起进入 implicit solve。&lt;/p&gt;
+\[\text{所有 DOF}\]&lt;p&gt;一起进入 implicit solve。&lt;/p&gt;
 &lt;p&gt;更精细的算法设计会尝试识别：&lt;/p&gt;
-\[
-\boxed{
-\text{stiff subspace}
-}
-\]&lt;p&gt;只对这部分支付更高代价。&lt;/p&gt;
+\[\boxed{ \text{stiff subspace} }\]&lt;p&gt;只对这部分支付更高代价。&lt;/p&gt;
 &lt;p&gt;这会自然连接到：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;modal splitting；&lt;/li&gt;
@@ -3226,76 +1515,31 @@ K\phi_i=\lambda_i\phi_i.
 &lt;hr&gt;
 &lt;h1 id=&#34;11-imex-和-substepping-有什么区别&#34;&gt;11. IMEX 和 substepping 有什么区别？
 &lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
-&lt;h1 id=&#34;delta-t_rm-game&#34;&gt;[
-\Delta t_{\rm game}
-&lt;/h1&gt;&lt;p&gt;1/60\text{s}.
-]&lt;/p&gt;
-&lt;p&gt;但 stiff spring 需要：&lt;/p&gt;
-\[
-\Delta t=1/1000\text{s}.
-\]&lt;p&gt;最简单方案：&lt;/p&gt;
-\[
-\boxed{\text{substep 17 次}}
-\]&lt;p&gt;即所有力都计算 17 次。&lt;/p&gt;
+\[\Delta t_{\rm game} = 1/60\text{s}.\]&lt;p&gt;但 stiff spring 需要：&lt;/p&gt;
+\[\Delta t=1/1000\text{s}.\]&lt;p&gt;最简单方案：&lt;/p&gt;
+\[\boxed{\text{substep 17 次}}\]&lt;p&gt;即所有力都计算 17 次。&lt;/p&gt;
 &lt;p&gt;IMEX 的思路不同：&lt;/p&gt;
-\[
-\boxed{
-\text{不缩小所有物理过程的时间步，
-而是改变 stiff term 的数值处理方式。}
-}
-\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{不缩小所有物理过程的时间步， 而是改变 stiff term 的数值处理方式。} }\]&lt;p&gt;所以：&lt;/p&gt;
 &lt;h3 id=&#34;substepping&#34;&gt;substepping
 &lt;/h3&gt;&lt;p&gt;解决：&lt;/p&gt;
-\[
-\text{时间分辨率不够}.
-\]&lt;h3 id=&#34;imex&#34;&gt;IMEX
+\[\text{时间分辨率不够}.\]&lt;h3 id=&#34;imex&#34;&gt;IMEX
 &lt;/h3&gt;&lt;p&gt;重点解决：&lt;/p&gt;
-\[
-\text{数值稳定性被 stiff term 限制}.
-\]&lt;p&gt;两者甚至可以组合：&lt;/p&gt;
-\[
-\boxed{
-\text{IMEX}
-+
-\text{multirate/subcycling}
-}
-\]&lt;p&gt;这是现代多尺度时间积分很自然的一条路线。&lt;/p&gt;
+\[\text{数值稳定性被 stiff term 限制}.\]&lt;p&gt;两者甚至可以组合：&lt;/p&gt;
+\[\boxed{ \text{IMEX} + \text{multirate/subcycling} }\]&lt;p&gt;这是现代多尺度时间积分很自然的一条路线。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;12-imex-为什么不等于无条件稳定&#34;&gt;12. IMEX 为什么不等于“无条件稳定”？
 &lt;/h1&gt;&lt;p&gt;这是很重要的限制。&lt;/p&gt;
 &lt;p&gt;虽然 stiff 部分隐式了，但：&lt;/p&gt;
-\[
-f_E
-\]&lt;p&gt;仍然是显式的。&lt;/p&gt;
+\[f_E\]&lt;p&gt;仍然是显式的。&lt;/p&gt;
 &lt;p&gt;所以总体 timestep 仍然必须满足：&lt;/p&gt;
-\[
-\boxed{
-\text{explicit subsystem 的稳定性限制}
-}
-\]&lt;p&gt;如果你错误地把一个高频项放进：&lt;/p&gt;
-\[
-f_E,
-\]&lt;p&gt;那么 IMEX 一样会爆。&lt;/p&gt;
+\[\boxed{ \text{explicit subsystem 的稳定性限制} }\]&lt;p&gt;如果你错误地把一个高频项放进：&lt;/p&gt;
+\[f_E,\]&lt;p&gt;那么 IMEX 一样会爆。&lt;/p&gt;
 &lt;p&gt;而且 explicit 与 implicit 两部分相互耦合时，整体稳定域并不是两个方法简单相加。&lt;/p&gt;
 &lt;p&gt;这正是为什么 Ascher–Ruuth–Spiteri 的经典工作要专门设计 &lt;strong&gt;IMEX Runge–Kutta pairs&lt;/strong&gt;，而不是任意拿一个 explicit RK 和一个 implicit RK 拼起来。论文的重要贡献之一就是设计具有良好组合稳定域的成对方法。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-对自研软体求解器一个很实用的思考框架&#34;&gt;13. 对自研软体求解器，一个很实用的思考框架
 &lt;/h1&gt;&lt;p&gt;假设一个时间步里有：&lt;/p&gt;
-&lt;h1 id=&#34;f&#34;&gt;[
-f
-&lt;/h1&gt;&lt;p&gt;f_{\rm stretch}
-+
-f_{\rm bend}
-+
-f_{\rm volume}
-+
-f_{\rm contact}
-+
-f_{\rm damping}
-+
-f_{\rm external}.
-]&lt;/p&gt;
-&lt;p&gt;不要先问：&lt;/p&gt;
+\[f = f_{\rm stretch} + f_{\rm bend} + f_{\rm volume} + f_{\rm contact} + f_{\rm damping} + f_{\rm external}.\]&lt;p&gt;不要先问：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“整个 solver 应该 explicit 还是 implicit？”&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -3349,90 +1593,33 @@ f_{\rm external}.
 	&lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;然后再决定：&lt;/p&gt;
-\[
-\boxed{
-\text{哪部分 implicit}
-}
-\]\[
-\boxed{
-\text{哪部分 explicit}
-}
-\]\[
-\boxed{
-\text{哪部分根本不该用普通 ODE integration，而应该用 constraint/contact solve}
-}
-\]&lt;p&gt;这个分层思维比“统一换一个更高级 integrator”更有工程价值。&lt;/p&gt;
+\[\boxed{ \text{哪部分 implicit} }\]\[\boxed{ \text{哪部分 explicit} }\]\[\boxed{ \text{哪部分根本不该用普通 ODE integration，而应该用 constraint/contact solve} }\]&lt;p&gt;这个分层思维比“统一换一个更高级 integrator”更有工程价值。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;14-它和-xpbd-其实有一个有意思的联系&#34;&gt;14. 它和 XPBD 其实有一个有意思的联系
 &lt;/h1&gt;&lt;p&gt;XPBD 并不通常被称作 IMEX。&lt;/p&gt;
 &lt;p&gt;但从设计哲学看，它也在进行某种：&lt;/p&gt;
-\[
-\boxed{\text{难处理物理与容易处理动力学的分裂}}
-\]&lt;p&gt;例如：&lt;/p&gt;
+\[\boxed{\text{难处理物理与容易处理动力学的分裂}}\]&lt;p&gt;例如：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;外力先显式预测：&lt;/li&gt;
 &lt;/ol&gt;
-&lt;h1 id=&#34;v&#34;&gt;[
-v^*
-&lt;/h1&gt;&lt;p&gt;v_n+hM^{-1}f_{\rm ext},
-]&lt;/p&gt;
-&lt;h1 id=&#34;x&#34;&gt;[
-x^*
-&lt;/h1&gt;&lt;p&gt;x_n+hv^*.
-]&lt;/p&gt;
-&lt;ol start=&#34;2&#34;&gt;
+\[v^* = v_n+hM^{-1}f_{\rm ext},\]\[x^* = x_n+hv^*.\]&lt;ol start=&#34;2&#34;&gt;
 &lt;li&gt;然后对 stiff constraints 做：&lt;/li&gt;
 &lt;/ol&gt;
-\[
-x^*\rightarrow x^{n+1}
-\]&lt;p&gt;的 constraint projection。&lt;/p&gt;
+\[x^*\rightarrow x^{n+1}\]&lt;p&gt;的 constraint projection。&lt;/p&gt;
 &lt;p&gt;因此整个时间步事实上已经不是“所有物理都统一积分”。&lt;/p&gt;
 &lt;p&gt;它在做：&lt;/p&gt;
-\[
-\boxed{
-\text{free dynamics}
-+
-\text{constraint correction}
-}
-\]&lt;p&gt;这和 operator splitting / IMEX 的总体思想有亲缘性。&lt;/p&gt;
+\[\boxed{ \text{free dynamics} + \text{constraint correction} }\]&lt;p&gt;这和 operator splitting / IMEX 的总体思想有亲缘性。&lt;/p&gt;
 &lt;p&gt;区别在于 XPBD 把 stiff elasticity 转换成：&lt;/p&gt;
-\[
-C(x)=0
-\]&lt;p&gt;附近的 constraint solve，而标准 IMEX 仍从 ODE/PDE time discretization 出发。&lt;/p&gt;
+\[C(x)=0\]&lt;p&gt;附近的 constraint solve，而标准 IMEX 仍从 ODE/PDE time discretization 出发。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;15-对物理引擎最值得迁移的一点&#34;&gt;15. 对物理引擎最值得迁移的一点
 &lt;/h1&gt;&lt;p&gt;IMEX 真正值得记住的并不是某个 Butcher tableau。&lt;/p&gt;
 &lt;p&gt;而是：&lt;/p&gt;
-\[
-\boxed{
-\text{不要因为系统的一小部分难算，
-就用最昂贵的方法处理整个系统。}
-}
-\]&lt;p&gt;如果问题中存在多个物理尺度：&lt;/p&gt;
-\[
-\text{slow}
-+
-\text{fast},
-\]&lt;p&gt;多个空间尺度：&lt;/p&gt;
-\[
-\text{coarse}
-+
-\text{tiny elements},
-\]&lt;p&gt;或者多个刚度等级：&lt;/p&gt;
-\[
-\text{soft}
-+
-\text{stiff},
-\]&lt;p&gt;那么更成熟的求解器设计通常会考虑：&lt;/p&gt;
-\[
-\boxed{
-\text{split}
-\rightarrow
-\text{treat differently}
-\rightarrow
-\text{recombine}
-}
-\]&lt;p&gt;这和前面几期其实形成了一条共同思想：&lt;/p&gt;
+\[\boxed{ \text{不要因为系统的一小部分难算， 就用最昂贵的方法处理整个系统。} }\]&lt;p&gt;如果问题中存在多个物理尺度：&lt;/p&gt;
+\[\text{slow} + \text{fast},\]&lt;p&gt;多个空间尺度：&lt;/p&gt;
+\[\text{coarse} + \text{tiny elements},\]&lt;p&gt;或者多个刚度等级：&lt;/p&gt;
+\[\text{soft} + \text{stiff},\]&lt;p&gt;那么更成熟的求解器设计通常会考虑：&lt;/p&gt;
+\[\boxed{ \text{split} \rightarrow \text{treat differently} \rightarrow \text{recombine} }\]&lt;p&gt;这和前面几期其实形成了一条共同思想：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;MLMC：不同精度层投入不同样本量；&lt;/li&gt;
 &lt;li&gt;MFMC：不同模型承担不同统计职责；&lt;/li&gt;
@@ -3440,23 +1627,11 @@ C(x)=0
 &lt;li&gt;IMEX：不同动力学项使用不同时间积分。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;背后都是：&lt;/p&gt;
-\[
-\boxed{
-\text{不要对异质问题使用均匀资源。}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{不要对异质问题使用均匀资源。} }\]&lt;hr&gt;
 &lt;h2 id=&#34;一个很值得做的工程诊断stiffness-census&#34;&gt;一个很值得做的工程诊断：stiffness census
 &lt;/h2&gt;&lt;p&gt;对于一个软体模型，可以估算各模块的局部最高频率：&lt;/p&gt;
-\[
-\omega_i^2
-\approx
-\lambda_{\max}(M^{-1}K_i).
-\]&lt;p&gt;然后记录：&lt;/p&gt;
-\[
-\Delta t_i
-\sim
-\frac{2}{\omega_i}.
-\]&lt;p&gt;如果得到：&lt;/p&gt;
+\[\omega_i^2 \approx \lambda_{\max}(M^{-1}K_i).\]&lt;p&gt;然后记录：&lt;/p&gt;
+\[\Delta t_i \sim \frac{2}{\omega_i}.\]&lt;p&gt;如果得到：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3474,39 +1649,15 @@ C(x)=0
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;那么整个显式 solver 的：&lt;/p&gt;
-\[
-0.08\text{ ms}
-\]&lt;p&gt;限制其实几乎完全来自 volume term。&lt;/p&gt;
+\[0.08\text{ ms}\]&lt;p&gt;限制其实几乎完全来自 volume term。&lt;/p&gt;
 &lt;p&gt;这时最有价值的问题就变成：&lt;/p&gt;
-\[
-\boxed{
-\text{为什么要让 gravity、bend、stretch 都跟着 volume 跑 12500 Hz？}
-}
-\]&lt;p&gt;这就是 IMEX 思维真正开始产生工程价值的位置。&lt;/p&gt;
+\[\boxed{ \text{为什么要让 gravity、bend、stretch 都跟着 volume 跑 12500 Hz？} }\]&lt;p&gt;这就是 IMEX 思维真正开始产生工程价值的位置。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;IMEX 的核心可以浓缩成：&lt;/p&gt;
-\[
-\boxed{
-\text{稳定性瓶颈应该被局部处理，而不是让整个系统为它买单。}
-}
-\]&lt;p&gt;更深一层：&lt;/p&gt;
-\[
-\boxed{
-\text{“显式还是隐式”通常不是系统级二选一，而可以是 term-level、mode-level、region-level 的资源分配问题。}
-}
-\]&lt;p&gt;一旦接受这一点，很多更先进的时间积分方法就会自然连起来：&lt;/p&gt;
-\[
-\text{IMEX}
-\rightarrow
-\text{operator splitting}
-\rightarrow
-\text{multirate integration}
-\rightarrow
-\text{local time stepping}
-\rightarrow
-\text{stiff-subspace methods}.
-\]&lt;p&gt;这条路线对于大规模 FEM、软体求解器和实时游戏物理都非常值得继续往下学。&lt;/p&gt;
+\[\boxed{ \text{稳定性瓶颈应该被局部处理，而不是让整个系统为它买单。} }\]&lt;p&gt;更深一层：&lt;/p&gt;
+\[\boxed{ \text{“显式还是隐式”通常不是系统级二选一，而可以是 term-level、mode-level、region-level 的资源分配问题。} }\]&lt;p&gt;一旦接受这一点，很多更先进的时间积分方法就会自然连起来：&lt;/p&gt;
+\[\text{IMEX} \rightarrow \text{operator splitting} \rightarrow \text{multirate integration} \rightarrow \text{local time stepping} \rightarrow \text{stiff-subspace methods}.\]&lt;p&gt;这条路线对于大规模 FEM、软体求解器和实时游戏物理都非常值得继续往下学。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
@@ -3542,17 +1693,7 @@ C(x)=0
 &lt;strong&gt;领域：有限元 × 物理引擎 × 接触力学 × 数值优化&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天选 IPC，因为它正好处在几个很重要的知识交叉点：&lt;/p&gt;
-\[
-\boxed{
-\text{隐式弹性动力学}
-+
-\text{Barrier Method}
-+
-\text{CCD}
-+
-\text{Newton Optimization}
-}
-\]&lt;p&gt;它解决的核心问题非常具体：&lt;/p&gt;
+\[\boxed{ \text{隐式弹性动力学} + \text{Barrier Method} + \text{CCD} + \text{Newton Optimization} }\]&lt;p&gt;它解决的核心问题非常具体：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;在大形变软体仿真里，怎样让接触从算法结构上保持不相交，而不是先允许穿透、再靠 penalty 或 projection 往回推？&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -3561,62 +1702,26 @@ C(x)=0
 &lt;h2 id=&#34;1-先看普通接触方法为什么容易变得脆弱&#34;&gt;1. 先看普通接触方法为什么容易变得脆弱
 &lt;/h2&gt;&lt;p&gt;假设两个软体表面发生接近。&lt;/p&gt;
 &lt;p&gt;Penalty contact 常见形式：&lt;/p&gt;
-\[
-f_c = k\,\max(0,-g)n
-\]&lt;p&gt;其中：&lt;/p&gt;
-\[
-g&lt;0
-\]&lt;p&gt;代表已经穿透。&lt;/p&gt;
+\[f_c = k\,\max(0,-g)n\]&lt;p&gt;其中：&lt;/p&gt;
+\[g&lt;0\]&lt;p&gt;代表已经穿透。&lt;/p&gt;
 &lt;p&gt;这意味着接触力是在：&lt;/p&gt;
-\[
-\boxed{\text{非法状态已经发生之后}}
-\]&lt;p&gt;才开始起作用。&lt;/p&gt;
+\[\boxed{\text{非法状态已经发生之后}}\]&lt;p&gt;才开始起作用。&lt;/p&gt;
 &lt;p&gt;于是你会面对一个熟悉的三角矛盾：&lt;/p&gt;
-\[
-k\text{ 小}
-\Rightarrow
-\text{穿透大}
-\]\[
-k\text{ 大}
-\Rightarrow
-\text{系统很 stiff}
-\]\[
-\Delta t\text{ 大}
-\Rightarrow
-\text{更容易跨过接触面}
-\]&lt;p&gt;很多工程调参，本质上都在这个三角形里打转。&lt;/p&gt;
+\[k\text{ 小} \Rightarrow \text{穿透大}\]\[k\text{ 大} \Rightarrow \text{系统很 stiff}\]\[\Delta t\text{ 大} \Rightarrow \text{更容易跨过接触面}\]&lt;p&gt;很多工程调参，本质上都在这个三角形里打转。&lt;/p&gt;
 &lt;p&gt;IPC 换了一个问题定义：&lt;/p&gt;
-\[
-\boxed{
-\text{不要允许 }d=0\text{ 被跨过去}
-}
-\]&lt;p&gt;其中：&lt;/p&gt;
-\[
-d(x)
-\]&lt;p&gt;是两个 collision primitives 的距离。&lt;/p&gt;
+\[\boxed{ \text{不要允许 }d=0\text{ 被跨过去} }\]&lt;p&gt;其中：&lt;/p&gt;
+\[d(x)\]&lt;p&gt;是两个 collision primitives 的距离。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-ipc-的核心给接触距离加一个-barrier-potential&#34;&gt;2. IPC 的核心：给接触距离加一个 barrier potential
 &lt;/h1&gt;&lt;p&gt;原始隐式动力学一个时间步可以写成某种增量势：&lt;/p&gt;
-\[
-E(x)
-\]&lt;p&gt;其中包含：&lt;/p&gt;
+\[E(x)\]&lt;p&gt;其中包含：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;惯性项；&lt;/li&gt;
 &lt;li&gt;弹性能；&lt;/li&gt;
 &lt;li&gt;外力势。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;IPC 增加：&lt;/p&gt;
-&lt;h1 id=&#34;bx&#34;&gt;[
-\boxed{
-B(x)
-&lt;/h1&gt;&lt;p&gt;E(x)
-+
-\kappa
-\sum_{k\in C}
-b(d_k(x))
-}
-]&lt;/p&gt;
-&lt;p&gt;这里：&lt;/p&gt;
+\[\boxed{ B(x) = E(x) + \kappa \sum_{k\in C} b(d_k(x)) }\]&lt;p&gt;这里：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(C\)：当前可能发生接触的 primitive pairs；&lt;/li&gt;
 &lt;li&gt;\(d_k\)：第 \(k\) 对几何元的距离；&lt;/li&gt;
@@ -3624,53 +1729,22 @@ b(d_k(x))
 &lt;li&gt;\(\kappa\)：barrier stiffness / conditioning parameter。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;IPC Toolkit 官方文档当前仍把 contact potential 写成：&lt;/p&gt;
-\[
-B(x)=\sum_{k\in C}b(d_k(x)),
-\]&lt;p&gt;并提供势能、梯度和 Hessian 的直接计算接口。&lt;/p&gt;
+\[B(x)=\sum_{k\in C}b(d_k(x)),\]&lt;p&gt;并提供势能、梯度和 Hessian 的直接计算接口。&lt;/p&gt;
 &lt;p&gt;Barrier 的关键性质可以粗略理解为：&lt;/p&gt;
-\[
-d\gg \hat d
-\Rightarrow
-b(d)=0
-\]&lt;p&gt;而当：&lt;/p&gt;
-\[
-d\rightarrow0^+
-\]&lt;p&gt;时：&lt;/p&gt;
-\[
-\boxed{
-b(d)\rightarrow+\infty
-}
-\]&lt;p&gt;因此优化器越想把两个表面推到重合，目标函数就越大。&lt;/p&gt;
+\[d\gg \hat d \Rightarrow b(d)=0\]&lt;p&gt;而当：&lt;/p&gt;
+\[d\rightarrow0^+\]&lt;p&gt;时：&lt;/p&gt;
+\[\boxed{ b(d)\rightarrow+\infty }\]&lt;p&gt;因此优化器越想把两个表面推到重合，目标函数就越大。&lt;/p&gt;
 &lt;p&gt;于是：&lt;/p&gt;
-\[
-d=0
-\]&lt;p&gt;变成一个不可跨越的能量墙。&lt;/p&gt;
+\[d=0\]&lt;p&gt;变成一个不可跨越的能量墙。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-为什么-barrier-和-penalty-的数学地位不一样&#34;&gt;3. 为什么 barrier 和 penalty 的数学地位不一样？
 &lt;/h1&gt;&lt;p&gt;Penalty 大概是：&lt;/p&gt;
-&lt;h1 id=&#34;e_pd&#34;&gt;[
-E_p(d)
-&lt;/h1&gt;&lt;p&gt;\frac{k}{2}\min(d,0)^2.
-]&lt;/p&gt;
-&lt;p&gt;它在：&lt;/p&gt;
-\[
-d&lt;0
-\]&lt;p&gt;以后才惩罚。&lt;/p&gt;
+\[E_p(d) = \frac{k}{2}\min(d,0)^2.\]&lt;p&gt;它在：&lt;/p&gt;
+\[d&lt;0\]&lt;p&gt;以后才惩罚。&lt;/p&gt;
 &lt;p&gt;Barrier 则工作在：&lt;/p&gt;
-\[
-d&gt;0
-\]&lt;p&gt;区域：&lt;/p&gt;
-\[
-\boxed{
-\lim_{d\to0^+}b(d)=+\infty
-}
-\]&lt;p&gt;所以可以用一句话概括：&lt;/p&gt;
-\[
-\boxed{
-\text{Penalty 惩罚违反约束；
-Barrier 阻止迭代进入违反约束的区域。}
-}
-\]&lt;p&gt;这正是 IPC 与很多传统 soft-contact formulation 最本质的区别之一。&lt;/p&gt;
+\[d&gt;0\]&lt;p&gt;区域：&lt;/p&gt;
+\[\boxed{ \lim_{d\to0^+}b(d)=+\infty }\]&lt;p&gt;所以可以用一句话概括：&lt;/p&gt;
+\[\boxed{ \text{Penalty 惩罚违反约束； Barrier 阻止迭代进入违反约束的区域。} }\]&lt;p&gt;这正是 IPC 与很多传统 soft-contact formulation 最本质的区别之一。&lt;/p&gt;
 &lt;p&gt;IPC 的原始 formulation 明确采用局部支持的 barrier，只让接近碰撞的 primitive pairs 产生势能，并使离得足够远的 pair 不受影响。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-但-barrier-本身还不够&#34;&gt;4. 但 barrier 本身还不够
@@ -3681,143 +1755,53 @@ Barrier 阻止迭代进入违反约束的区域。}
 &lt;/blockquote&gt;
 &lt;p&gt;不完全是。&lt;/p&gt;
 &lt;p&gt;Newton iteration 会产生搜索方向：&lt;/p&gt;
-\[
-p.
-\]&lt;p&gt;然后尝试：&lt;/p&gt;
-\[
-x_{\rm trial}=x+\alpha p.
-\]&lt;p&gt;即使：&lt;/p&gt;
-\[
-x
-\]&lt;p&gt;当前合法，&lt;/p&gt;
+\[p.\]&lt;p&gt;然后尝试：&lt;/p&gt;
+\[x_{\rm trial}=x+\alpha p.\]&lt;p&gt;即使：&lt;/p&gt;
+\[x\]&lt;p&gt;当前合法，&lt;/p&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[
-\alpha
-\]&lt;p&gt;太大，trial step 完全可能从：&lt;/p&gt;
-\[
-d&gt;0
-\]&lt;p&gt;直接跨到：&lt;/p&gt;
-\[
-d&lt;0.
-\]&lt;p&gt;数学上 barrier 在：&lt;/p&gt;
-\[
-d=0
-\]&lt;p&gt;附近发散，并不代表一个离散 Newton step 不会直接“跳过墙”。&lt;/p&gt;
+\[\alpha\]&lt;p&gt;太大，trial step 完全可能从：&lt;/p&gt;
+\[d&gt;0\]&lt;p&gt;直接跨到：&lt;/p&gt;
+\[d&lt;0.\]&lt;p&gt;数学上 barrier 在：&lt;/p&gt;
+\[d=0\]&lt;p&gt;附近发散，并不代表一个离散 Newton step 不会直接“跳过墙”。&lt;/p&gt;
 &lt;p&gt;所以 IPC 必须再加入：&lt;/p&gt;
-\[
-\boxed{\text{CCD-controlled line search}}
-\]&lt;p&gt;这就是 CCD 在 IPC 中真正具有决定性地位的原因。&lt;/p&gt;
+\[\boxed{\text{CCD-controlled line search}}\]&lt;p&gt;这就是 CCD 在 IPC 中真正具有决定性地位的原因。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-ccd-在这里不是碰撞检测完再处理而是控制优化步长&#34;&gt;5. CCD 在这里不是“碰撞检测完再处理”，而是控制优化步长
 &lt;/h1&gt;&lt;p&gt;给定：&lt;/p&gt;
-\[
-x
-\]&lt;p&gt;和 Newton direction：&lt;/p&gt;
-\[
-p,
-\]&lt;p&gt;考虑轨迹：&lt;/p&gt;
-\[
-x(\alpha)=x+\alpha p,
-\qquad
-0\le\alpha\le1.
-\]&lt;p&gt;CCD 询问：&lt;/p&gt;
-\[
-\boxed{
-\text{沿这条连续运动轨迹，第一次发生接触的 }\alpha_{\rm hit}\text{ 是多少？}
-}
-\]&lt;p&gt;然后约束：&lt;/p&gt;
-\[
-\alpha&lt;\alpha_{\rm hit}.
-\]&lt;p&gt;于是新的：&lt;/p&gt;
-\[
-x+\alpha p
-\]&lt;p&gt;仍然位于：&lt;/p&gt;
-\[
-d&gt;0
-\]&lt;p&gt;的可行区域。&lt;/p&gt;
+\[x\]&lt;p&gt;和 Newton direction：&lt;/p&gt;
+\[p,\]&lt;p&gt;考虑轨迹：&lt;/p&gt;
+\[x(\alpha)=x+\alpha p, \qquad 0\le\alpha\le1.\]&lt;p&gt;CCD 询问：&lt;/p&gt;
+\[\boxed{ \text{沿这条连续运动轨迹，第一次发生接触的 }\alpha_{\rm hit}\text{ 是多少？} }\]&lt;p&gt;然后约束：&lt;/p&gt;
+\[\alpha&lt;\alpha_{\rm hit}.\]&lt;p&gt;于是新的：&lt;/p&gt;
+\[x+\alpha p\]&lt;p&gt;仍然位于：&lt;/p&gt;
+\[d&gt;0\]&lt;p&gt;的可行区域。&lt;/p&gt;
 &lt;p&gt;原始 IPC 算法把这一过程直接写进 barrier-aware Newton：先求 Newton direction，再用 CCD 得到 step-size upper bound，然后继续做能量下降 line search。&lt;/p&gt;
 &lt;p&gt;因此可以非常准确地拆成：&lt;/p&gt;
-\[
-\boxed{
-\text{Barrier：告诉优化器不要靠近边界}
-}
-\]\[
-\boxed{
-\text{CCD：保证单次离散搜索步不会跨过边界}
-}
-\]&lt;p&gt;这两者缺一不可。&lt;/p&gt;
+\[\boxed{ \text{Barrier：告诉优化器不要靠近边界} }\]\[\boxed{ \text{CCD：保证单次离散搜索步不会跨过边界} }\]&lt;p&gt;这两者缺一不可。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-这也解释了ccd-才是合法性的决定性约束为什么只对了一半&#34;&gt;6. 这也解释了“CCD 才是合法性的决定性约束”为什么只对了一半
 &lt;/h1&gt;&lt;p&gt;如果只讨论：&lt;/p&gt;
-\[
-\boxed{
-\text{某一次 Newton step 是否会穿过去}
-}
-\]&lt;p&gt;那么确实：&lt;/p&gt;
-\[
-\text{CCD}
-\]&lt;p&gt;非常关键。&lt;/p&gt;
+\[\boxed{ \text{某一次 Newton step 是否会穿过去} }\]&lt;p&gt;那么确实：&lt;/p&gt;
+\[\text{CCD}\]&lt;p&gt;非常关键。&lt;/p&gt;
 &lt;p&gt;因为它直接保证 trajectory feasibility。&lt;/p&gt;
 &lt;p&gt;但如果只有 CCD，没有 barrier：&lt;/p&gt;
 &lt;p&gt;每次 Newton step 虽然不允许真正撞上，&lt;/p&gt;
 &lt;p&gt;优化器可能不断得到一个指向接触面的方向：&lt;/p&gt;
-\[
-p\rightarrow d=0.
-\]&lt;p&gt;于是：&lt;/p&gt;
-\[
-\alpha\rightarrow0
-\]&lt;p&gt;求解会越来越难推进。&lt;/p&gt;
+\[p\rightarrow d=0.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\alpha\rightarrow0\]&lt;p&gt;求解会越来越难推进。&lt;/p&gt;
 &lt;p&gt;Barrier 则改变目标函数梯度：&lt;/p&gt;
-&lt;h1 id=&#34;nabla-b&#34;&gt;[
-\nabla B
-&lt;/h1&gt;&lt;p&gt;\nabla E
-+
-\kappa\nabla b.
-]&lt;/p&gt;
-&lt;p&gt;越靠近接触面：&lt;/p&gt;
-\[
-\nabla b
-\]&lt;p&gt;越强，&lt;/p&gt;
+\[\nabla B = \nabla E + \kappa\nabla b.\]&lt;p&gt;越靠近接触面：&lt;/p&gt;
+\[\nabla b\]&lt;p&gt;越强，&lt;/p&gt;
 &lt;p&gt;所以 Newton direction 本身会逐渐形成物理上的排斥响应。&lt;/p&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-\[
-\boxed{
-\text{CCD 管“不能走到哪里”，
-Barrier 管“优化器为什么不应该往那里走”。}
-}
-\]&lt;p&gt;这一区分非常重要。&lt;/p&gt;
+\[\boxed{ \text{CCD 管“不能走到哪里”， Barrier 管“优化器为什么不应该往那里走”。} }\]&lt;p&gt;这一区分非常重要。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;7-为什么把接触写成势能这么有价值&#34;&gt;7. 为什么把接触写成“势能”这么有价值？
 &lt;/h1&gt;&lt;p&gt;因为弹性动力学本身已经可以写成一个 optimization problem。&lt;/p&gt;
 &lt;p&gt;例如 Backward Euler / variational time integration 常可得到类似：&lt;/p&gt;
-&lt;h1 id=&#34;xn1&#34;&gt;[
-x^{n+1}
-&lt;/h1&gt;&lt;p&gt;\arg\min_x
-\left[
-\frac{1}{2h^2}
-(x-\tilde x)^TM(x-\tilde x)
-+
-\Psi(x)
-\right].
-]&lt;/p&gt;
-&lt;p&gt;现在加入：&lt;/p&gt;
-\[
-\kappa B_{\rm contact}(x)
-\]&lt;p&gt;以后：&lt;/p&gt;
-&lt;h1 id=&#34;xn1-1&#34;&gt;[
-\boxed{
-x^{n+1}
-&lt;/h1&gt;&lt;p&gt;\arg\min_x
-\left[
-E_{\rm inertia}
-+
-E_{\rm elastic}
-+
-E_{\rm contact}
-\right].
-}
-]&lt;/p&gt;
-&lt;p&gt;于是 contact 不再是时间步后附加的：&lt;/p&gt;
+\[x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} (x-\tilde x)^TM(x-\tilde x) + \Psi(x) \right].\]&lt;p&gt;现在加入：&lt;/p&gt;
+\[\kappa B_{\rm contact}(x)\]&lt;p&gt;以后：&lt;/p&gt;
+\[\boxed{ x^{n+1} = \arg\min_x \left[ E_{\rm inertia} + E_{\rm elastic} + E_{\rm contact} \right]. }\]&lt;p&gt;于是 contact 不再是时间步后附加的：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3833,71 +1817,27 @@ E_{\rm contact}
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;而变成：&lt;/p&gt;
-\[
-\boxed{
-\text{整个时间步解的是一个统一的 coupled state}
-}
-\]&lt;p&gt;这正是 IPC 很强的 formulation-level 优势。&lt;/p&gt;
+\[\boxed{ \text{整个时间步解的是一个统一的 coupled state} }\]&lt;p&gt;这正是 IPC 很强的 formulation-level 优势。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-它和上一期的-complementarity-在哪里分叉&#34;&gt;8. 它和上一期的 Complementarity 在哪里分叉？
 &lt;/h1&gt;&lt;p&gt;Complementarity 接触通常写：&lt;/p&gt;
-\[
-g\ge0,
-\qquad
-\lambda\ge0,
-\qquad
-g\lambda=0.
-\]&lt;p&gt;它显式引入 dual variable：&lt;/p&gt;
-\[
-\lambda.
-\]&lt;p&gt;IPC 原始 primal barrier formulation 则主要在位置变量：&lt;/p&gt;
-\[
-x
-\]&lt;p&gt;上优化：&lt;/p&gt;
-\[
-\min_x E(x)+\kappa B(x).
-\]&lt;p&gt;因此可以粗略比较：&lt;/p&gt;
-\[
-\boxed{
-\text{Complementarity：显式处理约束反力/冲量}
-}
-\]\[
-\boxed{
-\text{IPC：把约束效应编码进 primal energy landscape}
-}
-\]&lt;p&gt;IPC 原论文也特别讨论了为什么采用 primal barrier：如果对数量巨大的 collision primitive pair 都增加拉格朗日乘子，系统规模会大幅增加，因此他们选择了更适合大量接触约束的 primal formulation。&lt;/p&gt;
+\[g\ge0, \qquad \lambda\ge0, \qquad g\lambda=0.\]&lt;p&gt;它显式引入 dual variable：&lt;/p&gt;
+\[\lambda.\]&lt;p&gt;IPC 原始 primal barrier formulation 则主要在位置变量：&lt;/p&gt;
+\[x\]&lt;p&gt;上优化：&lt;/p&gt;
+\[\min_x E(x)+\kappa B(x).\]&lt;p&gt;因此可以粗略比较：&lt;/p&gt;
+\[\boxed{ \text{Complementarity：显式处理约束反力/冲量} }\]\[\boxed{ \text{IPC：把约束效应编码进 primal energy landscape} }\]&lt;p&gt;IPC 原论文也特别讨论了为什么采用 primal barrier：如果对数量巨大的 collision primitive pair 都增加拉格朗日乘子，系统规模会大幅增加，因此他们选择了更适合大量接触约束的 primal formulation。&lt;/p&gt;
 &lt;p&gt;这是理解两条现代接触路线差异的很好切口。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-为什么-ipc-特别适合大形变-fem&#34;&gt;9. 为什么 IPC 特别适合大形变 FEM？
 &lt;/h1&gt;&lt;p&gt;因为大形变软体接触有三个问题同时存在：&lt;/p&gt;
-\[
-\text{elastic nonlinearity}
-\]\[
-\text{contact nonlinearity}
-\]\[
-\text{geometry nonlinearity}.
-\]&lt;p&gt;如果你分别做：&lt;/p&gt;
-\[
-\text{elastic solve}
-\rightarrow
-\text{collision correction}
-\]&lt;p&gt;它们会互相打架。&lt;/p&gt;
+\[\text{elastic nonlinearity}\]\[\text{contact nonlinearity}\]\[\text{geometry nonlinearity}.\]&lt;p&gt;如果你分别做：&lt;/p&gt;
+\[\text{elastic solve} \rightarrow \text{collision correction}\]&lt;p&gt;它们会互相打架。&lt;/p&gt;
 &lt;p&gt;例如：&lt;/p&gt;
 &lt;p&gt;弹性力希望继续压缩，&lt;/p&gt;
 &lt;p&gt;contact projection 又把节点推出去，&lt;/p&gt;
 &lt;p&gt;下一次 elastic solve 又拉回来。&lt;/p&gt;
 &lt;p&gt;IPC 把二者统一为：&lt;/p&gt;
-\[
-\boxed{
-\nabla
-\left(
-E_{\rm elastic}
-+
-E_{\rm contact}
-\right)
-=0.
-}
-\]&lt;p&gt;于是最后状态是：&lt;/p&gt;
+\[\boxed{ \nabla \left( E_{\rm elastic} + E_{\rm contact} \right) =0. }\]&lt;p&gt;于是最后状态是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;材料变形和接触排斥共同作用下的势能平衡。&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -3905,30 +1845,16 @@ E_{\rm contact}
 &lt;hr&gt;
 &lt;h1 id=&#34;10-为什么-hessian-又成了一个麻烦&#34;&gt;10. 为什么 Hessian 又成了一个麻烦？
 &lt;/h1&gt;&lt;p&gt;Newton 法需要：&lt;/p&gt;
-\[
-H=\nabla^2 B(x).
-\]&lt;p&gt;但 contact barrier 和某些非线性弹性能的 Hessian：&lt;/p&gt;
-\[
-H
-\]&lt;p&gt;并不一定处处正定。&lt;/p&gt;
+\[H=\nabla^2 B(x).\]&lt;p&gt;但 contact barrier 和某些非线性弹性能的 Hessian：&lt;/p&gt;
+\[H\]&lt;p&gt;并不一定处处正定。&lt;/p&gt;
 &lt;p&gt;如果直接求：&lt;/p&gt;
-\[
-Hp=-g,
-\]&lt;p&gt;可能得到：&lt;/p&gt;
-\[
-g^Tp&gt;0,
-\]&lt;p&gt;即：&lt;/p&gt;
-\[
-p
-\]&lt;p&gt;甚至不是下降方向。&lt;/p&gt;
+\[Hp=-g,\]&lt;p&gt;可能得到：&lt;/p&gt;
+\[g^Tp&gt;0,\]&lt;p&gt;即：&lt;/p&gt;
+\[p\]&lt;p&gt;甚至不是下降方向。&lt;/p&gt;
 &lt;p&gt;所以 IPC 使用：&lt;/p&gt;
-\[
-\boxed{\text{SPD projection}}
-\]&lt;p&gt;把 Hessian 调整为正定/半正定近似，然后得到稳定 descent direction。&lt;/p&gt;
+\[\boxed{\text{SPD projection}}\]&lt;p&gt;把 Hessian 调整为正定/半正定近似，然后得到稳定 descent direction。&lt;/p&gt;
 &lt;p&gt;原始算法流程里明确包括：&lt;/p&gt;
-\[
-H\leftarrow\operatorname{SPDProject}(\nabla^2B).
-\]&lt;p&gt;这和 Projective Dynamics / quasi-Newton 的思想再次产生联系：&lt;/p&gt;
+\[H\leftarrow\operatorname{SPDProject}(\nabla^2B).\]&lt;p&gt;这和 Projective Dynamics / quasi-Newton 的思想再次产生联系：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;Hessian 的处理方式，往往直接决定非线性物理求解器能不能稳定工作。&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -4000,40 +1926,20 @@ H\leftarrow\operatorname{SPDProject}(\nabla^2B).
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;这里有三个截然不同的模块：&lt;/p&gt;
-\[
-\boxed{\text{Newton：找下降方向}}
-\]\[
-\boxed{\text{CCD：限制可行步长}}
-\]\[
-\boxed{\text{line search：保证优化进展}}
-\]&lt;p&gt;这也是为什么 IPC 不能简单概括成“barrier contact”。&lt;/p&gt;
+\[\boxed{\text{Newton：找下降方向}}\]\[\boxed{\text{CCD：限制可行步长}}\]\[\boxed{\text{line search：保证优化进展}}\]&lt;p&gt;这也是为什么 IPC 不能简单概括成“barrier contact”。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;12-ipc-为什么还需要-broad-phase--constraint-culling&#34;&gt;12. IPC 为什么还需要 broad phase / constraint culling？
 &lt;/h1&gt;&lt;p&gt;理论上所有三角形、边、点都可能碰撞。&lt;/p&gt;
 &lt;p&gt;如果有：&lt;/p&gt;
-\[
-N
-\]&lt;p&gt;个 primitives，&lt;/p&gt;
+\[N\]&lt;p&gt;个 primitives，&lt;/p&gt;
 &lt;p&gt;naive pair 数量：&lt;/p&gt;
-\[
-O(N^2).
-\]&lt;p&gt;这是完全不能接受的。&lt;/p&gt;
+\[O(N^2).\]&lt;p&gt;这是完全不能接受的。&lt;/p&gt;
 &lt;p&gt;但 IPC barrier 有局部支持：&lt;/p&gt;
-\[
-d&gt;\hat d
-\Rightarrow
-b(d)=0.
-\]&lt;p&gt;因此只需要维护：&lt;/p&gt;
-\[
-\boxed{
-\text{距离足够近的 active constraint set}
-}
-\]&lt;p&gt;而不是所有几何 pair。&lt;/p&gt;
+\[d&gt;\hat d \Rightarrow b(d)=0.\]&lt;p&gt;因此只需要维护：&lt;/p&gt;
+\[\boxed{ \text{距离足够近的 active constraint set} }\]&lt;p&gt;而不是所有几何 pair。&lt;/p&gt;
 &lt;p&gt;这也是现代 IPC Toolkit 持续优化 broad phase 的原因。2026 年 2 月发布的 v1.5.0 已加入 fully parallel LBVH broad phase，同时加入新的接触势 formulation。&lt;/p&gt;
 &lt;p&gt;所以一个实际 IPC solver 的性能并不仅由：&lt;/p&gt;
-\[
-\text{linear solver}
-\]&lt;p&gt;决定。&lt;/p&gt;
+\[\text{linear solver}\]&lt;p&gt;决定。&lt;/p&gt;
 &lt;p&gt;collision candidate generation 本身就是大头。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-c-ipc-为什么很重要&#34;&gt;13. C-IPC 为什么很重要？
@@ -4046,143 +1952,65 @@ b(d)=0.
 &lt;li&gt;volumetric solids：三维体。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;2021 年的 &lt;strong&gt;Codimensional IPC（C-IPC）&lt;/strong&gt; 把这一体系扩展到：&lt;/p&gt;
-\[
-0D,1D,2D,3D
-\]&lt;p&gt;几何组合，并加入厚度、应变限制和摩擦等处理。论文明确强调其目标是让 mixed-dimensional systems 仍保持 interpenetration-free。&lt;/p&gt;
+\[0D,1D,2D,3D\]&lt;p&gt;几何组合，并加入厚度、应变限制和摩擦等处理。论文明确强调其目标是让 mixed-dimensional systems 仍保持 interpenetration-free。&lt;/p&gt;
 &lt;p&gt;它还提出 ACCD——一种 additive continuous collision detection，用 conservative advancement 逐步逼近 time of impact，主要用于薄结构极严格的碰撞精度要求。&lt;/p&gt;
 &lt;p&gt;这说明 IPC 真正形成的已经不是一个单点算法，而是一套：&lt;/p&gt;
-\[
-\boxed{
-\text{optimization-based contact simulation family}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{optimization-based contact simulation family} }\]&lt;hr&gt;
 &lt;h1 id=&#34;14-ipc-的局限在哪里&#34;&gt;14. IPC 的局限在哪里？
 &lt;/h1&gt;&lt;p&gt;第一，&lt;strong&gt;它不便宜&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;每个时间步可能需要多次：&lt;/p&gt;
-\[
-\text{broad phase}
-+
-\text{barrier gradient/Hessian}
-+
-\text{sparse solve}
-+
-\text{CCD}
-+
-\text{line search}.
-\]&lt;p&gt;相比简单 XPBD/Sequential Impulse：&lt;/p&gt;
-\[
-\boxed{
-\text{鲁棒性换计算成本}
-}
-\]&lt;p&gt;非常明显。&lt;/p&gt;
+\[\text{broad phase} + \text{barrier gradient/Hessian} + \text{sparse solve} + \text{CCD} + \text{line search}.\]&lt;p&gt;相比简单 XPBD/Sequential Impulse：&lt;/p&gt;
+\[\boxed{ \text{鲁棒性换计算成本} }\]&lt;p&gt;非常明显。&lt;/p&gt;
 &lt;p&gt;第二，CCD 本身必须高度可靠。&lt;/p&gt;
 &lt;p&gt;如果 CCD 漏掉：&lt;/p&gt;
-\[
-\alpha_{\rm hit},
-\]&lt;p&gt;整个“可行性保证”就可能被破坏。&lt;/p&gt;
+\[\alpha_{\rm hit},\]&lt;p&gt;整个“可行性保证”就可能被破坏。&lt;/p&gt;
 &lt;p&gt;第三，接触距离接近 barrier 区域时会带来很强的条件数变化，因此 barrier stiffness、Hessian conditioning 和 linear solver 都非常关键。&lt;/p&gt;
 &lt;p&gt;第四，对游戏实时物理而言，“严格无穿透”并不总值得它的成本。很多场景更愿意接受：&lt;/p&gt;
-\[
-0.1\text{ mm penetration}
-\]&lt;p&gt;换取：&lt;/p&gt;
-\[
-60/120\text{ FPS}.
-\]&lt;p&gt;所以 IPC 更像：&lt;/p&gt;
-\[
-\boxed{
-\text{high-fidelity / robust simulation formulation}
-}
-\]&lt;p&gt;而非所有实时引擎都应该照搬的默认方案。&lt;/p&gt;
+\[0.1\text{ mm penetration}\]&lt;p&gt;换取：&lt;/p&gt;
+\[60/120\text{ FPS}.\]&lt;p&gt;所以 IPC 更像：&lt;/p&gt;
+\[\boxed{ \text{high-fidelity / robust simulation formulation} }\]&lt;p&gt;而非所有实时引擎都应该照搬的默认方案。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;15-但它对自研求解器有一个非常强的迁移价值&#34;&gt;15. 但它对自研求解器有一个非常强的迁移价值
 &lt;/h1&gt;&lt;p&gt;IPC 最值得学的并不是具体 barrier 函数。&lt;/p&gt;
 &lt;p&gt;而是：&lt;/p&gt;
-\[
-\boxed{
-\text{把“物理合法性”放进优化路径本身。}
-}
-\]&lt;p&gt;你可以把求解器分成三个层次：&lt;/p&gt;
+\[\boxed{ \text{把“物理合法性”放进优化路径本身。} }\]&lt;p&gt;你可以把求解器分成三个层次：&lt;/p&gt;
 &lt;h3 id=&#34;物理目标&#34;&gt;物理目标
-&lt;/h3&gt;\[
-E(x)
-\]&lt;p&gt;决定：&lt;/p&gt;
+&lt;/h3&gt;\[E(x)\]&lt;p&gt;决定：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;系统倾向去哪里。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;h3 id=&#34;可行域&#34;&gt;可行域
-&lt;/h3&gt;\[
-d(x)&gt;0
-\]&lt;p&gt;决定：&lt;/p&gt;
+&lt;/h3&gt;\[d(x)&gt;0\]&lt;p&gt;决定：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;哪些状态根本不能去。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;h3 id=&#34;数值路径&#34;&gt;数值路径
-&lt;/h3&gt;\[
-x_k\rightarrow x_{k+1}
-\]&lt;p&gt;决定：&lt;/p&gt;
+&lt;/h3&gt;\[x_k\rightarrow x_{k+1}\]&lt;p&gt;决定：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;求解器是否会在寻找答案途中越过非法区域。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;很多不稳定 solver 只设计了第一层。&lt;/p&gt;
 &lt;p&gt;稍好的 solver 设计：&lt;/p&gt;
-\[
-E+\text{constraint}.
-\]&lt;p&gt;IPC 更进一步考虑：&lt;/p&gt;
-\[
-\boxed{
-\text{连 optimizer trajectory 本身也必须合法。}
-}
-\]&lt;p&gt;这是非常深的一层。&lt;/p&gt;
+\[E+\text{constraint}.\]&lt;p&gt;IPC 更进一步考虑：&lt;/p&gt;
+\[\boxed{ \text{连 optimizer trajectory 本身也必须合法。} }\]&lt;p&gt;这是非常深的一层。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;16-这对-tet-inversion-也有直接启发&#34;&gt;16. 这对 tet inversion 也有直接启发
 &lt;/h1&gt;&lt;p&gt;假设材料要求：&lt;/p&gt;
-\[
-J=\det F&gt;0.
-\]&lt;p&gt;普通 Neo-Hookean 在某些实现或数值路径下，可能仍然面临：&lt;/p&gt;
-\[
-J\rightarrow0
-\]&lt;p&gt;甚至跨入：&lt;/p&gt;
-\[
-J&lt;0.
-\]&lt;p&gt;IPC 类思想会促使你把问题拆成：&lt;/p&gt;
-\[
-\boxed{
-\text{材料能量是否阻止 }J\to0？
-}
-\]&lt;p&gt;以及：&lt;/p&gt;
-\[
-\boxed{
-\text{Newton / XPBD correction step 是否可能一步跨过 }J=0？
-}
-\]&lt;p&gt;这与接触完全同构：&lt;/p&gt;
-\[
-d&gt;0
-\]&lt;p&gt;对应：&lt;/p&gt;
-\[
-J&gt;0.
-\]&lt;p&gt;所以你会自然想到：&lt;/p&gt;
-\[
-\boxed{
-\text{barrier on }J
-+
-\text{step-size feasibility check}
-}
-\]&lt;p&gt;这就是 IPC formulation 对软体反转问题很强的迁移启发。&lt;/p&gt;
+\[J=\det F&gt;0.\]&lt;p&gt;普通 Neo-Hookean 在某些实现或数值路径下，可能仍然面临：&lt;/p&gt;
+\[J\rightarrow0\]&lt;p&gt;甚至跨入：&lt;/p&gt;
+\[J&lt;0.\]&lt;p&gt;IPC 类思想会促使你把问题拆成：&lt;/p&gt;
+\[\boxed{ \text{材料能量是否阻止 }J\to0？ }\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{ \text{Newton / XPBD correction step 是否可能一步跨过 }J=0？ }\]&lt;p&gt;这与接触完全同构：&lt;/p&gt;
+\[d&gt;0\]&lt;p&gt;对应：&lt;/p&gt;
+\[J&gt;0.\]&lt;p&gt;所以你会自然想到：&lt;/p&gt;
+\[\boxed{ \text{barrier on }J + \text{step-size feasibility check} }\]&lt;p&gt;这就是 IPC formulation 对软体反转问题很强的迁移启发。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;17-一个很实用的自研调试指标feasibility-margin&#34;&gt;17. 一个很实用的自研调试指标：Feasibility Margin
 &lt;/h1&gt;&lt;p&gt;如果做类似 IPC/Barrier 的 solver，我会建议每个 Newton/constraint iteration 都记录：&lt;/p&gt;
-\[
-d_{\min}
-\]&lt;p&gt;以及：&lt;/p&gt;
-\[
-J_{\min}.
-\]&lt;p&gt;再记录候选方向：&lt;/p&gt;
-\[
-p
-\]&lt;p&gt;对应的：&lt;/p&gt;
-\[
-\alpha_{\rm feasible}.
-\]&lt;p&gt;比如：&lt;/p&gt;
+\[d_{\min}\]&lt;p&gt;以及：&lt;/p&gt;
+\[J_{\min}.\]&lt;p&gt;再记录候选方向：&lt;/p&gt;
+\[p\]&lt;p&gt;对应的：&lt;/p&gt;
+\[\alpha_{\rm feasible}.\]&lt;p&gt;比如：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -4200,60 +2028,22 @@ p
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;如果长期出现：&lt;/p&gt;
-\[
-\alpha_{\rm feasible}\ll1,
-\]&lt;p&gt;说明你的搜索方向一直猛烈撞向可行域边界。&lt;/p&gt;
+\[\alpha_{\rm feasible}\ll1,\]&lt;p&gt;说明你的搜索方向一直猛烈撞向可行域边界。&lt;/p&gt;
 &lt;p&gt;这时真正的问题可能并不是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;CCD 太保守。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;更可能是：&lt;/p&gt;
-\[
-\boxed{
-\text{gradient/Hessian/constraint coupling 产生了很差的优化方向。}
-}
-\]&lt;p&gt;这是一种比单看 penetration count 更有价值的 solver diagnostic。&lt;/p&gt;
+\[\boxed{ \text{gradient/Hessian/constraint coupling 产生了很差的优化方向。} }\]&lt;p&gt;这是一种比单看 penetration count 更有价值的 solver diagnostic。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;IPC 最值得记住的不是：&lt;/p&gt;
-&lt;h1 id=&#34;bx-1&#34;&gt;[
-B(x)
-&lt;/h1&gt;&lt;p&gt;E(x)
-+
-\kappa\sum b(d_k).
-]&lt;/p&gt;
-&lt;p&gt;而是：&lt;/p&gt;
-\[
-\boxed{
-\text{物理合法性既要体现在最终状态，也要体现在求解路径中。}
-}
-\]&lt;p&gt;进一步拆开：&lt;/p&gt;
-\[
-\boxed{
-\text{Barrier 塑造能量地形；
-CCD 守住可行域；
-Newton 找平衡点。}
-}
-\]&lt;p&gt;这三个模块各自解决不同问题。&lt;/p&gt;
+\[B(x) = E(x) + \kappa\sum b(d_k).\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \text{物理合法性既要体现在最终状态，也要体现在求解路径中。} }\]&lt;p&gt;进一步拆开：&lt;/p&gt;
+\[\boxed{ \text{Barrier 塑造能量地形； CCD 守住可行域； Newton 找平衡点。} }\]&lt;p&gt;这三个模块各自解决不同问题。&lt;/p&gt;
 &lt;p&gt;理解这一点之后，很多看起来相近的词会彻底分开：&lt;/p&gt;
-\[
-\text{penalty}
-\neq
-\text{barrier},
-\]\[
-\text{CCD}
-\neq
-\text{contact response},
-\]\[
-\text{collision detection}
-\neq
-\text{contact solve}.
-\]&lt;p&gt;而从更大的知识体系看，IPC 是一个非常典型的例子：&lt;/p&gt;
-\[
-\boxed{
-\text{现代物理求解器正在越来越像“带几何可行域的非线性优化器”。}
-}
-\]&lt;p&gt;这条思想会继续连接到 frictional optimization、strain limiting、injectivity preservation，以及更广义的 constrained differentiable simulation。&lt;/p&gt;
+\[\text{penalty} \neq \text{barrier},\]\[\text{CCD} \neq \text{contact response},\]\[\text{collision detection} \neq \text{contact solve}.\]&lt;p&gt;而从更大的知识体系看，IPC 是一个非常典型的例子：&lt;/p&gt;
+\[\boxed{ \text{现代物理求解器正在越来越像“带几何可行域的非线性优化器”。} }\]&lt;p&gt;这条思想会继续连接到 frictional optimization、strain limiting、injectivity preservation，以及更广义的 constrained differentiable simulation。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;

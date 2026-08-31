@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Variational Integrators：时间积分器也可以“从力学原理里推出来” 主题：Variational Integrators（变分积分器）\n领域：有限元 × 计算力学 × 物理引擎 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[ \\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}} \\]传统数值积分通常先得到连续运动方程：\n\\[ M\\ddot q+\\nabla V(q)=0, \\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[ L(q,\\dot q)=T(\\dot q)-V(q). \\]真实运动满足 Hamilton 原理：\n\\[ \\delta S=0, \\]其中作用量\n[ S[q] \\int_{t_0}^{t_1} L(q,\\dot q),dt. ]\n对它做变分，就得到 Euler–Lagrange 方程：\n[ \\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} \\frac{\\partial L}{\\partial q} =0. ]\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Variational Integrators：时间积分器也可以“从力学原理里推出来” 主题：Variational Integrators（变分积分器）\n领域：有限元 × 计算力学 × 物理引擎 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[\\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}\\]传统数值积分通常先得到连续运动方程：\n\\[M\\ddot q+\\nabla V(q)=0,\\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[L(q,\\dot q)=T(\\dot q)-V(q).\\]真实运动满足 Hamilton 原理：\n\\[\\delta S=0,\\]其中作用量\n\\[S[q] = \\int_{t_0}^{t_1} L(q,\\dot q)\\,dt.\\]对它做变分，就得到 Euler–Lagrange 方程：\n\\[\\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} - \\frac{\\partial L}{\\partial q} =0.\\]也就是说，连续动力学存在一条逻辑链：\n">
 <title>Variational Integrators：时间积分器也可以“从力学原理里推出来”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/04-variational-integrators/'>
 
 <link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="Variational Integrators：时间积分器也可以“从力学原理里推出来”">
-<meta property='og:description' content="Variational Integrators：时间积分器也可以“从力学原理里推出来” 主题：Variational Integrators（变分积分器）\n领域：有限元 × 计算力学 × 物理引擎 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[ \\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}} \\]传统数值积分通常先得到连续运动方程：\n\\[ M\\ddot q+\\nabla V(q)=0, \\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[ L(q,\\dot q)=T(\\dot q)-V(q). \\]真实运动满足 Hamilton 原理：\n\\[ \\delta S=0, \\]其中作用量\n[ S[q] \\int_{t_0}^{t_1} L(q,\\dot q),dt. ]\n对它做变分，就得到 Euler–Lagrange 方程：\n[ \\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} \\frac{\\partial L}{\\partial q} =0. ]\n">
+<meta property='og:description' content="Variational Integrators：时间积分器也可以“从力学原理里推出来” 主题：Variational Integrators（变分积分器）\n领域：有限元 × 计算力学 × 物理引擎 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[\\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}\\]传统数值积分通常先得到连续运动方程：\n\\[M\\ddot q+\\nabla V(q)=0,\\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[L(q,\\dot q)=T(\\dot q)-V(q).\\]真实运动满足 Hamilton 原理：\n\\[\\delta S=0,\\]其中作用量\n\\[S[q] = \\int_{t_0}^{t_1} L(q,\\dot q)\\,dt.\\]对它做变分，就得到 Euler–Lagrange 方程：\n\\[\\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} - \\frac{\\partial L}{\\partial q} =0.\\]也就是说，连续动力学存在一条逻辑链：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/04-variational-integrators/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='计算力学' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='数值方法' /><meta property='article:published_time' content='2026-08-17T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-17T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Variational Integrators：时间积分器也可以“从力学原理里推出来”">
-<meta name="twitter:description" content="Variational Integrators：时间积分器也可以“从力学原理里推出来” 主题：Variational Integrators（变分积分器）\n领域：有限元 × 计算力学 × 物理引擎 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[ \\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}} \\]传统数值积分通常先得到连续运动方程：\n\\[ M\\ddot q+\\nabla V(q)=0, \\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[ L(q,\\dot q)=T(\\dot q)-V(q). \\]真实运动满足 Hamilton 原理：\n\\[ \\delta S=0, \\]其中作用量\n[ S[q] \\int_{t_0}^{t_1} L(q,\\dot q),dt. ]\n对它做变分，就得到 Euler–Lagrange 方程：\n[ \\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} \\frac{\\partial L}{\\partial q} =0. ]\n">
+<meta name="twitter:description" content="Variational Integrators：时间积分器也可以“从力学原理里推出来” 主题：Variational Integrators（变分积分器）\n领域：有限元 × 计算力学 × 物理引擎 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[\\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}\\]传统数值积分通常先得到连续运动方程：\n\\[M\\ddot q+\\nabla V(q)=0,\\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[L(q,\\dot q)=T(\\dot q)-V(q).\\]真实运动满足 Hamilton 原理：\n\\[\\delta S=0,\\]其中作用量\n\\[S[q] = \\int_{t_0}^{t_1} L(q,\\dot q)\\,dt.\\]对它做变分，就得到 Euler–Lagrange 方程：\n\\[\\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} - \\frac{\\partial L}{\\partial q} =0.\\]也就是说，连续动力学存在一条逻辑链：\n">
     </head>
     <body class="
     article-page
@@ -328,29 +328,6 @@
   </ol>
 
   <ol>
-    <li><a href="#fracpartial-lpartial-dot-q">[
-\frac{d}{dt}
-\frac{\partial L}{\partial \dot q}</a></li>
-  </ol>
-
-  <ol>
-    <li><a href="#right2">h
-\left[
-\frac12m
-\left(
-\frac{q_{k+1}-q_k}{h}
-\right)^2</a></li>
-  </ol>
-
-  <ol>
-    <li><a href="#2q_k-q_k-1">2q_k-q_{k-1}</a></li>
-  </ol>
-
-  <ol>
-    <li><a href="#frac12dot-qtmdot-q">\frac12\dot q^TM\dot q</a></li>
-  </ol>
-
-  <ol>
     <li><a href="#一个工程诊断例子">一个工程诊断例子</a></li>
   </ol>
 
@@ -416,7 +393,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 4 分钟
+                    阅读时长: 3 分钟
                 </time>
             </div>
         
@@ -436,105 +413,34 @@
 <strong>领域：有限元 × 计算力学 × 物理引擎 × 数值方法</strong><br>
 <strong>推荐阅读时间：约 8–10 分钟</strong></p>
 <p>今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：</p>
-\[
-\boxed{\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}
-\]<p>传统数值积分通常先得到连续运动方程：</p>
-\[
-M\ddot q+\nabla V(q)=0,
-\]<p>然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。</p>
+\[\boxed{\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}\]<p>传统数值积分通常先得到连续运动方程：</p>
+\[M\ddot q+\nabla V(q)=0,\]<p>然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。</p>
 <p><strong>Variational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。</strong></p>
 <p>Marsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。</p>
 <p>它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。</p>
 <hr>
 <h2 id="1-传统方法容易忽略什么">1. 传统方法容易忽略什么？
 </h2><p>考虑最简单的无阻尼机械系统：</p>
-\[
-L(q,\dot q)=T(\dot q)-V(q).
-\]<p>真实运动满足 Hamilton 原理：</p>
-\[
-\delta S=0,
-\]<p>其中作用量</p>
-<h1 id="sq">[
-S[q]
-</h1><p>\int_{t_0}^{t_1}
-L(q,\dot q),dt.
-]</p>
-<p>对它做变分，就得到 Euler–Lagrange 方程：</p>
-<h2 id="fracpartial-lpartial-dot-q">[
-\frac{d}{dt}
-\frac{\partial L}{\partial \dot q}
-</h2><p>\frac{\partial L}{\partial q}
-=0.
-]</p>
-<p>也就是说，连续动力学存在一条逻辑链：</p>
-\[
-\boxed{
-\text{variational principle}
-\rightarrow
-\text{Euler–Lagrange equation}
-\rightarrow
-\text{trajectory}
-}
-\]<p>普通时间积分通常在第二层才开始：</p>
-\[
-\text{Euler–Lagrange equation}
-\rightarrow
-\boxed{\text{discretize}}
-\]<p>而 VI 提前了一层：</p>
-\[
-\boxed{\text{discretize variational principle}}
-\rightarrow
-\text{discrete Euler–Lagrange equation}.
-\]<p>这两个操作一般<strong>并不等价</strong>。这一点也是离散力学和离散最优控制文献反复强调的核心区别。</p>
+\[L(q,\dot q)=T(\dot q)-V(q).\]<p>真实运动满足 Hamilton 原理：</p>
+\[\delta S=0,\]<p>其中作用量</p>
+\[S[q] = \int_{t_0}^{t_1} L(q,\dot q)\,dt.\]<p>对它做变分，就得到 Euler–Lagrange 方程：</p>
+\[\frac{d}{dt} \frac{\partial L}{\partial \dot q} - \frac{\partial L}{\partial q} =0.\]<p>也就是说，连续动力学存在一条逻辑链：</p>
+\[\boxed{ \text{variational principle} \rightarrow \text{Euler–Lagrange equation} \rightarrow \text{trajectory} }\]<p>普通时间积分通常在第二层才开始：</p>
+\[\text{Euler–Lagrange equation} \rightarrow \boxed{\text{discretize}}\]<p>而 VI 提前了一层：</p>
+\[\boxed{\text{discretize variational principle}} \rightarrow \text{discrete Euler–Lagrange equation}.\]<p>这两个操作一般<strong>并不等价</strong>。这一点也是离散力学和离散最优控制文献反复强调的核心区别。</p>
 <hr>
 <h1 id="2-怎么把-hamilton-原理离散化">2. 怎么把 Hamilton 原理离散化？
 </h1><p>连续作用量为：</p>
-\[
-S=\int L(q,\dot q)\,dt.
-\]<p>现在把时间切成：</p>
-\[
-t_0,t_1,\ldots,t_N,
-\qquad
-h=t_{k+1}-t_k.
-\]<p>用一个 <strong>discrete Lagrangian</strong></p>
-\[
-L_d(q_k,q_{k+1})
-\]<p>去近似一小段真实作用量：</p>
-\[
-L_d(q_k,q_{k+1})
-\approx
-\int_{t_k}^{t_{k+1}}
-L(q,\dot q)\,dt.
-\]<p>于是总作用量变成：</p>
-<h1 id="s_d">[
-S_d
-</h1><p>\sum_{k=0}^{N-1}
-L_d(q_k,q_{k+1}).
-]</p>
-<p>然后不再对连续曲线求变分，而是要求：</p>
-\[
-\delta S_d=0.
-\]<p>对内部节点 \(q_k\) 求导：</p>
-<h1 id="d_1l_dq_kq_k1">[
-D_2L_d(q_{k-1},q_k)
-+
-D_1L_d(q_k,q_{k+1})
-</h1><ol start="0">
-<li></li>
-</ol>
-<p>]</p>
-<p>这就是：</p>
-\[
-\boxed{
-\text{Discrete Euler–Lagrange equation}
-}
-\]<p>它直接定义了从</p>
-\[
-(q_{k-1},q_k)
-\]<p>到</p>
-\[
-(q_k,q_{k+1})
-\]<p>的时间推进。</p>
+\[S=\int L(q,\dot q)\,dt.\]<p>现在把时间切成：</p>
+\[t_0,t_1,\ldots,t_N, \qquad h=t_{k+1}-t_k.\]<p>用一个 <strong>discrete Lagrangian</strong></p>
+\[L_d(q_k,q_{k+1})\]<p>去近似一小段真实作用量：</p>
+\[L_d(q_k,q_{k+1}) \approx \int_{t_k}^{t_{k+1}} L(q,\dot q)\,dt.\]<p>于是总作用量变成：</p>
+\[S_d = \sum_{k=0}^{N-1} L_d(q_k,q_{k+1}).\]<p>然后不再对连续曲线求变分，而是要求：</p>
+\[\delta S_d=0.\]<p>对内部节点 \(q_k\) 求导：</p>
+\[D_2L_d(q_{k-1},q_k) + D_1L_d(q_k,q_{k+1}) = 0.\]<p>这就是：</p>
+\[\boxed{ \text{Discrete Euler–Lagrange equation} }\]<p>它直接定义了从</p>
+\[(q_{k-1},q_k)\]<p>到</p>
+\[(q_k,q_{k+1})\]<p>的时间推进。</p>
 <p>这里最重要的思想是：</p>
 <blockquote>
 <p><strong>离散运动方程并非人为挑选出来，而是从一个离散力学原理中推导出来。</strong></p>
@@ -542,59 +448,22 @@ D_1L_d(q_k,q_{k+1})
 <hr>
 <h1 id="3-一个惊喜熟悉的-verlet-可以从这里自然出现">3. 一个惊喜：熟悉的 Verlet 可以从这里自然出现
 </h1><p>考虑：</p>
-<h1 id="lqdot-q">[
-L(q,\dot q)
-</h1><p>\frac12m\dot q^2-V(q).
-]</p>
-<p>取一种简单 discrete Lagrangian：</p>
-<h1 id="l_dq_kq_k1">[
-L_d(q_k,q_{k+1})
-</h1><h2 id="right2">h
-\left[
-\frac12m
-\left(
-\frac{q_{k+1}-q_k}{h}
-\right)^2
-</h2><p>V(q_k)
-\right].
-]</p>
-<p>代入离散 Euler–Lagrange 方程，会得到类似：</p>
-<h1 id="fracq_k1-2q_kq_k-1h2">[
-m
-\frac{q_{k+1}-2q_k+q_{k-1}}{h^2}
-</h1><p>-\nabla V(q_k).
-]</p>
-<p>即：</p>
-<h1 id="q_k1">[
-\boxed{
-q_{k+1}
-</h1><h2 id="2q_k-q_k-1">2q_k-q_{k-1}
-</h2><p>\frac{h^2}{m}\nabla V(q_k)
-}
-]</p>
-<p>这正与 Störmer–Verlet / central-difference 家族有非常紧密的关系。</p>
+\[L(q,\dot q) = \frac12m\dot q^2-V(q).\]<p>取一种简单 discrete Lagrangian：</p>
+\[L_d(q_k,q_{k+1}) = h \left[ \frac12m \left( \frac{q_{k+1}-q_k}{h} \right)^2 - V(q_k) \right].\]<p>代入离散 Euler–Lagrange 方程，会得到类似：</p>
+\[m \frac{q_{k+1}-2q_k+q_{k-1}}{h^2} = -\nabla V(q_k).\]<p>即：</p>
+\[\boxed{ q_{k+1} = 2q_k-q_{k-1} - \frac{h^2}{m}\nabla V(q_k) }\]<p>这正与 Störmer–Verlet / central-difference 家族有非常紧密的关系。</p>
 <p>所以 Verlet 的长期动力学性质并非偶然。Marsden–West 的框架把许多熟悉的辛方法统一解释成离散变分积分器。</p>
 <hr>
 <h1 id="4-为什么它比局部误差小更值得关心">4. 为什么它比“局部误差小”更值得关心？
 </h1><p>这是 VI 最核心的部分。</p>
 <p>普通数值分析经常比较：</p>
-\[
-\|q_{\rm num}(t)-q_{\rm exact}(t)\|.
-\]<p>例如：</p>
-\[
-O(h),\qquad O(h^2),\qquad O(h^4).
-\]<p>但对于需要模拟：</p>
-\[
-10^4,\ 10^5,\ 10^6
-\]<p>个时间步的动力系统，只看每一步的误差阶数可能并不够。</p>
+\[\|q_{\rm num}(t)-q_{\rm exact}(t)\|.\]<p>例如：</p>
+\[O(h),\qquad O(h^2),\qquad O(h^4).\]<p>但对于需要模拟：</p>
+\[10^4,\ 10^5,\ 10^6\]<p>个时间步的动力系统，只看每一步的误差阶数可能并不够。</p>
 <p>因为机械系统有一些<strong>全局几何结构</strong>。</p>
 <p>最重要的是：</p>
-\[
-\boxed{\text{symplectic structure}}
-\]<p>对于 Hamiltonian 系统，真实流保持相空间中的辛形式：</p>
-\[
-dq\wedge dp.
-\]<p>变分积分器天然产生 symplectic map。</p>
+\[\boxed{\text{symplectic structure}}\]<p>对于 Hamiltonian 系统，真实流保持相空间中的辛形式：</p>
+\[dq\wedge dp.\]<p>变分积分器天然产生 symplectic map。</p>
 <p>一个直观但并不完全严格的理解是：</p>
 <blockquote>
 <p>它不会像普通数值耗散或数值反耗散方法那样，任意压缩或膨胀 Hamiltonian 相空间的动力学结构。</p>
@@ -604,130 +473,48 @@ dq\wedge dp.
 <h1 id="5-一个容易误解的地方vi-通常不严格守恒能量">5. 一个容易误解的地方：VI 通常<strong>不严格守恒能量</strong>
 </h1><p>这是非常重要的区别。</p>
 <p>很多人看到：</p>
-\[
-\text{structure preserving}
-\]<p>就会理解成：</p>
-\[
-E_{k+1}=E_k.
-\]<p>一般并非如此。</p>
+\[\text{structure preserving}\]<p>就会理解成：</p>
+\[E_{k+1}=E_k.\]<p>一般并非如此。</p>
 <p>普通固定步长 symplectic / variational integrator 通常表现为：</p>
-<h1 id="e_k">[
-E_k
-</h1><p>E_0
-+
-\text{bounded oscillatory error},
-]</p>
-<p>而不是严格：</p>
-\[
-E_k=E_0.
-\]<p>更深的 backward error analysis 告诉我们：辛积分器可以理解为<strong>精确积分了一个与原 Hamiltonian 非常接近的 modified Hamiltonian</strong>。这正是它长期能量误差往往有界、不产生系统性漂移的重要原因。Hairer–Lubich–Wanner 专门把这种长期行为作为几何积分理论的核心内容。</p>
+\[E_k = E_0 + \text{bounded oscillatory error},\]<p>而不是严格：</p>
+\[E_k=E_0.\]<p>更深的 backward error analysis 告诉我们：辛积分器可以理解为<strong>精确积分了一个与原 Hamiltonian 非常接近的 modified Hamiltonian</strong>。这正是它长期能量误差往往有界、不产生系统性漂移的重要原因。Hairer–Lubich–Wanner 专门把这种长期行为作为几何积分理论的核心内容。</p>
 <p>所以一个很值得记住的区别是：</p>
-\[
-\boxed{
-\text{exact energy conservation}
-\neq
-\text{good long-term energy behavior}
-}
-\]<p>很多时候后者才是动力学仿真真正需要的东西。</p>
+\[\boxed{ \text{exact energy conservation} \neq \text{good long-term energy behavior} }\]<p>很多时候后者才是动力学仿真真正需要的东西。</p>
 <hr>
 <h1 id="6-noether-定理在离散世界里仍然存在">6. Noether 定理在离散世界里仍然存在
 </h1><p>连续力学中，Noether 定理把：</p>
-\[
-\text{symmetry}
-\]<p>与：</p>
-\[
-\text{conserved quantity}
-\]<p>连接起来。</p>
+\[\text{symmetry}\]<p>与：</p>
+\[\text{conserved quantity}\]<p>连接起来。</p>
 <p>例如空间平移不改变 Lagrangian：</p>
-\[
-\Rightarrow
-\text{linear momentum conservation}.
-\]<p>旋转不变：</p>
-\[
-\Rightarrow
-\text{angular momentum conservation}.
-\]<p>时间平移：</p>
-\[
-\Rightarrow
-\text{energy relation}.
-\]<p>VI 中存在对应的 <strong>discrete Noether theorem</strong>。如果 discrete Lagrangian 保留相应对称性，对应的离散动量可以被精确保存。Marsden–West 将这一点作为 VI 理论的核心结果之一。</p>
+\[\Rightarrow \text{linear momentum conservation}.\]<p>旋转不变：</p>
+\[\Rightarrow \text{angular momentum conservation}.\]<p>时间平移：</p>
+\[\Rightarrow \text{energy relation}.\]<p>VI 中存在对应的 <strong>discrete Noether theorem</strong>。如果 discrete Lagrangian 保留相应对称性，对应的离散动量可以被精确保存。Marsden–West 将这一点作为 VI 理论的核心结果之一。</p>
 <p>这对物理引擎设计尤其有意义：</p>
 <p>如果一个孤立软体没有外力和外力矩，那么你希望：</p>
-\[
-P_{k+1}=P_k,
-\]\[
-L_{k+1}=L_k.
-\]<p>VI 提供了一种很强的设计原则：</p>
+\[P_{k+1}=P_k,\]\[L_{k+1}=L_k.\]<p>VI 提供了一种很强的设计原则：</p>
 <blockquote>
 <p><strong>不要事后写一个 momentum correction；从一开始就让离散公式保留对应的对称性。</strong></p>
 </blockquote>
 <hr>
 <h1 id="7-这和-fem-的关系比看起来更近">7. 这和 FEM 的关系比看起来更近
 </h1><p>空间有限元首先把连续弹性体：</p>
-\[
-x(X,t)
-\]<p>离散成节点自由度：</p>
-\[
-q(t).
-\]<p>于是得到一个半离散系统：</p>
-<h1 id="nabla-eq">[
-M\ddot q
-+
-\nabla E(q)
-</h1><p>f.
-]</p>
-<p>其 Lagrangian 就是：</p>
-<h1 id="lqdot-q-1">[
-L(q,\dot q)
-</h1><h2 id="frac12dot-qtmdot-q">\frac12\dot q^TM\dot q
-</h2><p>E(q).
-]</p>
-<p>所以：</p>
-\[
-\boxed{
-\text{FEM负责空间离散}
-}
-\]<p>而：</p>
-\[
-\boxed{
-\text{VI负责时间离散}
-}
-\]<p>两者实际上天然可以组合。</p>
+\[x(X,t)\]<p>离散成节点自由度：</p>
+\[q(t).\]<p>于是得到一个半离散系统：</p>
+\[M\ddot q + \nabla E(q) = f.\]<p>其 Lagrangian 就是：</p>
+\[L(q,\dot q) = \frac12\dot q^TM\dot q - E(q).\]<p>所以：</p>
+\[\boxed{ \text{FEM负责空间离散} }\]<p>而：</p>
+\[\boxed{ \text{VI负责时间离散} }\]<p>两者实际上天然可以组合。</p>
 <p>也就是说，一个结构保持型 FEM 可以理解为：</p>
-\[
-\text{continuum mechanics}
-\]\[
-\downarrow\quad \text{spatial discretization}
-\]\[
-L(q,\dot q)
-\]\[
-\downarrow\quad \text{variational time discretization}
-\]\[
-q_0,q_1,q_2,\ldots
-\]<p>近年来也仍有工作继续研究 Hamiltonian / symplectic FEM 的空间—时间组合。</p>
+\[\text{continuum mechanics}\]\[\downarrow\quad \text{spatial discretization}\]\[L(q,\dot q)\]\[\downarrow\quad \text{variational time discretization}\]\[q_0,q_1,q_2,\ldots\]<p>近年来也仍有工作继续研究 Hamiltonian / symplectic FEM 的空间—时间组合。</p>
 <hr>
 <h1 id="8-为什么游戏物理里没有-everywhere-都使用-vi">8. 为什么游戏物理里没有 everywhere 都使用 VI？
 </h1><p>这里必须看到它的局限。</p>
 <p>真实游戏物理往往包含：</p>
-\[
-\text{collision}
-+
-\text{Coulomb friction}
-+
-\text{damping}
-+
-\text{motors}
-+
-\text{constraint activation/deactivation}.
-\]<p>这些东西会破坏最干净的保守 Hamiltonian 结构。</p>
+\[\text{collision} + \text{Coulomb friction} + \text{damping} + \text{motors} + \text{constraint activation/deactivation}.\]<p>这些东西会破坏最干净的保守 Hamiltonian 结构。</p>
 <p>尤其是摩擦：</p>
-\[
-F_f
-\]<p>本身就是耗散性的。</p>
+\[F_f\]<p>本身就是耗散性的。</p>
 <p>撞击还可能包含：</p>
-\[
-v^-\rightarrow v^+
-\]<p>这种非光滑事件。</p>
+\[v^-\rightarrow v^+\]<p>这种非光滑事件。</p>
 <p>所以 VI 最漂亮的理论通常建立在：</p>
 <ul>
 <li>conservative；</li>
@@ -742,30 +529,14 @@ v^-\rightarrow v^+
 </h1><p>这个方向到现在并没有停留在 2001 年理论。</p>
 <p>SIGGRAPH 2025 的 <strong>Variational Elastodynamic Simulation</strong> 又重新处理了非线性弹性中的变分时间积分。论文指出，variational time integration 在求解时可能遭遇 ill-conditioned Hessian 和不可靠 root finding，而可靠求解又与其动量保持性质密切相关；他们进一步挖掘了问题中的“hidden convex”结构，以提高非线性弹性动力学求解的鲁棒性。</p>
 <p>这件事情很有意思，因为它说明：</p>
-\[
-\boxed{
-\text{好的离散理论}
-}
-\]<p>仍然必须配合：</p>
-\[
-\boxed{
-\text{好的 nonlinear solver}
-}
-\]<p>结构保持并不会自动消灭数值求解困难。</p>
+\[\boxed{ \text{好的离散理论} }\]<p>仍然必须配合：</p>
+\[\boxed{ \text{好的 nonlinear solver} }\]<p>结构保持并不会自动消灭数值求解困难。</p>
 <p>这和 IPC 非常相似：</p>
-\[
-\text{formulation}
-+
-\text{optimization algorithm}
-\]<p>必须一起设计。</p>
+\[\text{formulation} + \text{optimization algorithm}\]<p>必须一起设计。</p>
 <hr>
 <h1 id="10-对物理求解器最值得迁移的一点">10. 对物理求解器最值得迁移的一点
 </h1><p>VI 最值得迁移的不是某个具体积分公式，而是：</p>
-\[
-\boxed{
-\text{structure before accuracy}
-}
-\]<p>这里的 structure 可以是：</p>
+\[\boxed{ \text{structure before accuracy} }\]<p>这里的 structure 可以是：</p>
 <ul>
 <li>momentum conservation；</li>
 <li>symplecticity；</li>
@@ -775,40 +546,19 @@ v^-\rightarrow v^+
 <li>constraint invariants。</li>
 </ul>
 <p>传统思路容易变成：</p>
-\[
-\text{先求一个近似答案}
-\rightarrow
-\text{再不断 correction}.
-\]<p>VI 给出另一种设计哲学：</p>
-\[
-\boxed{
-\text{从离散模型本身，就让某些正确性成为结构性质。}
-}
-\]<p>这与你前面讨论 IPC 时发现的现象其实高度一致。</p>
+\[\text{先求一个近似答案} \rightarrow \text{再不断 correction}.\]<p>VI 给出另一种设计哲学：</p>
+\[\boxed{ \text{从离散模型本身，就让某些正确性成为结构性质。} }\]<p>这与你前面讨论 IPC 时发现的现象其实高度一致。</p>
 <p>IPC 中：</p>
-\[
-\text{CCD}
-\]<p>让：</p>
-\[
-d>0
-\]<p>成为 trajectory feasibility。</p>
+\[\text{CCD}\]<p>让：</p>
+\[d>0\]<p>成为 trajectory feasibility。</p>
 <p>VI 中：</p>
-\[
-\text{discrete symmetry}
-\]<p>让某些 momentum conservation 成为离散动力学本身的性质。</p>
+\[\text{discrete symmetry}\]<p>让某些 momentum conservation 成为离散动力学本身的性质。</p>
 <p>它们背后有同一个非常强的求解器思想：</p>
-\[
-\boxed{
-\text{尽量把“正确”编码进 formulation，
-而不是依赖迭代结束后的修补。}
-}
-\]<hr>
+\[\boxed{ \text{尽量把“正确”编码进 formulation， 而不是依赖迭代结束后的修补。} }\]<hr>
 <h2 id="一个工程诊断例子">一个工程诊断例子
 </h2><p>假设你的软体掉在没有摩擦的地面上，然后弹起。</p>
 <p>你发现：</p>
-\[
-P_x(t)
-\]<p>在没有水平外力的情况下持续漂移。</p>
+\[P_x(t)\]<p>在没有水平外力的情况下持续漂移。</p>
 <p>典型工程做法可能是找：</p>
 <ul>
 <li>contact correction；</li>
@@ -822,51 +572,20 @@ P_x(t)
 <p><strong>你的整个离散时间步是否具有水平平移对称性？</strong></p>
 </blockquote>
 <p>如果某个约束或 correction 隐式依赖：</p>
-\[
-x_{\rm world},
-\]<p>而不是仅依赖相对位置，就可能人为破坏平移不变性。</p>
+\[x_{\rm world},\]<p>而不是仅依赖相对位置，就可能人为破坏平移不变性。</p>
 <p>于是：</p>
-\[
-\text{symmetry broken}
-\Rightarrow
-\text{momentum conservation broken}.
-\]<p>这个思考方式特别适合做复杂求解器诊断。</p>
+\[\text{symmetry broken} \Rightarrow \text{momentum conservation broken}.\]<p>这个思考方式特别适合做复杂求解器诊断。</p>
 <p>它把问题从：</p>
-\[
-\text{哪个参数有错？}
-\]<p>提升到：</p>
-\[
-\boxed{
-\text{这个离散算法保留了哪些连续系统结构？}
-}
-\]<hr>
+\[\text{哪个参数有错？}\]<p>提升到：</p>
+\[\boxed{ \text{这个离散算法保留了哪些连续系统结构？} }\]<hr>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1>\[
-\boxed{
-\text{不要只离散方程，也可以离散产生方程的原理。}
-}
-\]<p>更进一步：</p>
-\[
-\boxed{
-\text{一个积分器的质量，不只取决于单步误差，
-还取决于它长期保留了什么。}
-}
-\]<p>如果未来你要自己设计软体或刚体求解器，这个问题值得经常拿出来：</p>
+</h1>\[\boxed{ \text{不要只离散方程，也可以离散产生方程的原理。} }\]<p>更进一步：</p>
+\[\boxed{ \text{一个积分器的质量，不只取决于单步误差， 还取决于它长期保留了什么。} }\]<p>如果未来你要自己设计软体或刚体求解器，这个问题值得经常拿出来：</p>
 <blockquote>
 <p><strong>哪些性质应该由 tolerance 保证，哪些应该由算法结构保证？</strong></p>
 </blockquote>
 <p>这会自然连接到：</p>
-\[
-\text{variational integrators}
-\rightarrow
-\text{symplectic methods}
-\rightarrow
-\text{Lie-group integrators}
-\rightarrow
-\text{energy-momentum methods}
-\rightarrow
-\text{structure-preserving differentiable simulation}.
-\]<h3 id="拓展阅读">拓展阅读
+\[\text{variational integrators} \rightarrow \text{symplectic methods} \rightarrow \text{Lie-group integrators} \rightarrow \text{energy-momentum methods} \rightarrow \text{structure-preserving differentiable simulation}.\]<h3 id="拓展阅读">拓展阅读
 </h3><ol>
 <li>
 <p><strong>Marsden &amp; West, <em>Discrete Mechanics and Variational Integrators</em>, Acta Numerica, 2001</strong>。这是最重要的理论入口，系统讲离散作用量、离散 Euler–Lagrange 方程、symplecticity、Noether theorem、约束与外力。</p>

@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存” 主题：PagedAttention 与 KV Cache 虚拟内存化 领域：AI 全栈工程 × 大模型推理 × GPU 系统 推荐阅读时间：约 8–10 分钟\nPagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：\n$$ \\boxed{\\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}} $$vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 20.4%–38.2%；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 2–4× serving throughput。(arXiv)\n更值得学的是它背后的思想：\n$$ \\boxed{\\text{资源布局本身，也是算法的一部分。}} $$ 1. 为什么 LLM 推理会突然变成“内存管理问题”？ 自回归模型生成第 \\(t\\) 个 token 时，需要：\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存” 主题：PagedAttention 与 KV Cache 虚拟内存化 领域：AI 全栈工程 × 大模型推理 × GPU 系统 推荐阅读时间：约 8–10 分钟\nPagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：\n$$\\boxed{\\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}$$vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 20.4%–38.2%；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 2–4× serving throughput。(arXiv)\n更值得学的是它背后的思想：\n$$\\boxed{\\text{资源布局本身，也是算法的一部分。}}$$ 1. 为什么 LLM 推理会突然变成“内存管理问题”？ 自回归模型生成第 \\(t\\) 个 token 时，需要：\n$$q_t$$与之前所有 token 的：\n">
 <title>PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/18-paged-attention/'>
 
 <link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”">
-<meta property='og:description' content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存” 主题：PagedAttention 与 KV Cache 虚拟内存化 领域：AI 全栈工程 × 大模型推理 × GPU 系统 推荐阅读时间：约 8–10 分钟\nPagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：\n$$ \\boxed{\\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}} $$vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 20.4%–38.2%；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 2–4× serving throughput。(arXiv)\n更值得学的是它背后的思想：\n$$ \\boxed{\\text{资源布局本身，也是算法的一部分。}} $$ 1. 为什么 LLM 推理会突然变成“内存管理问题”？ 自回归模型生成第 \\(t\\) 个 token 时，需要：\n">
+<meta property='og:description' content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存” 主题：PagedAttention 与 KV Cache 虚拟内存化 领域：AI 全栈工程 × 大模型推理 × GPU 系统 推荐阅读时间：约 8–10 分钟\nPagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：\n$$\\boxed{\\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}$$vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 20.4%–38.2%；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 2–4× serving throughput。(arXiv)\n更值得学的是它背后的思想：\n$$\\boxed{\\text{资源布局本身，也是算法的一部分。}}$$ 1. 为什么 LLM 推理会突然变成“内存管理问题”？ 自回归模型生成第 \\(t\\) 个 token 时，需要：\n$$q_t$$与之前所有 token 的：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/18-paged-attention/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:tag' content='大模型推理' /><meta property='article:tag' content='GPU 系统' /><meta property='article:published_time' content='2026-08-31T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-31T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”">
-<meta name="twitter:description" content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存” 主题：PagedAttention 与 KV Cache 虚拟内存化 领域：AI 全栈工程 × 大模型推理 × GPU 系统 推荐阅读时间：约 8–10 分钟\nPagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：\n$$ \\boxed{\\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}} $$vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 20.4%–38.2%；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 2–4× serving throughput。(arXiv)\n更值得学的是它背后的思想：\n$$ \\boxed{\\text{资源布局本身，也是算法的一部分。}} $$ 1. 为什么 LLM 推理会突然变成“内存管理问题”？ 自回归模型生成第 \\(t\\) 个 token 时，需要：\n">
+<meta name="twitter:description" content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存” 主题：PagedAttention 与 KV Cache 虚拟内存化 领域：AI 全栈工程 × 大模型推理 × GPU 系统 推荐阅读时间：约 8–10 分钟\nPagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：\n$$\\boxed{\\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}$$vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 20.4%–38.2%；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 2–4× serving throughput。(arXiv)\n更值得学的是它背后的思想：\n$$\\boxed{\\text{资源布局本身，也是算法的一部分。}}$$ 1. 为什么 LLM 推理会突然变成“内存管理问题”？ 自回归模型生成第 \\(t\\) 个 token 时，需要：\n$$q_t$$与之前所有 token 的：\n">
     </head>
     <body class="
     article-page
@@ -393,7 +393,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 7 分钟
+                    阅读时长: 6 分钟
                 </time>
             </div>
         
@@ -413,74 +413,32 @@
 <strong>领域：AI 全栈工程 × 大模型推理 × GPU 系统</strong>
 <strong>推荐阅读时间：约 8–10 分钟</strong></p>
 <p>PagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：</p>
-$$
-\boxed{\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}
-$$<p>vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 <strong>20.4%–38.2%</strong>；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 <strong>2–4× serving throughput</strong>。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+$$\boxed{\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}$$<p>vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 <strong>20.4%–38.2%</strong>；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 <strong>2–4× serving throughput</strong>。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
      target="_blank" rel="noopener"
     >arXiv</a>)</p>
 <p>更值得学的是它背后的思想：</p>
-$$
-\boxed{\text{资源布局本身，也是算法的一部分。}}
-$$<hr>
+$$\boxed{\text{资源布局本身，也是算法的一部分。}}$$<hr>
 <h2 id="1-为什么-llm-推理会突然变成内存管理问题">1. 为什么 LLM 推理会突然变成“内存管理问题”？
 </h2><p>自回归模型生成第 \(t\) 个 token 时，需要：</p>
-$$
-q_t
-$$<p>与之前所有 token 的：</p>
-$$
-k_1,\ldots,k_t
-$$<p>计算 attention。</p>
+$$q_t$$<p>与之前所有 token 的：</p>
+$$k_1,\ldots,k_t$$<p>计算 attention。</p>
 <p>如果每生成一个 token 都重新计算过去所有 token 的 \(K,V\)，浪费极大。</p>
 <p>所以推理系统保存：</p>
-$$
-\boxed{\text{KV Cache}}
-$$<p>即每层过去所有 token 的：</p>
-$$
-K,V.
-$$<p>下一步只计算新 token 的：</p>
-$$
-K_t,V_t
-$$<p>再读取历史 cache。</p>
+$$\boxed{\text{KV Cache}}$$<p>即每层过去所有 token 的：</p>
+$$K,V.$$<p>下一步只计算新 token 的：</p>
+$$K_t,V_t$$<p>再读取历史 cache。</p>
 <p>因此 decode 阶段大致变成：</p>
-$$
-\text{计算一个新 token}
-+
-\boxed{\text{读取越来越大的历史 KV}}
-$$<p>而且生成过程严格自回归：</p>
-$$
-x_1\rightarrow x_2\rightarrow\cdots
-$$<p>单请求的 GPU 并行度并不高。原始 vLLM 论文指出，这使 generation/decode 阶段高度 memory-bound，提高吞吐量的关键之一是同时 batch 更多请求。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+$$\text{计算一个新 token} + \boxed{\text{读取越来越大的历史 KV}}$$<p>而且生成过程严格自回归：</p>
+$$x_1\rightarrow x_2\rightarrow\cdots$$<p>单请求的 GPU 并行度并不高。原始 vLLM 论文指出，这使 generation/decode 阶段高度 memory-bound，提高吞吐量的关键之一是同时 batch 更多请求。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
      target="_blank" rel="noopener"
     >arXiv</a>)</p>
 <p>于是产生了一个链条：</p>
-$$
-\boxed{
-\text{KV Cache 占用}
-\rightarrow
-\text{能容纳多少并发 sequence}
-\rightarrow
-\text{batch size}
-\rightarrow
-\text{GPU utilization}
-\rightarrow
-\text{吞吐量}
-}
-$$<p>所以浪费 10 GB 显存并不只是“浪费 10 GB”。</p>
+$$\boxed{ \text{KV Cache 占用} \rightarrow \text{能容纳多少并发 sequence} \rightarrow \text{batch size} \rightarrow \text{GPU utilization} \rightarrow \text{吞吐量} }$$<p>所以浪费 10 GB 显存并不只是“浪费 10 GB”。</p>
 <p>它可能意味着：</p>
-$$
-\boxed{\text{少跑一大批并发请求。}}
-$$<hr>
+$$\boxed{\text{少跑一大批并发请求。}}$$<hr>
 <h1 id="2-kv-cache-到底有多大">2. KV Cache 到底有多大？
 </h1><p>对于传统 multi-head/GQA Transformer，一个 token 的 KV Cache 大致为：</p>
-<h1 id="m_rm-token">$$
-M_{\rm token}
-</h1><p>2
-\times L
-\times H_{\rm KV}
-\times d_{\rm head}
-\times b
-$$</p>
-<p>其中：</p>
+$$M_{\rm token} = 2 \times L \times H_{\rm KV} \times d_{\rm head} \times b$$<p>其中：</p>
 <ul>
 <li>\(2\)：Key + Value；</li>
 <li>\(L\)：Transformer 层数；</li>
@@ -489,33 +447,14 @@ $$</p>
 <li>\(b\)：每个元素字节数。</li>
 </ul>
 <p>举一个示意模型：</p>
-$$
-L=32,\quad
-H_{\rm KV}=8,\quad
-d_{\rm head}=128,
-$$<p>BF16：</p>
-$$
-b=2.
-$$<p>那么：</p>
-<h1 id="m_rm-token-1">$$
-M_{\rm token}
-</h1><h1 id="2times32times8times128times2">2\times32\times8\times128\times2
-</h1><p>128\text{ KB/token}.
-$$</p>
-<p>一个：</p>
-$$
-8192
-$$<p>token sequence 就大约需要：</p>
-$$
-\boxed{1\text{ GB KV Cache}}
-$$<p>这还只是一个请求。</p>
+$$L=32,\quad H_{\rm KV}=8,\quad d_{\rm head}=128,$$<p>BF16：</p>
+$$b=2.$$<p>那么：</p>
+$$M_{\rm token} = 2\times32\times8\times128\times2 = 128\text{ KB/token}.$$<p>一个：</p>
+$$8192$$<p>token sequence 就大约需要：</p>
+$$\boxed{1\text{ GB KV Cache}}$$<p>这还只是一个请求。</p>
 <p>如果同时服务：</p>
-$$
-40
-$$<p>条长 sequence：</p>
-$$
-\approx40\text{ GB}.
-$$<p>所以长上下文时代，KV Cache 很容易从“附属数据”变成 inference infrastructure 的核心资源。</p>
+$$40$$<p>条长 sequence：</p>
+$$\approx40\text{ GB}.$$<p>所以长上下文时代，KV Cache 很容易从“附属数据”变成 inference infrastructure 的核心资源。</p>
 <p>vLLM 原论文举的历史例子更夸张：OPT-13B FP16 每 token KV 约 800 KB，因此长度 2048 的单个请求最大约需 1.6 GB KV Cache。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
      target="_blank" rel="noopener"
     >arXiv</a>)</p>
@@ -533,11 +472,7 @@ $$<p>所以长上下文时代，KV Cache 很容易从“附属数据”变成 in
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>服务器不知道实际会生成：</p>
-$$
-50？
-\quad500？
-\quad2000？
-$$<p>token。</p>
+$$50？ \quad500？ \quad2000？$$<p>token。</p>
 <p>旧式做法很自然：</p>
 <blockquote>
 <p>为安全起见，先给它分配能够容纳最大长度的连续 tensor。</p>
@@ -583,13 +518,7 @@ $$<p>token。</p>
 <li>释放。</li>
 </ul>
 <p>这就是经典动态内存管理问题：</p>
-$$
-\boxed{
-\text{internal fragmentation}
-+
-\text{external fragmentation}
-}
-$$<p>vLLM 团队测得，当时一些连续分配方案中真正用于 token state 的 KV 空间比例最低只有约 20.4%。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+$$\boxed{ \text{internal fragmentation} + \text{external fragmentation} }$$<p>vLLM 团队测得，当时一些连续分配方案中真正用于 token state 的 KV 空间比例最低只有约 20.4%。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
      target="_blank" rel="noopener"
     >arXiv</a>)</p>
 <p>这时继续优化矩阵乘 kernel 已经无法解决根本问题。</p>
@@ -627,14 +556,8 @@ $$<p>vLLM 团队测得，当时一些连续分配方案中真正用于 token sta
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>通过：</p>
-$$
-\boxed{\text{page table}}
-$$<p>建立：</p>
-$$
-\text{logical page}
-\rightarrow
-\text{physical frame}.
-$$<p>PagedAttention 把这个思想迁移过来：</p>
+$$\boxed{\text{page table}}$$<p>建立：</p>
+$$\text{logical page} \rightarrow \text{physical frame}.$$<p>PagedAttention 把这个思想迁移过来：</p>
 <div class="table-wrapper"><table>
 	<thead>
 			<tr>
@@ -666,9 +589,7 @@ $$<p>PagedAttention 把这个思想迁移过来：</p>
 	</tbody>
 </table></div>
 <p>于是一个 sequence：</p>
-$$
-[1,2,3,4,5,\ldots]
-$$<p>逻辑上连续，</p>
+$$[1,2,3,4,5,\ldots]$$<p>逻辑上连续，</p>
 <p>但 KV 可以实际存成：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -695,48 +616,23 @@ $$<p>逻辑上连续，</p>
 <h1 id="5-它并没有近似-attention">5. 它并没有近似 Attention
 </h1><p>这是一个很重要的澄清。</p>
 <p>正常 attention：</p>
-<h1 id="a_ij">$$
-a_{ij}
-</h1><p>\operatorname{softmax}
-\left(
-\frac{q_i^Tk_j}{\sqrt d}
-\right).
-$$</p>
-<p>PagedAttention 仍然读取这些：</p>
-$$
-K,V
-$$<p>完成 attention。</p>
+$$a_{ij} = \operatorname{softmax} \left( \frac{q_i^Tk_j}{\sqrt d} \right).$$<p>PagedAttention 仍然读取这些：</p>
+$$K,V$$<p>完成 attention。</p>
 <p>变化的是：</p>
-$$
-\boxed{\text{这些 }K,V\text{ 在物理显存中的布局}}
-$$<p>因此它本质上属于：</p>
-$$
-\boxed{\text{memory virtualization}}
-$$<p>而不是：</p>
-$$
-\text{sparse attention}
-$$<p>或：</p>
-$$
-\text{approximate attention}.
-$$<p>vLLM 官方当前实现仍以固定 token 数的 cache block 为基本管理单元，其 cache 配置中明确包含 <code>block_size</code>、KV Cache memory size、prefix caching、KV offloading 等参数。(<a class="link" href="https://docs.vllm.ai/en/stable/api/vllm/config/cache/"  title="cache - vLLM"
+$$\boxed{\text{这些 }K,V\text{ 在物理显存中的布局}}$$<p>因此它本质上属于：</p>
+$$\boxed{\text{memory virtualization}}$$<p>而不是：</p>
+$$\text{sparse attention}$$<p>或：</p>
+$$\text{approximate attention}.$$<p>vLLM 官方当前实现仍以固定 token 数的 cache block 为基本管理单元，其 cache 配置中明确包含 <code>block_size</code>、KV Cache memory size、prefix caching、KV offloading 等参数。(<a class="link" href="https://docs.vllm.ai/en/stable/api/vllm/config/cache/"  title="cache - vLLM"
      target="_blank" rel="noopener"
     >vLLM</a>)</p>
 <hr>
 <h1 id="6-为什么分页以后碎片突然变得容易控制">6. 为什么分页以后碎片突然变得容易控制？
 </h1><p>假设 block size 为：</p>
-$$
-B=16\text{ tokens}.
-$$<p>一个 100 token 请求需要：</p>
-$$
-\left\lceil\frac{100}{16}\right\rceil=7
-$$<p>个 block。</p>
+$$B=16\text{ tokens}.$$<p>一个 100 token 请求需要：</p>
+$$\left\lceil\frac{100}{16}\right\rceil=7$$<p>个 block。</p>
 <p>真正浪费只发生在最后一个 block：</p>
-$$
-112-100=12\text{ tokens}.
-$$<p>因此内部碎片上界从“可能预留整个最大 sequence”缩小到：</p>
-$$
-\boxed{<1\text{ block/request}}
-$$<p>同时所有 physical block 都同样大小：</p>
+$$112-100=12\text{ tokens}.$$<p>因此内部碎片上界从“可能预留整个最大 sequence”缩小到：</p>
+$$\boxed{<1\text{ block/request}}$$<p>同时所有 physical block 都同样大小：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -771,9 +667,7 @@ $$<p>同时所有 physical block 都同样大小：</p>
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>prompt 的：</p>
-$$
-K,V
-$$<p>被复制 8 份。</p>
+$$K,V$$<p>被复制 8 份。</p>
 <p>Paged memory 允许：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -792,16 +686,12 @@ $$<p>被复制 8 份。</p>
 </div><p>多个 logical sequences 指向相同 physical KV blocks。</p>
 <p>只有发生分叉后才分配自己的 block。</p>
 <p>这其实就是：</p>
-$$
-\boxed{\text{Copy-on-Write}}
-$$<p>思想。</p>
+$$\boxed{\text{Copy-on-Write}}$$<p>思想。</p>
 <p>原论文在 beam search 场景中报告，block sharing 在其测试中最高可以节省约 55% 的 KV memory。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
      target="_blank" rel="noopener"
     >arXiv</a>)</p>
 <p>这个能力后来也自然演化出了：</p>
-$$
-\boxed{\text{Prefix Caching}}
-$$<p>如果不同请求拥有完全相同的 prefix，就可以复用已经计算好的 KV blocks。vLLM 官方实现使用 block tokens 与此前 prefix 来标识 cache block。(<a class="link" href="https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html"  title="Implementation — vLLM"
+$$\boxed{\text{Prefix Caching}}$$<p>如果不同请求拥有完全相同的 prefix，就可以复用已经计算好的 KV blocks。vLLM 官方实现使用 block tokens 与此前 prefix 来标识 cache block。(<a class="link" href="https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html"  title="Implementation — vLLM"
      target="_blank" rel="noopener"
     >vLLM</a>)</p>
 <hr>
@@ -852,95 +742,42 @@ $$<p>如果不同请求拥有完全相同的 prefix，就可以复用已经计�
 </div><p>这样 GPU 更容易持续吃满。</p>
 <p>问题是：如果 E 进来时 GPU 没有一块足够大的<strong>连续 KV 空间</strong>，调度器仍然无法放进去。</p>
 <p>PagedAttention 提供：</p>
-$$
-\boxed{\text{细粒度可组合显存}}
-$$<p>Continuous batching 提供：</p>
-$$
-\boxed{\text{细粒度 request scheduling}}
-$$<p>二者结合后才真正形成：</p>
-$$
-\boxed{
-\text{空出来一点资源}
-\Rightarrow
-\text{马上拿去服务另一个请求}
-}
-$$<p>vLLM 官方目前仍把 PagedAttention 和 continuous batching 同时列为其高吞吐 serving 的核心能力。(<a class="link" href="https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com"  title="vLLM - vLLM"
+$$\boxed{\text{细粒度可组合显存}}$$<p>Continuous batching 提供：</p>
+$$\boxed{\text{细粒度 request scheduling}}$$<p>二者结合后才真正形成：</p>
+$$\boxed{ \text{空出来一点资源} \Rightarrow \text{马上拿去服务另一个请求} }$$<p>vLLM 官方目前仍把 PagedAttention 和 continuous batching 同时列为其高吞吐 serving 的核心能力。(<a class="link" href="https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com"  title="vLLM - vLLM"
      target="_blank" rel="noopener"
     >vLLM</a>)</p>
 <hr>
 <h1 id="9-它和-flashattention-到底是什么关系">9. 它和 FlashAttention 到底是什么关系？
 </h1><p>这两个名字很容易混在一起，但解决的是不同层的问题。</p>
 <p><strong>FlashAttention</strong> 问：</p>
-$$
-\boxed{
-\text{一次 attention computation 怎样减少 HBM↔SRAM 数据搬运？}
-}
-$$<p>它通过 tiling、kernel fusion 等方式降低 GPU 内存层级间的 IO，是：</p>
-$$
-\boxed{\text{kernel / algorithmic IO optimization}}
-$$<p>。(<a class="link" href="https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com"  title="FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness"
+$$\boxed{ \text{一次 attention computation 怎样减少 HBM↔SRAM 数据搬运？} }$$<p>它通过 tiling、kernel fusion 等方式降低 GPU 内存层级间的 IO，是：</p>
+$$\boxed{\text{kernel / algorithmic IO optimization}}$$<p>。(<a class="link" href="https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com"  title="FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness"
      target="_blank" rel="noopener"
     >arXiv</a>)</p>
 <p><strong>PagedAttention</strong> 问：</p>
-$$
-\boxed{
-\text{几百个动态 sequence 的历史 KV 到底怎样放进 GPU memory？}
-}
-$$<p>它属于：</p>
-$$
-\boxed{\text{serving memory management}}
-$$<p>所以可以简单记成：</p>
-$$
-\boxed{
-\text{FlashAttention：一次 Attention 怎样算得更高效}
-}
-$$$$
-\boxed{
-\text{PagedAttention：大量请求的 KV 怎样活得更高效}
-}
-$$<p>现代系统完全可以同时使用两类优化；当前 vLLM 文档也明确列出了 FlashAttention/FlashInfer 等 optimized kernel 与其 KV Cache 管理能力。(<a class="link" href="https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com"  title="vLLM - vLLM"
+$$\boxed{ \text{几百个动态 sequence 的历史 KV 到底怎样放进 GPU memory？} }$$<p>它属于：</p>
+$$\boxed{\text{serving memory management}}$$<p>所以可以简单记成：</p>
+$$\boxed{ \text{FlashAttention：一次 Attention 怎样算得更高效} }$$$$\boxed{ \text{PagedAttention：大量请求的 KV 怎样活得更高效} }$$<p>现代系统完全可以同时使用两类优化；当前 vLLM 文档也明确列出了 FlashAttention/FlashInfer 等 optimized kernel 与其 KV Cache 管理能力。(<a class="link" href="https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com"  title="vLLM - vLLM"
      target="_blank" rel="noopener"
     >vLLM</a>)</p>
 <hr>
 <h1 id="10-pagedattention-真正改变的是容量--吞吐的转换率">10. PagedAttention 真正改变的是“容量 → 吞吐”的转换率
 </h1><p>假设 GPU 能给 KV Cache 留：</p>
-$$
-40\text{ GB}.
-$$<p>方案 A 的有效利用率只有：</p>
-$$
-40\%.
-$$<p>真正保存 token states：</p>
-$$
-16\text{ GB}.
-$$<p>方案 B 达到：</p>
-$$
-95\%.
-$$<p>真正使用：</p>
-$$
-38\text{ GB}.
-$$<p>即使：</p>
+$$40\text{ GB}.$$<p>方案 A 的有效利用率只有：</p>
+$$40\%.$$<p>真正保存 token states：</p>
+$$16\text{ GB}.$$<p>方案 B 达到：</p>
+$$95\%.$$<p>真正使用：</p>
+$$38\text{ GB}.$$<p>即使：</p>
 <ul>
 <li>GPU FLOPS 没变；</li>
 <li>模型没变；</li>
 <li>attention 数学没变；</li>
 </ul>
 <p>可同时驻留的请求数可能提高：</p>
-<p>$$</p>
-<blockquote>
-<p>2\times.
-$$</p>
-</blockquote>
-<p>decode 又恰恰需要 batch 才能有效利用 GPU。</p>
+$$>2\times.$$<p>decode 又恰恰需要 batch 才能有效利用 GPU。</p>
 <p>所以：</p>
-$$
-\boxed{
-\text{memory utilization}
-\rightarrow
-\text{batch capacity}
-\rightarrow
-\text{compute utilization}
-}
-$$<p>形成乘法效应。</p>
+$$\boxed{ \text{memory utilization} \rightarrow \text{batch capacity} \rightarrow \text{compute utilization} }$$<p>形成乘法效应。</p>
 <p>这解释了为什么一个“内存分配算法”能最终体现为明显的 tokens/s 提升。原始 vLLM 实验报告的 2–4× throughput 增益本质上正来自这种系统级连锁。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
      target="_blank" rel="noopener"
     >arXiv</a>)</p>
@@ -958,13 +795,7 @@ $$<p>形成乘法效应。</p>
 </div>
 </div><p>访问很简单。</p>
 <p>paged KV 需要：</p>
-$$
-\text{logical block}
-\rightarrow
-\text{block table}
-\rightarrow
-\text{physical block}.
-$$<p>这会增加：</p>
+$$\text{logical block} \rightarrow \text{block table} \rightarrow \text{physical block}.$$<p>这会增加：</p>
 <ul>
 <li>地址间接寻址；</li>
 <li>metadata；</li>
@@ -973,37 +804,18 @@ $$<p>这会增加：</p>
 <li>block size 调优问题。</li>
 </ul>
 <p>block 太大：</p>
-$$
-\Rightarrow
-\text{最后一页浪费增加}.
-$$<p>block 太小：</p>
-$$
-\Rightarrow
-\text{block table、调度和 kernel overhead 增加}.
-$$<p>所以 PagedAttention 的真正贡献并不是“分页一定快”。</p>
+$$\Rightarrow \text{最后一页浪费增加}.$$<p>block 太小：</p>
+$$\Rightarrow \text{block table、调度和 kernel overhead 增加}.$$<p>所以 PagedAttention 的真正贡献并不是“分页一定快”。</p>
 <p>而是：</p>
-$$
-\boxed{
-\text{用一点访问复杂度，
-换取大量更有价值的并发容量。}
-}
-$$<p>这是典型 systems trade-off。</p>
+$$\boxed{ \text{用一点访问复杂度， 换取大量更有价值的并发容量。} }$$<p>这是典型 systems trade-off。</p>
 <hr>
 <h1 id="12-它也没有解决长上下文的所有问题">12. 它也没有解决长上下文的所有问题
 </h1><p>PagedAttention 解决：</p>
-$$
-\boxed{\text{KV Cache allocation efficiency}}
-$$<p>但如果上下文从：</p>
-$$
-8K\rightarrow1M,
-$$<p>历史 KV 本身仍然巨大。</p>
+$$\boxed{\text{KV Cache allocation efficiency}}$$<p>但如果上下文从：</p>
+$$8K\rightarrow1M,$$<p>历史 KV 本身仍然巨大。</p>
 <p>即使：</p>
-$$
-100\%
-$$<p>利用显存，</p>
-$$
-1M\text{ token KV}
-$$<p>还是 1M token KV。</p>
+$$100\%$$<p>利用显存，</p>
+$$1M\text{ token KV}$$<p>还是 1M token KV。</p>
 <p>而普通 attention 的计算量问题也不会因为 paging 自动消失。</p>
 <p>因此后续方向包括：</p>
 <ul>
@@ -1019,27 +831,13 @@ $$<p>还是 1M token KV。</p>
      target="_blank" rel="noopener"
     >vLLM</a>)</p>
 <p>所以 PagedAttention 更准确的位置是：</p>
-$$
-\boxed{
-\text{KV Cache 系统架构的基础设施层}
-}
-$$<p>而不是长上下文问题的终点。</p>
+$$\boxed{ \text{KV Cache 系统架构的基础设施层} }$$<p>而不是长上下文问题的终点。</p>
 <hr>
 <h1 id="13-对-ai-agent-系统尤其有价值的启发">13. 对 AI Agent 系统尤其有价值的启发
 </h1><p>Agent workload 往往不是简单：</p>
-$$
-\text{prompt}\rightarrow\text{一次回答}.
-$$<p>而可能是：</p>
-$$
-\text{system prompt}
-+\text{长历史}
-+\text{工具调用}
-+\text{新 observation}
-+\text{继续推理}.
-$$<p>于是大量请求可能共享：</p>
-$$
-\boxed{\text{相同或部分相同的 prefix}}
-$$<p>例如同一 Agent 的：</p>
+$$\text{prompt}\rightarrow\text{一次回答}.$$<p>而可能是：</p>
+$$\text{system prompt} +\text{长历史} +\text{工具调用} +\text{新 observation} +\text{继续推理}.$$<p>于是大量请求可能共享：</p>
+$$\boxed{\text{相同或部分相同的 prefix}}$$<p>例如同一 Agent 的：</p>
 <ul>
 <li>system instructions；</li>
 <li>tool definitions；</li>
@@ -1047,9 +845,7 @@ $$<p>例如同一 Agent 的：</p>
 <li>cached documents。</li>
 </ul>
 <p>这时 KV Cache 开始具有一种很有意思的性质：</p>
-$$
-\boxed{\text{它已经不只是 inference 临时内存，而是一种可复用计算状态。}}
-$$<p>一旦这样理解，问题自然会从：</p>
+$$\boxed{\text{它已经不只是 inference 临时内存，而是一种可复用计算状态。}}$$<p>一旦这样理解，问题自然会从：</p>
 <blockquote>
 <p>怎样运行一次模型？</p>
 </blockquote>
@@ -1058,21 +854,11 @@ $$<p>一旦这样理解，问题自然会从：</p>
 <p><strong>怎样管理、寻址、共享、淘汰一大批模型中间状态？</strong></p>
 </blockquote>
 <p>这越来越像：</p>
-$$
-\text{数据库}
-+
-\text{操作系统}
-+
-\text{分布式缓存}
-$$<p>问题，而不只是深度学习问题。</p>
+$$\text{数据库} + \text{操作系统} + \text{分布式缓存}$$<p>问题，而不只是深度学习问题。</p>
 <hr>
 <h1 id="14-对物理引擎科学计算也有一个很强的迁移">14. 对物理引擎/科学计算也有一个很强的迁移
 </h1><p>PagedAttention 最深层的思想其实与 Attention 无关：</p>
-$$
-\boxed{
-\text{logical continuity 不需要 physical continuity。}
-}
-$$<p>这在大型 simulation system 中也很有价值。</p>
+$$\boxed{ \text{logical continuity 不需要 physical continuity。} }$$<p>这在大型 simulation system 中也很有价值。</p>
 <p>例如：</p>
 <ul>
 <li>粒子池；</li>
@@ -1083,13 +869,9 @@ $$<p>这在大型 simulation system 中也很有价值。</p>
 <li>GPU constraint batches。</li>
 </ul>
 <p>如果对象数量：</p>
-$$
-N(t)
-$$<p>动态增长、删除、分裂，</p>
+$$N(t)$$<p>动态增长、删除、分裂，</p>
 <p>强行要求：</p>
-$$
-\boxed{\text{每个逻辑对象拥有连续可扩张物理数组}}
-$$<p>往往会制造：</p>
+$$\boxed{\text{每个逻辑对象拥有连续可扩张物理数组}}$$<p>往往会制造：</p>
 <ul>
 <li>realloc；</li>
 <li>memcpy；</li>
@@ -1097,44 +879,14 @@ $$<p>往往会制造：</p>
 <li>over-reservation。</li>
 </ul>
 <p>PagedAttention 的思考方式是：</p>
-$$
-\boxed{
-\text{逻辑数据结构}
-\quad\neq\quad
-\text{物理内存布局}
-}
-$$<p>中间加入：</p>
-$$
-\boxed{\text{indirection layer}}
-$$<p>以后，调度器获得了巨大的自由度。</p>
+$$\boxed{ \text{逻辑数据结构} \quad\neq\quad \text{物理内存布局} }$$<p>中间加入：</p>
+$$\boxed{\text{indirection layer}}$$<p>以后，调度器获得了巨大的自由度。</p>
 <p>这是一种极其通用的高性能系统设计方法。</p>
 <hr>
 <h2 id="一个很实用的部署诊断思路">一个很实用的部署诊断思路
 </h2><p>如果以后部署自己的 LLM/Agent 服务，不要只监控：</p>
-$$
-\text{GPU utilization}.
-$$<p>至少应该同时看：</p>
-$$
-\boxed{
-\text{KV cache utilization}
-}
-$$$$
-\boxed{
-\text{running / waiting requests}
-}
-$$$$
-\boxed{
-\text{tokens/s}
-}
-$$$$
-\boxed{
-\text{TTFT}
-}
-$$$$
-\boxed{
-\text{inter-token latency}
-}
-$$<p>如果出现：</p>
+$$\text{GPU utilization}.$$<p>至少应该同时看：</p>
+$$\boxed{ \text{KV cache utilization} }$$$$\boxed{ \text{running / waiting requests} }$$$$\boxed{ \text{tokens/s} }$$$$\boxed{ \text{TTFT} }$$$$\boxed{ \text{inter-token latency} }$$<p>如果出现：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -1148,12 +900,8 @@ $$<p>如果出现：</p>
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>那么瓶颈很可能并不在：</p>
-$$
-\text{更多 TFLOPS}
-$$<p>而在：</p>
-$$
-\boxed{\text{serving memory capacity / scheduling}}
-$$<p>这一层。</p>
+$$\text{更多 TFLOPS}$$<p>而在：</p>
+$$\boxed{\text{serving memory capacity / scheduling}}$$<p>这一层。</p>
 <p>这是做 AI 全栈工程时非常重要的性能诊断转变。</p>
 <hr>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
@@ -1162,41 +910,14 @@ $$<p>这一层。</p>
 <p>“把 KV Cache 分成 block。”</p>
 </blockquote>
 <p>更重要的是：</p>
-$$
-\boxed{
-\text{LLM serving 的性能，不能只从神经网络计算图理解。}
-}
-$$<p>模型进入真实服务以后：</p>
-$$
-\text{模型结构}
-$$<p>只是系统中的一层。</p>
+$$\boxed{ \text{LLM serving 的性能，不能只从神经网络计算图理解。} }$$<p>模型进入真实服务以后：</p>
+$$\text{模型结构}$$<p>只是系统中的一层。</p>
 <p>下面还有：</p>
-$$
-\boxed{
-\text{GPU kernel}
-+
-\text{memory allocator}
-+
-\text{scheduler}
-+
-\text{cache}
-+
-\text{distributed runtime}.
-}
-$$<p>PagedAttention 特别漂亮的地方在于，它没有发明一个更聪明的 Transformer，而是把操作系统中已经成熟几十年的：</p>
-$$
-\boxed{\text{virtual memory}}
-$$<p>重新映射到：</p>
-$$
-\boxed{\text{KV Cache}}
-$$<p>上。</p>
+$$\boxed{ \text{GPU kernel} + \text{memory allocator} + \text{scheduler} + \text{cache} + \text{distributed runtime}. }$$<p>PagedAttention 特别漂亮的地方在于，它没有发明一个更聪明的 Transformer，而是把操作系统中已经成熟几十年的：</p>
+$$\boxed{\text{virtual memory}}$$<p>重新映射到：</p>
+$$\boxed{\text{KV Cache}}$$<p>上。</p>
 <p>最后得到的启发非常普遍：</p>
-$$
-\boxed{
-\text{当一种资源具有“大小动态变化、生命周期不确定、存在共享机会”的特点时，
-优先考虑把逻辑地址与物理存储解耦。}
-}
-$$<p>这是一个远远超出 LLM serving 的工程思想。</p>
+$$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确定、存在共享机会”的特点时， 优先考虑把逻辑地址与物理存储解耦。} }$$<p>这是一个远远超出 LLM serving 的工程思想。</p>
 <h3 id="拓展阅读">拓展阅读
 </h3><ol>
 <li>

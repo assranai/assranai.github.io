@@ -18,41 +18,19 @@
 &lt;strong&gt;领域：可靠性 × 代理模型 × 科学机器学习&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 7 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;AK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：&lt;/p&gt;
-\[
-\boxed{\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}}
-\]&lt;p&gt;这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。&lt;/p&gt;
+\[\boxed{\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}}\]&lt;p&gt;这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-可靠性问题其实不是普通回归问题&#34;&gt;1. 可靠性问题其实不是普通回归问题
 &lt;/h2&gt;&lt;p&gt;设极限状态函数为：&lt;/p&gt;
-\[
-g(\mathbf x)
-\]&lt;p&gt;通常规定：&lt;/p&gt;
-\[
-g(\mathbf x)&gt;0 \quad \text{安全}
-\]\[
-g(\mathbf x)\le 0 \quad \text{失效}.
-\]&lt;p&gt;失效概率：&lt;/p&gt;
-\[
-P_f=P[g(\mathbf X)\le0].
-\]&lt;p&gt;如果直接用 Monte Carlo：&lt;/p&gt;
-&lt;h1 id=&#34;hat-p_f&#34;&gt;[
-\hat P_f
-&lt;/h1&gt;&lt;p&gt;\frac{1}{N}
-\sum_{i=1}^N
-I[g(\mathbf x_i)\le0].
-]&lt;/p&gt;
-&lt;p&gt;真正昂贵的是：&lt;/p&gt;
-\[
-g(\mathbf x_i)
-\]&lt;p&gt;可能意味着一次完整的 FEM、CFD 或多体动力学仿真。&lt;/p&gt;
+\[g(\mathbf x)\]&lt;p&gt;通常规定：&lt;/p&gt;
+\[g(\mathbf x)&gt;0 \quad \text{安全}\]\[g(\mathbf x)\le 0 \quad \text{失效}.\]&lt;p&gt;失效概率：&lt;/p&gt;
+\[P_f=P[g(\mathbf X)\le0].\]&lt;p&gt;如果直接用 Monte Carlo：&lt;/p&gt;
+\[\hat P_f = \frac{1}{N} \sum_{i=1}^N I[g(\mathbf x_i)\le0].\]&lt;p&gt;真正昂贵的是：&lt;/p&gt;
+\[g(\mathbf x_i)\]&lt;p&gt;可能意味着一次完整的 FEM、CFD 或多体动力学仿真。&lt;/p&gt;
 &lt;p&gt;假设：&lt;/p&gt;
-\[
-P_f=10^{-4},
-\]&lt;p&gt;为了稳定估计这个概率，通常需要大量样本。&lt;/p&gt;
+\[P_f=10^{-4},\]&lt;p&gt;为了稳定估计这个概率，通常需要大量样本。&lt;/p&gt;
 &lt;p&gt;问题随之出现：&lt;/p&gt;
-\[
-10^5\sim10^7
-\]&lt;p&gt;次高保真模型调用往往不可接受。&lt;/p&gt;
+\[10^5\sim10^7\]&lt;p&gt;次高保真模型调用往往不可接受。&lt;/p&gt;
 &lt;p&gt;于是自然想到：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;用 Kriging 代替真实模型。&lt;/p&gt;
@@ -61,30 +39,12 @@ P_f=10^{-4},
 &lt;hr&gt;
 &lt;h1 id=&#34;2-全局--高不代表可靠度准确&#34;&gt;2. 全局 \(R^2\) 高，不代表可靠度准确
 &lt;/h1&gt;&lt;p&gt;假设真实极限状态面是：&lt;/p&gt;
-\[
-g(x_1,x_2)=0.
-\]&lt;p&gt;你训练出一个 Kriging：&lt;/p&gt;
-\[
-\hat g(\mathbf x).
-\]&lt;p&gt;普通代理建模通常优化：&lt;/p&gt;
-&lt;h1 id=&#34;mathrmrmse&#34;&gt;[
-\mathrm{RMSE}
-&lt;/h1&gt;&lt;p&gt;\sqrt{
-\frac1N
-\sum_i
-(g_i-\hat g_i)^2
-}
-]&lt;/p&gt;
-&lt;p&gt;或者追求：&lt;/p&gt;
-\[
-R^2\rightarrow1.
-\]&lt;p&gt;但可靠性计算实际上只关心：&lt;/p&gt;
-\[
-\boxed{\operatorname{sign}g(\mathbf x)}
-\]&lt;p&gt;尤其是在：&lt;/p&gt;
-\[
-g(\mathbf x)\approx0
-\]&lt;p&gt;附近。&lt;/p&gt;
+\[g(x_1,x_2)=0.\]&lt;p&gt;你训练出一个 Kriging：&lt;/p&gt;
+\[\hat g(\mathbf x).\]&lt;p&gt;普通代理建模通常优化：&lt;/p&gt;
+\[\mathrm{RMSE} = \sqrt{ \frac1N \sum_i (g_i-\hat g_i)^2 }\]&lt;p&gt;或者追求：&lt;/p&gt;
+\[R^2\rightarrow1.\]&lt;p&gt;但可靠性计算实际上只关心：&lt;/p&gt;
+\[\boxed{\operatorname{sign}g(\mathbf x)}\]&lt;p&gt;尤其是在：&lt;/p&gt;
+\[g(\mathbf x)\approx0\]&lt;p&gt;附近。&lt;/p&gt;
 &lt;p&gt;举个极端例子。&lt;/p&gt;
 &lt;p&gt;两个区域：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -109,169 +69,70 @@ g(\mathbf x)\approx0
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;A 的误差：&lt;/p&gt;
-\[
-|100-90|=10
-\]&lt;p&gt;很大，但可靠性分类仍正确：&lt;/p&gt;
-\[
-100&gt;0,\qquad90&gt;0.
-\]&lt;p&gt;B 的误差：&lt;/p&gt;
-\[
-|0.02-(-0.01)|=0.03
-\]&lt;p&gt;非常小，但：&lt;/p&gt;
-\[
-+\rightarrow-
-\]&lt;p&gt;安全样本被直接判成失效。&lt;/p&gt;
+\[|100-90|=10\]&lt;p&gt;很大，但可靠性分类仍正确：&lt;/p&gt;
+\[100&gt;0,\qquad90&gt;0.\]&lt;p&gt;B 的误差：&lt;/p&gt;
+\[|0.02-(-0.01)|=0.03\]&lt;p&gt;非常小，但：&lt;/p&gt;
+\[+\rightarrow-\]&lt;p&gt;安全样本被直接判成失效。&lt;/p&gt;
 &lt;p&gt;对于 \(P_f\) 来说，第二个误差可能远比第一个严重。&lt;/p&gt;
 &lt;p&gt;因此可靠性问题真正对应的是：&lt;/p&gt;
-\[
-\boxed{\text{classification accuracy near }g=0}
-\]&lt;p&gt;而不是：&lt;/p&gt;
-\[
-\text{global regression accuracy}.
-\]&lt;p&gt;这就是 AK-MCS 的思想起点。&lt;/p&gt;
+\[\boxed{\text{classification accuracy near }g=0}\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\text{global regression accuracy}.\]&lt;p&gt;这就是 AK-MCS 的思想起点。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-kriging-恰好提供了主动学习需要的两个量&#34;&gt;3. Kriging 恰好提供了主动学习需要的两个量
 &lt;/h1&gt;&lt;p&gt;Kriging 对某个输入 \(\mathbf x\) 给出：&lt;/p&gt;
-\[
-G(\mathbf x)
-\sim
-\mathcal N
-\left(
-\mu(\mathbf x),
-\sigma^2(\mathbf x)
-\right).
-\]&lt;p&gt;其中：&lt;/p&gt;
-\[
-\mu(\mathbf x)
-\]&lt;p&gt;是预测均值，&lt;/p&gt;
-\[
-\sigma(\mathbf x)
-\]&lt;p&gt;是预测不确定性。&lt;/p&gt;
+\[G(\mathbf x) \sim \mathcal N \left( \mu(\mathbf x), \sigma^2(\mathbf x) \right).\]&lt;p&gt;其中：&lt;/p&gt;
+\[\mu(\mathbf x)\]&lt;p&gt;是预测均值，&lt;/p&gt;
+\[\sigma(\mathbf x)\]&lt;p&gt;是预测不确定性。&lt;/p&gt;
 &lt;p&gt;于是我们可以问：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;这个点被错误分类的可能性有多大？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;如果&lt;/p&gt;
-\[
-|\mu|\gg\sigma,
-\]&lt;p&gt;例如：&lt;/p&gt;
-\[
-\mu=10,\qquad\sigma=0.1,
-\]&lt;p&gt;那么几乎肯定：&lt;/p&gt;
-\[
-g&gt;0.
-\]&lt;p&gt;没有必要再花一次昂贵 FEM。&lt;/p&gt;
+\[|\mu|\gg\sigma,\]&lt;p&gt;例如：&lt;/p&gt;
+\[\mu=10,\qquad\sigma=0.1,\]&lt;p&gt;那么几乎肯定：&lt;/p&gt;
+\[g&gt;0.\]&lt;p&gt;没有必要再花一次昂贵 FEM。&lt;/p&gt;
 &lt;p&gt;反过来，如果：&lt;/p&gt;
-\[
-\mu=0.05,\qquad\sigma=0.1,
-\]&lt;p&gt;那么这个点到底属于：&lt;/p&gt;
-\[
-g&gt;0
-\]&lt;p&gt;还是&lt;/p&gt;
-\[
-g&lt;0
-\]&lt;p&gt;非常不确定。&lt;/p&gt;
+\[\mu=0.05,\qquad\sigma=0.1,\]&lt;p&gt;那么这个点到底属于：&lt;/p&gt;
+\[g&gt;0\]&lt;p&gt;还是&lt;/p&gt;
+\[g&lt;0\]&lt;p&gt;非常不确定。&lt;/p&gt;
 &lt;p&gt;于是 Echard 等提出非常简单的学习函数：&lt;/p&gt;
-&lt;h1 id=&#34;umathbf-x&#34;&gt;[
-\boxed{
-U(\mathbf x)
-&lt;/h1&gt;&lt;p&gt;\frac{|\mu(\mathbf x)|}
-{\sigma(\mathbf x)}
-}
-]&lt;/p&gt;
-&lt;p&gt;AK-MCS 每轮寻找：&lt;/p&gt;
-&lt;h1 id=&#34;mathbf-x&#34;&gt;[
-\mathbf x^*
-&lt;/h1&gt;&lt;p&gt;\arg\min U(\mathbf x).
-]&lt;/p&gt;
-&lt;p&gt;也就是优先计算：&lt;/p&gt;
-\[
-\boxed{
-\text{离失效面近}
-+
-\text{预测又不确定}
-}
-\]&lt;p&gt;的样本。&lt;/p&gt;
+\[\boxed{ U(\mathbf x) = \frac{|\mu(\mathbf x)|} {\sigma(\mathbf x)} }\]&lt;p&gt;AK-MCS 每轮寻找：&lt;/p&gt;
+\[\mathbf x^* = \arg\min U(\mathbf x).\]&lt;p&gt;也就是优先计算：&lt;/p&gt;
+\[\boxed{ \text{离失效面近} + \text{预测又不确定} }\]&lt;p&gt;的样本。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-为什么--函数这么聪明&#34;&gt;4. 为什么 \(U\) 函数这么聪明？
 &lt;/h1&gt;&lt;p&gt;这个式子看起来非常简单：&lt;/p&gt;
-\[
-U=\frac{|\mu|}{\sigma}.
-\]&lt;p&gt;但它同时编码了两个需求。&lt;/p&gt;
+\[U=\frac{|\mu|}{\sigma}.\]&lt;p&gt;但它同时编码了两个需求。&lt;/p&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[
-|\mu|\rightarrow0,
-\]&lt;p&gt;说明预测点靠近：&lt;/p&gt;
-\[
-g=0.
-\]&lt;p&gt;这是 &lt;strong&gt;exploitation&lt;/strong&gt;：&lt;/p&gt;
+\[|\mu|\rightarrow0,\]&lt;p&gt;说明预测点靠近：&lt;/p&gt;
+\[g=0.\]&lt;p&gt;这是 &lt;strong&gt;exploitation&lt;/strong&gt;：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;去研究我们已经认为可能存在失效边界的位置。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[
-\sigma\rightarrow\infty,
-\]&lt;p&gt;则：&lt;/p&gt;
-\[
-U\rightarrow0.
-\]&lt;p&gt;这是 &lt;strong&gt;exploration&lt;/strong&gt;：&lt;/p&gt;
+\[\sigma\rightarrow\infty,\]&lt;p&gt;则：&lt;/p&gt;
+\[U\rightarrow0.\]&lt;p&gt;这是 &lt;strong&gt;exploration&lt;/strong&gt;：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;去研究代理模型没有把握的位置。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;所以 U-learning 实际是在做：&lt;/p&gt;
-\[
-\boxed{
-\text{boundary exploitation}
-+
-\text{uncertainty exploration}
-}
-\]&lt;p&gt;这正是主动学习 acquisition function 的核心结构。&lt;/p&gt;
+\[\boxed{ \text{boundary exploitation} + \text{uncertainty exploration} }\]&lt;p&gt;这正是主动学习 acquisition function 的核心结构。&lt;/p&gt;
 &lt;p&gt;从机器学习视角看，它和 Bayesian optimization 中 EI、UCB 的思路非常接近。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-一个更深的解释-本质上是分类置信度&#34;&gt;5. 一个更深的解释：\(U\) 本质上是“分类置信度”
 &lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
-\[
-G(\mathbf x)
-\sim
-N(\mu,\sigma^2).
-\]&lt;p&gt;如果：&lt;/p&gt;
-\[
-\mu&gt;0,
-\]&lt;p&gt;代理模型认为该点安全。&lt;/p&gt;
+\[G(\mathbf x) \sim N(\mu,\sigma^2).\]&lt;p&gt;如果：&lt;/p&gt;
+\[\mu&gt;0,\]&lt;p&gt;代理模型认为该点安全。&lt;/p&gt;
 &lt;p&gt;但真正失效的概率为：&lt;/p&gt;
-&lt;h1 id=&#34;pgle0&#34;&gt;[
-P(G\le0)
-&lt;/h1&gt;&lt;p&gt;\Phi
-\left(
--\frac{\mu}{\sigma}
-\right).
-]&lt;/p&gt;
-&lt;p&gt;因此：&lt;/p&gt;
-&lt;h1 id=&#34;p_rm-misclass&#34;&gt;[
-P_{\rm misclass}
-&lt;/h1&gt;&lt;p&gt;\Phi(-U).
-]&lt;/p&gt;
-&lt;p&gt;所以：&lt;/p&gt;
-\[
-U=2
-\]&lt;p&gt;时：&lt;/p&gt;
-\[
-P_{\rm misclass}
-\approx2.3\%.
-\]&lt;p&gt;这解释了 AK-MCS 中经典的：&lt;/p&gt;
-\[
-U\ge2
-\]&lt;p&gt;停止思想。&lt;/p&gt;
+\[P(G\le0) = \Phi \left( -\frac{\mu}{\sigma} \right).\]&lt;p&gt;因此：&lt;/p&gt;
+\[P_{\rm misclass} = \Phi(-U).\]&lt;p&gt;所以：&lt;/p&gt;
+\[U=2\]&lt;p&gt;时：&lt;/p&gt;
+\[P_{\rm misclass} \approx2.3\%.\]&lt;p&gt;这解释了 AK-MCS 中经典的：&lt;/p&gt;
+\[U\ge2\]&lt;p&gt;停止思想。&lt;/p&gt;
 &lt;p&gt;当所有候选点都满足：&lt;/p&gt;
-\[
-U\ge2,
-\]&lt;p&gt;意味着每个候选样本的 Kriging 分类都有相对较高置信度。&lt;/p&gt;
+\[U\ge2,\]&lt;p&gt;意味着每个候选样本的 Kriging 分类都有相对较高置信度。&lt;/p&gt;
 &lt;p&gt;因此它优化的目标非常明确：&lt;/p&gt;
-\[
-\boxed{
-\text{让失效/安全分类足够可靠}
-}
-\]&lt;p&gt;而不是把整个响应面磨得越来越光滑。&lt;/p&gt;
+\[\boxed{ \text{让失效/安全分类足够可靠} }\]&lt;p&gt;而不是把整个响应面磨得越来越光滑。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-ak-mcs-实际如何运行&#34;&gt;6. AK-MCS 实际如何运行
 &lt;/h1&gt;&lt;p&gt;算法结构可以压缩成：&lt;/p&gt;
@@ -321,56 +182,19 @@ U\ge2,
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;这里有一个非常漂亮的计算分工：&lt;/p&gt;
 &lt;p&gt;真实模型负责：&lt;/p&gt;
-\[
-N_{\rm HF}\sim几十\text{到几百}
-\]&lt;p&gt;次昂贵计算。&lt;/p&gt;
+\[N_{\rm HF}\sim几十\text{到几百}\]&lt;p&gt;次昂贵计算。&lt;/p&gt;
 &lt;p&gt;而：&lt;/p&gt;
-\[
-10^5\sim10^7
-\]&lt;p&gt;个 Monte Carlo 点则交给极便宜的 Kriging。&lt;/p&gt;
+\[10^5\sim10^7\]&lt;p&gt;个 Monte Carlo 点则交给极便宜的 Kriging。&lt;/p&gt;
 &lt;p&gt;因此 AK-MCS 可以理解为：&lt;/p&gt;
-\[
-\boxed{
-\text{Kriging负责降低单次成本}
-+
-\text{Active Learning负责减少训练点}
-+
-\text{MCS负责概率积分}
-}
-\]&lt;p&gt;这三个模块实际上相互独立。后来的统一研究框架也把主动可靠性分析拆成四个模块：&lt;/p&gt;
-\[
-\boxed{
-\text{surrogate}
-+
-\text{reliability estimator}
-+
-\text{learning function}
-+
-\text{stopping criterion}
-}
-\]&lt;p&gt;这是一种很适合研究创新的模块化视角。&lt;/p&gt;
+\[\boxed{ \text{Kriging负责降低单次成本} + \text{Active Learning负责减少训练点} + \text{MCS负责概率积分} }\]&lt;p&gt;这三个模块实际上相互独立。后来的统一研究框架也把主动可靠性分析拆成四个模块：&lt;/p&gt;
+\[\boxed{ \text{surrogate} + \text{reliability estimator} + \text{learning function} + \text{stopping criterion} }\]&lt;p&gt;这是一种很适合研究创新的模块化视角。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;7-为什么这对有限元问题特别有效&#34;&gt;7. 为什么这对有限元问题特别有效？
 &lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
-\[
-x_1=\text{材料模量},
-\]\[
-x_2=\text{间隙},
-\]\[
-x_3=\text{载荷},
-\]&lt;p&gt;有限元输出最大应力：&lt;/p&gt;
-\[
-\sigma_{\max}(\mathbf x).
-\]&lt;p&gt;定义：&lt;/p&gt;
-&lt;h1 id=&#34;gmathbf-x&#34;&gt;[
-g(\mathbf x)
-&lt;/h1&gt;&lt;h2 id=&#34;sigma_rm-allow&#34;&gt;\sigma_{\rm allow}
-&lt;/h2&gt;&lt;p&gt;\sigma_{\max}(\mathbf x).
-]&lt;/p&gt;
-&lt;p&gt;普通 DoE 可能大量采样：&lt;/p&gt;
-\[
-g\gg0
-\]&lt;p&gt;的安全区域。&lt;/p&gt;
+\[x_1=\text{材料模量},\]\[x_2=\text{间隙},\]\[x_3=\text{载荷},\]&lt;p&gt;有限元输出最大应力：&lt;/p&gt;
+\[\sigma_{\max}(\mathbf x).\]&lt;p&gt;定义：&lt;/p&gt;
+\[g(\mathbf x) = \sigma_{\rm allow} - \sigma_{\max}(\mathbf x).\]&lt;p&gt;普通 DoE 可能大量采样：&lt;/p&gt;
+\[g\gg0\]&lt;p&gt;的安全区域。&lt;/p&gt;
 &lt;p&gt;例如：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -415,89 +239,44 @@ g\gg0
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;即极限状态面附近。&lt;/p&gt;
 &lt;p&gt;因此它实际上做的是：&lt;/p&gt;
-\[
-\boxed{
-\text{information allocation}
-}
-\]&lt;p&gt;而不仅仅是 surrogate fitting。&lt;/p&gt;
+\[\boxed{ \text{information allocation} }\]&lt;p&gt;而不仅仅是 surrogate fitting。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-这也是为什么缺一个变量后--暴跌需要谨慎解释&#34;&gt;8. 这也是为什么“缺一个变量后 \(R^2\) 暴跌”需要谨慎解释
 &lt;/h1&gt;&lt;p&gt;这里有一个非常重要的研究启发。&lt;/p&gt;
 &lt;p&gt;假设完整输入：&lt;/p&gt;
-\[
-g(x_1,x_2,x_3).
-\]&lt;p&gt;删除：&lt;/p&gt;
-\[
-x_3
-\]&lt;p&gt;以后，得到：&lt;/p&gt;
-\[
-\hat g(x_1,x_2).
-\]&lt;p&gt;如果 \(R^2\)：&lt;/p&gt;
-\[
-0.96\rightarrow0.4,
-\]&lt;p&gt;通常会马上得出：&lt;/p&gt;
+\[g(x_1,x_2,x_3).\]&lt;p&gt;删除：&lt;/p&gt;
+\[x_3\]&lt;p&gt;以后，得到：&lt;/p&gt;
+\[\hat g(x_1,x_2).\]&lt;p&gt;如果 \(R^2\)：&lt;/p&gt;
+\[0.96\rightarrow0.4,\]&lt;p&gt;通常会马上得出：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;模型坏了。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;但可靠性问题真正应该再问一步：&lt;/p&gt;
-\[
-\boxed{
-\operatorname{sign}(\hat g)
-\text{ 在 }g\approx0\text{ 区域还能不能保持正确？}
-}
-\]&lt;p&gt;可能出现两种完全不同的结果：&lt;/p&gt;
+\[\boxed{ \operatorname{sign}(\hat g) \text{ 在 }g\approx0\text{ 区域还能不能保持正确？} }\]&lt;p&gt;可能出现两种完全不同的结果：&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;情况 A&lt;/strong&gt;&lt;/p&gt;
-\[
-R^2=0.4
-\]&lt;p&gt;但 limit-state classification 很准确。&lt;/p&gt;
+\[R^2=0.4\]&lt;p&gt;但 limit-state classification 很准确。&lt;/p&gt;
 &lt;p&gt;则：&lt;/p&gt;
-\[
-P_f
-\]&lt;p&gt;仍可能很好。&lt;/p&gt;
+\[P_f\]&lt;p&gt;仍可能很好。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;情况 B&lt;/strong&gt;&lt;/p&gt;
-\[
-R^2=0.95
-\]&lt;p&gt;但少数失效边界点发生错判。&lt;/p&gt;
+\[R^2=0.95\]&lt;p&gt;但少数失效边界点发生错判。&lt;/p&gt;
 &lt;p&gt;则：&lt;/p&gt;
-\[
-P_f
-\]&lt;p&gt;可能严重偏差。&lt;/p&gt;
+\[P_f\]&lt;p&gt;可能严重偏差。&lt;/p&gt;
 &lt;p&gt;因此对于可靠性代理模型，更适合关注：&lt;/p&gt;
-\[
-P_{\rm misclass},
-\]\[
-\text{limit-state error},
-\]\[
-|\Delta P_f|,
-\]&lt;p&gt;而不能只看：&lt;/p&gt;
-\[
-R^2,\quad RMSE.
-\]&lt;p&gt;这正是 AK-MCS 给出的评价范式转变。&lt;/p&gt;
+\[P_{\rm misclass},\]\[\text{limit-state error},\]\[|\Delta P_f|,\]&lt;p&gt;而不能只看：&lt;/p&gt;
+\[R^2,\quad RMSE.\]&lt;p&gt;这正是 AK-MCS 给出的评价范式转变。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-ak-mcs-的局限在哪里&#34;&gt;9. AK-MCS 的局限在哪里？
 &lt;/h1&gt;&lt;p&gt;AK-MCS 并非万能。&lt;/p&gt;
 &lt;p&gt;最明显的问题是：&lt;/p&gt;
 &lt;h3 id=&#34;高维&#34;&gt;高维
 &lt;/h3&gt;&lt;p&gt;随着维数增加：&lt;/p&gt;
-\[
-d\uparrow
-\]&lt;p&gt;Gaussian Process 本身训练和候选集搜索都会越来越困难。&lt;/p&gt;
+\[d\uparrow\]&lt;p&gt;Gaussian Process 本身训练和候选集搜索都会越来越困难。&lt;/p&gt;
 &lt;h3 id=&#34;极小失效概率&#34;&gt;极小失效概率
 &lt;/h3&gt;&lt;p&gt;如果：&lt;/p&gt;
-\[
-P_f\sim10^{-8},
-\]&lt;p&gt;crude Monte Carlo 候选池本身就会非常低效。&lt;/p&gt;
+\[P_f\sim10^{-8},\]&lt;p&gt;crude Monte Carlo 候选池本身就会非常低效。&lt;/p&gt;
 &lt;p&gt;因此常见改进是：&lt;/p&gt;
-\[
-\text{AK}
-+
-\text{Importance Sampling},
-\]&lt;p&gt;或者：&lt;/p&gt;
-\[
-\text{AK}
-+
-\text{Subset Simulation}.
-\]&lt;p&gt;Echard 等随后就在 2012 年发展了结合 importance sampling 与 Kriging 的方法，用于更小失效概率。&lt;/p&gt;
+\[\text{AK} + \text{Importance Sampling},\]&lt;p&gt;或者：&lt;/p&gt;
+\[\text{AK} + \text{Subset Simulation}.\]&lt;p&gt;Echard 等随后就在 2012 年发展了结合 importance sampling 与 Kriging 的方法，用于更小失效概率。&lt;/p&gt;
 &lt;h3 id=&#34;多个失效区域&#34;&gt;多个失效区域
 &lt;/h3&gt;&lt;p&gt;如果存在多个相互分离的 failure islands：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -529,43 +308,24 @@ P_f\sim10^{-8},
 &lt;hr&gt;
 &lt;h1 id=&#34;10-一个很新的方向给-ak-mcs-加统计认证&#34;&gt;10. 一个很新的方向：给 AK-MCS 加“统计认证”
 &lt;/h1&gt;&lt;p&gt;经典 AK-MCS 中：&lt;/p&gt;
-\[
-\sigma_{\rm GP}
-\]&lt;p&gt;来自 Gaussian Process 自身的概率模型。&lt;/p&gt;
+\[\sigma_{\rm GP}\]&lt;p&gt;来自 Gaussian Process 自身的概率模型。&lt;/p&gt;
 &lt;p&gt;问题是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;如果 GP 模型假设本身错了呢？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;2026 年 6 月出现的一项工作提出 &lt;strong&gt;AK-MCS-C2&lt;/strong&gt;，把 conformal prediction 与 AK-MCS 结合，希望给 surrogate classification error 提供更弱分布假设下的统计保证，尤其针对小样本和 rare-event reliability。这个方向目前仍比较新，适合作为“代理模型不确定性如何真正进入可靠度可信度”的研究入口。&lt;/p&gt;
 &lt;p&gt;这背后实际上对应一个越来越重要的问题：&lt;/p&gt;
-\[
-\boxed{
-\text{我们不仅要估计 }P_f，
-\text{还要知道这个 }P_f\text{ 有多可信。}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{我们不仅要估计 }P_f， \text{还要知道这个 }P_f\text{ 有多可信。} }\]&lt;hr&gt;
 &lt;h1 id=&#34;今天最值得留下的一点&#34;&gt;今天最值得留下的一点
 &lt;/h1&gt;&lt;p&gt;AK-MCS 最深刻的地方可以浓缩成一句：&lt;/p&gt;
-\[
-\boxed{
-\text{采样策略应当服务于最终任务，而不是服务于代理模型本身。}
-}
-\]&lt;p&gt;如果任务是预测温度场：&lt;/p&gt;
-\[
-\text{global RMSE}
-\]&lt;p&gt;可能很重要。&lt;/p&gt;
+\[\boxed{ \text{采样策略应当服务于最终任务，而不是服务于代理模型本身。} }\]&lt;p&gt;如果任务是预测温度场：&lt;/p&gt;
+\[\text{global RMSE}\]&lt;p&gt;可能很重要。&lt;/p&gt;
 &lt;p&gt;如果任务是优化：&lt;/p&gt;
-\[
-\text{optimum neighborhood}
-\]&lt;p&gt;更重要。&lt;/p&gt;
+\[\text{optimum neighborhood}\]&lt;p&gt;更重要。&lt;/p&gt;
 &lt;p&gt;如果任务是可靠性：&lt;/p&gt;
-\[
-\boxed{\text{limit-state surface}}
-\]&lt;p&gt;才是信息最有价值的位置。&lt;/p&gt;
+\[\boxed{\text{limit-state surface}}\]&lt;p&gt;才是信息最有价值的位置。&lt;/p&gt;
 &lt;p&gt;因此在做任何代理模型之前，一个比“选什么核函数”更重要的问题是：&lt;/p&gt;
-\[
-\boxed{\text{我真正需要这个 surrogate 判断什么？}}
-\]&lt;hr&gt;
+\[\boxed{\text{我真正需要这个 surrogate 判断什么？}}\]&lt;hr&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;p&gt;原始方法首选 Echard, Gayton &amp;amp; Lemaire, &lt;em&gt;AK-MCS: An active learning reliability method combining Kriging and Monte Carlo Simulation&lt;/em&gt;, &lt;strong&gt;Structural Safety, 2011&lt;/strong&gt;。这是整个方法族最值得先读的一篇。&lt;/p&gt;
 &lt;p&gt;想建立完整知识地图，推荐 Moustapha, Marelli &amp;amp; Sudret, &lt;em&gt;Active learning for structural reliability: Survey, general framework and benchmark&lt;/em&gt;。作者把大量方法统一拆成 surrogate、reliability estimator、learning function 和 stopping criterion，并进行了大规模 benchmark。&lt;/p&gt;
@@ -584,12 +344,8 @@ P_f\sim10^{-8},
 &lt;strong&gt;领域：有限元 × 可靠性 × 不确定性量化 × 代理模型&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;这期选 MFMC，是因为它提供了一种和 AK-MCS 很不同的代理模型使用方式：&lt;/p&gt;
-\[
-\boxed{\text{低保真模型不负责给最终答案，只负责让高保真统计估计更省样本}}
-\]&lt;p&gt;这点很重要。很多代理模型研究都在追求：&lt;/p&gt;
-\[
-\hat f(x)\approx f_{\rm HF}(x)
-\]&lt;p&gt;然后直接用 \(\hat f\) 替代真实模型。但一旦 surrogate 有系统偏差，最终概率、均值或尾部统计量也会被带偏。&lt;/p&gt;
+\[\boxed{\text{低保真模型不负责给最终答案，只负责让高保真统计估计更省样本}}\]&lt;p&gt;这点很重要。很多代理模型研究都在追求：&lt;/p&gt;
+\[\hat f(x)\approx f_{\rm HF}(x)\]&lt;p&gt;然后直接用 \(\hat f\) 替代真实模型。但一旦 surrogate 有系统偏差，最终概率、均值或尾部统计量也会被带偏。&lt;/p&gt;
 &lt;p&gt;MFMC 的思路更保守：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;始终让高保真模型留在估计器里，用低保真模型作为 control variate 降低方差。&lt;/strong&gt;&lt;/p&gt;
@@ -598,31 +354,13 @@ P_f\sim10^{-8},
 &lt;hr&gt;
 &lt;h2 id=&#34;1-问题从哪里来&#34;&gt;1. 问题从哪里来？
 &lt;/h2&gt;&lt;p&gt;设真正关心的高保真模型为：&lt;/p&gt;
-\[
-f_0(X),
-\]&lt;p&gt;例如一次高精度非线性 FEM 输出的最大应力。&lt;/p&gt;
+\[f_0(X),\]&lt;p&gt;例如一次高精度非线性 FEM 输出的最大应力。&lt;/p&gt;
 &lt;p&gt;我们想估计：&lt;/p&gt;
-\[
-\mu_0=E[f_0(X)].
-\]&lt;p&gt;普通 Monte Carlo：&lt;/p&gt;
-&lt;h1 id=&#34;hatmu_rm-mc&#34;&gt;[
-\hat\mu_{\rm MC}
-&lt;/h1&gt;&lt;p&gt;\frac1N\sum_{i=1}^N f_0(X_i),
-]&lt;/p&gt;
-&lt;p&gt;其方差为：&lt;/p&gt;
-&lt;h1 id=&#34;mathrmvarhatmu_rm-mc&#34;&gt;[
-\mathrm{Var}(\hat\mu_{\rm MC})
-&lt;/h1&gt;&lt;p&gt;\frac{\sigma_0^2}{N}.
-]&lt;/p&gt;
-&lt;p&gt;问题非常直接：&lt;/p&gt;
-\[
-N\uparrow
-\Rightarrow
-\text{误差下降}
-\]&lt;p&gt;但如果一次高保真 FEM 要 10 分钟：&lt;/p&gt;
-\[
-10^5
-\]&lt;p&gt;次样本就完全不可接受。&lt;/p&gt;
+\[\mu_0=E[f_0(X)].\]&lt;p&gt;普通 Monte Carlo：&lt;/p&gt;
+\[\hat\mu_{\rm MC} = \frac1N\sum_{i=1}^N f_0(X_i),\]&lt;p&gt;其方差为：&lt;/p&gt;
+\[\mathrm{Var}(\hat\mu_{\rm MC}) = \frac{\sigma_0^2}{N}.\]&lt;p&gt;问题非常直接：&lt;/p&gt;
+\[N\uparrow \Rightarrow \text{误差下降}\]&lt;p&gt;但如果一次高保真 FEM 要 10 分钟：&lt;/p&gt;
+\[10^5\]&lt;p&gt;次样本就完全不可接受。&lt;/p&gt;
 &lt;p&gt;另一方面，我们往往已经有很多“没那么准，但便宜”的东西：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;粗网格 FEM；&lt;/li&gt;
@@ -634,104 +372,39 @@ N\uparrow
 &lt;li&gt;经验公式。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;MFMC 的核心问题于是变成：&lt;/p&gt;
-\[
-\boxed{\text{怎样把这些“不完全可信”的模型安全地利用起来？}}
-\]&lt;hr&gt;
+\[\boxed{\text{怎样把这些“不完全可信”的模型安全地利用起来？}}\]&lt;hr&gt;
 &lt;h1 id=&#34;2-control-variate-是整个方法的核心&#34;&gt;2. Control Variate 是整个方法的核心
 &lt;/h1&gt;&lt;p&gt;先只考虑一个低保真模型：&lt;/p&gt;
-\[
-f_1(X).
-\]&lt;p&gt;如果它与高保真模型高度相关：&lt;/p&gt;
-\[
-\rho=\mathrm{Corr}(f_0,f_1),
-\]&lt;p&gt;那么可以构造：&lt;/p&gt;
-&lt;h1 id=&#34;y&#34;&gt;[
-Y
-&lt;/h1&gt;&lt;h2 id=&#34;f_0&#34;&gt;f_0
-&lt;/h2&gt;&lt;p&gt;\alpha
-\left(
-f_1-E[f_1]
-\right).
-]&lt;/p&gt;
-&lt;p&gt;因为：&lt;/p&gt;
-\[
-E[f_1-E[f_1]]=0,
-\]&lt;p&gt;所以：&lt;/p&gt;
-\[
-E[Y]=E[f_0].
-\]&lt;p&gt;即：&lt;/p&gt;
-\[
-\boxed{\text{低保真模型不会改变目标均值}}
-\]&lt;p&gt;但它可以改变方差。&lt;/p&gt;
+\[f_1(X).\]&lt;p&gt;如果它与高保真模型高度相关：&lt;/p&gt;
+\[\rho=\mathrm{Corr}(f_0,f_1),\]&lt;p&gt;那么可以构造：&lt;/p&gt;
+\[Y = f_0 - \alpha \left( f_1-E[f_1] \right).\]&lt;p&gt;因为：&lt;/p&gt;
+\[E[f_1-E[f_1]]=0,\]&lt;p&gt;所以：&lt;/p&gt;
+\[E[Y]=E[f_0].\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{\text{低保真模型不会改变目标均值}}\]&lt;p&gt;但它可以改变方差。&lt;/p&gt;
 &lt;p&gt;最优：&lt;/p&gt;
-&lt;h1 id=&#34;alpha&#34;&gt;[
-\alpha^*
-&lt;/h1&gt;&lt;p&gt;\frac{\mathrm{Cov}(f_0,f_1)}
-{\mathrm{Var}(f_1)}
-]&lt;/p&gt;
-&lt;p&gt;时：&lt;/p&gt;
-&lt;h1 id=&#34;mathrmvary&#34;&gt;[
-\mathrm{Var}(Y)
-&lt;/h1&gt;&lt;p&gt;\sigma_0^2(1-\rho^2).
-]&lt;/p&gt;
-&lt;p&gt;这个公式非常值得记住：&lt;/p&gt;
-\[
-\boxed{
-\text{variance reduction}
-\sim
-1-\rho^2
-}
-\]&lt;p&gt;如果：&lt;/p&gt;
-\[
-\rho=0.99,
-\]&lt;p&gt;那么：&lt;/p&gt;
-\[
-1-\rho^2\approx0.02.
-\]&lt;p&gt;即使低保真模型绝对误差并不小，只要它能&lt;strong&gt;跟随高保真模型的涨落趋势&lt;/strong&gt;，就可能非常有价值。&lt;/p&gt;
+\[\alpha^* = \frac{\mathrm{Cov}(f_0,f_1)} {\mathrm{Var}(f_1)}\]&lt;p&gt;时：&lt;/p&gt;
+\[\mathrm{Var}(Y) = \sigma_0^2(1-\rho^2).\]&lt;p&gt;这个公式非常值得记住：&lt;/p&gt;
+\[\boxed{ \text{variance reduction} \sim 1-\rho^2 }\]&lt;p&gt;如果：&lt;/p&gt;
+\[\rho=0.99,\]&lt;p&gt;那么：&lt;/p&gt;
+\[1-\rho^2\approx0.02.\]&lt;p&gt;即使低保真模型绝对误差并不小，只要它能&lt;strong&gt;跟随高保真模型的涨落趋势&lt;/strong&gt;，就可能非常有价值。&lt;/p&gt;
 &lt;p&gt;这和传统 surrogate evaluation 有明显区别。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-一个反直觉结论低保真模型可以很不准但仍然非常有用&#34;&gt;3. 一个反直觉结论：低保真模型可以“很不准”，但仍然非常有用
 &lt;/h1&gt;&lt;p&gt;假设真实 FEM 输出：&lt;/p&gt;
-\[
-f_0(X)=100+10X.
-\]&lt;p&gt;粗糙模型：&lt;/p&gt;
-\[
-f_1(X)=60+8X.
-\]&lt;p&gt;它存在巨大 bias：&lt;/p&gt;
-\[
-f_1-f_0\approx-40.
-\]&lt;p&gt;如果直接把它当 surrogate：&lt;/p&gt;
-\[
-E[f_1]
-\]&lt;p&gt;显然不能替代：&lt;/p&gt;
-\[
-E[f_0].
-\]&lt;p&gt;但二者几乎完全线性相关：&lt;/p&gt;
-\[
-\rho\approx1.
-\]&lt;p&gt;于是作为 control variate，它非常优秀。&lt;/p&gt;
+\[f_0(X)=100+10X.\]&lt;p&gt;粗糙模型：&lt;/p&gt;
+\[f_1(X)=60+8X.\]&lt;p&gt;它存在巨大 bias：&lt;/p&gt;
+\[f_1-f_0\approx-40.\]&lt;p&gt;如果直接把它当 surrogate：&lt;/p&gt;
+\[E[f_1]\]&lt;p&gt;显然不能替代：&lt;/p&gt;
+\[E[f_0].\]&lt;p&gt;但二者几乎完全线性相关：&lt;/p&gt;
+\[\rho\approx1.\]&lt;p&gt;于是作为 control variate，它非常优秀。&lt;/p&gt;
 &lt;p&gt;这说明：&lt;/p&gt;
-\[
-\boxed{
-\text{surrogate accuracy}
-\neq
-\text{variance-reduction value}
-}
-\]&lt;p&gt;对于 MFMC，更重要的问题不是：&lt;/p&gt;
-\[
-R^2 \text{ 是否接近 1？}
-\]&lt;p&gt;而是：&lt;/p&gt;
-\[
-\boxed{
-\text{相关性有多高，以及一次低保真调用有多便宜？}
-}
-\]&lt;p&gt;这是一种非常值得迁移的模型评价方式。&lt;/p&gt;
+\[\boxed{ \text{surrogate accuracy} \neq \text{variance-reduction value} }\]&lt;p&gt;对于 MFMC，更重要的问题不是：&lt;/p&gt;
+\[R^2 \text{ 是否接近 1？}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \text{相关性有多高，以及一次低保真调用有多便宜？} }\]&lt;p&gt;这是一种非常值得迁移的模型评价方式。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-真正的-mfmc不知道低保真均值怎么办&#34;&gt;4. 真正的 MFMC：不知道低保真均值怎么办？
 &lt;/h1&gt;&lt;p&gt;经典 control variate 假设：&lt;/p&gt;
-\[
-E[f_1]
-\]&lt;p&gt;已知。&lt;/p&gt;
+\[E[f_1]\]&lt;p&gt;已知。&lt;/p&gt;
 &lt;p&gt;现实中通常不知道。&lt;/p&gt;
 &lt;p&gt;MFMC 的做法是：&lt;/p&gt;
 &lt;ul&gt;
@@ -740,34 +413,13 @@ E[f_1]
 &lt;li&gt;用更多低保真样本把它自己的均值估得非常准。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;对于多个低保真模型：&lt;/p&gt;
-\[
-f_1,\dots,f_k,
-\]&lt;p&gt;经典 MFMC 估计器可以写成：&lt;/p&gt;
-&lt;h1 id=&#34;hatmu_rm-mf&#34;&gt;[
-\hat\mu_{\rm MF}
-&lt;/h1&gt;&lt;h2 id=&#34;hatmu_im_i&#34;&gt;\hat\mu_0^{(m_0)}
-+
-\sum_{i=1}^{k}
-\alpha_i
-\left(
-\hat\mu_i^{(m_i)}
-&lt;/h2&gt;&lt;p&gt;\hat\mu_i^{(m_{i-1})}
-\right),
-]&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
-\[
-m_0\le m_1\le\cdots\le m_k.
-\]&lt;p&gt;高保真只计算：&lt;/p&gt;
-\[
-m_0
-\]&lt;p&gt;次，最便宜的低保真可能计算：&lt;/p&gt;
-\[
-m_k\gg m_0
-\]&lt;p&gt;次。&lt;/p&gt;
+\[f_1,\dots,f_k,\]&lt;p&gt;经典 MFMC 估计器可以写成：&lt;/p&gt;
+\[\hat\mu_{\rm MF} = \hat\mu_0^{(m_0)} + \sum_{i=1}^{k} \alpha_i \left( \hat\mu_i^{(m_i)} - \hat\mu_i^{(m_{i-1})} \right),\]&lt;p&gt;其中：&lt;/p&gt;
+\[m_0\le m_1\le\cdots\le m_k.\]&lt;p&gt;高保真只计算：&lt;/p&gt;
+\[m_0\]&lt;p&gt;次，最便宜的低保真可能计算：&lt;/p&gt;
+\[m_k\gg m_0\]&lt;p&gt;次。&lt;/p&gt;
 &lt;p&gt;这个估计器的关键性质是：&lt;/p&gt;
-\[
-\boxed{E[\hat\mu_{\rm MF}]=E[f_0]}
-\]&lt;p&gt;即低保真模型即使没有误差界，也不必承担最终 bias。&lt;/p&gt;
+\[\boxed{E[\hat\mu_{\rm MF}]=E[f_0]}\]&lt;p&gt;即低保真模型即使没有误差界，也不必承担最终 bias。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-mfmc-真正精彩的地方模型价值可以量化&#34;&gt;5. MFMC 真正精彩的地方：模型价值可以量化
 &lt;/h1&gt;&lt;p&gt;假设第 \(i\) 个模型：&lt;/p&gt;
@@ -776,137 +428,50 @@ m_k\gg m_0
 &lt;li&gt;与高保真相关系数：\(\rho_i\)&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;那么模型管理问题本质是：&lt;/p&gt;
-\[
-\min_{m_0,\ldots,m_k}
-\mathrm{Var}(\hat\mu_{\rm MF})
-\]&lt;p&gt;subject to：&lt;/p&gt;
-\[
-\sum_i c_i m_i\le B.
-\]&lt;p&gt;也就是说：&lt;/p&gt;
-\[
-\boxed{
-\text{不是“哪个 surrogate 最准”，而是“每一美元计算预算买到多少方差下降”}
-}
-\]&lt;p&gt;2016 年经典工作正是围绕这个 optimal model management 问题展开，并给出了满足一定条件时的解析最优分配。数值实验中使用的低保真来源并不限于单一类型，而包括 reduced model、data-fit model、support vector machine 等。&lt;/p&gt;
+\[\min_{m_0,\ldots,m_k} \mathrm{Var}(\hat\mu_{\rm MF})\]&lt;p&gt;subject to：&lt;/p&gt;
+\[\sum_i c_i m_i\le B.\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \text{不是“哪个 surrogate 最准”，而是“每一美元计算预算买到多少方差下降”} }\]&lt;p&gt;2016 年经典工作正是围绕这个 optimal model management 问题展开，并给出了满足一定条件时的解析最优分配。数值实验中使用的低保真来源并不限于单一类型，而包括 reduced model、data-fit model、support vector machine 等。&lt;/p&gt;
 &lt;p&gt;这对工程项目非常现实。&lt;/p&gt;
 &lt;p&gt;你可能同时拥有：&lt;/p&gt;
-\[
-\begin{aligned}
-f_0 &amp;: \text{刚柔耦合高精度模型},\\
-f_1 &amp;: \text{粗网格柔性模型},\\
-f_2 &amp;: \text{刚体 Adams 模型},\\
-f_3 &amp;: \text{Kriging},\\
-f_4 &amp;: \text{经验公式}.
-\end{aligned}
-\]&lt;p&gt;MFMC 不要求它们形成严格的“物理精度等级”。&lt;/p&gt;
+\[\begin{aligned} f_0 &amp;: \text{刚柔耦合高精度模型},\\ f_1 &amp;: \text{粗网格柔性模型},\\ f_2 &amp;: \text{刚体 Adams 模型},\\ f_3 &amp;: \text{Kriging},\\ f_4 &amp;: \text{经验公式}. \end{aligned}\]&lt;p&gt;MFMC 不要求它们形成严格的“物理精度等级”。&lt;/p&gt;
 &lt;p&gt;它只关心：&lt;/p&gt;
-\[
-\boxed{成本 + 相关性}
-\]&lt;p&gt;因此一个便宜但“物理上很粗”的模型，有时会比一个昂贵但略微更准确的模型更有价值。&lt;/p&gt;
+\[\boxed{成本 + 相关性}\]&lt;p&gt;因此一个便宜但“物理上很粗”的模型，有时会比一个昂贵但略微更准确的模型更有价值。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-它和-multilevel-monte-carlomlmc有什么区别&#34;&gt;6. 它和 Multilevel Monte Carlo（MLMC）有什么区别？
 &lt;/h1&gt;&lt;p&gt;两者名字很像，但逻辑不同。&lt;/p&gt;
 &lt;p&gt;MLMC 通常依赖一个自然层级：&lt;/p&gt;
-\[
-h_0&gt;h_1&gt;\cdots&gt;h_L,
-\]&lt;p&gt;例如：&lt;/p&gt;
-\[
-\text{粗网格}
-\rightarrow
-\text{中网格}
-\rightarrow
-\text{细网格}.
-\]&lt;p&gt;利用 telescoping identity：&lt;/p&gt;
-&lt;h1 id=&#34;ef_l&#34;&gt;[
-E[f_L]
-&lt;/h1&gt;&lt;p&gt;E[f_0]
-+
-\sum_{\ell=1}^{L}
-E[f_\ell-f_{\ell-1}].
-]&lt;/p&gt;
-&lt;p&gt;它非常适合具有明确 discretization hierarchy 的 PDE/FEM。&lt;/p&gt;
+\[h_0&gt;h_1&gt;\cdots&gt;h_L,\]&lt;p&gt;例如：&lt;/p&gt;
+\[\text{粗网格} \rightarrow \text{中网格} \rightarrow \text{细网格}.\]&lt;p&gt;利用 telescoping identity：&lt;/p&gt;
+\[E[f_L] = E[f_0] + \sum_{\ell=1}^{L} E[f_\ell-f_{\ell-1}].\]&lt;p&gt;它非常适合具有明确 discretization hierarchy 的 PDE/FEM。&lt;/p&gt;
 &lt;p&gt;MFMC 更一般：&lt;/p&gt;
-\[
-\boxed{
-\text{模型之间不要求存在严格网格层级}
-}
-\]&lt;p&gt;你完全可以组合：&lt;/p&gt;
-\[
-\text{FEM}
-+
-\text{ROM}
-+
-\text{Kriging}
-+
-\text{神经网络}.
-\]&lt;p&gt;这正是 multifidelity survey 强调的区别之一：一般的 multifidelity 模型集合未必具有明确误差衰减率和层级结构。&lt;/p&gt;
+\[\boxed{ \text{模型之间不要求存在严格网格层级} }\]&lt;p&gt;你完全可以组合：&lt;/p&gt;
+\[\text{FEM} + \text{ROM} + \text{Kriging} + \text{神经网络}.\]&lt;p&gt;这正是 multifidelity survey 强调的区别之一：一般的 multifidelity 模型集合未必具有明确误差衰减率和层级结构。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;7-为什么它对可靠性问题尤其有意思&#34;&gt;7. 为什么它对可靠性问题尤其有意思？
 &lt;/h1&gt;&lt;p&gt;失效概率本身也是一个期望：&lt;/p&gt;
-&lt;h1 id=&#34;p_f&#34;&gt;[
-P_f
-&lt;/h1&gt;&lt;p&gt;E[I(g(X)\le0)].
-]&lt;/p&gt;
-&lt;p&gt;定义：&lt;/p&gt;
-&lt;h1 id=&#34;y_0&#34;&gt;[
-Y_0
-&lt;/h1&gt;&lt;p&gt;I(g_{\rm HF}(X)\le0).
-]&lt;/p&gt;
-&lt;p&gt;低保真模型也可以形成：&lt;/p&gt;
-&lt;h1 id=&#34;y_1&#34;&gt;[
-Y_1
-&lt;/h1&gt;&lt;p&gt;I(g_{\rm LF}(X)\le0).
-]&lt;/p&gt;
-&lt;p&gt;于是原则上可以把：&lt;/p&gt;
-\[
-Y_1
-\]&lt;p&gt;作为 control variate。&lt;/p&gt;
+\[P_f = E[I(g(X)\le0)].\]&lt;p&gt;定义：&lt;/p&gt;
+\[Y_0 = I(g_{\rm HF}(X)\le0).\]&lt;p&gt;低保真模型也可以形成：&lt;/p&gt;
+\[Y_1 = I(g_{\rm LF}(X)\le0).\]&lt;p&gt;于是原则上可以把：&lt;/p&gt;
+\[Y_1\]&lt;p&gt;作为 control variate。&lt;/p&gt;
 &lt;p&gt;但这里有一个陷阱。&lt;/p&gt;
 &lt;p&gt;对于 rare event：&lt;/p&gt;
-\[
-P_f\ll1,
-\]&lt;p&gt;indicator 大多数时候都是：&lt;/p&gt;
-\[
-0.
-\]&lt;p&gt;此时相关性结构会变得比普通均值估计困难，而且 crude Monte Carlo 本身已经低效。&lt;/p&gt;
+\[P_f\ll1,\]&lt;p&gt;indicator 大多数时候都是：&lt;/p&gt;
+\[0.\]&lt;p&gt;此时相关性结构会变得比普通均值估计困难，而且 crude Monte Carlo 本身已经低效。&lt;/p&gt;
 &lt;p&gt;因此可靠性领域往往进一步组合：&lt;/p&gt;
-\[
-\boxed{
-\text{multifidelity}
-+
-\text{importance sampling}
-}
-\]&lt;p&gt;Peherstorfer 等人在 2016 年也专门发展了 multifidelity importance sampling；后续工作仍在研究 control variates 与 importance sampling 的组合。&lt;/p&gt;
+\[\boxed{ \text{multifidelity} + \text{importance sampling} }\]&lt;p&gt;Peherstorfer 等人在 2016 年也专门发展了 multifidelity importance sampling；后续工作仍在研究 control variates 与 importance sampling 的组合。&lt;/p&gt;
 &lt;p&gt;所以 MFMC 对：&lt;/p&gt;
-\[
-E[Y],\quad \mathrm{Var}(Y)
-\]&lt;p&gt;非常自然；&lt;/p&gt;
+\[E[Y],\quad \mathrm{Var}(Y)\]&lt;p&gt;非常自然；&lt;/p&gt;
 &lt;p&gt;对极小：&lt;/p&gt;
-\[
-P_f
-\]&lt;p&gt;通常还需要 rare-event sampling 技术配合。&lt;/p&gt;
+\[P_f\]&lt;p&gt;通常还需要 rare-event sampling 技术配合。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-它给代理模型研究一个很重要的评价范式&#34;&gt;8. 它给代理模型研究一个很重要的评价范式
 &lt;/h1&gt;&lt;p&gt;很多 surrogate 工作默认评价：&lt;/p&gt;
-\[
-R^2,\ RMSE,\ MAE.
-\]&lt;p&gt;MFMC 会提出另一个问题：&lt;/p&gt;
-\[
-\boxed{
-\mathrm{Corr}(f_{\rm HF},f_{\rm LF})
-}
-\]&lt;p&gt;以及：&lt;/p&gt;
-\[
-\boxed{
-\frac{\text{variance reduction}}
-{\text{computational cost}}
-}
-\]&lt;p&gt;可能才是最终任务真正需要的指标。&lt;/p&gt;
+\[R^2,\ RMSE,\ MAE.\]&lt;p&gt;MFMC 会提出另一个问题：&lt;/p&gt;
+\[\boxed{ \mathrm{Corr}(f_{\rm HF},f_{\rm LF}) }\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{ \frac{\text{variance reduction}} {\text{computational cost}} }\]&lt;p&gt;可能才是最终任务真正需要的指标。&lt;/p&gt;
 &lt;p&gt;这意味着：&lt;/p&gt;
 &lt;p&gt;一个代理模型即使：&lt;/p&gt;
-\[
-R^2=0.8,
-\]&lt;p&gt;只要：&lt;/p&gt;
+\[R^2=0.8,\]&lt;p&gt;只要：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;非常便宜；&lt;/li&gt;
 &lt;li&gt;与 HF 强相关；&lt;/li&gt;
@@ -914,38 +479,18 @@ R^2=0.8,
 &lt;/ul&gt;
 &lt;p&gt;它仍然可能具有巨大统计价值。&lt;/p&gt;
 &lt;p&gt;反过来，一个：&lt;/p&gt;
-\[
-R^2=0.98
-\]&lt;p&gt;但推理成本较高的复杂 surrogate，在 MFMC 框架里未必值得加入。&lt;/p&gt;
+\[R^2=0.98\]&lt;p&gt;但推理成本较高的复杂 surrogate，在 MFMC 框架里未必值得加入。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-一个更现代的发展approximate-control-variates&#34;&gt;9. 一个更现代的发展：Approximate Control Variates
 &lt;/h1&gt;&lt;p&gt;经典 MFMC 的 recursive sampling 结构并不是理论极限。&lt;/p&gt;
 &lt;p&gt;Gorodetsky、Geraci、Eldred 和 Jakeman 后来提出 generalized &lt;strong&gt;Approximate Control Variate（ACV）&lt;/strong&gt; 框架，并证明某些经典递归多模型策略的最大方差降低能力实际上受到限制；通过新的非递归采样结构，可以更充分利用多个低保真模型。&lt;/p&gt;
 &lt;p&gt;这使技术演化路线变成：&lt;/p&gt;
-\[
-\boxed{
-\text{Control Variates}
-\rightarrow
-\text{MFMC}
-\rightarrow
-\text{Approximate Control Variates}
-\rightarrow
-\text{现代多模型 UQ}
-}
-\]&lt;p&gt;到 2025–2026 年，NASA 等机构仍在继续研究如何自动调节 multifidelity 模型参数，使给定预算下的 estimator variance 最小化，说明“模型如何自动分配预算”仍然是活跃的工程研究问题。&lt;/p&gt;
+\[\boxed{ \text{Control Variates} \rightarrow \text{MFMC} \rightarrow \text{Approximate Control Variates} \rightarrow \text{现代多模型 UQ} }\]&lt;p&gt;到 2025–2026 年，NASA 等机构仍在继续研究如何自动调节 multifidelity 模型参数，使给定预算下的 estimator variance 最小化，说明“模型如何自动分配预算”仍然是活跃的工程研究问题。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;10-对工程研究最值得迁移的一点&#34;&gt;10. 对工程研究最值得迁移的一点
 &lt;/h1&gt;&lt;p&gt;MFMC 最深刻的地方，其实是一种对代理模型定位的重新理解：&lt;/p&gt;
-\[
-\boxed{
-\text{代理模型不必承担“真值模型”的责任}
-}
-\]&lt;p&gt;它可以只承担：&lt;/p&gt;
-\[
-\boxed{
-\text{information carrier / variance reducer}
-}
-\]&lt;p&gt;这非常适合现实工程，因为现实中往往存在大量：&lt;/p&gt;
+\[\boxed{ \text{代理模型不必承担“真值模型”的责任} }\]&lt;p&gt;它可以只承担：&lt;/p&gt;
+\[\boxed{ \text{information carrier / variance reducer} }\]&lt;p&gt;这非常适合现实工程，因为现实中往往存在大量：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;旧模型；&lt;/li&gt;
 &lt;li&gt;粗网格模型；&lt;/li&gt;
@@ -962,21 +507,10 @@ R^2=0.98
 &lt;p&gt;只要答案是肯定的，它们就可能仍然有统计价值。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h2&gt;\[
-\boxed{
-\text{低保真模型的价值，不取决于它离真值有多近，
-而取决于它能以多低的成本解释多少高保真波动。}
-}
-\]&lt;p&gt;这也是 multifidelity 方法比“单纯做代理模型拟合”更值得研究的地方。&lt;/p&gt;
+&lt;/h2&gt;\[\boxed{ \text{低保真模型的价值，不取决于它离真值有多近， 而取决于它能以多低的成本解释多少高保真波动。} }\]&lt;p&gt;这也是 multifidelity 方法比“单纯做代理模型拟合”更值得研究的地方。&lt;/p&gt;
 &lt;p&gt;它把问题从：&lt;/p&gt;
-\[
-\text{怎样造一个更准的 surrogate？}
-\]&lt;p&gt;转成：&lt;/p&gt;
-\[
-\boxed{
-\text{怎样管理一整个模型生态，让有限计算预算产生最多信息？}
-}
-\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+\[\text{怎样造一个更准的 surrogate？}\]&lt;p&gt;转成：&lt;/p&gt;
+\[\boxed{ \text{怎样管理一整个模型生态，让有限计算预算产生最多信息？} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Peherstorfer, Willcox &amp;amp; Gunzburger, &lt;em&gt;Optimal Model Management for Multifidelity Monte Carlo Estimation&lt;/em&gt;, SIAM Journal on Scientific Computing, 2016&lt;/strong&gt;。经典 MFMC 原始框架，重点看 estimator、cost allocation 和 unbiasedness。&lt;/p&gt;
@@ -1004,13 +538,9 @@ R^2=0.98
 &lt;h2 id=&#34;1-先把问题压缩成一个最简单的例子&#34;&gt;1. 先把问题压缩成一个最简单的例子
 &lt;/h2&gt;&lt;p&gt;假设你研究某机构的不确定性传播。&lt;/p&gt;
 &lt;p&gt;输入：&lt;/p&gt;
-\[
-X=(\text{间隙},\text{杆长误差},\text{摩擦系数},\text{载荷})
-\]&lt;p&gt;高保真模型 HF 是复杂刚柔耦合 FEM/多体模型，一次 10 分钟；低保真 LF 是简化刚体模型，一次 0.01 秒。&lt;/p&gt;
+\[X=(\text{间隙},\text{杆长误差},\text{摩擦系数},\text{载荷})\]&lt;p&gt;高保真模型 HF 是复杂刚柔耦合 FEM/多体模型，一次 10 分钟；低保真 LF 是简化刚体模型，一次 0.01 秒。&lt;/p&gt;
 &lt;p&gt;现在你想知道：&lt;/p&gt;
-\[
-\mu_H=E[Y_H]
-\]&lt;p&gt;例如平均最大驱动力。&lt;/p&gt;
+\[\mu_H=E[Y_H]\]&lt;p&gt;例如平均最大驱动力。&lt;/p&gt;
 &lt;p&gt;假设不同随机样本下结果是：&lt;/p&gt;
 &lt;table&gt;
 	&lt;thead&gt;
@@ -1050,39 +580,19 @@ X=(\text{间隙},\text{杆长误差},\text{摩擦系数},\text{载荷})
 &lt;/table&gt;
 &lt;p&gt;LF 数值明显不准。&lt;/p&gt;
 &lt;p&gt;但仔细看：&lt;/p&gt;
-\[
-HF\uparrow\Rightarrow LF\uparrow
-\]\[
-HF\downarrow\Rightarrow LF\downarrow
-\]&lt;p&gt;于是它包含一个非常重要的信息：&lt;/p&gt;
-\[
-\boxed{\text{这个随机输入是让系统响应偏高，还是偏低}}
-\]&lt;p&gt;这就是 MFMC 真正要利用的信息。&lt;/p&gt;
+\[HF\uparrow\Rightarrow LF\uparrow\]\[HF\downarrow\Rightarrow LF\downarrow\]&lt;p&gt;于是它包含一个非常重要的信息：&lt;/p&gt;
+\[\boxed{\text{这个随机输入是让系统响应偏高，还是偏低}}\]&lt;p&gt;这就是 MFMC 真正要利用的信息。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;2-它不关心-lf-是否知道答案而关心-lf-是否知道涨跌&#34;&gt;2. 它不关心 LF 是否知道“答案”，而关心 LF 是否知道“涨跌”
 &lt;/h2&gt;&lt;p&gt;假设：&lt;/p&gt;
-\[
-Y_H=100+20X+\epsilon_H
-\]&lt;p&gt;而一个很粗的模型是：&lt;/p&gt;
-\[
-Y_L=40+10X+\epsilon_L.
-\]&lt;p&gt;显然：&lt;/p&gt;
-\[
-Y_L\neq Y_H.
-\]&lt;p&gt;拿 LF 直接做代理模型会有严重 bias。&lt;/p&gt;
+\[Y_H=100+20X+\epsilon_H\]&lt;p&gt;而一个很粗的模型是：&lt;/p&gt;
+\[Y_L=40+10X+\epsilon_L.\]&lt;p&gt;显然：&lt;/p&gt;
+\[Y_L\neq Y_H.\]&lt;p&gt;拿 LF 直接做代理模型会有严重 bias。&lt;/p&gt;
 &lt;p&gt;但两者都受：&lt;/p&gt;
-\[
-X
-\]&lt;p&gt;驱动，因此可能：&lt;/p&gt;
-\[
-\rho(Y_H,Y_L)=0.95.
-\]&lt;p&gt;MFMC 利用的就是：&lt;/p&gt;
-\[
-\boxed{\rho}
-\]&lt;p&gt;而不是：&lt;/p&gt;
-\[
-Y_H-Y_L.
-\]&lt;p&gt;所以可以把低保真模型想象成一个&lt;strong&gt;廉价传感器&lt;/strong&gt;。&lt;/p&gt;
+\[X\]&lt;p&gt;驱动，因此可能：&lt;/p&gt;
+\[\rho(Y_H,Y_L)=0.95.\]&lt;p&gt;MFMC 利用的就是：&lt;/p&gt;
+\[\boxed{\rho}\]&lt;p&gt;而不是：&lt;/p&gt;
+\[Y_H-Y_L.\]&lt;p&gt;所以可以把低保真模型想象成一个&lt;strong&gt;廉价传感器&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;它刻度不准：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;HF 说 120 MPa，LF 可能永远只报 75 MPa。&lt;/p&gt;
@@ -1095,231 +605,102 @@ Y_H-Y_L.
 &lt;hr&gt;
 &lt;h1 id=&#34;3-这个信息到底怎样帮-monte-carlo&#34;&gt;3. 这个信息到底怎样帮 Monte Carlo？
 &lt;/h1&gt;&lt;p&gt;普通 Monte Carlo 用：&lt;/p&gt;
-&lt;h1 id=&#34;hatmu_h&#34;&gt;[
-\hat\mu_H
-&lt;/h1&gt;&lt;p&gt;\frac1{N_H}
-\sum_{i=1}^{N_H}Y_H^{(i)}.
-]&lt;/p&gt;
-&lt;p&gt;如果 HF 很贵，只能算 20 次。&lt;/p&gt;
+\[\hat\mu_H = \frac1{N_H} \sum_{i=1}^{N_H}Y_H^{(i)}.\]&lt;p&gt;如果 HF 很贵，只能算 20 次。&lt;/p&gt;
 &lt;p&gt;于是这 20 个随机样本可能恰好偏高：&lt;/p&gt;
-\[
-\bar Y_H=112.
-\]&lt;p&gt;但真实均值其实可能是：&lt;/p&gt;
-\[
-E[Y_H]=105.
-\]&lt;p&gt;你不知道这次抽样到底偏了多少。&lt;/p&gt;
+\[\bar Y_H=112.\]&lt;p&gt;但真实均值其实可能是：&lt;/p&gt;
+\[E[Y_H]=105.\]&lt;p&gt;你不知道这次抽样到底偏了多少。&lt;/p&gt;
 &lt;p&gt;现在关键来了。&lt;/p&gt;
 &lt;p&gt;对&lt;strong&gt;同样的 20 个随机输入&lt;/strong&gt;，我们也算 LF：&lt;/p&gt;
-\[
-\bar Y_L^{20}=72.
-\]&lt;p&gt;因为 LF 极便宜，我们另外再算：&lt;/p&gt;
-\[
-N_L=1,000,000
-\]&lt;p&gt;个 LF。&lt;/p&gt;
+\[\bar Y_L^{20}=72.\]&lt;p&gt;因为 LF 极便宜，我们另外再算：&lt;/p&gt;
+\[N_L=1,000,000\]&lt;p&gt;个 LF。&lt;/p&gt;
 &lt;p&gt;于是非常准确地知道：&lt;/p&gt;
-\[
-E[Y_L]\approx65.
-\]&lt;p&gt;现在我们发现：&lt;/p&gt;
-\[
-\boxed{
-\text{这 20 个 HF 样本对应的 LF 恰好比 LF 总体均值高了 7}
-}
-\]&lt;p&gt;即：&lt;/p&gt;
-\[
-72-65=7.
-\]&lt;p&gt;由于我们已经从少量 HF/LF 配对样本知道：&lt;/p&gt;
-\[
-HF\uparrow\leftrightarrow LF\uparrow,
-\]&lt;p&gt;于是有理由判断：&lt;/p&gt;
+\[E[Y_L]\approx65.\]&lt;p&gt;现在我们发现：&lt;/p&gt;
+\[\boxed{ \text{这 20 个 HF 样本对应的 LF 恰好比 LF 总体均值高了 7} }\]&lt;p&gt;即：&lt;/p&gt;
+\[72-65=7.\]&lt;p&gt;由于我们已经从少量 HF/LF 配对样本知道：&lt;/p&gt;
+\[HF\uparrow\leftrightarrow LF\uparrow,\]&lt;p&gt;于是有理由判断：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;这批 HF Monte Carlo 样本大概率也抽高了。&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;因此把：&lt;/p&gt;
-\[
-112
-\]&lt;p&gt;往下修正。&lt;/p&gt;
+\[112\]&lt;p&gt;往下修正。&lt;/p&gt;
 &lt;p&gt;这就是 control variate。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-数学上其实就这么简单&#34;&gt;4. 数学上其实就这么简单
 &lt;/h1&gt;&lt;p&gt;构造：&lt;/p&gt;
-&lt;h1 id=&#34;hatmu_rm-mf-1&#34;&gt;[
-\boxed{
-\hat\mu_{\rm MF}
-&lt;/h1&gt;&lt;h2 id=&#34;bar-y_h&#34;&gt;\bar Y_H
-&lt;/h2&gt;&lt;p&gt;\alpha
-(\bar Y_L^{HF}-\bar Y_L^{large})
-}
-]&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
-\[
-\bar Y_L^{HF}
-\]&lt;p&gt;是和 HF 使用相同随机样本得到的 LF 均值；&lt;/p&gt;
+\[\boxed{ \hat\mu_{\rm MF} = \bar Y_H - \alpha (\bar Y_L^{HF}-\bar Y_L^{large}) }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\bar Y_L^{HF}\]&lt;p&gt;是和 HF 使用相同随机样本得到的 LF 均值；&lt;/p&gt;
 &lt;p&gt;而：&lt;/p&gt;
-\[
-\bar Y_L^{large}
-\]&lt;p&gt;是几十万/几百万次廉价 LF 得到的精确总体均值估计。&lt;/p&gt;
+\[\bar Y_L^{large}\]&lt;p&gt;是几十万/几百万次廉价 LF 得到的精确总体均值估计。&lt;/p&gt;
 &lt;p&gt;刚才：&lt;/p&gt;
-\[
-\bar Y_H=112
-\]\[
-\bar Y_L^{HF}=72
-\]\[
-\bar Y_L^{large}=65.
-\]&lt;p&gt;假设估计得到：&lt;/p&gt;
-\[
-\alpha=1,
-\]&lt;p&gt;那么：&lt;/p&gt;
-&lt;h1 id=&#34;hatmu_rm-mf-2&#34;&gt;[
-\hat\mu_{\rm MF}
-&lt;/h1&gt;&lt;h1 id=&#34;112-72-65&#34;&gt;112-(72-65)
-&lt;/h1&gt;&lt;ol start=&#34;105&#34;&gt;
-&lt;li&gt;&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;]&lt;/p&gt;
-&lt;p&gt;注意一个非常关键的地方：&lt;/p&gt;
+\[\bar Y_H=112\]\[\bar Y_L^{HF}=72\]\[\bar Y_L^{large}=65.\]&lt;p&gt;假设估计得到：&lt;/p&gt;
+\[\alpha=1,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\hat\mu_{\rm MF} = 112-(72-65) = 105.\]&lt;p&gt;注意一个非常关键的地方：&lt;/p&gt;
 &lt;h3 id=&#34;lf-从来没有告诉我们&#34;&gt;LF 从来没有告诉我们：
-&lt;/h3&gt;\[
-E[Y_H]=105.
-\]&lt;p&gt;它告诉我们的其实是：&lt;/p&gt;
-\[
-\boxed{\text{你这批昂贵 HF 样本可能抽偏了，而且大概偏向哪个方向。}}
-\]&lt;p&gt;这就是 MFMC 最核心的直觉。&lt;/p&gt;
+&lt;/h3&gt;\[E[Y_H]=105.\]&lt;p&gt;它告诉我们的其实是：&lt;/p&gt;
+\[\boxed{\text{你这批昂贵 HF 样本可能抽偏了，而且大概偏向哪个方向。}}\]&lt;p&gt;这就是 MFMC 最核心的直觉。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-所以-mfmc-从-lf-中获得的是三类信息&#34;&gt;5. 所以 MFMC 从 LF 中获得的是三类信息
 &lt;/h1&gt;&lt;p&gt;可以更准确地归纳为：&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;第一，随机输入导致输出变化的共同趋势&lt;/strong&gt;&lt;/p&gt;
-\[
-X\rightarrow Y_L
-\]&lt;p&gt;可以廉价反映：&lt;/p&gt;
-\[
-X\rightarrow Y_H
-\]&lt;p&gt;的一部分规律。&lt;/p&gt;
+\[X\rightarrow Y_L\]&lt;p&gt;可以廉价反映：&lt;/p&gt;
+\[X\rightarrow Y_H\]&lt;p&gt;的一部分规律。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;第二，小规模 HF Monte Carlo 的抽样偏差信息&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;比较：&lt;/p&gt;
-\[
-\bar Y_L^{HF}
-\]&lt;p&gt;和：&lt;/p&gt;
-\[
-\bar Y_L^{large},
-\]&lt;p&gt;可以判断 HF 那几十个随机样本在统计意义上“抽高了还是抽低了”。&lt;/p&gt;
+\[\bar Y_L^{HF}\]&lt;p&gt;和：&lt;/p&gt;
+\[\bar Y_L^{large},\]&lt;p&gt;可以判断 HF 那几十个随机样本在统计意义上“抽高了还是抽低了”。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;第三，不同模型的信息价值&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;通过：&lt;/p&gt;
-\[
-\rho_{HL}
-\]&lt;p&gt;和模型成本：&lt;/p&gt;
-\[
-c_L
-\]&lt;p&gt;判断一个 LF 值不值得使用。&lt;/p&gt;
+\[\rho_{HL}\]&lt;p&gt;和模型成本：&lt;/p&gt;
+\[c_L\]&lt;p&gt;判断一个 LF 值不值得使用。&lt;/p&gt;
 &lt;p&gt;经典 MFMC 甚至进一步优化各模型调用次数，使固定计算预算下 MSE 最小。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-它最终服务的不是预测而是统计量估计&#34;&gt;6. 它最终服务的不是“预测”，而是“统计量估计”
 &lt;/h1&gt;&lt;p&gt;这一点特别重要。&lt;/p&gt;
 &lt;p&gt;MFMC 的主要目的通常不是得到：&lt;/p&gt;
-\[
-\hat f(x)
-\]&lt;p&gt;然后问：&lt;/p&gt;
+\[\hat f(x)\]&lt;p&gt;然后问：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;给定 \(x\)，系统输出是多少？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;这是普通 surrogate modeling。&lt;/p&gt;
 &lt;p&gt;MFMC 更关心：&lt;/p&gt;
-\[
-\boxed{E[Y]}
-\]&lt;p&gt;以及扩展后的：&lt;/p&gt;
-\[
-\mathrm{Var}[Y],
-\]&lt;p&gt;Sobol sensitivity indices 等统计量；已有专门工作把 MFMC 扩展到方差和全局敏感度指标估计。&lt;/p&gt;
+\[\boxed{E[Y]}\]&lt;p&gt;以及扩展后的：&lt;/p&gt;
+\[\mathrm{Var}[Y],\]&lt;p&gt;Sobol sensitivity indices 等统计量；已有专门工作把 MFMC 扩展到方差和全局敏感度指标估计。&lt;/p&gt;
 &lt;p&gt;更广泛的 multifidelity UQ 还可以服务：&lt;/p&gt;
-\[
-P_f,\quad CVaR,\quad
-\text{optimization under uncertainty},
-\]&lt;p&gt;不过小失效概率通常会结合 importance sampling 等技术，而不是最基础的 MFMC。&lt;/p&gt;
+\[P_f,\quad CVaR,\quad \text{optimization under uncertainty},\]&lt;p&gt;不过小失效概率通常会结合 importance sampling 等技术，而不是最基础的 MFMC。&lt;/p&gt;
 &lt;p&gt;所以最好把两类方法分开：&lt;/p&gt;
-\[
-\boxed{
-\begin{array}{c}
-\text{Kriging / NN surrogate}\\
-\downarrow\\
-\text{我要预测 }f(x)
-\end{array}
-}
-\]&lt;p&gt;和：&lt;/p&gt;
-\[
-\boxed{
-\begin{array}{c}
-\text{MFMC}\\
-\downarrow\\
-\text{我要更便宜地估计 }E[f(X)]
-\end{array}
-}
-\]&lt;hr&gt;
+\[\boxed{ \begin{array}{c} \text{Kriging / NN surrogate}\\ \downarrow\\ \text{我要预测 }f(x) \end{array} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \begin{array}{c} \text{MFMC}\\ \downarrow\\ \text{我要更便宜地估计 }E[f(X)] \end{array} }\]&lt;hr&gt;
 &lt;h1 id=&#34;7-为什么不直接用-lf-做一个-hf-surrogate&#34;&gt;7. 为什么不直接用 LF 做一个 HF surrogate？
 &lt;/h1&gt;&lt;p&gt;这正是 MFMC 最有价值的地方。&lt;/p&gt;
 &lt;p&gt;假设 LF 有系统偏差：&lt;/p&gt;
-\[
-Y_L=0.7Y_H-20+\epsilon.
-\]&lt;p&gt;直接 surrogate：&lt;/p&gt;
-\[
-Y_H\approx Y_L
-\]&lt;p&gt;当然不可靠。&lt;/p&gt;
+\[Y_L=0.7Y_H-20+\epsilon.\]&lt;p&gt;直接 surrogate：&lt;/p&gt;
+\[Y_H\approx Y_L\]&lt;p&gt;当然不可靠。&lt;/p&gt;
 &lt;p&gt;即使训练一个 correction model：&lt;/p&gt;
-\[
-Y_H=g(Y_L),
-\]&lt;p&gt;仍然必须担心 surrogate bias。&lt;/p&gt;
+\[Y_H=g(Y_L),\]&lt;p&gt;仍然必须担心 surrogate bias。&lt;/p&gt;
 &lt;p&gt;而 MFMC 不要求：&lt;/p&gt;
-\[
-Y_L\approx Y_H.
-\]&lt;p&gt;它只希望：&lt;/p&gt;
-\[
-\boxed{|\rho(Y_L,Y_H)|\text{ 足够高}}
-\]&lt;p&gt;同时：&lt;/p&gt;
-\[
-c_L\ll c_H.
-\]&lt;p&gt;经典 MFMC 保留高保真模型在估计器中，因此即使 LF 没有已知误差界，也可以构造针对 HF 统计量的无偏估计器。&lt;/p&gt;
+\[Y_L\approx Y_H.\]&lt;p&gt;它只希望：&lt;/p&gt;
+\[\boxed{|\rho(Y_L,Y_H)|\text{ 足够高}}\]&lt;p&gt;同时：&lt;/p&gt;
+\[c_L\ll c_H.\]&lt;p&gt;经典 MFMC 保留高保真模型在估计器中，因此即使 LF 没有已知误差界，也可以构造针对 HF 统计量的无偏估计器。&lt;/p&gt;
 &lt;p&gt;这就是它的安全性来源。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-放到可靠性问题里你会更容易看出它的边界&#34;&gt;8. 放到可靠性问题里，你会更容易看出它的边界
 &lt;/h1&gt;&lt;p&gt;假设你关心：&lt;/p&gt;
-\[
-P_f=P[g_H(X)&lt;0].
-\]&lt;p&gt;定义：&lt;/p&gt;
-\[
-I_H(X)=
-\begin{cases}
-1,&amp;g_H(X)&lt;0\\
-0,&amp;g_H(X)\ge0
-\end{cases}
-\]&lt;p&gt;那么：&lt;/p&gt;
-\[
-P_f=E[I_H].
-\]&lt;p&gt;理论上 LF 可以帮助判断：&lt;/p&gt;
+\[P_f=P[g_H(X)&lt;0].\]&lt;p&gt;定义：&lt;/p&gt;
+\[I_H(X)= \begin{cases} 1,&amp;g_H(X)&lt;0\\ 0,&amp;g_H(X)\ge0 \end{cases}\]&lt;p&gt;那么：&lt;/p&gt;
+\[P_f=E[I_H].\]&lt;p&gt;理论上 LF 可以帮助判断：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;这批有限的 HF 样本是否过度落在危险区/安全区。&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;但是 rare-event reliability 会出现困难。&lt;/p&gt;
 &lt;p&gt;例如：&lt;/p&gt;
-\[
-P_f=10^{-6}.
-\]&lt;p&gt;普通随机样本中：&lt;/p&gt;
-\[
-99.9999\%
-\]&lt;p&gt;都是安全点。&lt;/p&gt;
+\[P_f=10^{-6}.\]&lt;p&gt;普通随机样本中：&lt;/p&gt;
+\[99.9999\%\]&lt;p&gt;都是安全点。&lt;/p&gt;
 &lt;p&gt;那么 HF/LF 的 indicator：&lt;/p&gt;
-\[
-I_H,I_L
-\]&lt;p&gt;几乎永远同时为 0。&lt;/p&gt;
+\[I_H,I_L\]&lt;p&gt;几乎永远同时为 0。&lt;/p&gt;
 &lt;p&gt;相关信息非常贫乏。&lt;/p&gt;
 &lt;p&gt;所以对于可靠性：&lt;/p&gt;
-\[
-\boxed{
-\text{纯 MFMC 通常不是小失效概率问题的终点}
-}
-\]&lt;p&gt;而会自然走向：&lt;/p&gt;
-\[
-\text{MFMC/control variate}
-+
-\text{importance sampling}
-\]&lt;p&gt;或者其他 rare-event 方法。相关研究确实发展了 multifidelity failure-probability estimation 与 multifidelity importance sampling。&lt;/p&gt;
+\[\boxed{ \text{纯 MFMC 通常不是小失效概率问题的终点} }\]&lt;p&gt;而会自然走向：&lt;/p&gt;
+\[\text{MFMC/control variate} + \text{importance sampling}\]&lt;p&gt;或者其他 rare-event 方法。相关研究确实发展了 multifidelity failure-probability estimation 与 multifidelity importance sampling。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;最后用一句话把-mfmc-讲透&#34;&gt;最后用一句话把 MFMC 讲透
 &lt;/h2&gt;&lt;p&gt;你可以把普通 Monte Carlo 想成：&lt;/p&gt;
@@ -1331,12 +712,7 @@ I_H,I_L
 &lt;p&gt;我另外有一个不太准确但非常便宜的调查员（LF）。我让他调查 100 万人，于是知道总体趋势；然后观察他在那 30 个专家样本上相对于总体究竟偏高还是偏低，用这个信息校正 30 个专家造成的&lt;strong&gt;抽样噪声&lt;/strong&gt;。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-\[
-\boxed{
-\text{LF 提供的是“关于抽样误差的信息”，
-HF 提供的是“关于真实尺度的信息”。}
-}
-\]&lt;p&gt;这也是我认为理解 MFMC 最关键的一步。&lt;/p&gt;
+\[\boxed{ \text{LF 提供的是“关于抽样误差的信息”， HF 提供的是“关于真实尺度的信息”。} }\]&lt;p&gt;这也是我认为理解 MFMC 最关键的一步。&lt;/p&gt;
 &lt;p&gt;它的价值场景其实很明确：&lt;strong&gt;你已经认可 HF 是真值模型，但 Monte Carlo 需要调用 HF 太多次；同时手里存在一个便宜、与 HF 响应高度相关的模型。&lt;/strong&gt; 这时候 MFMC 才真正有吸引力。SIAM 的综述也正是把这类方法定位在 UQ、推断和优化等需要反复调用模型的 outer-loop 问题中。&lt;/p&gt;
 &lt;p&gt;如果你愿意继续往下追 MFMC，我认为下一步最值得讲的是一个更尖锐的问题：&lt;strong&gt;为什么“相关性高”就能知道 HF 的 Monte Carlo 抽样误差？&lt;/strong&gt; 把 control variate 的方差公式从头推一遍之后，MFMC 基本就彻底透明了。&lt;/p&gt;
 </description>
@@ -1352,26 +728,10 @@ HF 提供的是“关于真实尺度的信息”。}
 &lt;strong&gt;领域：有限元 × 不确定性量化 × 代理模型&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天这个主题和 Kriging 很接近，但它代表了另一种完全不同的代理思想：&lt;/p&gt;
-\[
-\boxed{
-\text{Kriging：从输入输出数据学习 }f(\mu)
-}
-\]&lt;p&gt;而 Reduced Basis（RB）更像：&lt;/p&gt;
-\[
-\boxed{
-\text{从高维 PDE/FEM 解空间中学习一个低维物理解空间}
-}
-\]&lt;p&gt;更关键的是，经典 &lt;strong&gt;Certified RB&lt;/strong&gt; 不满足于给出一个近似解：&lt;/p&gt;
-\[
-u_N(\mu),
-\]&lt;p&gt;它还试图在线给出一个可计算的误差上界：&lt;/p&gt;
-\[
-\boxed{
-\|u_h(\mu)-u_N(\mu)\|
-\le
-\Delta_N(\mu)
-}
-\]&lt;p&gt;这里的 \(\Delta_N\) 就是所谓 &lt;strong&gt;a posteriori error estimator/bound&lt;/strong&gt;。&lt;/p&gt;
+\[\boxed{ \text{Kriging：从输入输出数据学习 }f(\mu) }\]&lt;p&gt;而 Reduced Basis（RB）更像：&lt;/p&gt;
+\[\boxed{ \text{从高维 PDE/FEM 解空间中学习一个低维物理解空间} }\]&lt;p&gt;更关键的是，经典 &lt;strong&gt;Certified RB&lt;/strong&gt; 不满足于给出一个近似解：&lt;/p&gt;
+\[u_N(\mu),\]&lt;p&gt;它还试图在线给出一个可计算的误差上界：&lt;/p&gt;
+\[\boxed{ \|u_h(\mu)-u_N(\mu)\| \le \Delta_N(\mu) }\]&lt;p&gt;这里的 \(\Delta_N\) 就是所谓 &lt;strong&gt;a posteriori error estimator/bound&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;这件事非常值得理解，因为它代表一种和机器学习代理模型明显不同的理念：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;代理模型不仅输出预测，还输出一个由原始物理方程推导出的“这次预测是否可信”的证据。&lt;/strong&gt;&lt;/p&gt;
@@ -1380,9 +740,7 @@ u_N(\mu),
 &lt;hr&gt;
 &lt;h2 id=&#34;1-它到底在解决什么问题&#34;&gt;1. 它到底在解决什么问题？
 &lt;/h2&gt;&lt;p&gt;假设有限元离散以后得到：&lt;/p&gt;
-\[
-A(\mu)u_h(\mu)=f(\mu),
-\]&lt;p&gt;其中：&lt;/p&gt;
+\[A(\mu)u_h(\mu)=f(\mu),\]&lt;p&gt;其中：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(u_h\in\mathbb R^{N_h}\)；&lt;/li&gt;
 &lt;li&gt;\(N_h\) 可能是 \(10^5\sim10^7\)；&lt;/li&gt;
@@ -1390,9 +748,7 @@ A(\mu)u_h(\mu)=f(\mu),
 &lt;/ul&gt;
 &lt;p&gt;如果只计算一个工况，高精度 FEM 完全没问题。&lt;/p&gt;
 &lt;p&gt;真正困难的是：&lt;/p&gt;
-\[
-\mu_1,\mu_2,\ldots,\mu_{100000}
-\]&lt;p&gt;这种 repeated-query 场景，例如：&lt;/p&gt;
+\[\mu_1,\mu_2,\ldots,\mu_{100000}\]&lt;p&gt;这种 repeated-query 场景，例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Monte Carlo；&lt;/li&gt;
 &lt;li&gt;可靠性；&lt;/li&gt;
@@ -1401,92 +757,39 @@ A(\mu)u_h(\mu)=f(\mu),
 &lt;li&gt;实时数字孪生。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;每次都求：&lt;/p&gt;
-\[
-A(\mu)u=f
-\]&lt;p&gt;成本就太高。&lt;/p&gt;
+\[A(\mu)u=f\]&lt;p&gt;成本就太高。&lt;/p&gt;
 &lt;p&gt;RB 的第一步是观察：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;虽然 FEM 解有几十万个自由度，但随着几个参数变化，真正出现的所有解可能只占据高维空间中的一个很薄的低维流形。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;也就是说：&lt;/p&gt;
-&lt;h1 id=&#34;mathcal-m&#34;&gt;[
-\mathcal M
-&lt;/h1&gt;&lt;p&gt;{u_h(\mu):\mu\in\mathcal P}
-]&lt;/p&gt;
-&lt;p&gt;可能实际上具有很低的“有效维数”。&lt;/p&gt;
+\[\mathcal M = \{u_h(\mu):\mu\in\mathcal P\}\]&lt;p&gt;可能实际上具有很低的“有效维数”。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-reduced-basis-到底降了什么&#34;&gt;2. Reduced Basis 到底降了什么？
 &lt;/h1&gt;&lt;p&gt;选择若干具有代表性的高保真解：&lt;/p&gt;
-\[
-u_h(\mu_1),\dots,u_h(\mu_N),
-\]&lt;p&gt;构造：&lt;/p&gt;
-&lt;h1 id=&#34;v_n&#34;&gt;[
-V_N
-&lt;/h1&gt;&lt;p&gt;\operatorname{span}
-{
-\zeta_1,\dots,\zeta_N
-}.
-]&lt;/p&gt;
-&lt;p&gt;其中通常：&lt;/p&gt;
-\[
-N\ll N_h.
-\]&lt;p&gt;例如：&lt;/p&gt;
-\[
-N_h=10^6,
-\]&lt;p&gt;而：&lt;/p&gt;
-\[
-N=30.
-\]&lt;p&gt;然后认为任意新参数下的解都可以近似为：&lt;/p&gt;
-&lt;h1 id=&#34;u_nmu&#34;&gt;[
-u_N(\mu)
-&lt;/h1&gt;&lt;p&gt;\sum_{i=1}^N a_i(\mu)\zeta_i.
-]&lt;/p&gt;
-&lt;p&gt;矩阵形式：&lt;/p&gt;
-\[
-u_N=Va.
-\]&lt;p&gt;把它代回有限元弱形式，通过 Galerkin projection：&lt;/p&gt;
-&lt;h1 id=&#34;vtamuv-a&#34;&gt;[
-V^TA(\mu)V a
-&lt;/h1&gt;&lt;p&gt;V^Tf.
-]&lt;/p&gt;
-&lt;p&gt;于是原来的：&lt;/p&gt;
-\[
-10^6\times10^6
-\]&lt;p&gt;问题变成：&lt;/p&gt;
-\[
-\boxed{
-30\times30
-}
-\]&lt;p&gt;的问题。&lt;/p&gt;
+\[u_h(\mu_1),\dots,u_h(\mu_N),\]&lt;p&gt;构造：&lt;/p&gt;
+\[V_N = \operatorname{span} \{ \zeta_1,\dots,\zeta_N \}.\]&lt;p&gt;其中通常：&lt;/p&gt;
+\[N\ll N_h.\]&lt;p&gt;例如：&lt;/p&gt;
+\[N_h=10^6,\]&lt;p&gt;而：&lt;/p&gt;
+\[N=30.\]&lt;p&gt;然后认为任意新参数下的解都可以近似为：&lt;/p&gt;
+\[u_N(\mu) = \sum_{i=1}^N a_i(\mu)\zeta_i.\]&lt;p&gt;矩阵形式：&lt;/p&gt;
+\[u_N=Va.\]&lt;p&gt;把它代回有限元弱形式，通过 Galerkin projection：&lt;/p&gt;
+\[V^TA(\mu)V a = V^Tf.\]&lt;p&gt;于是原来的：&lt;/p&gt;
+\[10^6\times10^6\]&lt;p&gt;问题变成：&lt;/p&gt;
+\[\boxed{ 30\times30 }\]&lt;p&gt;的问题。&lt;/p&gt;
 &lt;p&gt;这也是 RB 与普通响应面最根本的区别之一：&lt;/p&gt;
-\[
-\text{Kriging通常学习输出}
-\]&lt;p&gt;而 RB 直接压缩：&lt;/p&gt;
-\[
-\boxed{\text{PDE/FEM state space}}
-\]&lt;p&gt;因此一旦得到：&lt;/p&gt;
-\[
-u_N(x;\mu),
-\]&lt;p&gt;很多物理量都可以继续从它计算。&lt;/p&gt;
+\[\text{Kriging通常学习输出}\]&lt;p&gt;而 RB 直接压缩：&lt;/p&gt;
+\[\boxed{\text{PDE/FEM state space}}\]&lt;p&gt;因此一旦得到：&lt;/p&gt;
+\[u_N(x;\mu),\]&lt;p&gt;很多物理量都可以继续从它计算。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-但这其实还不够&#34;&gt;3. 但这其实还不够
 &lt;/h1&gt;&lt;p&gt;问题马上出现：&lt;/p&gt;
 &lt;p&gt;假设：&lt;/p&gt;
-\[
-N=20
-\]&lt;p&gt;得到一个极快的 ROM。&lt;/p&gt;
+\[N=20\]&lt;p&gt;得到一个极快的 ROM。&lt;/p&gt;
 &lt;p&gt;对于某个新参数：&lt;/p&gt;
-\[
-\mu^*,
-\]&lt;p&gt;它告诉你：&lt;/p&gt;
-\[
-\sigma_{\max}=317\text{ MPa}.
-\]&lt;p&gt;那么真正关键的问题是：&lt;/p&gt;
-\[
-\boxed{
-317\text{ MPa 到底靠不靠谱？}
-}
-\]&lt;p&gt;普通 surrogate 往往依赖：&lt;/p&gt;
+\[\mu^*,\]&lt;p&gt;它告诉你：&lt;/p&gt;
+\[\sigma_{\max}=317\text{ MPa}.\]&lt;p&gt;那么真正关键的问题是：&lt;/p&gt;
+\[\boxed{ 317\text{ MPa 到底靠不靠谱？} }\]&lt;p&gt;普通 surrogate 往往依赖：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;test-set RMSE；&lt;/li&gt;
 &lt;li&gt;cross validation；&lt;/li&gt;
@@ -1495,278 +798,107 @@ N=20
 &lt;/ul&gt;
 &lt;p&gt;这些指标告诉你模型的&lt;strong&gt;总体经验表现&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;但对于某个具体：&lt;/p&gt;
-\[
-\mu^*,
-\]&lt;p&gt;你通常不能因此严格推出：&lt;/p&gt;
-\[
-|f_{\rm HF}(\mu^*)-f_{\rm ROM}(\mu^*)|&lt;\epsilon.
-\]&lt;p&gt;Certified RB 的目标就是补上这一层。&lt;/p&gt;
+\[\mu^*,\]&lt;p&gt;你通常不能因此严格推出：&lt;/p&gt;
+\[|f_{\rm HF}(\mu^*)-f_{\rm ROM}(\mu^*)|&lt;\epsilon.\]&lt;p&gt;Certified RB 的目标就是补上这一层。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-核心工具residual&#34;&gt;4. 核心工具：Residual
 &lt;/h1&gt;&lt;p&gt;已知 reduced solution：&lt;/p&gt;
-\[
-u_N(\mu),
-\]&lt;p&gt;把它重新代回原方程：&lt;/p&gt;
-&lt;h1 id=&#34;rvmu&#34;&gt;[
-r(v;\mu)
-&lt;/h1&gt;&lt;h2 id=&#34;fvmu&#34;&gt;f(v;\mu)
-&lt;/h2&gt;&lt;p&gt;a(u_N,v;\mu).
-]&lt;/p&gt;
+\[u_N(\mu),\]&lt;p&gt;把它重新代回原方程：&lt;/p&gt;
+\[r(v;\mu) = f(v;\mu) - a(u_N,v;\mu).\]&lt;p&gt;如果：&lt;/p&gt;
+\[r=0,\]&lt;p&gt;说明：&lt;/p&gt;
+\[u_N\]&lt;p&gt;已经满足完整有限元方程。&lt;/p&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[
-r=0,
-\]&lt;p&gt;说明：&lt;/p&gt;
-\[
-u_N
-\]&lt;p&gt;已经满足完整有限元方程。&lt;/p&gt;
-&lt;p&gt;如果：&lt;/p&gt;
-\[
-r
-\]&lt;p&gt;很大，那么显然 reduced solution 有问题。&lt;/p&gt;
+\[r\]&lt;p&gt;很大，那么显然 reduced solution 有问题。&lt;/p&gt;
 &lt;p&gt;所以 residual 是一个非常自然的错误信号。&lt;/p&gt;
 &lt;p&gt;但是：&lt;/p&gt;
-\[
-\boxed{
-\text{residual 小}
-\not\Rightarrow
-\text{solution error 一定小}
-}
-\]&lt;p&gt;还差一个条件。&lt;/p&gt;
+\[\boxed{ \text{residual 小} \not\Rightarrow \text{solution error 一定小} }\]&lt;p&gt;还差一个条件。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-为什么还需要-coercivity&#34;&gt;5. 为什么还需要 coercivity？
 &lt;/h1&gt;&lt;p&gt;考虑线性 coercive PDE：&lt;/p&gt;
-\[
-a(u,v;\mu)=f(v).
-\]&lt;p&gt;定义 coercivity constant：&lt;/p&gt;
-&lt;h1 id=&#34;alphamu&#34;&gt;[
-\alpha(\mu)
-&lt;/h1&gt;&lt;p&gt;\inf_{v\ne0}
-\frac{a(v,v;\mu)}
-{|v|^2}.
-]&lt;/p&gt;
-&lt;p&gt;它可以粗略理解成：&lt;/p&gt;
-\[
-\boxed{\text{系统抵抗扰动的“最弱刚度”}}
-\]&lt;p&gt;如果：&lt;/p&gt;
-\[
-\alpha
-\]&lt;p&gt;很大，那么小 residual 通常意味着小 error。&lt;/p&gt;
+\[a(u,v;\mu)=f(v).\]&lt;p&gt;定义 coercivity constant：&lt;/p&gt;
+\[\alpha(\mu) = \inf_{v\ne0} \frac{a(v,v;\mu)} {\|v\|^2}.\]&lt;p&gt;它可以粗略理解成：&lt;/p&gt;
+\[\boxed{\text{系统抵抗扰动的“最弱刚度”}}\]&lt;p&gt;如果：&lt;/p&gt;
+\[\alpha\]&lt;p&gt;很大，那么小 residual 通常意味着小 error。&lt;/p&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[
-\alpha\rightarrow0,
-\]&lt;p&gt;系统本身接近病态：&lt;/p&gt;
-\[
-\text{很小 residual}
-\]&lt;p&gt;也可能对应：&lt;/p&gt;
-\[
-\text{很大 solution error}.
-\]&lt;p&gt;于是经典 RB 可以推出类似：&lt;/p&gt;
-\[
-\boxed{
-\|u_h-u_N\|
-\le
-\frac{\|r\|_{V&#39;}}{\alpha_{\rm LB}(\mu)}
-}
-\]&lt;p&gt;其中：&lt;/p&gt;
-\[
-\alpha_{\rm LB}(\mu)
-\le
-\alpha(\mu)
-\]&lt;p&gt;是 coercivity constant 的可计算下界。&lt;/p&gt;
+\[\alpha\rightarrow0,\]&lt;p&gt;系统本身接近病态：&lt;/p&gt;
+\[\text{很小 residual}\]&lt;p&gt;也可能对应：&lt;/p&gt;
+\[\text{很大 solution error}.\]&lt;p&gt;于是经典 RB 可以推出类似：&lt;/p&gt;
+\[\boxed{ \|u_h-u_N\| \le \frac{\|r\|_{V&#39;}}{\alpha_{\rm LB}(\mu)} }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\alpha_{\rm LB}(\mu) \le \alpha(\mu)\]&lt;p&gt;是 coercivity constant 的可计算下界。&lt;/p&gt;
 &lt;p&gt;因此误差估计器：&lt;/p&gt;
-&lt;h1 id=&#34;delta_nmu&#34;&gt;[
-\boxed{
-\Delta_N(\mu)
-&lt;/h1&gt;&lt;p&gt;\frac{|r(\cdot;\mu)|&lt;em&gt;{V&amp;rsquo;}}
-{\alpha&lt;/em&gt;{\rm LB}(\mu)}
-}
-]&lt;/p&gt;
-&lt;p&gt;这就是 Certified RB 最核心的数学结构。现代 pyMOR 的 coercive reduced-basis 实现同样要求 coercivity lower bound，并利用 residual/Riesz representative 构造 reduction error estimator。&lt;/p&gt;
+\[\boxed{ \Delta_N(\mu) = \frac{\|r(\cdot;\mu)\|_{V&#39;}} {\alpha_{\rm LB}(\mu)} }\]&lt;p&gt;这就是 Certified RB 最核心的数学结构。现代 pyMOR 的 coercive reduced-basis 实现同样要求 coercivity lower bound，并利用 residual/Riesz representative 构造 reduction error estimator。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-这里有一个非常深的解释&#34;&gt;6. 这里有一个非常深的解释
 &lt;/h1&gt;&lt;p&gt;这个公式：&lt;/p&gt;
-&lt;h1 id=&#34;delta&#34;&gt;[
-\Delta
-&lt;/h1&gt;&lt;p&gt;\frac{|r|}
-{\alpha}
-]&lt;/p&gt;
-&lt;p&gt;实际上把两个完全不同的问题分开了：&lt;/p&gt;
+\[\Delta = \frac{\|r\|} {\alpha}\]&lt;p&gt;实际上把两个完全不同的问题分开了：&lt;/p&gt;
 &lt;h3 id=&#34;模型有没有满足方程&#34;&gt;模型有没有满足方程？
 &lt;/h3&gt;&lt;p&gt;由：&lt;/p&gt;
-\[
-\|r\|
-\]&lt;p&gt;衡量。&lt;/p&gt;
+\[\|r\|\]&lt;p&gt;衡量。&lt;/p&gt;
 &lt;h3 id=&#34;这个物理问题本身对误差有多敏感&#34;&gt;这个物理问题本身对误差有多敏感？
 &lt;/h3&gt;&lt;p&gt;由：&lt;/p&gt;
-\[
-\alpha
-\]&lt;p&gt;衡量。&lt;/p&gt;
+\[\alpha\]&lt;p&gt;衡量。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-\text{error}
-\approx
-\text{equation violation}
-\times
-\text{problem conditioning}
-}
-\]&lt;p&gt;这是一种非常普遍的数值分析思想。&lt;/p&gt;
+\[\boxed{ \text{error} \approx \text{equation violation} \times \text{problem conditioning} }\]&lt;p&gt;这是一种非常普遍的数值分析思想。&lt;/p&gt;
 &lt;p&gt;类似结构还会出现在：&lt;/p&gt;
-\[
-\|x-x^*\|
-\lesssim
-\|A^{-1}\|
-\|Ax-b\|.
-\]&lt;p&gt;因此 residual-based certification 其实与条件数、稳定性理论是同一套语言。&lt;/p&gt;
+\[\|x-x^*\| \lesssim \|A^{-1}\| \|Ax-b\|.\]&lt;p&gt;因此 residual-based certification 其实与条件数、稳定性理论是同一套语言。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;7-为什么这个-error-estimator-会反过来指导学什么&#34;&gt;7. 为什么这个 error estimator 会反过来指导“学什么”？
 &lt;/h1&gt;&lt;p&gt;这是 RB 特别漂亮的地方。&lt;/p&gt;
 &lt;p&gt;假设参数空间中有：&lt;/p&gt;
-\[
-10^6
-\]&lt;p&gt;个 candidate：&lt;/p&gt;
-\[
-\mu.
-\]&lt;p&gt;显然不能全部做高保真 FEM。&lt;/p&gt;
+\[10^6\]&lt;p&gt;个 candidate：&lt;/p&gt;
+\[\mu.\]&lt;p&gt;显然不能全部做高保真 FEM。&lt;/p&gt;
 &lt;p&gt;但对于每一个 candidate，可以便宜地计算：&lt;/p&gt;
-\[
-\Delta_N(\mu).
-\]&lt;p&gt;然后找到：&lt;/p&gt;
-&lt;h1 id=&#34;mu&#34;&gt;[
-\boxed{
-\mu^*
-&lt;/h1&gt;&lt;p&gt;\arg\max_{\mu}
-\Delta_N(\mu)
-}
-]&lt;/p&gt;
-&lt;p&gt;意思是：&lt;/p&gt;
+\[\Delta_N(\mu).\]&lt;p&gt;然后找到：&lt;/p&gt;
+\[\boxed{ \mu^* = \arg\max_{\mu} \Delta_N(\mu) }\]&lt;p&gt;意思是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;当前 reduced basis 最不可信的参数在哪里？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;接下来只对：&lt;/p&gt;
-\[
-\mu^*
-\]&lt;p&gt;跑一次高保真 FEM：&lt;/p&gt;
-\[
-u_h(\mu^*),
-\]&lt;p&gt;把它加入基：&lt;/p&gt;
-&lt;h1 id=&#34;v_n1&#34;&gt;[
-V_{N+1}
-&lt;/h1&gt;&lt;p&gt;V_N+\operatorname{span}{u_h(\mu^*)}.
-]&lt;/p&gt;
-&lt;p&gt;重复。&lt;/p&gt;
+\[\mu^*\]&lt;p&gt;跑一次高保真 FEM：&lt;/p&gt;
+\[u_h(\mu^*),\]&lt;p&gt;把它加入基：&lt;/p&gt;
+\[V_{N+1} = V_N+\operatorname{span}\{u_h(\mu^*)\}.\]&lt;p&gt;重复。&lt;/p&gt;
 &lt;p&gt;这就是经典：&lt;/p&gt;
-\[
-\boxed{\text{Greedy Reduced Basis}}
-\]&lt;p&gt;结构。pyMOR 当前的 &lt;code&gt;rb_greedy&lt;/code&gt; 就是按这种逻辑工作：用 reduction error estimator 在 training set 上寻找当前最差参数，只有被选中的参数才真正调用 full-order model。&lt;/p&gt;
+\[\boxed{\text{Greedy Reduced Basis}}\]&lt;p&gt;结构。pyMOR 当前的 &lt;code&gt;rb_greedy&lt;/code&gt; 就是按这种逻辑工作：用 reduction error estimator 在 training set 上寻找当前最差参数，只有被选中的参数才真正调用 full-order model。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-你会发现它和-ak-mcs-很像但学习目标不同&#34;&gt;8. 你会发现它和 AK-MCS 很像，但学习目标不同
 &lt;/h1&gt;&lt;p&gt;AK-MCS：&lt;/p&gt;
-&lt;h1 id=&#34;mu-1&#34;&gt;[
-\mu^*
-&lt;/h1&gt;&lt;p&gt;\arg\min U(\mu)
-]&lt;/p&gt;
-&lt;p&gt;寻找：&lt;/p&gt;
-\[
-\boxed{
-\text{最可能误判失效边界的地方}
-}
-\]&lt;p&gt;RB Greedy：&lt;/p&gt;
-&lt;h1 id=&#34;mu-2&#34;&gt;[
-\mu^*
-&lt;/h1&gt;&lt;p&gt;\arg\max\Delta_N(\mu)
-]&lt;/p&gt;
-&lt;p&gt;寻找：&lt;/p&gt;
-\[
-\boxed{
-\text{当前 PDE 解近似最差的地方}
-}
-\]&lt;p&gt;因此二者背后其实是同一种主动学习哲学：&lt;/p&gt;
-\[
-\boxed{
-\text{高保真计算应该投给当前模型最缺信息的位置}
-}
-\]&lt;p&gt;但它们依赖的信息来源不同：&lt;/p&gt;
+\[\mu^* = \arg\min U(\mu)\]&lt;p&gt;寻找：&lt;/p&gt;
+\[\boxed{ \text{最可能误判失效边界的地方} }\]&lt;p&gt;RB Greedy：&lt;/p&gt;
+\[\mu^* = \arg\max\Delta_N(\mu)\]&lt;p&gt;寻找：&lt;/p&gt;
+\[\boxed{ \text{当前 PDE 解近似最差的地方} }\]&lt;p&gt;因此二者背后其实是同一种主动学习哲学：&lt;/p&gt;
+\[\boxed{ \text{高保真计算应该投给当前模型最缺信息的位置} }\]&lt;p&gt;但它们依赖的信息来源不同：&lt;/p&gt;
 &lt;p&gt;AK-MCS：&lt;/p&gt;
-\[
-\text{Gaussian-process statistical uncertainty}.
-\]&lt;p&gt;Certified RB：&lt;/p&gt;
-\[
-\boxed{\text{PDE residual + stability theory}}
-\]&lt;p&gt;这一区别非常值得记住。&lt;/p&gt;
+\[\text{Gaussian-process statistical uncertainty}.\]&lt;p&gt;Certified RB：&lt;/p&gt;
+\[\boxed{\text{PDE residual + stability theory}}\]&lt;p&gt;这一区别非常值得记住。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-certified为什么比普通-rom-更重要&#34;&gt;9. “Certified”为什么比普通 ROM 更重要？
 &lt;/h1&gt;&lt;p&gt;假设你把模型用于游戏视觉效果。&lt;/p&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[
-3\%\text{ error}
-\]&lt;p&gt;一般没有问题。&lt;/p&gt;
+\[3\%\text{ error}\]&lt;p&gt;一般没有问题。&lt;/p&gt;
 &lt;p&gt;但如果用于：&lt;/p&gt;
-\[
-\text{reliability}
-\]&lt;p&gt;问题会完全不同。&lt;/p&gt;
+\[\text{reliability}\]&lt;p&gt;问题会完全不同。&lt;/p&gt;
 &lt;p&gt;设失效条件：&lt;/p&gt;
-&lt;h1 id=&#34;gmu&#34;&gt;[
-g(\mu)
-&lt;/h1&gt;&lt;h2 id=&#34;sigma_rm-allow&#34;&gt;\sigma_{\rm allow}
-&lt;/h2&gt;&lt;p&gt;\sigma(\mu).
-]&lt;/p&gt;
-&lt;p&gt;Reduced model 得到：&lt;/p&gt;
-\[
-g_N(\mu)=5\text{ MPa}.
-\]&lt;p&gt;如果输出误差可能达到：&lt;/p&gt;
-\[
-\pm20\text{ MPa},
-\]&lt;p&gt;那么它实际上完全无法确定：&lt;/p&gt;
-\[
-\text{safe/failure}.
-\]&lt;p&gt;但如果你有：&lt;/p&gt;
-\[
-|g-g_N|
-\le2\text{ MPa},
-\]&lt;p&gt;由于：&lt;/p&gt;
-\[
-g_N=5,
-\]&lt;p&gt;立即得到：&lt;/p&gt;
-\[
-g\ge3&gt;0.
-\]&lt;p&gt;这个样本就可以&lt;strong&gt;无需 HF 计算直接认证为安全&lt;/strong&gt;。&lt;/p&gt;
+\[g(\mu) = \sigma_{\rm allow} - \sigma(\mu).\]&lt;p&gt;Reduced model 得到：&lt;/p&gt;
+\[g_N(\mu)=5\text{ MPa}.\]&lt;p&gt;如果输出误差可能达到：&lt;/p&gt;
+\[\pm20\text{ MPa},\]&lt;p&gt;那么它实际上完全无法确定：&lt;/p&gt;
+\[\text{safe/failure}.\]&lt;p&gt;但如果你有：&lt;/p&gt;
+\[|g-g_N| \le2\text{ MPa},\]&lt;p&gt;由于：&lt;/p&gt;
+\[g_N=5,\]&lt;p&gt;立即得到：&lt;/p&gt;
+\[g\ge3&gt;0.\]&lt;p&gt;这个样本就可以&lt;strong&gt;无需 HF 计算直接认证为安全&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;反过来：&lt;/p&gt;
-\[
-g_N=-7,
-\quad
-\Delta_g=2
-\]&lt;p&gt;则：&lt;/p&gt;
-\[
-g&lt;-5&lt;0,
-\]&lt;p&gt;可以认证为失效。&lt;/p&gt;
+\[g_N=-7, \quad \Delta_g=2\]&lt;p&gt;则：&lt;/p&gt;
+\[g&lt;-5&lt;0,\]&lt;p&gt;可以认证为失效。&lt;/p&gt;
 &lt;p&gt;只有：&lt;/p&gt;
-\[
-|g_N|\le\Delta_g
-\]&lt;p&gt;的时候：&lt;/p&gt;
-\[
-\boxed{\text{classification uncertain}}
-\]&lt;p&gt;才需要升级到高保真模型。&lt;/p&gt;
+\[|g_N|\le\Delta_g\]&lt;p&gt;的时候：&lt;/p&gt;
+\[\boxed{\text{classification uncertain}}\]&lt;p&gt;才需要升级到高保真模型。&lt;/p&gt;
 &lt;p&gt;你可以看到这已经开始自然连接：&lt;/p&gt;
-\[
-\boxed{
-\text{Certified ROM}
-+
-\text{reliability sampling}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{Certified ROM} + \text{reliability sampling} }\]&lt;hr&gt;
 &lt;h1 id=&#34;10-它与-kriging-的-uncertainty-有什么本质区别&#34;&gt;10. 它与 Kriging 的 uncertainty 有什么本质区别？
 &lt;/h1&gt;&lt;p&gt;这是今天最值得分清楚的一点。&lt;/p&gt;
 &lt;p&gt;Gaussian Process 给：&lt;/p&gt;
-\[
-\mu(x),\sigma(x).
-\]&lt;p&gt;其：&lt;/p&gt;
-\[
-\sigma(x)
-\]&lt;p&gt;来自：&lt;/p&gt;
-\[
-\boxed{\text{统计模型假设}}
-\]&lt;p&gt;包括：&lt;/p&gt;
+\[\mu(x),\sigma(x).\]&lt;p&gt;其：&lt;/p&gt;
+\[\sigma(x)\]&lt;p&gt;来自：&lt;/p&gt;
+\[\boxed{\text{统计模型假设}}\]&lt;p&gt;包括：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;kernel；&lt;/li&gt;
 &lt;li&gt;GP prior；&lt;/li&gt;
@@ -1774,94 +906,41 @@ g&lt;-5&lt;0,
 &lt;li&gt;hyperparameters。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;如果这些假设失配：&lt;/p&gt;
-\[
-\sigma
-\]&lt;p&gt;不一定等于实际预测误差。&lt;/p&gt;
+\[\sigma\]&lt;p&gt;不一定等于实际预测误差。&lt;/p&gt;
 &lt;p&gt;Certified RB 的：&lt;/p&gt;
-\[
-\Delta_N
-\]&lt;p&gt;则来自：&lt;/p&gt;
-\[
-\boxed{\text{原始控制方程}}
-\]&lt;p&gt;在适用的数学条件下，它可以是真正的：&lt;/p&gt;
-\[
-\text{upper bound}.
-\]&lt;p&gt;因此二者对应两种完全不同的不确定性：&lt;/p&gt;
-\[
-\boxed{
-\text{GP uncertainty：epistemic/statistical}
-}
-\]\[
-\boxed{
-\text{RB certification：numerical/model-reduction error}
-}
-\]&lt;p&gt;不能简单把两者当成同一种“置信度”。&lt;/p&gt;
+\[\Delta_N\]&lt;p&gt;则来自：&lt;/p&gt;
+\[\boxed{\text{原始控制方程}}\]&lt;p&gt;在适用的数学条件下，它可以是真正的：&lt;/p&gt;
+\[\text{upper bound}.\]&lt;p&gt;因此二者对应两种完全不同的不确定性：&lt;/p&gt;
+\[\boxed{ \text{GP uncertainty：epistemic/statistical} }\]\[\boxed{ \text{RB certification：numerical/model-reduction error} }\]&lt;p&gt;不能简单把两者当成同一种“置信度”。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;11-offlineonline-decomposition-才决定它是否真的快&#34;&gt;11. Offline–Online decomposition 才决定它是否真的快
 &lt;/h1&gt;&lt;p&gt;这里还有一个重要工程条件。&lt;/p&gt;
 &lt;p&gt;如果每次计算：&lt;/p&gt;
-\[
-r(\mu)
-\]&lt;p&gt;仍然需要组装一个：&lt;/p&gt;
-\[
-10^6
-\]&lt;p&gt;维 FEM 系统，那么：&lt;/p&gt;
-\[
-N=30
-\]&lt;p&gt;也没有真正解决问题。&lt;/p&gt;
+\[r(\mu)\]&lt;p&gt;仍然需要组装一个：&lt;/p&gt;
+\[10^6\]&lt;p&gt;维 FEM 系统，那么：&lt;/p&gt;
+\[N=30\]&lt;p&gt;也没有真正解决问题。&lt;/p&gt;
 &lt;p&gt;因此 RB 通常要求参数依赖近似具有 affine decomposition：&lt;/p&gt;
-&lt;h1 id=&#34;amu&#34;&gt;[
-A(\mu)
-&lt;/h1&gt;&lt;p&gt;\sum_{q=1}^{Q}
-\theta_q(\mu)A_q.
-]&lt;/p&gt;
-&lt;p&gt;于是：&lt;/p&gt;
+\[A(\mu) = \sum_{q=1}^{Q} \theta_q(\mu)A_q.\]&lt;p&gt;于是：&lt;/p&gt;
 &lt;h3 id=&#34;offline&#34;&gt;Offline
 &lt;/h3&gt;&lt;p&gt;提前计算：&lt;/p&gt;
-\[
-V^TA_qV.
-\]&lt;h3 id=&#34;online&#34;&gt;Online
+\[V^TA_qV.\]&lt;h3 id=&#34;online&#34;&gt;Online
 &lt;/h3&gt;&lt;p&gt;只组装：&lt;/p&gt;
-&lt;h1 id=&#34;a_nmu&#34;&gt;[
-A_N(\mu)
-&lt;/h1&gt;&lt;p&gt;\sum_q
-\theta_q(\mu)
-V^TA_qV.
-]&lt;/p&gt;
-&lt;p&gt;此时在线复杂度主要与：&lt;/p&gt;
-\[
-N,Q
-\]&lt;p&gt;有关，而不再依赖：&lt;/p&gt;
-\[
-N_h.
-\]&lt;p&gt;这就是经典 RB 所谓：&lt;/p&gt;
-\[
-\boxed{\text{offline-online decomposition}}
-\]&lt;p&gt;也是它真正适用于 many-query / real-time applications 的条件之一。&lt;/p&gt;
+\[A_N(\mu) = \sum_q \theta_q(\mu) V^TA_qV.\]&lt;p&gt;此时在线复杂度主要与：&lt;/p&gt;
+\[N,Q\]&lt;p&gt;有关，而不再依赖：&lt;/p&gt;
+\[N_h.\]&lt;p&gt;这就是经典 RB 所谓：&lt;/p&gt;
+\[\boxed{\text{offline-online decomposition}}\]&lt;p&gt;也是它真正适用于 many-query / real-time applications 的条件之一。&lt;/p&gt;
 &lt;p&gt;对于非仿射和强非线性问题，则往往还需要 empirical interpolation、DEIM 等 hyper-reduction 手段；RBniCS 和 pyMOR 等工程库都实现了相关方法。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;12-一个非常现实的局限认证并不是免费的&#34;&gt;12. 一个非常现实的局限：认证并不是免费的
 &lt;/h1&gt;&lt;p&gt;Certified RB 看起来很理想，但困难集中在几个地方。&lt;/p&gt;
 &lt;p&gt;第一，复杂非线性：&lt;/p&gt;
-\[
-R(u;\mu)=0
-\]&lt;p&gt;时，误差界通常比线性 coercive PDE 难很多。已有工作把 a posteriori analysis 扩展到 nonlinear variational problems，但条件和实现复杂度都会明显提高。&lt;/p&gt;
+\[R(u;\mu)=0\]&lt;p&gt;时，误差界通常比线性 coercive PDE 难很多。已有工作把 a posteriori analysis 扩展到 nonlinear variational problems，但条件和实现复杂度都会明显提高。&lt;/p&gt;
 &lt;p&gt;第二，稳定性常数：&lt;/p&gt;
-\[
-\alpha_{\rm LB}(\mu)
-\]&lt;p&gt;本身可能不好算。&lt;/p&gt;
+\[\alpha_{\rm LB}(\mu)\]&lt;p&gt;本身可能不好算。&lt;/p&gt;
 &lt;p&gt;如果下界过于保守：&lt;/p&gt;
-\[
-\alpha_{\rm LB}\ll\alpha,
-\]&lt;p&gt;那么：&lt;/p&gt;
-\[
-\Delta_N
-\]&lt;p&gt;会很松：&lt;/p&gt;
-\[
-\text{真实误差}=10^{-4},
-\qquad
-\Delta=10^{-1}.
-\]&lt;p&gt;虽然“正确”，但没什么实际用途。&lt;/p&gt;
+\[\alpha_{\rm LB}\ll\alpha,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\Delta_N\]&lt;p&gt;会很松：&lt;/p&gt;
+\[\text{真实误差}=10^{-4}, \qquad \Delta=10^{-1}.\]&lt;p&gt;虽然“正确”，但没什么实际用途。&lt;/p&gt;
 &lt;p&gt;第三，如果解流形本身高维，例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;激波；&lt;/li&gt;
@@ -1870,53 +949,21 @@ R(u;\mu)=0
 &lt;li&gt;强局部化；&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;那么：&lt;/p&gt;
-\[
-N
-\]&lt;p&gt;可能需要增长得很快。&lt;/p&gt;
+\[N\]&lt;p&gt;可能需要增长得很快。&lt;/p&gt;
 &lt;p&gt;这也是 reduced basis 不一定适合所有非线性动力学的原因。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-对代理模型研究最值得迁移的一个思想&#34;&gt;13. 对代理模型研究最值得迁移的一个思想
 &lt;/h1&gt;&lt;p&gt;很多 surrogate workflow 是：&lt;/p&gt;
-\[
-\text{train}
-\rightarrow
-\text{test}
-\rightarrow
-R^2=0.98
-\rightarrow
-\text{deploy}.
-\]&lt;p&gt;但真正工程化以后，我们更希望系统具有：&lt;/p&gt;
-\[
-\boxed{
-\text{prediction}
-+
-\text{local trust metric}
-+
-\text{fallback mechanism}
-}
-\]&lt;p&gt;也就是说：&lt;/p&gt;
-\[
-\hat y(x)
-\]&lt;p&gt;之外，还应该有：&lt;/p&gt;
-\[
-c(x)
-\]&lt;p&gt;判断：&lt;/p&gt;
+\[\text{train} \rightarrow \text{test} \rightarrow R^2=0.98 \rightarrow \text{deploy}.\]&lt;p&gt;但真正工程化以后，我们更希望系统具有：&lt;/p&gt;
+\[\boxed{ \text{prediction} + \text{local trust metric} + \text{fallback mechanism} }\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\hat y(x)\]&lt;p&gt;之外，还应该有：&lt;/p&gt;
+\[c(x)\]&lt;p&gt;判断：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;这一个输入到底能不能信？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;于是工作流可以变成：&lt;/p&gt;
-\[
-\Delta(x)&lt;\epsilon
-\Rightarrow
-\text{接受 surrogate},
-\]\[
-\Delta(x)\ge\epsilon
-\Rightarrow
-\text{调用 HF}.
-\]&lt;p&gt;这就从一个“静态代理模型”变成：&lt;/p&gt;
-\[
-\boxed{\text{adaptive fidelity system}}
-\]&lt;p&gt;这个思想其实可以迁移到：&lt;/p&gt;
+\[\Delta(x)&lt;\epsilon \Rightarrow \text{接受 surrogate},\]\[\Delta(x)\ge\epsilon \Rightarrow \text{调用 HF}.\]&lt;p&gt;这就从一个“静态代理模型”变成：&lt;/p&gt;
+\[\boxed{\text{adaptive fidelity system}}\]&lt;p&gt;这个思想其实可以迁移到：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Kriging；&lt;/li&gt;
 &lt;li&gt;神经网络 surrogate；&lt;/li&gt;
@@ -1927,63 +974,22 @@ c(x)
 &lt;hr&gt;
 &lt;h1 id=&#34;14-对实时物理引擎也有一个很有意思的启发&#34;&gt;14. 对实时物理引擎也有一个很有意思的启发
 &lt;/h1&gt;&lt;p&gt;假设游戏里同时拥有：&lt;/p&gt;
-\[
-\text{cheap solver}
-\]&lt;p&gt;和：&lt;/p&gt;
-\[
-\text{expensive solver}.
-\]&lt;p&gt;最简单的 LOD 是看距离：&lt;/p&gt;
-\[
-d_{\rm camera}&gt;50m
-\Rightarrow
-\text{cheap}.
-\]&lt;p&gt;但 numerical-analysis 风格的设计会变成：&lt;/p&gt;
-\[
-\boxed{
-\text{如果 cheap solver 的在线误差指标足够小，就继续 cheap；
-否则自动升级 fidelity。}
-}
-\]&lt;p&gt;也就是说，LOD 不由：&lt;/p&gt;
-\[
-\text{距离}
-\]&lt;p&gt;决定，而由：&lt;/p&gt;
-\[
-\boxed{\text{estimated physics error}}
-\]&lt;p&gt;决定。&lt;/p&gt;
+\[\text{cheap solver}\]&lt;p&gt;和：&lt;/p&gt;
+\[\text{expensive solver}.\]&lt;p&gt;最简单的 LOD 是看距离：&lt;/p&gt;
+\[d_{\rm camera}&gt;50m \Rightarrow \text{cheap}.\]&lt;p&gt;但 numerical-analysis 风格的设计会变成：&lt;/p&gt;
+\[\boxed{ \text{如果 cheap solver 的在线误差指标足够小，就继续 cheap； 否则自动升级 fidelity。} }\]&lt;p&gt;也就是说，LOD 不由：&lt;/p&gt;
+\[\text{距离}\]&lt;p&gt;决定，而由：&lt;/p&gt;
+\[\boxed{\text{estimated physics error}}\]&lt;p&gt;决定。&lt;/p&gt;
 &lt;p&gt;这其实是 Certified RB 背后的工程思想最值得迁移的地方。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h2&gt;&lt;p&gt;Reduced Basis 最有价值的部分，并不是：&lt;/p&gt;
-\[
-10^6\text{ DOF}
-\rightarrow
-30\text{ DOF}.
-\]&lt;p&gt;真正重要的是：&lt;/p&gt;
-\[
-\boxed{
-\text{快速模型 + 在线误差认证}
-}
-\]&lt;p&gt;形成了一个闭环：&lt;/p&gt;
-\[
-\text{快速预测}
-\rightarrow
-\text{检查可信度}
-\rightarrow
-\text{必要时调用 HF}
-\rightarrow
-\text{扩充模型}.
-\]&lt;p&gt;因此它提出了一个比“代理模型精度多高”更成熟的问题：&lt;/p&gt;
-\[
-\boxed{
-\text{代理模型能否知道自己什么时候不应该被相信？}
-}
-\]&lt;p&gt;对可靠性分析而言，这尤其重要，因为真正危险的往往不是平均意义上的：&lt;/p&gt;
-\[
-R^2=0.95,
-\]&lt;p&gt;而是某一个极限状态附近的样本：&lt;/p&gt;
-\[
-\boxed{\text{代理模型错了，却不知道自己错了。}}
-\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+\[10^6\text{ DOF} \rightarrow 30\text{ DOF}.\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \text{快速模型 + 在线误差认证} }\]&lt;p&gt;形成了一个闭环：&lt;/p&gt;
+\[\text{快速预测} \rightarrow \text{检查可信度} \rightarrow \text{必要时调用 HF} \rightarrow \text{扩充模型}.\]&lt;p&gt;因此它提出了一个比“代理模型精度多高”更成熟的问题：&lt;/p&gt;
+\[\boxed{ \text{代理模型能否知道自己什么时候不应该被相信？} }\]&lt;p&gt;对可靠性分析而言，这尤其重要，因为真正危险的往往不是平均意义上的：&lt;/p&gt;
+\[R^2=0.95,\]&lt;p&gt;而是某一个极限状态附近的样本：&lt;/p&gt;
+\[\boxed{\text{代理模型错了，却不知道自己错了。}}\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Quarteroni, Manzoni &amp;amp; Negri, &lt;em&gt;Reduced Basis Methods for Partial Differential Equations: An Introduction&lt;/em&gt;&lt;/strong&gt;，以及 Hesthaven, Rozza &amp;amp; Stamm 的 &lt;strong&gt;&lt;em&gt;Certified Reduced Basis Methods for Parametrized Partial Differential Equations&lt;/em&gt;&lt;/strong&gt;。两本都是建立完整 RB / certification 体系的标准入口。&lt;/p&gt;
@@ -2014,9 +1020,7 @@ R^2=0.95,
 &lt;strong&gt;领域：可靠性 × 不确定性量化 × 代理模型&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：&lt;/p&gt;
-\[
-\boxed{\text{失效越稀有，普通 Monte Carlo 越浪费计算}}
-\]&lt;p&gt;它的核心思想却异常简单：&lt;/p&gt;
+\[\boxed{\text{失效越稀有，普通 Monte Carlo 越浪费计算}}\]&lt;p&gt;它的核心思想却异常简单：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;不要直接寻找一个概率为 \(10^{-6}\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \(0.1\)，最后把这些条件概率乘起来。&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -2024,178 +1028,57 @@ R^2=0.95,
 &lt;hr&gt;
 &lt;h2 id=&#34;1-为什么普通-monte-carlo-遇到小失效概率会失效&#34;&gt;1. 为什么普通 Monte Carlo 遇到小失效概率会失效？
 &lt;/h2&gt;&lt;p&gt;设极限状态函数：&lt;/p&gt;
-\[
-g(X)
-\]&lt;p&gt;规定：&lt;/p&gt;
-\[
-g(X)\le0
-\]&lt;p&gt;为失效。&lt;/p&gt;
+\[g(X)\]&lt;p&gt;规定：&lt;/p&gt;
+\[g(X)\le0\]&lt;p&gt;为失效。&lt;/p&gt;
 &lt;p&gt;那么：&lt;/p&gt;
-\[
-P_f=P[g(X)\le0].
-\]&lt;p&gt;普通 Monte Carlo 估计：&lt;/p&gt;
-&lt;h1 id=&#34;hat-p_f&#34;&gt;[
-\hat P_f
-&lt;/h1&gt;&lt;p&gt;\frac1N
-\sum_{i=1}^{N}
-I[g(X_i)\le0].
-]&lt;/p&gt;
-&lt;p&gt;如果：&lt;/p&gt;
-\[
-P_f=10^{-6},
-\]&lt;p&gt;那么平均：&lt;/p&gt;
-\[
-10^6
-\]&lt;p&gt;个样本才能看到一次失效。&lt;/p&gt;
+\[P_f=P[g(X)\le0].\]&lt;p&gt;普通 Monte Carlo 估计：&lt;/p&gt;
+\[\hat P_f = \frac1N \sum_{i=1}^{N} I[g(X_i)\le0].\]&lt;p&gt;如果：&lt;/p&gt;
+\[P_f=10^{-6},\]&lt;p&gt;那么平均：&lt;/p&gt;
+\[10^6\]&lt;p&gt;个样本才能看到一次失效。&lt;/p&gt;
 &lt;p&gt;但“看到一次”远远不够。&lt;/p&gt;
 &lt;p&gt;Bernoulli estimator 的变异系数近似：&lt;/p&gt;
-&lt;h1 id=&#34;delta&#34;&gt;[
-\delta
-&lt;/h1&gt;&lt;p&gt;\sqrt{
-\frac{1-P_f}{NP_f}
-}.
-]&lt;/p&gt;
-&lt;p&gt;如果希望：&lt;/p&gt;
-\[
-\delta=0.1,
-\]&lt;p&gt;那么约需要：&lt;/p&gt;
-\[
-NP_f\approx100,
-\]&lt;p&gt;也就是：&lt;/p&gt;
-\[
-N\approx10^8.
-\]&lt;p&gt;如果一次有限元仿真需要 10 秒：&lt;/p&gt;
-\[
-10^8\times10\text{s}
-\]&lt;p&gt;已经完全没有工程意义。&lt;/p&gt;
+\[\delta = \sqrt{ \frac{1-P_f}{NP_f} }.\]&lt;p&gt;如果希望：&lt;/p&gt;
+\[\delta=0.1,\]&lt;p&gt;那么约需要：&lt;/p&gt;
+\[NP_f\approx100,\]&lt;p&gt;也就是：&lt;/p&gt;
+\[N\approx10^8.\]&lt;p&gt;如果一次有限元仿真需要 10 秒：&lt;/p&gt;
+\[10^8\times10\text{s}\]&lt;p&gt;已经完全没有工程意义。&lt;/p&gt;
 &lt;p&gt;所以 rare-event reliability 的真正困难是：&lt;/p&gt;
-\[
-\boxed{
-\text{绝大多数昂贵计算都浪费在“显然安全”的区域}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{绝大多数昂贵计算都浪费在“显然安全”的区域} }\]&lt;hr&gt;
 &lt;h1 id=&#34;2-subset-simulation-的核心人为建立一串中间失效事件&#34;&gt;2. Subset Simulation 的核心：人为建立一串中间失效事件
 &lt;/h1&gt;&lt;p&gt;假设最终失效域是：&lt;/p&gt;
-\[
-F=\{g(X)\le0\}.
-\]&lt;p&gt;构造：&lt;/p&gt;
-\[
-F_1\supset F_2\supset\cdots\supset F_m=F.
-\]&lt;p&gt;那么根据概率乘法：&lt;/p&gt;
-&lt;h1 id=&#34;pf&#34;&gt;[
-P(F)
-&lt;/h1&gt;&lt;p&gt;P(F_1)
-P(F_2|F_1)
-\cdots
-P(F_m|F_{m-1}).
-]&lt;/p&gt;
-&lt;p&gt;如果我们故意让每一级：&lt;/p&gt;
-\[
-P(F_i|F_{i-1})\approx p_0,
-\]&lt;p&gt;比如：&lt;/p&gt;
-\[
-p_0=0.1,
-\]&lt;p&gt;而：&lt;/p&gt;
-\[
-P_f=10^{-6},
-\]&lt;p&gt;那么大约：&lt;/p&gt;
-&lt;h1 id=&#34;10-6&#34;&gt;[
-10^{-6}
-&lt;/h1&gt;&lt;p&gt;0.1^6.
-]&lt;/p&gt;
-&lt;p&gt;于是原本一个：&lt;/p&gt;
-\[
-10^{-6}
-\]&lt;p&gt;的稀有事件，变成 6 个：&lt;/p&gt;
-\[
-10^{-1}
-\]&lt;p&gt;级别的条件事件。&lt;/p&gt;
+\[F=\{g(X)\le0\}.\]&lt;p&gt;构造：&lt;/p&gt;
+\[F_1\supset F_2\supset\cdots\supset F_m=F.\]&lt;p&gt;那么根据概率乘法：&lt;/p&gt;
+\[P(F) = P(F_1) P(F_2|F_1) \cdots P(F_m|F_{m-1}).\]&lt;p&gt;如果我们故意让每一级：&lt;/p&gt;
+\[P(F_i|F_{i-1})\approx p_0,\]&lt;p&gt;比如：&lt;/p&gt;
+\[p_0=0.1,\]&lt;p&gt;而：&lt;/p&gt;
+\[P_f=10^{-6},\]&lt;p&gt;那么大约：&lt;/p&gt;
+\[10^{-6} = 0.1^6.\]&lt;p&gt;于是原本一个：&lt;/p&gt;
+\[10^{-6}\]&lt;p&gt;的稀有事件，变成 6 个：&lt;/p&gt;
+\[10^{-1}\]&lt;p&gt;级别的条件事件。&lt;/p&gt;
 &lt;p&gt;这就是整个方法最核心的一步：&lt;/p&gt;
-\[
-\boxed{
-\text{Rare event}
-\rightarrow
-\text{sequence of moderately rare events}
-}
-\]&lt;p&gt;原论文正是以这种 conditional probability decomposition 为基本思想。&lt;/p&gt;
+\[\boxed{ \text{Rare event} \rightarrow \text{sequence of moderately rare events} }\]&lt;p&gt;原论文正是以这种 conditional probability decomposition 为基本思想。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-中间事件到底是什么&#34;&gt;3. 中间事件到底是什么？
 &lt;/h1&gt;&lt;p&gt;假设失效定义：&lt;/p&gt;
-\[
-g(X)\le0.
-\]&lt;p&gt;Subset Simulation 不会一开始就要求：&lt;/p&gt;
-\[
-g\le0.
-\]&lt;p&gt;而可能建立：&lt;/p&gt;
-\[
-F_1=\{g(X)\le b_1\},
-\]\[
-F_2=\{g(X)\le b_2\},
-\]&lt;p&gt;……&lt;/p&gt;
-\[
-F_m=\{g(X)\le0\},
-\]&lt;p&gt;其中：&lt;/p&gt;
-\[
-b_1&gt;b_2&gt;\cdots&gt;0.
-\]&lt;p&gt;例如某结构应力极限：&lt;/p&gt;
-\[
-\sigma_{\rm allow}=500\text{ MPa}.
-\]&lt;p&gt;定义：&lt;/p&gt;
-\[
-g=500-\sigma_{\max}.
-\]&lt;p&gt;那么 SuS 可能逐级关注：&lt;/p&gt;
-\[
-\sigma_{\max}&gt;300,
-\]&lt;p&gt;[&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;380,
-]&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;[&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;440,
-]&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;[&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;475,
-]&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;[&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;ol start=&#34;500&#34;&gt;
-&lt;li&gt;&lt;/li&gt;
-&lt;/ol&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;]&lt;/p&gt;
-&lt;p&gt;于是采样过程就像不断向失效域“推进”。&lt;/p&gt;
+\[g(X)\le0.\]&lt;p&gt;Subset Simulation 不会一开始就要求：&lt;/p&gt;
+\[g\le0.\]&lt;p&gt;而可能建立：&lt;/p&gt;
+\[F_1=\{g(X)\le b_1\},\]\[F_2=\{g(X)\le b_2\},\]&lt;p&gt;……&lt;/p&gt;
+\[F_m=\{g(X)\le0\},\]&lt;p&gt;其中：&lt;/p&gt;
+\[b_1&gt;b_2&gt;\cdots&gt;0.\]&lt;p&gt;例如某结构应力极限：&lt;/p&gt;
+\[\sigma_{\rm allow}=500\text{ MPa}.\]&lt;p&gt;定义：&lt;/p&gt;
+\[g=500-\sigma_{\max}.\]&lt;p&gt;那么 SuS 可能逐级关注：&lt;/p&gt;
+\[\sigma_{\max}&gt;300,\]\[&gt;380,\]\[&gt;440,\]\[&gt;475,\]\[&gt;500.\]&lt;p&gt;于是采样过程就像不断向失效域“推进”。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-最巧妙的一步阈值通常不是提前规定的&#34;&gt;4. 最巧妙的一步：阈值通常不是提前规定的
 &lt;/h1&gt;&lt;p&gt;假设每一级生成：&lt;/p&gt;
-\[
-N=1000
-\]&lt;p&gt;个样本，并选择：&lt;/p&gt;
-\[
-p_0=0.1.
-\]&lt;p&gt;第一轮普通随机采样后，把样本按照：&lt;/p&gt;
-\[
-g(X)
-\]&lt;p&gt;排序。&lt;/p&gt;
+\[N=1000\]&lt;p&gt;个样本，并选择：&lt;/p&gt;
+\[p_0=0.1.\]&lt;p&gt;第一轮普通随机采样后，把样本按照：&lt;/p&gt;
+\[g(X)\]&lt;p&gt;排序。&lt;/p&gt;
 &lt;p&gt;直接取最危险的：&lt;/p&gt;
-\[
-100
-\]&lt;p&gt;个样本。&lt;/p&gt;
+\[100\]&lt;p&gt;个样本。&lt;/p&gt;
 &lt;p&gt;第 100 个样本对应的 \(g\) 值就是：&lt;/p&gt;
-\[
-b_1.
-\]&lt;p&gt;因此：&lt;/p&gt;
-&lt;h1 id=&#34;frac1001000&#34;&gt;[
-P(F_1)
-\approx
-\frac{100}{1000}
-&lt;/h1&gt;&lt;p&gt;0.1.
-]&lt;/p&gt;
-&lt;p&gt;下一层同理。&lt;/p&gt;
+\[b_1.\]&lt;p&gt;因此：&lt;/p&gt;
+\[P(F_1) \approx \frac{100}{1000} = 0.1.\]&lt;p&gt;下一层同理。&lt;/p&gt;
 &lt;p&gt;于是 intermediate thresholds 是&lt;strong&gt;自适应生成的&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;你不需要提前知道失效面在哪里。&lt;/p&gt;
 &lt;p&gt;这也是 Subset Simulation 在：&lt;/p&gt;
@@ -2209,66 +1092,28 @@ P(F_1)
 &lt;h1 id=&#34;5-但第二层样本从哪里来&#34;&gt;5. 但第二层样本从哪里来？
 &lt;/h1&gt;&lt;p&gt;这是理解 SuS 最关键的一点。&lt;/p&gt;
 &lt;p&gt;第一层：&lt;/p&gt;
-\[
-X\sim p_X(x)
-\]&lt;p&gt;直接 Monte Carlo 即可。&lt;/p&gt;
+\[X\sim p_X(x)\]&lt;p&gt;直接 Monte Carlo 即可。&lt;/p&gt;
 &lt;p&gt;但第二层需要：&lt;/p&gt;
-\[
-X\sim p(X|F_1).
-\]&lt;p&gt;也就是说：&lt;/p&gt;
-\[
-\boxed{\text{只在 }F_1\text{ 内采样}}
-\]&lt;p&gt;第三层进一步要求：&lt;/p&gt;
-\[
-X\sim p(X|F_2).
-\]&lt;p&gt;问题是这种条件分布一般无法直接采样。&lt;/p&gt;
+\[X\sim p(X|F_1).\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{\text{只在 }F_1\text{ 内采样}}\]&lt;p&gt;第三层进一步要求：&lt;/p&gt;
+\[X\sim p(X|F_2).\]&lt;p&gt;问题是这种条件分布一般无法直接采样。&lt;/p&gt;
 &lt;p&gt;所以经典 Subset Simulation 引入：&lt;/p&gt;
-\[
-\boxed{\text{Markov Chain Monte Carlo}}
-\]&lt;p&gt;来生成 conditional samples。原始 SubSim/MCMC 以及后续 benchmark 工作都采用这一结构。&lt;/p&gt;
+\[\boxed{\text{Markov Chain Monte Carlo}}\]&lt;p&gt;来生成 conditional samples。原始 SubSim/MCMC 以及后续 benchmark 工作都采用这一结构。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-mcmc-在这里到底干什么&#34;&gt;6. MCMC 在这里到底干什么？
 &lt;/h1&gt;&lt;p&gt;第一层结束后得到：&lt;/p&gt;
-\[
-100
-\]&lt;p&gt;个满足：&lt;/p&gt;
-\[
-F_1
-\]&lt;p&gt;的“种子样本”。&lt;/p&gt;
+\[100\]&lt;p&gt;个满足：&lt;/p&gt;
+\[F_1\]&lt;p&gt;的“种子样本”。&lt;/p&gt;
 &lt;p&gt;从每个 seed 出发进行 MCMC：&lt;/p&gt;
-\[
-X^{(0)}
-\rightarrow
-X^{(1)}
-\rightarrow
-X^{(2)}
-\rightarrow\cdots
-\]&lt;p&gt;但只接受满足：&lt;/p&gt;
-\[
-X\in F_1
-\]&lt;p&gt;的状态。&lt;/p&gt;
+\[X^{(0)} \rightarrow X^{(1)} \rightarrow X^{(2)} \rightarrow\cdots\]&lt;p&gt;但只接受满足：&lt;/p&gt;
+\[X\in F_1\]&lt;p&gt;的状态。&lt;/p&gt;
 &lt;p&gt;于是最终生成约：&lt;/p&gt;
-\[
-1000
-\]&lt;p&gt;个：&lt;/p&gt;
-\[
-X\sim p(X|F_1)
-\]&lt;p&gt;样本。&lt;/p&gt;
+\[1000\]&lt;p&gt;个：&lt;/p&gt;
+\[X\sim p(X|F_1)\]&lt;p&gt;样本。&lt;/p&gt;
 &lt;p&gt;然后再找其中最危险的 10%：&lt;/p&gt;
-\[
-F_2.
-\]&lt;p&gt;继续重复。&lt;/p&gt;
+\[F_2.\]&lt;p&gt;继续重复。&lt;/p&gt;
 &lt;p&gt;所以整个过程更准确地说是：&lt;/p&gt;
-\[
-\boxed{
-\text{Monte Carlo}
-\rightarrow
-\text{conditional MCMC}
-\rightarrow
-\text{conditional MCMC}
-\rightarrow\cdots
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{Monte Carlo} \rightarrow \text{conditional MCMC} \rightarrow \text{conditional MCMC} \rightarrow\cdots }\]&lt;hr&gt;
 &lt;h1 id=&#34;7-它为什么会显著降低计算量&#34;&gt;7. 它为什么会显著降低计算量？
 &lt;/h1&gt;&lt;p&gt;这里有一个非常重要的信息论直觉。&lt;/p&gt;
 &lt;p&gt;普通 Monte Carlo：&lt;/p&gt;
@@ -2285,9 +1130,7 @@ F_2.
 &lt;p&gt;“这个点安全。”&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;但这对：&lt;/p&gt;
-\[
-P_f=10^{-6}
-\]&lt;p&gt;几乎没有新信息。&lt;/p&gt;
+\[P_f=10^{-6}\]&lt;p&gt;几乎没有新信息。&lt;/p&gt;
 &lt;p&gt;Subset Simulation 则逐层：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -2314,53 +1157,24 @@ P_f=10^{-6}
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;也就是说后面的计算预算几乎都被集中到：&lt;/p&gt;
-\[
-\boxed{\text{failure-relevant region}}
-\]&lt;p&gt;附近。&lt;/p&gt;
+\[\boxed{\text{failure-relevant region}}\]&lt;p&gt;附近。&lt;/p&gt;
 &lt;p&gt;这与 AK-MCS 的精神其实很接近：&lt;/p&gt;
 &lt;p&gt;AK-MCS：&lt;/p&gt;
-\[
-\text{高保真计算集中到 }g\approx0.
-\]&lt;p&gt;Subset Simulation：&lt;/p&gt;
-\[
-\text{随机采样逐渐条件化到危险区域}.
-\]&lt;p&gt;共同原则都是：&lt;/p&gt;
-\[
-\boxed{
-\text{不要平均地在整个输入空间浪费计算预算}
-}
-\]&lt;hr&gt;
+\[\text{高保真计算集中到 }g\approx0.\]&lt;p&gt;Subset Simulation：&lt;/p&gt;
+\[\text{随机采样逐渐条件化到危险区域}.\]&lt;p&gt;共同原则都是：&lt;/p&gt;
+\[\boxed{ \text{不要平均地在整个输入空间浪费计算预算} }\]&lt;hr&gt;
 &lt;h1 id=&#34;8-一个非常容易忽视的问题sus-的样本不再独立&#34;&gt;8. 一个非常容易忽视的问题：SuS 的样本不再独立
 &lt;/h1&gt;&lt;p&gt;普通 Monte Carlo：&lt;/p&gt;
-\[
-X_1,\ldots,X_N
-\]&lt;p&gt;相互独立。&lt;/p&gt;
+\[X_1,\ldots,X_N\]&lt;p&gt;相互独立。&lt;/p&gt;
 &lt;p&gt;而 MCMC 生成：&lt;/p&gt;
-\[
-X^{(1)},X^{(2)},\ldots
-\]&lt;p&gt;存在自相关。&lt;/p&gt;
+\[X^{(1)},X^{(2)},\ldots\]&lt;p&gt;存在自相关。&lt;/p&gt;
 &lt;p&gt;所以虽然每层名义上有：&lt;/p&gt;
-\[
-N=1000,
-\]&lt;p&gt;其有效样本量可能只有：&lt;/p&gt;
-\[
-N_{\rm eff}&lt;1000.
-\]&lt;p&gt;可以粗略理解为：&lt;/p&gt;
-\[
-N_{\rm eff}
-\approx
-\frac{N}
-{1+2\sum_{k=1}^{\infty}\rho_k}.
-\]&lt;p&gt;如果 chain mixing 很差：&lt;/p&gt;
-\[
-\rho_k
-\]&lt;p&gt;长期很大，则：&lt;/p&gt;
-\[
-N_{\rm eff}\ll N.
-\]&lt;p&gt;所以 SuS 的效率很大程度上取决于：&lt;/p&gt;
-\[
-\boxed{\text{MCMC 能否在条件失效域中充分移动}}
-\]&lt;p&gt;而这也是它最大的弱点之一。&lt;/p&gt;
+\[N=1000,\]&lt;p&gt;其有效样本量可能只有：&lt;/p&gt;
+\[N_{\rm eff}&lt;1000.\]&lt;p&gt;可以粗略理解为：&lt;/p&gt;
+\[N_{\rm eff} \approx \frac{N} {1+2\sum_{k=1}^{\infty}\rho_k}.\]&lt;p&gt;如果 chain mixing 很差：&lt;/p&gt;
+\[\rho_k\]&lt;p&gt;长期很大，则：&lt;/p&gt;
+\[N_{\rm eff}\ll N.\]&lt;p&gt;所以 SuS 的效率很大程度上取决于：&lt;/p&gt;
+\[\boxed{\text{MCMC 能否在条件失效域中充分移动}}\]&lt;p&gt;而这也是它最大的弱点之一。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-多个失效岛会成为严重问题&#34;&gt;9. 多个失效岛会成为严重问题
 &lt;/h1&gt;&lt;p&gt;假设 failure domain 有两个彼此分离区域：&lt;/p&gt;
@@ -2381,72 +1195,35 @@ N_{\rm eff}\ll N.
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;第一层 MCMC 恰好只找到：&lt;/p&gt;
-\[
-A
-\]&lt;p&gt;附近的 seed。&lt;/p&gt;
+\[A\]&lt;p&gt;附近的 seed。&lt;/p&gt;
 &lt;p&gt;后续：&lt;/p&gt;
-\[
-F_1\rightarrow F_2\rightarrow F_3
-\]&lt;p&gt;就可能一直困在：&lt;/p&gt;
-\[
-A
-\]&lt;p&gt;附近。&lt;/p&gt;
+\[F_1\rightarrow F_2\rightarrow F_3\]&lt;p&gt;就可能一直困在：&lt;/p&gt;
+\[A\]&lt;p&gt;附近。&lt;/p&gt;
 &lt;p&gt;于是：&lt;/p&gt;
-\[
-B
-\]&lt;p&gt;虽然贡献了真实失效概率，却被漏掉。&lt;/p&gt;
+\[B\]&lt;p&gt;虽然贡献了真实失效概率，却被漏掉。&lt;/p&gt;
 &lt;p&gt;这就是所谓：&lt;/p&gt;
-\[
-\boxed{\text{mode trapping / poor exploration}}
-\]&lt;p&gt;问题。&lt;/p&gt;
+\[\boxed{\text{mode trapping / poor exploration}}\]&lt;p&gt;问题。&lt;/p&gt;
 &lt;p&gt;到 2026 年，这仍然是活跃研究方向。例如 2026 年提出的 &lt;strong&gt;Directional Subset Simulation&lt;/strong&gt; 就明确针对多失效模式下 MCMC 容易困在输入空间局部区域的问题，通过方向性信息帮助中间层保留多个潜在失效方向。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-\text{SuS解决 rare-event rarity，
-但不自动解决 multimodality}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{SuS解决 rare-event rarity， 但不自动解决 multimodality} }\]&lt;hr&gt;
 &lt;h1 id=&#34;10-一个值得记住的参数&#34;&gt;10. 一个值得记住的参数：\(p_0\)
 &lt;/h1&gt;&lt;p&gt;SuS 中通常选择：&lt;/p&gt;
-\[
-p_0\approx0.1
-\]&lt;p&gt;左右。&lt;/p&gt;
+\[p_0\approx0.1\]&lt;p&gt;左右。&lt;/p&gt;
 &lt;p&gt;为什么不能：&lt;/p&gt;
-\[
-p_0=0.9？
-\]&lt;p&gt;因为层数会非常多。&lt;/p&gt;
+\[p_0=0.9？\]&lt;p&gt;因为层数会非常多。&lt;/p&gt;
 &lt;p&gt;为什么不能：&lt;/p&gt;
-\[
-p_0=10^{-4}？
-\]&lt;p&gt;因为每层又变成了 rare-event estimation。&lt;/p&gt;
+\[p_0=10^{-4}？\]&lt;p&gt;因为每层又变成了 rare-event estimation。&lt;/p&gt;
 &lt;p&gt;于是存在经典折中：&lt;/p&gt;
-\[
-\boxed{
-\text{每层足够容易采到}
-+
-\text{层数不能太多}
-}
-\]&lt;p&gt;这也是为什么：&lt;/p&gt;
-\[
-0.1
-\]&lt;p&gt;量级经常被使用。&lt;/p&gt;
+\[\boxed{ \text{每层足够容易采到} + \text{层数不能太多} }\]&lt;p&gt;这也是为什么：&lt;/p&gt;
+\[0.1\]&lt;p&gt;量级经常被使用。&lt;/p&gt;
 &lt;p&gt;它并非神奇常数，更接近计算效率上的经验最优区域。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;11-它和-form-有什么本质差异&#34;&gt;11. 它和 FORM 有什么本质差异？
 &lt;/h1&gt;&lt;p&gt;FORM 寻找：&lt;/p&gt;
-&lt;h1 id=&#34;beta&#34;&gt;[
-\beta
-&lt;/h1&gt;&lt;p&gt;\min_{g(u)=0}|u|,
-]&lt;/p&gt;
-&lt;p&gt;即标准正态空间中最可能失效点。&lt;/p&gt;
+\[\beta = \min_{g(u)=0}\|u\|,\]&lt;p&gt;即标准正态空间中最可能失效点。&lt;/p&gt;
 &lt;p&gt;然后：&lt;/p&gt;
-\[
-P_f\approx\Phi(-\beta).
-\]&lt;p&gt;本质上是：&lt;/p&gt;
-\[
-\boxed{\text{局部几何近似}}
-\]&lt;p&gt;因此如果失效面比较规整，FORM 极其便宜。&lt;/p&gt;
+\[P_f\approx\Phi(-\beta).\]&lt;p&gt;本质上是：&lt;/p&gt;
+\[\boxed{\text{局部几何近似}}\]&lt;p&gt;因此如果失效面比较规整，FORM 极其便宜。&lt;/p&gt;
 &lt;p&gt;但遇到：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;多失效模式；&lt;/li&gt;
@@ -2456,123 +1233,48 @@ P_f\approx\Phi(-\beta).
 &lt;p&gt;一个 design point 很难描述完整失效概率。&lt;/p&gt;
 &lt;p&gt;Subset Simulation 不需要近似失效面为一阶或二阶曲面。&lt;/p&gt;
 &lt;p&gt;它直接采样：&lt;/p&gt;
-\[
-P(F).
-\]&lt;p&gt;所以可以粗略记：&lt;/p&gt;
-\[
-\boxed{
-\text{FORM：寻找最重要的失效点}
-}
-\]\[
-\boxed{
-\text{SuS：逐层探索整个失效区域}
-}
-\]&lt;p&gt;代价当然也更高。&lt;/p&gt;
+\[P(F).\]&lt;p&gt;所以可以粗略记：&lt;/p&gt;
+\[\boxed{ \text{FORM：寻找最重要的失效点} }\]\[\boxed{ \text{SuS：逐层探索整个失效区域} }\]&lt;p&gt;代价当然也更高。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;12-它与-importance-sampling-又有什么区别&#34;&gt;12. 它与 Importance Sampling 又有什么区别？
 &lt;/h1&gt;&lt;p&gt;Importance Sampling 需要构造：&lt;/p&gt;
-\[
-q(x)
-\]&lt;p&gt;让样本更多落在失效区域。&lt;/p&gt;
+\[q(x)\]&lt;p&gt;让样本更多落在失效区域。&lt;/p&gt;
 &lt;p&gt;然后：&lt;/p&gt;
-&lt;h1 id=&#34;p_f&#34;&gt;[
-P_f
-&lt;/h1&gt;&lt;p&gt;E_q
-\left[
-I_F(X)
-\frac{p(X)}{q(X)}
-\right].
-]&lt;/p&gt;
-&lt;p&gt;难点在于：&lt;/p&gt;
-\[
-\boxed{\text{怎样提前构造一个好的 }q(x)}
-\]&lt;p&gt;尤其高维、多峰失效域里很困难。&lt;/p&gt;
+\[P_f = E_q \left[ I_F(X) \frac{p(X)}{q(X)} \right].\]&lt;p&gt;难点在于：&lt;/p&gt;
+\[\boxed{\text{怎样提前构造一个好的 }q(x)}\]&lt;p&gt;尤其高维、多峰失效域里很困难。&lt;/p&gt;
 &lt;p&gt;Subset Simulation 不直接构造全局：&lt;/p&gt;
-\[
-q(x).
-\]&lt;p&gt;而是逐步得到：&lt;/p&gt;
-\[
-p(X|F_1),
-\]\[
-p(X|F_2),
-\]&lt;p&gt;……&lt;/p&gt;
+\[q(x).\]&lt;p&gt;而是逐步得到：&lt;/p&gt;
+\[p(X|F_1),\]\[p(X|F_2),\]&lt;p&gt;……&lt;/p&gt;
 &lt;p&gt;可以理解成一种：&lt;/p&gt;
-\[
-\boxed{\text{自适应地学习重要区域}}
-\]&lt;p&gt;因此它在“不知道失效域在哪里”时尤其有优势。&lt;/p&gt;
+\[\boxed{\text{自适应地学习重要区域}}\]&lt;p&gt;因此它在“不知道失效域在哪里”时尤其有优势。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-sus-和代理模型结合时会出现一个很漂亮的结构&#34;&gt;13. SuS 和代理模型结合时，会出现一个很漂亮的结构
 &lt;/h1&gt;&lt;p&gt;传统 SuS 最大成本仍然是：&lt;/p&gt;
-\[
-g(X)
-\]&lt;p&gt;每个样本都要真实仿真。&lt;/p&gt;
+\[g(X)\]&lt;p&gt;每个样本都要真实仿真。&lt;/p&gt;
 &lt;p&gt;于是自然出现：&lt;/p&gt;
-\[
-\boxed{
-\text{Kriging / NN}
-+
-\text{Subset Simulation}
-}
-\]&lt;p&gt;而 SuS 有一个天然优势：&lt;/p&gt;
+\[\boxed{ \text{Kriging / NN} + \text{Subset Simulation} }\]&lt;p&gt;而 SuS 有一个天然优势：&lt;/p&gt;
 &lt;p&gt;它每一层产生的样本都越来越靠近失效域。&lt;/p&gt;
 &lt;p&gt;因此这些 conditional samples 本身就是很有价值的：&lt;/p&gt;
-\[
-\boxed{\text{active-learning candidate pool}}
-\]&lt;p&gt;2024 年已有工作直接使用 intermediate-event MCMC samples 迭代优化 metamodel；相关现代 active-learning 文献也明确把 SuS 的中间条件样本作为代理模型主动采样候选池。&lt;/p&gt;
+\[\boxed{\text{active-learning candidate pool}}\]&lt;p&gt;2024 年已有工作直接使用 intermediate-event MCMC samples 迭代优化 metamodel；相关现代 active-learning 文献也明确把 SuS 的中间条件样本作为代理模型主动采样候选池。&lt;/p&gt;
 &lt;p&gt;这形成一个很自然的循环：&lt;/p&gt;
-\[
-\text{SuS找到危险区域}
-\]\[
-\downarrow
-\]\[
-\text{surrogate重点学习危险区域}
-\]\[
-\downarrow
-\]\[
-\text{surrogate降低下一层SuS成本}.
-\]&lt;p&gt;这比先在整个输入空间训练一个“全局很准”的 surrogate 更符合可靠性任务本身。&lt;/p&gt;
+\[\text{SuS找到危险区域}\]\[\downarrow\]\[\text{surrogate重点学习危险区域}\]\[\downarrow\]\[\text{surrogate降低下一层SuS成本}.\]&lt;p&gt;这比先在整个输入空间训练一个“全局很准”的 surrogate 更符合可靠性任务本身。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;14-一个很新的发展multi-fidelity-subset-simulation&#34;&gt;14. 一个很新的发展：Multi-fidelity Subset Simulation
 &lt;/h1&gt;&lt;p&gt;这也正好连接前几天讲过的 MFMC。&lt;/p&gt;
 &lt;p&gt;2026 年发表的 &lt;strong&gt;Multi-fidelity Subset Simulation (MFSS)&lt;/strong&gt; 把不同 fidelity 也纳入 rare-event simulation，把 fidelity 当作扩充空间中的随机变量，并通过 Bayes 关系恢复高保真失效概率，同时优化不同 fidelity 的采样预算。&lt;/p&gt;
 &lt;p&gt;它试图解决：&lt;/p&gt;
-\[
-\boxed{
-\text{SuS知道“去哪采”，
-multifidelity知道“用多贵的模型采”}
-}
-\]&lt;p&gt;所以可以把两类资源分配思想组合起来：&lt;/p&gt;
-\[
-\boxed{
-\text{空间分配：在哪里算？}
-}
-\]\[
-\boxed{
-\text{精度分配：用什么模型算？}
-}
-\]&lt;p&gt;这是目前可靠性计算非常值得关注的一条路线。&lt;/p&gt;
+\[\boxed{ \text{SuS知道“去哪采”， multifidelity知道“用多贵的模型采”} }\]&lt;p&gt;所以可以把两类资源分配思想组合起来：&lt;/p&gt;
+\[\boxed{ \text{空间分配：在哪里算？} }\]\[\boxed{ \text{精度分配：用什么模型算？} }\]&lt;p&gt;这是目前可靠性计算非常值得关注的一条路线。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;15-对可靠性研究最值得迁移的一点&#34;&gt;15. 对可靠性研究最值得迁移的一点
 &lt;/h1&gt;&lt;p&gt;Subset Simulation 最深刻的地方不只是：&lt;/p&gt;
-&lt;h1 id=&#34;p_f-1&#34;&gt;[
-P_f
-&lt;/h1&gt;&lt;p&gt;\prod_i P(F_i|F_{i-1}).
-]&lt;/p&gt;
-&lt;p&gt;真正值得记住的是：&lt;/p&gt;
-\[
-\boxed{\text{困难概率可以通过改变采样分布来变得容易。}}
-\]&lt;p&gt;普通 Monte Carlo 接受原始分布：&lt;/p&gt;
-\[
-p_X(x)
-\]&lt;p&gt;给你的全部样本。&lt;/p&gt;
+\[P_f = \prod_i P(F_i|F_{i-1}).\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{\text{困难概率可以通过改变采样分布来变得容易。}}\]&lt;p&gt;普通 Monte Carlo 接受原始分布：&lt;/p&gt;
+\[p_X(x)\]&lt;p&gt;给你的全部样本。&lt;/p&gt;
 &lt;p&gt;SuS 则不断构造：&lt;/p&gt;
-\[
-p(X|F_i),
-\]&lt;p&gt;让后续计算越来越聚焦目标事件。&lt;/p&gt;
+\[p(X|F_i),\]&lt;p&gt;让后续计算越来越聚焦目标事件。&lt;/p&gt;
 &lt;p&gt;因此它实际上在做一种：&lt;/p&gt;
-\[
-\boxed{\text{distribution steering}}
-\]&lt;p&gt;这是一种非常普遍的思想。&lt;/p&gt;
+\[\boxed{\text{distribution steering}}\]&lt;p&gt;这是一种非常普遍的思想。&lt;/p&gt;
 &lt;p&gt;你会在很多地方再次看到：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Importance Sampling；&lt;/li&gt;
@@ -2589,29 +1291,11 @@ p(X|F_i),
 &lt;hr&gt;
 &lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h2&gt;&lt;p&gt;AK-MCS 的问题是：&lt;/p&gt;
-\[
-\boxed{\text{“哪个点最值得再做一次高保真计算？”}}
-\]&lt;p&gt;MFMC 的问题是：&lt;/p&gt;
-\[
-\boxed{\text{“哪个便宜模型能帮助消除统计噪声？”}}
-\]&lt;p&gt;MLMC 的问题是：&lt;/p&gt;
-\[
-\boxed{\text{“哪个精度层值得投入多少样本？”}}
-\]&lt;p&gt;而 Subset Simulation 问的是：&lt;/p&gt;
-\[
-\boxed{
-\text{“怎样让采样分布本身逐渐迁移到失效区域？”}
-}
-\]&lt;p&gt;这四个问题其实正在组成一个完整的现代可靠性计算框架：&lt;/p&gt;
-\[
-\text{where to sample}
-+
-\text{what fidelity}
-+
-\text{which surrogate}
-+
-\text{how to estimate }P_f.
-\]&lt;p&gt;如果以后考虑做可靠性方法研究，我会特别关注这种&lt;strong&gt;资源分配层面的组合创新&lt;/strong&gt;，因为它比单独把 Kriging 的 \(R^2\) 再提高一点更接近真正昂贵工程模型的核心瓶颈。&lt;/p&gt;
+\[\boxed{\text{“哪个点最值得再做一次高保真计算？”}}\]&lt;p&gt;MFMC 的问题是：&lt;/p&gt;
+\[\boxed{\text{“哪个便宜模型能帮助消除统计噪声？”}}\]&lt;p&gt;MLMC 的问题是：&lt;/p&gt;
+\[\boxed{\text{“哪个精度层值得投入多少样本？”}}\]&lt;p&gt;而 Subset Simulation 问的是：&lt;/p&gt;
+\[\boxed{ \text{“怎样让采样分布本身逐渐迁移到失效区域？”} }\]&lt;p&gt;这四个问题其实正在组成一个完整的现代可靠性计算框架：&lt;/p&gt;
+\[\text{where to sample} + \text{what fidelity} + \text{which surrogate} + \text{how to estimate }P_f.\]&lt;p&gt;如果以后考虑做可靠性方法研究，我会特别关注这种&lt;strong&gt;资源分配层面的组合创新&lt;/strong&gt;，因为它比单独把 Kriging 的 \(R^2\) 再提高一点更接近真正昂贵工程模型的核心瓶颈。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
@@ -2647,122 +1331,50 @@ p(X|F_i),
 &lt;strong&gt;领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：&lt;/p&gt;
-\[
-\boxed{
-\text{普通代理：学习 }x\mapsto y
-}
-\]&lt;p&gt;而 Neural Operator 试图学习：&lt;/p&gt;
-\[
-\boxed{
-\mathcal G:\text{输入函数}\mapsto\text{输出函数}
-}
-\]&lt;p&gt;这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：&lt;strong&gt;模型参数可以独立于具体离散分辨率&lt;/strong&gt;。&lt;/p&gt;
+\[\boxed{ \text{普通代理：学习 }x\mapsto y }\]&lt;p&gt;而 Neural Operator 试图学习：&lt;/p&gt;
+\[\boxed{ \mathcal G:\text{输入函数}\mapsto\text{输出函数} }\]&lt;p&gt;这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：&lt;strong&gt;模型参数可以独立于具体离散分辨率&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-普通代理模型到底在学什么&#34;&gt;1. 普通代理模型到底在学什么？
 &lt;/h2&gt;&lt;p&gt;假设有限元模型输入：&lt;/p&gt;
-\[
-x=
-(E,\nu,F,\text{gap})
-\]&lt;p&gt;输出：&lt;/p&gt;
-\[
-y=
-\sigma_{\max}.
-\]&lt;p&gt;Kriging、MLP、XGBoost 都可以学习：&lt;/p&gt;
-\[
-f:\mathbb R^4\rightarrow\mathbb R.
-\]&lt;p&gt;这个问题本质上是：&lt;/p&gt;
-\[
-\boxed{\text{有限维向量}\rightarrow\text{有限维向量}}
-\]&lt;p&gt;即使输出不是一个标量，而是：&lt;/p&gt;
-\[
-1000
-\]&lt;p&gt;个节点位移：&lt;/p&gt;
-\[
-u\in\mathbb R^{3000},
-\]&lt;p&gt;你仍然是在学习：&lt;/p&gt;
-\[
-\mathbb R^4\rightarrow\mathbb R^{3000}.
-\]&lt;p&gt;问题是，这个：&lt;/p&gt;
-\[
-3000
-\]&lt;p&gt;其实来自某一次具体网格离散。&lt;/p&gt;
+\[x= (E,\nu,F,\text{gap})\]&lt;p&gt;输出：&lt;/p&gt;
+\[y= \sigma_{\max}.\]&lt;p&gt;Kriging、MLP、XGBoost 都可以学习：&lt;/p&gt;
+\[f:\mathbb R^4\rightarrow\mathbb R.\]&lt;p&gt;这个问题本质上是：&lt;/p&gt;
+\[\boxed{\text{有限维向量}\rightarrow\text{有限维向量}}\]&lt;p&gt;即使输出不是一个标量，而是：&lt;/p&gt;
+\[1000\]&lt;p&gt;个节点位移：&lt;/p&gt;
+\[u\in\mathbb R^{3000},\]&lt;p&gt;你仍然是在学习：&lt;/p&gt;
+\[\mathbb R^4\rightarrow\mathbb R^{3000}.\]&lt;p&gt;问题是，这个：&lt;/p&gt;
+\[3000\]&lt;p&gt;其实来自某一次具体网格离散。&lt;/p&gt;
 &lt;p&gt;一旦：&lt;/p&gt;
-\[
-3000\rightarrow12000
-\]&lt;p&gt;节点数变了，普通网络的输出维度通常也跟着失效。&lt;/p&gt;
+\[3000\rightarrow12000\]&lt;p&gt;节点数变了，普通网络的输出维度通常也跟着失效。&lt;/p&gt;
 &lt;p&gt;这说明它真正学习的是：&lt;/p&gt;
-\[
-\boxed{\text{某个离散问题}}
-\]&lt;p&gt;而不是：&lt;/p&gt;
-\[
-\boxed{\text{连续物理问题本身}}
-\]&lt;p&gt;Neural Operator 正是在这一点上换了问题定义。&lt;/p&gt;
+\[\boxed{\text{某个离散问题}}\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\boxed{\text{连续物理问题本身}}\]&lt;p&gt;Neural Operator 正是在这一点上换了问题定义。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-pde-本来就是函数到函数的映射&#34;&gt;2. PDE 本来就是“函数到函数”的映射
 &lt;/h1&gt;&lt;p&gt;考虑 Darcy 方程：&lt;/p&gt;
-\[
--\nabla\cdot(a(x)\nabla u(x))=f(x).
-\]&lt;p&gt;输入并不只是几个数字。&lt;/p&gt;
+\[-\nabla\cdot(a(x)\nabla u(x))=f(x).\]&lt;p&gt;输入并不只是几个数字。&lt;/p&gt;
 &lt;p&gt;材料系数：&lt;/p&gt;
-\[
-a(x)
-\]&lt;p&gt;本身就是一个空间函数。&lt;/p&gt;
+\[a(x)\]&lt;p&gt;本身就是一个空间函数。&lt;/p&gt;
 &lt;p&gt;输出：&lt;/p&gt;
-\[
-u(x)
-\]&lt;p&gt;也是函数。&lt;/p&gt;
+\[u(x)\]&lt;p&gt;也是函数。&lt;/p&gt;
 &lt;p&gt;因此真正的物理关系其实是：&lt;/p&gt;
-\[
-\boxed{
-\mathcal G:
-a(x)\mapsto u(x)
-}
-\]&lt;p&gt;这里：&lt;/p&gt;
-\[
-\mathcal G
-\]&lt;p&gt;就是 PDE 的 &lt;strong&gt;solution operator&lt;/strong&gt;。&lt;/p&gt;
+\[\boxed{ \mathcal G: a(x)\mapsto u(x) }\]&lt;p&gt;这里：&lt;/p&gt;
+\[\mathcal G\]&lt;p&gt;就是 PDE 的 &lt;strong&gt;solution operator&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;传统 FEM 做的事情是：&lt;/p&gt;
-\[
-a(x)
-\]&lt;p&gt;先离散成：&lt;/p&gt;
-\[
-a_h\in\mathbb R^N,
-\]&lt;p&gt;然后求：&lt;/p&gt;
-\[
-u_h\in\mathbb R^N.
-\]&lt;p&gt;而 Neural Operator 的目标是在概念上直接逼近：&lt;/p&gt;
-\[
-\boxed{
-\mathcal G:a\mapsto u
-}
-\]&lt;p&gt;而不是固定某个：&lt;/p&gt;
-\[
-N.
-\]&lt;p&gt;所以 Neural Operator 的真正跃迁在于：&lt;/p&gt;
-\[
-\boxed{
-\text{learning functions}
-\rightarrow
-\text{learning operators}
-}
-\]&lt;p&gt;DeepONet 和 Neural Operator/FNO 都建立在这一思想上。DeepONet 2021 直接从 operator universal approximation theorem 出发构造 branch/trunk 网络；Kovachki 等则给出了更统一的 neural operator 框架。&lt;/p&gt;
+\[a(x)\]&lt;p&gt;先离散成：&lt;/p&gt;
+\[a_h\in\mathbb R^N,\]&lt;p&gt;然后求：&lt;/p&gt;
+\[u_h\in\mathbb R^N.\]&lt;p&gt;而 Neural Operator 的目标是在概念上直接逼近：&lt;/p&gt;
+\[\boxed{ \mathcal G:a\mapsto u }\]&lt;p&gt;而不是固定某个：&lt;/p&gt;
+\[N.\]&lt;p&gt;所以 Neural Operator 的真正跃迁在于：&lt;/p&gt;
+\[\boxed{ \text{learning functions} \rightarrow \text{learning operators} }\]&lt;p&gt;DeepONet 和 Neural Operator/FNO 都建立在这一思想上。DeepONet 2021 直接从 operator universal approximation theorem 出发构造 branch/trunk 网络；Kovachki 等则给出了更统一的 neural operator 框架。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-为什么这对-fem-surrogate-很关键&#34;&gt;3. 为什么这对 FEM surrogate 很关键？
 &lt;/h1&gt;&lt;p&gt;假设你想代理：&lt;/p&gt;
-\[
-E(x)\rightarrow u(x).
-\]&lt;p&gt;传统做法可能把有限元场展平：&lt;/p&gt;
-\[
-u=
-[u_1,u_2,\dots,u_N]
-\]&lt;p&gt;然后训练网络。&lt;/p&gt;
+\[E(x)\rightarrow u(x).\]&lt;p&gt;传统做法可能把有限元场展平：&lt;/p&gt;
+\[u= [u_1,u_2,\dots,u_N]\]&lt;p&gt;然后训练网络。&lt;/p&gt;
 &lt;p&gt;这种方式的麻烦是：&lt;/p&gt;
-\[
-\boxed{
-\text{mesh topology / node count 被硬编码进模型}
-}
-\]&lt;p&gt;而工程模型很容易发生：&lt;/p&gt;
+\[\boxed{ \text{mesh topology / node count 被硬编码进模型} }\]&lt;p&gt;而工程模型很容易发生：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;网格细化；&lt;/li&gt;
 &lt;li&gt;采样分辨率变化；&lt;/li&gt;
@@ -2771,16 +1383,8 @@ u=
 &lt;li&gt;不同离散尺度。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;Neural Operator 更希望满足：&lt;/p&gt;
-\[
-\boxed{
-\text{train on one discretization}
-\rightarrow
-\text{evaluate on another discretization}
-}
-\]&lt;p&gt;这就是所谓：&lt;/p&gt;
-\[
-\boxed{\text{discretization invariance}}
-\]&lt;p&gt;JMLR 的统一理论论文把它列为 neural operator 的关键设计属性；官方 NeuralOperator 库也直接把“resolution invariant”作为其核心定位。&lt;/p&gt;
+\[\boxed{ \text{train on one discretization} \rightarrow \text{evaluate on another discretization} }\]&lt;p&gt;这就是所谓：&lt;/p&gt;
+\[\boxed{\text{discretization invariance}}\]&lt;p&gt;JMLR 的统一理论论文把它列为 neural operator 的关键设计属性；官方 NeuralOperator 库也直接把“resolution invariant”作为其核心定位。&lt;/p&gt;
 &lt;p&gt;不过这里要很谨慎：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;“resolution invariant”不等于“任何新网格、新几何、新 PDE 都能零误差泛化”。&lt;/strong&gt;&lt;/p&gt;
@@ -2790,54 +1394,18 @@ u=
 &lt;h1 id=&#34;4-fno-是怎么做到这一点的&#34;&gt;4. FNO 是怎么做到这一点的？
 &lt;/h1&gt;&lt;p&gt;Fourier Neural Operator 是目前最经典的一种 Neural Operator。&lt;/p&gt;
 &lt;p&gt;它的一层可以粗略写成：&lt;/p&gt;
-&lt;h1 id=&#34;v_l1x&#34;&gt;[
-v_{l+1}(x)
-&lt;/h1&gt;&lt;p&gt;\sigma
-\left[
-Wv_l(x)
-+
-\mathcal K_\theta v_l(x)
-\right].
-]&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
-\[
-W
-\]&lt;p&gt;是局部线性变换，&lt;/p&gt;
+\[v_{l+1}(x) = \sigma \left[ Wv_l(x) + \mathcal K_\theta v_l(x) \right].\]&lt;p&gt;其中：&lt;/p&gt;
+\[W\]&lt;p&gt;是局部线性变换，&lt;/p&gt;
 &lt;p&gt;而：&lt;/p&gt;
-\[
-\mathcal K_\theta
-\]&lt;p&gt;是一个积分算子：&lt;/p&gt;
-&lt;h1 id=&#34;mathcal-kvx&#34;&gt;[
-(\mathcal Kv)(x)
-&lt;/h1&gt;&lt;p&gt;\int_D
-\kappa_\theta(x,y)v(y),dy.
-]&lt;/p&gt;
-&lt;p&gt;FNO 的关键是：&lt;/p&gt;
+\[\mathcal K_\theta\]&lt;p&gt;是一个积分算子：&lt;/p&gt;
+\[(\mathcal Kv)(x) = \int_D \kappa_\theta(x,y)v(y)\,dy.\]&lt;p&gt;FNO 的关键是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;不直接在物理空间学习这个巨大 kernel，而是在 Fourier 空间参数化它。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;因为卷积满足：&lt;/p&gt;
-&lt;h1 id=&#34;mathcal-fkv&#34;&gt;[
-\mathcal F(K*v)
-&lt;/h1&gt;&lt;p&gt;\mathcal F(K)\mathcal F(v).
-]&lt;/p&gt;
-&lt;p&gt;于是实际计算大致变成：&lt;/p&gt;
-\[
-\boxed{
-v
-\xrightarrow{\mathrm{FFT}}
-\hat v
-\xrightarrow{\text{低频模态线性变换}}
-R_\theta\hat v
-\xrightarrow{\mathrm{IFFT}}
-\tilde v
-}
-\]&lt;p&gt;再加局部项和非线性：&lt;/p&gt;
-&lt;h1 id=&#34;v_l1&#34;&gt;[
-v_{l+1}
-&lt;/h1&gt;&lt;p&gt;\sigma(\tilde v+Wv_l).
-]&lt;/p&gt;
-&lt;p&gt;官方 FNO 理论指南也把 Fourier layer 总结为：&lt;/p&gt;
+\[\mathcal F(K*v) = \mathcal F(K)\mathcal F(v).\]&lt;p&gt;于是实际计算大致变成：&lt;/p&gt;
+\[\boxed{ v \xrightarrow{\mathrm{FFT}} \hat v \xrightarrow{\text{低频模态线性变换}} R_\theta\hat v \xrightarrow{\mathrm{IFFT}} \tilde v }\]&lt;p&gt;再加局部项和非线性：&lt;/p&gt;
+\[v_{l+1} = \sigma(\tilde v+Wv_l).\]&lt;p&gt;官方 FNO 理论指南也把 Fourier layer 总结为：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;Fourier transform；&lt;/li&gt;
 &lt;li&gt;对保留的低频 Fourier modes 做可学习线性变换；&lt;/li&gt;
@@ -2848,39 +1416,19 @@ v_{l+1}
 &lt;/h1&gt;&lt;p&gt;这里有两个原因。&lt;/p&gt;
 &lt;p&gt;第一，FFT 很便宜。&lt;/p&gt;
 &lt;p&gt;若物理空间做全局积分：&lt;/p&gt;
-&lt;h1 id=&#34;mathcal-kvx-1&#34;&gt;[
-(\mathcal Kv)(x)
-&lt;/h1&gt;&lt;p&gt;\int\kappa(x,y)v(y)dy,
-]&lt;/p&gt;
-&lt;p&gt;离散后朴素成本可能接近：&lt;/p&gt;
-\[
-O(N^2).
-\]&lt;p&gt;FFT 卷积可以做到大致：&lt;/p&gt;
-\[
-O(N\log N).
-\]&lt;p&gt;第二，很多 PDE 的大尺度结构主要集中在低频模态。&lt;/p&gt;
+\[(\mathcal Kv)(x) = \int\kappa(x,y)v(y)dy,\]&lt;p&gt;离散后朴素成本可能接近：&lt;/p&gt;
+\[O(N^2).\]&lt;p&gt;FFT 卷积可以做到大致：&lt;/p&gt;
+\[O(N\log N).\]&lt;p&gt;第二，很多 PDE 的大尺度结构主要集中在低频模态。&lt;/p&gt;
 &lt;p&gt;因此 FNO 通常只保留：&lt;/p&gt;
-\[
-k\le k_{\max}
-\]&lt;p&gt;的部分 Fourier modes。&lt;/p&gt;
+\[k\le k_{\max}\]&lt;p&gt;的部分 Fourier modes。&lt;/p&gt;
 &lt;p&gt;高频直接截断。&lt;/p&gt;
 &lt;p&gt;这既降低成本，也相当于一种：&lt;/p&gt;
-\[
-\boxed{\text{learned spectral model reduction}}
-\]&lt;p&gt;所以 FNO 可以粗略理解成：&lt;/p&gt;
-\[
-\boxed{
-\text{谱方法的表示能力}
-+
-\text{神经网络学习未知算子}
-}
-\]&lt;p&gt;这也是它和传统 CNN 最大的不同之一：CNN 每层通常主要做局部邻域传播，而 FNO 的 Fourier convolution 一层就可以产生全局耦合。&lt;/p&gt;
+\[\boxed{\text{learned spectral model reduction}}\]&lt;p&gt;所以 FNO 可以粗略理解成：&lt;/p&gt;
+\[\boxed{ \text{谱方法的表示能力} + \text{神经网络学习未知算子} }\]&lt;p&gt;这也是它和传统 CNN 最大的不同之一：CNN 每层通常主要做局部邻域传播，而 FNO 的 Fourier convolution 一层就可以产生全局耦合。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-一个直观例子随机材料场到位移场&#34;&gt;6. 一个直观例子：随机材料场到位移场
 &lt;/h1&gt;&lt;p&gt;假设二维弹性体的 Young 模量不是一个标量，而是：&lt;/p&gt;
-\[
-E(x,y).
-\]&lt;p&gt;你可能有局部软区：&lt;/p&gt;
+\[E(x,y).\]&lt;p&gt;你可能有局部软区：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -2896,23 +1444,11 @@ E(x,y).
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;给定载荷以后，希望得到：&lt;/p&gt;
-\[
-u_x(x,y),\quad u_y(x,y).
-\]&lt;p&gt;传统 Kriging 如果把每个网格点：&lt;/p&gt;
-\[
-E_1,\dots,E_{10000}
-\]&lt;p&gt;全当输入，把：&lt;/p&gt;
-\[
-u_1,\dots,u_{20000}
-\]&lt;p&gt;全当输出，会变成一个极高维回归。&lt;/p&gt;
+\[u_x(x,y),\quad u_y(x,y).\]&lt;p&gt;传统 Kriging 如果把每个网格点：&lt;/p&gt;
+\[E_1,\dots,E_{10000}\]&lt;p&gt;全当输入，把：&lt;/p&gt;
+\[u_1,\dots,u_{20000}\]&lt;p&gt;全当输出，会变成一个极高维回归。&lt;/p&gt;
 &lt;p&gt;Neural Operator 的问题定义则更自然：&lt;/p&gt;
-\[
-\boxed{
-E(x,y)
-\mapsto
-u(x,y)
-}
-\]&lt;p&gt;于是模型真正学习的是：&lt;/p&gt;
+\[\boxed{ E(x,y) \mapsto u(x,y) }\]&lt;p&gt;于是模型真正学习的是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“不同空间分布的材料场，会怎样改变整个结构响应场？”&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -2927,91 +1463,31 @@ u(x,y)
 &lt;hr&gt;
 &lt;h1 id=&#34;7-这与-pod--reduced-basis-的差别很值得分清&#34;&gt;7. 这与 POD / Reduced Basis 的差别很值得分清
 &lt;/h1&gt;&lt;p&gt;前几期讲过 Reduced Basis：&lt;/p&gt;
-\[
-u(x;\mu)
-\approx
-\sum_{i=1}^r a_i(\mu)\phi_i(x).
-\]&lt;p&gt;它先构造：&lt;/p&gt;
-\[
-\{\phi_i\}
-\]&lt;p&gt;这样的低维物理解空间。&lt;/p&gt;
+\[u(x;\mu) \approx \sum_{i=1}^r a_i(\mu)\phi_i(x).\]&lt;p&gt;它先构造：&lt;/p&gt;
+\[\{\phi_i\}\]&lt;p&gt;这样的低维物理解空间。&lt;/p&gt;
 &lt;p&gt;然后只学习：&lt;/p&gt;
-\[
-\mu\mapsto a_i.
-\]&lt;p&gt;所以 RB 的思路是：&lt;/p&gt;
-\[
-\boxed{
-\text{找到低维物理子空间}
-+
-\text{在里面求解}
-}
-\]&lt;p&gt;Neural Operator 则更倾向：&lt;/p&gt;
-\[
-\boxed{
-\text{直接学习完整 solution operator}
-}
-\]&lt;p&gt;优势是灵活、表达力强。&lt;/p&gt;
+\[\mu\mapsto a_i.\]&lt;p&gt;所以 RB 的思路是：&lt;/p&gt;
+\[\boxed{ \text{找到低维物理子空间} + \text{在里面求解} }\]&lt;p&gt;Neural Operator 则更倾向：&lt;/p&gt;
+\[\boxed{ \text{直接学习完整 solution operator} }\]&lt;p&gt;优势是灵活、表达力强。&lt;/p&gt;
 &lt;p&gt;代价是：&lt;/p&gt;
-\[
-\boxed{
-\text{通常缺少传统 ROM 那样直接的误差认证和物理保证}
-}
-\]&lt;p&gt;因此两者在知识体系里并不是竞争关系。&lt;/p&gt;
+\[\boxed{ \text{通常缺少传统 ROM 那样直接的误差认证和物理保证} }\]&lt;p&gt;因此两者在知识体系里并不是竞争关系。&lt;/p&gt;
 &lt;p&gt;更适合这样理解：&lt;/p&gt;
-\[
-\text{RB/POD}
-\quad\longleftrightarrow\quad
-\text{physics-driven model reduction}
-\]\[
-\text{Neural Operator}
-\quad\longleftrightarrow\quad
-\text{data-driven operator approximation}.
-\]&lt;hr&gt;
+\[\text{RB/POD} \quad\longleftrightarrow\quad \text{physics-driven model reduction}\]\[\text{Neural Operator} \quad\longleftrightarrow\quad \text{data-driven operator approximation}.\]&lt;hr&gt;
 &lt;h1 id=&#34;8-它学的是求解器这句话要怎么准确理解&#34;&gt;8. “它学的是求解器”这句话要怎么准确理解？
 &lt;/h1&gt;&lt;p&gt;假设 PDE 由参数：&lt;/p&gt;
-\[
-a(x)
-\]&lt;p&gt;决定。&lt;/p&gt;
+\[a(x)\]&lt;p&gt;决定。&lt;/p&gt;
 &lt;p&gt;传统数值求解器每来一个新输入：&lt;/p&gt;
-\[
-a^{(i)}
-\]&lt;p&gt;都执行：&lt;/p&gt;
-\[
-\boxed{
-\text{assemble}
-\rightarrow
-\text{solve}
-}
-\]&lt;p&gt;Neural Operator 在训练阶段见过大量：&lt;/p&gt;
-\[
-a^{(i)}\rightarrow u^{(i)}.
-\]&lt;p&gt;训练完成后，新输入直接：&lt;/p&gt;
-\[
-a^{(*)}
-\xrightarrow{\mathcal G_\theta}
-u^{(*)}.
-\]&lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-\text{昂贵 PDE solve}
-}
-\]&lt;p&gt;变成：&lt;/p&gt;
-\[
-\boxed{
-\text{一次神经网络 forward}
-}
-\]&lt;p&gt;原始 FNO 论文在 Burgers、Darcy 和 Navier–Stokes 等 PDE 上展示了这种能力，并报告在其测试设置中相较传统数值求解可达到最高约三个数量级的推理加速。&lt;/p&gt;
+\[a^{(i)}\]&lt;p&gt;都执行：&lt;/p&gt;
+\[\boxed{ \text{assemble} \rightarrow \text{solve} }\]&lt;p&gt;Neural Operator 在训练阶段见过大量：&lt;/p&gt;
+\[a^{(i)}\rightarrow u^{(i)}.\]&lt;p&gt;训练完成后，新输入直接：&lt;/p&gt;
+\[a^{(*)} \xrightarrow{\mathcal G_\theta} u^{(*)}.\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{昂贵 PDE solve} }\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{ \text{一次神经网络 forward} }\]&lt;p&gt;原始 FNO 论文在 Burgers、Darcy 和 Navier–Stokes 等 PDE 上展示了这种能力，并报告在其测试设置中相较传统数值求解可达到最高约三个数量级的推理加速。&lt;/p&gt;
 &lt;p&gt;但这里特别要强调：&lt;/p&gt;
-\[
-\boxed{\text{训练成本没有消失}}
-\]&lt;p&gt;你仍然要先获得高质量：&lt;/p&gt;
-\[
-(a_i,u_i)
-\]&lt;p&gt;训练数据。&lt;/p&gt;
+\[\boxed{\text{训练成本没有消失}}\]&lt;p&gt;你仍然要先获得高质量：&lt;/p&gt;
+\[(a_i,u_i)\]&lt;p&gt;训练数据。&lt;/p&gt;
 &lt;p&gt;所以它真正适合的是：&lt;/p&gt;
-\[
-\boxed{\text{many-query setting}}
-\]&lt;p&gt;例如：&lt;/p&gt;
+\[\boxed{\text{many-query setting}}\]&lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Monte Carlo；&lt;/li&gt;
 &lt;li&gt;参数优化；&lt;/li&gt;
@@ -3023,30 +1499,19 @@ u^{(*)}.
 &lt;hr&gt;
 &lt;h1 id=&#34;9-为什么零样本超分辨率很吸引人&#34;&gt;9. 为什么“零样本超分辨率”很吸引人？
 &lt;/h1&gt;&lt;p&gt;FNO 原始工作一个很著名的结果是：&lt;/p&gt;
-\[
-\boxed{\text{zero-shot super-resolution}}
-\]&lt;p&gt;例如较低分辨率训练：&lt;/p&gt;
-\[
-64\times64
-\]&lt;p&gt;然后更高分辨率评价。&lt;/p&gt;
+\[\boxed{\text{zero-shot super-resolution}}\]&lt;p&gt;例如较低分辨率训练：&lt;/p&gt;
+\[64\times64\]&lt;p&gt;然后更高分辨率评价。&lt;/p&gt;
 &lt;p&gt;为什么理论上可以这么做？&lt;/p&gt;
 &lt;p&gt;因为学习参数主要作用于：&lt;/p&gt;
-\[
-\boxed{\text{Fourier modes}}
-\]&lt;p&gt;而不是固定的：&lt;/p&gt;
-\[
-64\times64
-\]&lt;p&gt;神经元连接。&lt;/p&gt;
+\[\boxed{\text{Fourier modes}}\]&lt;p&gt;而不是固定的：&lt;/p&gt;
+\[64\times64\]&lt;p&gt;神经元连接。&lt;/p&gt;
 &lt;p&gt;换句话说，模型学习的是近似连续频谱算子。&lt;/p&gt;
 &lt;p&gt;换一个采样密度，只是在更细的 grid 上评价同一个 learned operator。&lt;/p&gt;
 &lt;p&gt;这正是 neural operator 与普通固定尺寸 CNN 的重要结构差异。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;10-但这件事有一个很重要的限制高频细节可能正是-fno-的弱点&#34;&gt;10. 但这件事有一个很重要的限制：高频细节可能正是 FNO 的弱点
 &lt;/h1&gt;&lt;p&gt;FNO 最常见的实现会截断高 Fourier modes：&lt;/p&gt;
-\[
-\hat v_k=0,
-\qquad |k|&gt;k_{\max}.
-\]&lt;p&gt;这本来是效率来源。&lt;/p&gt;
+\[\hat v_k=0, \qquad |k|&gt;k_{\max}.\]&lt;p&gt;这本来是效率来源。&lt;/p&gt;
 &lt;p&gt;但如果问题真正重要的信息恰好来自：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;冲击波；&lt;/li&gt;
@@ -3056,57 +1521,27 @@ u^{(*)}.
 &lt;li&gt;高梯度应力集中；&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;那么：&lt;/p&gt;
-\[
-\boxed{\text{低频全局表示可能过度平滑}}
-\]&lt;p&gt;这不是一个次要实现细节，而是 FNO 架构本身的 inductive bias。&lt;/p&gt;
+\[\boxed{\text{低频全局表示可能过度平滑}}\]&lt;p&gt;这不是一个次要实现细节，而是 FNO 架构本身的 inductive bias。&lt;/p&gt;
 &lt;p&gt;2024 年 ICML 的 Local Neural Operator 工作就直接指出：FNO 的 global operations 容易 over-smoothing，可能无法捕捉局部细节；引入局部积分核和微分算子后，其测试中相对 \(L^2\) 误差进一步降低了 34–72%。&lt;/p&gt;
 &lt;p&gt;这说明 Neural Operator 当前一个很重要的发展方向是：&lt;/p&gt;
-\[
-\boxed{
-\text{global operator}
-+
-\text{local differential structure}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{global operator} + \text{local differential structure} }\]&lt;hr&gt;
 &lt;h1 id=&#34;11-这对有限元问题尤其重要&#34;&gt;11. 这对有限元问题尤其重要
 &lt;/h1&gt;&lt;p&gt;在很多结构问题中：&lt;/p&gt;
-\[
-\text{global displacement}
-\]&lt;p&gt;其实很好预测。&lt;/p&gt;
+\[\text{global displacement}\]&lt;p&gt;其实很好预测。&lt;/p&gt;
 &lt;p&gt;难的是：&lt;/p&gt;
-\[
-\boxed{
-\text{local stress concentration}
-}
-\]&lt;p&gt;例如孔边：&lt;/p&gt;
-\[
-\sigma_{\max}
-\]&lt;p&gt;可能来自非常小的局部区域。&lt;/p&gt;
+\[\boxed{ \text{local stress concentration} }\]&lt;p&gt;例如孔边：&lt;/p&gt;
+\[\sigma_{\max}\]&lt;p&gt;可能来自非常小的局部区域。&lt;/p&gt;
 &lt;p&gt;那么一个场模型即使：&lt;/p&gt;
-\[
-\|u-\hat u\|_{L^2}
-\]&lt;p&gt;很小，&lt;/p&gt;
+\[\|u-\hat u\|_{L^2}\]&lt;p&gt;很小，&lt;/p&gt;
 &lt;p&gt;也不代表：&lt;/p&gt;
-\[
-\max_x\sigma(x)
-\]&lt;p&gt;准确。&lt;/p&gt;
+\[\max_x\sigma(x)\]&lt;p&gt;准确。&lt;/p&gt;
 &lt;p&gt;因为：&lt;/p&gt;
-\[
-\sigma=C:\nabla u
-\]&lt;p&gt;对梯度误差更敏感。&lt;/p&gt;
+\[\sigma=C:\nabla u\]&lt;p&gt;对梯度误差更敏感。&lt;/p&gt;
 &lt;p&gt;所以如果把 Neural Operator 用于可靠性分析，不能只看：&lt;/p&gt;
-\[
-\boxed{\text{field }L^2\text{ error}}
-\]&lt;p&gt;还应该检查：&lt;/p&gt;
-\[
-\|\nabla u-\nabla\hat u\|,
-\]&lt;p&gt;极值误差：&lt;/p&gt;
-\[
-|\sigma_{\max}-\hat\sigma_{\max}|,
-\]&lt;p&gt;以及失效边界：&lt;/p&gt;
-\[
-g(X)=0
-\]&lt;p&gt;附近的分类错误。&lt;/p&gt;
+\[\boxed{\text{field }L^2\text{ error}}\]&lt;p&gt;还应该检查：&lt;/p&gt;
+\[\|\nabla u-\nabla\hat u\|,\]&lt;p&gt;极值误差：&lt;/p&gt;
+\[|\sigma_{\max}-\hat\sigma_{\max}|,\]&lt;p&gt;以及失效边界：&lt;/p&gt;
+\[g(X)=0\]&lt;p&gt;附近的分类错误。&lt;/p&gt;
 &lt;p&gt;这和前面 AK-MCS 的思想再次接上了：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;最终任务需要什么信息，代理模型就应该围绕什么误差训练和评价。&lt;/strong&gt;&lt;/p&gt;
@@ -3114,85 +1549,33 @@ g(X)=0
 &lt;hr&gt;
 &lt;h1 id=&#34;12-它对可靠性研究的真正价值在哪里&#34;&gt;12. 它对可靠性研究的真正价值在哪里？
 &lt;/h1&gt;&lt;p&gt;假设随机输入不再是：&lt;/p&gt;
-\[
-X=(x_1,x_2,x_3),
-\]&lt;p&gt;而是随机场：&lt;/p&gt;
-\[
-E(x,\omega),
-\]\[
-p(x,\omega),
-\]\[
-T(x,\omega).
-\]&lt;p&gt;传统 Kriging 很容易遭遇：&lt;/p&gt;
-\[
-\boxed{\text{输入维数爆炸}}
-\]&lt;p&gt;因为随机场离散后：&lt;/p&gt;
-\[
-10000
-\]&lt;p&gt;个网格点就是：&lt;/p&gt;
-\[
-10000
-\]&lt;p&gt;维输入。&lt;/p&gt;
+\[X=(x_1,x_2,x_3),\]&lt;p&gt;而是随机场：&lt;/p&gt;
+\[E(x,\omega),\]\[p(x,\omega),\]\[T(x,\omega).\]&lt;p&gt;传统 Kriging 很容易遭遇：&lt;/p&gt;
+\[\boxed{\text{输入维数爆炸}}\]&lt;p&gt;因为随机场离散后：&lt;/p&gt;
+\[10000\]&lt;p&gt;个网格点就是：&lt;/p&gt;
+\[10000\]&lt;p&gt;维输入。&lt;/p&gt;
 &lt;p&gt;通常要先做：&lt;/p&gt;
-\[
-\text{Karhunen–Loève expansion}
-\]&lt;p&gt;降成几十个随机变量。&lt;/p&gt;
+\[\text{Karhunen–Loève expansion}\]&lt;p&gt;降成几十个随机变量。&lt;/p&gt;
 &lt;p&gt;Neural Operator 则允许更直接地接受：&lt;/p&gt;
-\[
-\boxed{\text{field input}}
-\]&lt;p&gt;因此特别适合：&lt;/p&gt;
-\[
-\text{random field}
-\rightarrow
-\text{response field}.
-\]&lt;p&gt;再从：&lt;/p&gt;
-\[
-u(x)
-\]&lt;p&gt;提取：&lt;/p&gt;
-\[
-g(u)
-\]&lt;p&gt;做可靠性计算。&lt;/p&gt;
+\[\boxed{\text{field input}}\]&lt;p&gt;因此特别适合：&lt;/p&gt;
+\[\text{random field} \rightarrow \text{response field}.\]&lt;p&gt;再从：&lt;/p&gt;
+\[u(x)\]&lt;p&gt;提取：&lt;/p&gt;
+\[g(u)\]&lt;p&gt;做可靠性计算。&lt;/p&gt;
 &lt;p&gt;所以它在可靠性里的潜力不只是“替代 Kriging”。&lt;/p&gt;
 &lt;p&gt;它更可能改变：&lt;/p&gt;
-\[
-\boxed{\text{高维随机场可靠性}}
-\]&lt;p&gt;这一类问题的建模方式。&lt;/p&gt;
+\[\boxed{\text{高维随机场可靠性}}\]&lt;p&gt;这一类问题的建模方式。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-对软体动力学也有一个很强的迁移&#34;&gt;13. 对软体动力学也有一个很强的迁移
 &lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
-\[
-u(x,t)
-\]&lt;p&gt;或者：&lt;/p&gt;
-\[
-x(X,t).
-\]&lt;p&gt;理论上可以训练 operator：&lt;/p&gt;
-\[
-\boxed{
-(x_t,v_t,\text{material},f_{\rm ext})
-\mapsto
-(x_{t+\Delta t},v_{t+\Delta t})
-}
-\]&lt;p&gt;这已经很接近：&lt;/p&gt;
-\[
-\boxed{\text{learned timestepper}}
-\]&lt;p&gt;甚至可以直接学习：&lt;/p&gt;
-\[
-\text{initial state}
-\mapsto
-\text{whole trajectory}.
-\]&lt;p&gt;但对于物理引擎，有一个巨大问题：&lt;/p&gt;
-\[
-\boxed{\text{rollout stability}}
-\]&lt;p&gt;即单步：&lt;/p&gt;
-\[
-1\%\text{ error}
-\]&lt;p&gt;连续滚动：&lt;/p&gt;
-\[
-1000
-\]&lt;p&gt;步后不一定还是：&lt;/p&gt;
-\[
-1\%.
-\]&lt;p&gt;可能逐步偏离物理流形。&lt;/p&gt;
+\[u(x,t)\]&lt;p&gt;或者：&lt;/p&gt;
+\[x(X,t).\]&lt;p&gt;理论上可以训练 operator：&lt;/p&gt;
+\[\boxed{ (x_t,v_t,\text{material},f_{\rm ext}) \mapsto (x_{t+\Delta t},v_{t+\Delta t}) }\]&lt;p&gt;这已经很接近：&lt;/p&gt;
+\[\boxed{\text{learned timestepper}}\]&lt;p&gt;甚至可以直接学习：&lt;/p&gt;
+\[\text{initial state} \mapsto \text{whole trajectory}.\]&lt;p&gt;但对于物理引擎，有一个巨大问题：&lt;/p&gt;
+\[\boxed{\text{rollout stability}}\]&lt;p&gt;即单步：&lt;/p&gt;
+\[1\%\text{ error}\]&lt;p&gt;连续滚动：&lt;/p&gt;
+\[1000\]&lt;p&gt;步后不一定还是：&lt;/p&gt;
+\[1\%.\]&lt;p&gt;可能逐步偏离物理流形。&lt;/p&gt;
 &lt;p&gt;尤其涉及：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;contact；&lt;/li&gt;
@@ -3203,30 +1586,16 @@ x(X,t).
 &lt;/ul&gt;
 &lt;p&gt;这类硬结构时，纯数据驱动 operator 可能给出视觉上合理、物理上非法的状态。&lt;/p&gt;
 &lt;p&gt;所以在实时物理里，更有吸引力的方向往往是：&lt;/p&gt;
-\[
-\boxed{
-\text{learned operator}
-+
-\text{physics constraints / correction / projection}
-}
-\]&lt;p&gt;而不是彻底删除 solver。&lt;/p&gt;
+\[\boxed{ \text{learned operator} + \text{physics constraints / correction / projection} }\]&lt;p&gt;而不是彻底删除 solver。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;14-一个非常值得实践的最小实验&#34;&gt;14. 一个非常值得实践的最小实验
 &lt;/h1&gt;&lt;p&gt;如果想真正理解 Neural Operator，我建议不要一开始做 Navier–Stokes。&lt;/p&gt;
 &lt;p&gt;可以做一个非常简单的 2D Poisson/Darcy 问题：&lt;/p&gt;
-\[
--\nabla\cdot(a(x)\nabla u)=f.
-\]&lt;p&gt;生成：&lt;/p&gt;
-\[
-N=1000
-\]&lt;p&gt;个随机：&lt;/p&gt;
-\[
-a(x,y)
-\]&lt;p&gt;场。&lt;/p&gt;
+\[-\nabla\cdot(a(x)\nabla u)=f.\]&lt;p&gt;生成：&lt;/p&gt;
+\[N=1000\]&lt;p&gt;个随机：&lt;/p&gt;
+\[a(x,y)\]&lt;p&gt;场。&lt;/p&gt;
 &lt;p&gt;FEM/FDM 求：&lt;/p&gt;
-\[
-u(x,y).
-\]&lt;p&gt;然后训练 FNO：&lt;/p&gt;
+\[u(x,y).\]&lt;p&gt;然后训练 FNO：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -3262,43 +1631,19 @@ u(x,y).
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;最值得做的实验不是单纯看训练误差，而是：&lt;/p&gt;
-\[
-\boxed{\text{64×64 训练}}
-\]&lt;p&gt;然后：&lt;/p&gt;
-\[
-\boxed{\text{128×128 测试}}
-\]&lt;p&gt;再检查：&lt;/p&gt;
-\[
-L^2\text{ error},
-\]\[
-H^1\text{ error},
-\]&lt;p&gt;以及 PDE residual：&lt;/p&gt;
-\[
-\|-\nabla\cdot(a\nabla\hat u)-f\|.
-\]&lt;p&gt;这样你会直接看见：&lt;/p&gt;
-\[
-\boxed{
-\text{“预测一个数组”}
-\]&lt;p&gt;和：&lt;/p&gt;
-\[
-\boxed{
-\text{“学习一个离散无关算子”}
-}
-\]&lt;p&gt;之间到底差在哪里。&lt;/p&gt;
+\[\boxed{\text{64×64 训练}}\]&lt;p&gt;然后：&lt;/p&gt;
+\[\boxed{\text{128×128 测试}}\]&lt;p&gt;再检查：&lt;/p&gt;
+\[L^2\text{ error},\]\[H^1\text{ error},\]&lt;p&gt;以及 PDE residual：&lt;/p&gt;
+\[\|-\nabla\cdot(a\nabla\hat u)-f\|.\]&lt;p&gt;这样你会直接看见：&lt;/p&gt;
+\[\boxed{ \text{“预测一个数组”}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \text{“学习一个离散无关算子”} }\]&lt;p&gt;之间到底差在哪里。&lt;/p&gt;
 &lt;p&gt;官方 &lt;code&gt;neuraloperator&lt;/code&gt; 项目已经提供 FNO、TFNO、训练流程和理论指南，适合作为直接实现入口。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;15-最值得警惕的一点neural-operator-仍然没有真正理解-pde&#34;&gt;15. 最值得警惕的一点：Neural Operator 仍然没有真正“理解 PDE”
 &lt;/h1&gt;&lt;p&gt;这是科学机器学习里非常容易夸大的地方。&lt;/p&gt;
 &lt;p&gt;如果训练数据全部来自某个：&lt;/p&gt;
-\[
-\mathcal P_{\rm train},
-\]&lt;p&gt;那么网络实际学到的是：&lt;/p&gt;
-\[
-\boxed{
-\mathcal G
-\text{ 在训练分布附近的近似}
-}
-\]&lt;p&gt;它并不自动拥有：&lt;/p&gt;
+\[\mathcal P_{\rm train},\]&lt;p&gt;那么网络实际学到的是：&lt;/p&gt;
+\[\boxed{ \mathcal G \text{ 在训练分布附近的近似} }\]&lt;p&gt;它并不自动拥有：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;守恒律；&lt;/li&gt;
 &lt;li&gt;最大值原理；&lt;/li&gt;
@@ -3308,23 +1653,11 @@ H^1\text{ error},
 &lt;li&gt;OOD 保证。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-\[
-\boxed{
-\text{operator learning}
-\neq
-\text{numerical analysis guarantee}
-}
-\]&lt;p&gt;这一点对工程应用特别重要。&lt;/p&gt;
+\[\boxed{ \text{operator learning} \neq \text{numerical analysis guarantee} }\]&lt;p&gt;这一点对工程应用特别重要。&lt;/p&gt;
 &lt;p&gt;它非常适合作为：&lt;/p&gt;
-\[
-\boxed{\text{快速 many-query surrogate}}
-\]&lt;p&gt;但如果任务要求：&lt;/p&gt;
-\[
-10^{-6}\text{ 失效概率}
-\]&lt;p&gt;或者：&lt;/p&gt;
-\[
-\text{严格无穿透}
-\]&lt;p&gt;那么仍然需要：&lt;/p&gt;
+\[\boxed{\text{快速 many-query surrogate}}\]&lt;p&gt;但如果任务要求：&lt;/p&gt;
+\[10^{-6}\text{ 失效概率}\]&lt;p&gt;或者：&lt;/p&gt;
+\[\text{严格无穿透}\]&lt;p&gt;那么仍然需要：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;certification；&lt;/li&gt;
 &lt;li&gt;residual checking；&lt;/li&gt;
@@ -3336,27 +1669,9 @@ H^1\text{ error},
 &lt;hr&gt;
 &lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h2&gt;&lt;p&gt;Neural Operator 最深刻的地方，可以浓缩成：&lt;/p&gt;
-\[
-\boxed{
-\text{它试图代理的不是一个响应面，而是一整个“输入场到解场”的求解过程。}
-}
-\]&lt;p&gt;所以它在知识体系中的位置大约是：&lt;/p&gt;
-\[
-\text{Kriging / MLP surrogate}
-\]\[
-\downarrow
-\]\[
-\boxed{\text{Neural Operator}}
-\]\[
-\downarrow
-\]\[
-\text{learned PDE solver / scientific foundation model}.
-\]&lt;p&gt;它真正值得学的原因并不是“FNO 很流行”，而是它迫使我们重新思考一个问题：&lt;/p&gt;
-\[
-\boxed{
-\text{代理模型究竟应该学习最终输出，还是学习产生这些输出的算子？}
-}
-\]&lt;p&gt;对于随机场可靠性、多工况有限元、数字孪生和 AI 驱动求解器，这个区别会越来越重要。&lt;/p&gt;
+\[\boxed{ \text{它试图代理的不是一个响应面，而是一整个“输入场到解场”的求解过程。} }\]&lt;p&gt;所以它在知识体系中的位置大约是：&lt;/p&gt;
+\[\text{Kriging / MLP surrogate}\]\[\downarrow\]\[\boxed{\text{Neural Operator}}\]\[\downarrow\]\[\text{learned PDE solver / scientific foundation model}.\]&lt;p&gt;它真正值得学的原因并不是“FNO 很流行”，而是它迫使我们重新思考一个问题：&lt;/p&gt;
+\[\boxed{ \text{代理模型究竟应该学习最终输出，还是学习产生这些输出的算子？} }\]&lt;p&gt;对于随机场可靠性、多工况有限元、数字孪生和 AI 驱动求解器，这个区别会越来越重要。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
@@ -3394,65 +1709,27 @@ H^1\text{ error},
 &lt;strong&gt;领域：可靠性 × 不确定性量化 × 代理模型&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天选 Active Subspaces，因为它回答了一个对高维代理模型非常重要的问题：&lt;/p&gt;
-\[
-\boxed{
-\text{如果有 30 个输入变量，是否真的意味着问题有 30 个“有效维度”？}
-}
-\]&lt;p&gt;答案经常是否定的。&lt;/p&gt;
+\[\boxed{ \text{如果有 30 个输入变量，是否真的意味着问题有 30 个“有效维度”？} }\]&lt;p&gt;答案经常是否定的。&lt;/p&gt;
 &lt;p&gt;很多工程模型虽然输入是：&lt;/p&gt;
-\[
-x\in\mathbb R^m,
-\]&lt;p&gt;但输出：&lt;/p&gt;
-\[
-f(x)
-\]&lt;p&gt;主要沿少数几个&lt;strong&gt;输入空间方向&lt;/strong&gt;变化。&lt;/p&gt;
+\[x\in\mathbb R^m,\]&lt;p&gt;但输出：&lt;/p&gt;
+\[f(x)\]&lt;p&gt;主要沿少数几个&lt;strong&gt;输入空间方向&lt;/strong&gt;变化。&lt;/p&gt;
 &lt;p&gt;注意这里说的不是某几个变量，而是：&lt;/p&gt;
-\[
-\boxed{\text{变量的线性组合}}
-\]&lt;p&gt;例如真正控制响应的可能是：&lt;/p&gt;
-\[
-0.7x_1-0.2x_2+0.5x_7+0.1x_{12},
-\]&lt;p&gt;而不是单独某一个：&lt;/p&gt;
-\[
-x_i.
-\]&lt;p&gt;Active Subspaces 正是要找这些“最有作用的方向”。Constantine 的 SIAM 专著将其定义为一类用于发现和利用参数空间低维结构的方法，目标是让响应面、优化、积分和反问题等原本高维的参数研究转到较低维空间中。&lt;/p&gt;
+\[\boxed{\text{变量的线性组合}}\]&lt;p&gt;例如真正控制响应的可能是：&lt;/p&gt;
+\[0.7x_1-0.2x_2+0.5x_7+0.1x_{12},\]&lt;p&gt;而不是单独某一个：&lt;/p&gt;
+\[x_i.\]&lt;p&gt;Active Subspaces 正是要找这些“最有作用的方向”。Constantine 的 SIAM 专著将其定义为一类用于发现和利用参数空间低维结构的方法，目标是让响应面、优化、积分和反问题等原本高维的参数研究转到较低维空间中。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-为什么传统变量筛选有时会完全看错问题&#34;&gt;1. 为什么传统“变量筛选”有时会完全看错问题？
 &lt;/h2&gt;&lt;p&gt;考虑一个简单函数：&lt;/p&gt;
-&lt;h1 id=&#34;fx_1x_2&#34;&gt;[
-f(x_1,x_2)
-&lt;/h1&gt;&lt;p&gt;(x_1+x_2)^2.
-]&lt;/p&gt;
-&lt;p&gt;如果只从坐标轴看：&lt;/p&gt;
-\[
-x_1
-\]&lt;p&gt;和：&lt;/p&gt;
-\[
-x_2
-\]&lt;p&gt;都重要。&lt;/p&gt;
+\[f(x_1,x_2) = (x_1+x_2)^2.\]&lt;p&gt;如果只从坐标轴看：&lt;/p&gt;
+\[x_1\]&lt;p&gt;和：&lt;/p&gt;
+\[x_2\]&lt;p&gt;都重要。&lt;/p&gt;
 &lt;p&gt;你无法删掉任何一个变量。&lt;/p&gt;
 &lt;p&gt;但换坐标：&lt;/p&gt;
-\[
-y_1=
-\frac{x_1+x_2}{\sqrt2},
-\qquad
-y_2=
-\frac{x_1-x_2}{\sqrt2}.
-\]&lt;p&gt;那么：&lt;/p&gt;
-\[
-f=2y_1^2.
-\]&lt;p&gt;于是：&lt;/p&gt;
-\[
-\boxed{
-f\text{ 完全不依赖 }y_2.
-}
-\]&lt;p&gt;原问题看起来：&lt;/p&gt;
-\[
-2\text{ 维}
-\]&lt;p&gt;实际上只有：&lt;/p&gt;
-\[
-1\text{ 个有效方向}.
-\]&lt;p&gt;这就是 Active Subspaces 最基本的动机。&lt;/p&gt;
+\[y_1= \frac{x_1+x_2}{\sqrt2}, \qquad y_2= \frac{x_1-x_2}{\sqrt2}.\]&lt;p&gt;那么：&lt;/p&gt;
+\[f=2y_1^2.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ f\text{ 完全不依赖 }y_2. }\]&lt;p&gt;原问题看起来：&lt;/p&gt;
+\[2\text{ 维}\]&lt;p&gt;实际上只有：&lt;/p&gt;
+\[1\text{ 个有效方向}.\]&lt;p&gt;这就是 Active Subspaces 最基本的动机。&lt;/p&gt;
 &lt;p&gt;传统变量筛选问：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;哪个 \(x_i\) 最重要？&lt;/p&gt;
@@ -3465,143 +1742,46 @@ f\text{ 完全不依赖 }y_2.
 &lt;hr&gt;
 &lt;h1 id=&#34;2-核心矩阵只有一个&#34;&gt;2. 核心矩阵只有一个
 &lt;/h1&gt;&lt;p&gt;设：&lt;/p&gt;
-\[
-f:\mathbb R^m\rightarrow\mathbb R.
-\]&lt;p&gt;定义：&lt;/p&gt;
-&lt;h1 id=&#34;c&#34;&gt;[
-\boxed{
-C
-&lt;/h1&gt;&lt;p&gt;E
-\left[
-\nabla f(x)\nabla f(x)^T
-\right]
-}
-]&lt;/p&gt;
-&lt;p&gt;更完整地写：&lt;/p&gt;
-&lt;h1 id=&#34;c-1&#34;&gt;[
-C
-&lt;/h1&gt;&lt;p&gt;\int
-\nabla f(x)
-\nabla f(x)^T
-\rho(x),dx,
-]&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
-\[
-\rho(x)
-\]&lt;p&gt;是输入概率密度。&lt;/p&gt;
+\[f:\mathbb R^m\rightarrow\mathbb R.\]&lt;p&gt;定义：&lt;/p&gt;
+\[\boxed{ C = E \left[ \nabla f(x)\nabla f(x)^T \right] }\]&lt;p&gt;更完整地写：&lt;/p&gt;
+\[C = \int \nabla f(x) \nabla f(x)^T \rho(x)\,dx,\]&lt;p&gt;其中：&lt;/p&gt;
+\[\rho(x)\]&lt;p&gt;是输入概率密度。&lt;/p&gt;
 &lt;p&gt;这个矩阵很关键。&lt;/p&gt;
 &lt;p&gt;因为对任意单位方向：&lt;/p&gt;
-\[
-w,
-\]&lt;p&gt;有：&lt;/p&gt;
-&lt;h1 id=&#34;wtcw&#34;&gt;[
-w^TCw
-&lt;/h1&gt;&lt;p&gt;E
-\left[
-(w^T\nabla f)^2
-\right].
-]&lt;/p&gt;
-&lt;p&gt;而：&lt;/p&gt;
-\[
-w^T\nabla f
-\]&lt;p&gt;就是：&lt;/p&gt;
-\[
-\boxed{
-\text{沿方向 }w\text{ 的方向导数}
-}
-\]&lt;p&gt;所以：&lt;/p&gt;
-\[
-w^TCw
-\]&lt;p&gt;衡量的是：&lt;/p&gt;
+\[w,\]&lt;p&gt;有：&lt;/p&gt;
+\[w^TCw = E \left[ (w^T\nabla f)^2 \right].\]&lt;p&gt;而：&lt;/p&gt;
+\[w^T\nabla f\]&lt;p&gt;就是：&lt;/p&gt;
+\[\boxed{ \text{沿方向 }w\text{ 的方向导数} }\]&lt;p&gt;所以：&lt;/p&gt;
+\[w^TCw\]&lt;p&gt;衡量的是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;沿这个输入方向移动时，输出平均变化有多强。&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;于是问题变成一个特征值问题：&lt;/p&gt;
-\[
-C=W\Lambda W^T.
-\]&lt;p&gt;其中：&lt;/p&gt;
-&lt;h1 id=&#34;lambda&#34;&gt;[
-\Lambda
-&lt;/h1&gt;&lt;p&gt;\operatorname{diag}
-(
-\lambda_1,\lambda_2,\ldots,\lambda_m
-),
-]&lt;/p&gt;
-&lt;p&gt;且：&lt;/p&gt;
-\[
-\lambda_1\ge
-\lambda_2\ge
-\cdots\ge0.
-\]&lt;hr&gt;
+\[C=W\Lambda W^T.\]&lt;p&gt;其中：&lt;/p&gt;
+\[\Lambda = \operatorname{diag} ( \lambda_1,\lambda_2,\ldots,\lambda_m ),\]&lt;p&gt;且：&lt;/p&gt;
+\[\lambda_1\ge \lambda_2\ge \cdots\ge0.\]&lt;hr&gt;
 &lt;h1 id=&#34;3-特征值在这里到底意味着什么&#34;&gt;3. 特征值在这里到底意味着什么？
 &lt;/h1&gt;&lt;p&gt;对于特征向量：&lt;/p&gt;
-\[
-w_i,
-\]&lt;p&gt;有：&lt;/p&gt;
-&lt;h1 id=&#34;lambda_i&#34;&gt;[
-\boxed{
-\lambda_i
-&lt;/h1&gt;&lt;p&gt;E
-[
-(w_i^T\nabla f)^2
-]
-}
-]&lt;/p&gt;
-&lt;p&gt;所以：&lt;/p&gt;
-\[
-\lambda_i
-\]&lt;p&gt;越大，说明沿：&lt;/p&gt;
-\[
-w_i
-\]&lt;p&gt;方向移动时：&lt;/p&gt;
-\[
-f
-\]&lt;p&gt;变化越剧烈。&lt;/p&gt;
+\[w_i,\]&lt;p&gt;有：&lt;/p&gt;
+\[\boxed{ \lambda_i = E [ (w_i^T\nabla f)^2 ] }\]&lt;p&gt;所以：&lt;/p&gt;
+\[\lambda_i\]&lt;p&gt;越大，说明沿：&lt;/p&gt;
+\[w_i\]&lt;p&gt;方向移动时：&lt;/p&gt;
+\[f\]&lt;p&gt;变化越剧烈。&lt;/p&gt;
 &lt;p&gt;如果出现：&lt;/p&gt;
-\[
-\lambda_1,\lambda_2
-\gg
-\lambda_3,\ldots,\lambda_m,
-\]&lt;p&gt;就意味着存在一个二维 active subspace：&lt;/p&gt;
-\[
-W_1=[w_1,w_2].
-\]&lt;p&gt;然后定义：&lt;/p&gt;
-\[
-\boxed{
-y=W_1^Tx
-}
-\]&lt;p&gt;作为 active variables。&lt;/p&gt;
+\[\lambda_1,\lambda_2 \gg \lambda_3,\ldots,\lambda_m,\]&lt;p&gt;就意味着存在一个二维 active subspace：&lt;/p&gt;
+\[W_1=[w_1,w_2].\]&lt;p&gt;然后定义：&lt;/p&gt;
+\[\boxed{ y=W_1^Tx }\]&lt;p&gt;作为 active variables。&lt;/p&gt;
 &lt;p&gt;其余：&lt;/p&gt;
-\[
-z=W_2^Tx
-\]&lt;p&gt;就是 inactive variables。&lt;/p&gt;
+\[z=W_2^Tx\]&lt;p&gt;就是 inactive variables。&lt;/p&gt;
 &lt;p&gt;如果 inactive directions 上变化很弱：&lt;/p&gt;
-\[
-f(x)
-\approx
-g(W_1^Tx).
-\]&lt;p&gt;于是原来的：&lt;/p&gt;
-\[
-m\text{ 维函数}
-\]&lt;p&gt;被近似压缩成：&lt;/p&gt;
-\[
-\boxed{
-r\text{ 维 ridge function}
-}
-\]&lt;p&gt;其中：&lt;/p&gt;
-\[
-r\ll m.
-\]&lt;p&gt;这就是整个 Active Subspace 方法的数学核心。&lt;/p&gt;
+\[f(x) \approx g(W_1^Tx).\]&lt;p&gt;于是原来的：&lt;/p&gt;
+\[m\text{ 维函数}\]&lt;p&gt;被近似压缩成：&lt;/p&gt;
+\[\boxed{ r\text{ 维 ridge function} }\]&lt;p&gt;其中：&lt;/p&gt;
+\[r\ll m.\]&lt;p&gt;这就是整个 Active Subspace 方法的数学核心。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-一个很直观的工程例子&#34;&gt;4. 一个很直观的工程例子
 &lt;/h1&gt;&lt;p&gt;假设某机构最大卡滞力：&lt;/p&gt;
-&lt;h1 id=&#34;f_max&#34;&gt;[
-F_{\max}
-&lt;/h1&gt;&lt;p&gt;f(
-x_1,\ldots,x_{20}
-),
-]&lt;/p&gt;
-&lt;p&gt;输入包括：&lt;/p&gt;
+\[F_{\max} = f( x_1,\ldots,x_{20} ),\]&lt;p&gt;输入包括：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;5 个杆长误差；&lt;/li&gt;
 &lt;li&gt;6 个孔隙；&lt;/li&gt;
@@ -3610,9 +1790,7 @@ x_1,\ldots,x_{20}
 &lt;li&gt;2 个载荷参数。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;传统代理建模面对：&lt;/p&gt;
-\[
-20\text{ 维输入}.
-\]&lt;p&gt;如果使用 Kriging，维度越高：&lt;/p&gt;
+\[20\text{ 维输入}.\]&lt;p&gt;如果使用 Kriging，维度越高：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;DOE 样本需求越大；&lt;/li&gt;
 &lt;li&gt;length scale 越难估；&lt;/li&gt;
@@ -3620,140 +1798,47 @@ x_1,\ldots,x_{20}
 &lt;li&gt;failure boundary 越难覆盖。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;现在假设 Active Subspaces 算出来：&lt;/p&gt;
-\[
-\lambda_1,\lambda_2
-\gg
-\lambda_3.
-\]&lt;p&gt;那么可能得到：&lt;/p&gt;
-&lt;h1 id=&#34;y_1&#34;&gt;[
-y_1
-&lt;/h1&gt;&lt;h2 id=&#34;043x_rm-gap&#34;&gt;0.55x_{\rm friction}
-+
-0.43x_{\rm gap}
-&lt;/h2&gt;&lt;p&gt;0.31x_{\rm stiffness}
-+\cdots
-]&lt;/p&gt;
-&lt;h1 id=&#34;y_2&#34;&gt;[
-y_2
-&lt;/h1&gt;&lt;h2 id=&#34;064x_rm-load&#34;&gt;0.64x_{\rm load}
-&lt;/h2&gt;&lt;p&gt;0.41x_{\rm rod}
-+\cdots
-]&lt;/p&gt;
-&lt;p&gt;于是：&lt;/p&gt;
-\[
-F_{\max}
-\approx
-g(y_1,y_2).
-\]&lt;p&gt;你就可以在：&lt;/p&gt;
-\[
-\boxed{2\text{ 维空间}}
-\]&lt;p&gt;里建 Kriging。&lt;/p&gt;
+\[\lambda_1,\lambda_2 \gg \lambda_3.\]&lt;p&gt;那么可能得到：&lt;/p&gt;
+\[y_1 = 0.55x_{\rm friction} + 0.43x_{\rm gap} - 0.31x_{\rm stiffness} +\cdots\]\[y_2 = 0.64x_{\rm load} - 0.41x_{\rm rod} +\cdots\]&lt;p&gt;于是：&lt;/p&gt;
+\[F_{\max} \approx g(y_1,y_2).\]&lt;p&gt;你就可以在：&lt;/p&gt;
+\[\boxed{2\text{ 维空间}}\]&lt;p&gt;里建 Kriging。&lt;/p&gt;
 &lt;p&gt;这和“从 20 个变量删到 5 个变量”是完全不同的降维。&lt;/p&gt;
 &lt;p&gt;因为：&lt;/p&gt;
-\[
-\boxed{
-\text{Active Subspaces 保留的是方向，不一定保留原变量。}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{Active Subspaces 保留的是方向，不一定保留原变量。} }\]&lt;hr&gt;
 &lt;h1 id=&#34;5-它和-pca-很像但其实作用对象完全不同&#34;&gt;5. 它和 PCA 很像，但其实作用对象完全不同
 &lt;/h1&gt;&lt;p&gt;这是最容易混淆的地方。&lt;/p&gt;
 &lt;p&gt;PCA 对：&lt;/p&gt;
-\[
-X
-\]&lt;p&gt;本身做协方差分解：&lt;/p&gt;
-\[
-\operatorname{Cov}(X).
-\]&lt;p&gt;寻找：&lt;/p&gt;
-\[
-\boxed{
-\text{输入数据变化最大的方向}
-}
-\]&lt;p&gt;Active Subspaces 对：&lt;/p&gt;
-\[
-\nabla f
-\]&lt;p&gt;做二阶矩：&lt;/p&gt;
-\[
-E[\nabla f\nabla f^T].
-\]&lt;p&gt;寻找：&lt;/p&gt;
-\[
-\boxed{
-\text{输出响应最敏感的方向}
-}
-\]&lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-\text{PCA 是 input-driven}
-}
-\]&lt;p&gt;而：&lt;/p&gt;
-\[
-\boxed{
-\text{Active Subspace 是 output-aware}
-}
-\]&lt;p&gt;一个方向即使在输入数据中方差很大：&lt;/p&gt;
-\[
-\operatorname{Var}(w^TX)\gg0,
-\]&lt;p&gt;但如果：&lt;/p&gt;
-\[
-w^T\nabla f\approx0,
-\]&lt;p&gt;对响应而言它仍然可能完全不重要。&lt;/p&gt;
+\[X\]&lt;p&gt;本身做协方差分解：&lt;/p&gt;
+\[\operatorname{Cov}(X).\]&lt;p&gt;寻找：&lt;/p&gt;
+\[\boxed{ \text{输入数据变化最大的方向} }\]&lt;p&gt;Active Subspaces 对：&lt;/p&gt;
+\[\nabla f\]&lt;p&gt;做二阶矩：&lt;/p&gt;
+\[E[\nabla f\nabla f^T].\]&lt;p&gt;寻找：&lt;/p&gt;
+\[\boxed{ \text{输出响应最敏感的方向} }\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{PCA 是 input-driven} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{Active Subspace 是 output-aware} }\]&lt;p&gt;一个方向即使在输入数据中方差很大：&lt;/p&gt;
+\[\operatorname{Var}(w^TX)\gg0,\]&lt;p&gt;但如果：&lt;/p&gt;
+\[w^T\nabla f\approx0,\]&lt;p&gt;对响应而言它仍然可能完全不重要。&lt;/p&gt;
 &lt;p&gt;这个区别非常关键。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-它和-sobol-灵敏度也不是同一个东西&#34;&gt;6. 它和 Sobol 灵敏度也不是同一个东西
 &lt;/h1&gt;&lt;p&gt;Sobol 指数问：&lt;/p&gt;
-\[
-\boxed{
-\text{某个变量 }x_i
-\text{贡献了多少输出方差？}
-}
-\]&lt;p&gt;所以天然以：&lt;/p&gt;
-\[
-x_1,x_2,\ldots,x_m
-\]&lt;p&gt;为坐标。&lt;/p&gt;
+\[\boxed{ \text{某个变量 }x_i \text{贡献了多少输出方差？} }\]&lt;p&gt;所以天然以：&lt;/p&gt;
+\[x_1,x_2,\ldots,x_m\]&lt;p&gt;为坐标。&lt;/p&gt;
 &lt;p&gt;Active Subspaces 问：&lt;/p&gt;
-\[
-\boxed{
-\text{哪个方向 }
-w^Tx
-\text{让输出变化最大？}
-}
-\]&lt;p&gt;因此它能够捕获：&lt;/p&gt;
-\[
-x_1+x_2
-\]&lt;p&gt;这种组合方向。&lt;/p&gt;
+\[\boxed{ \text{哪个方向 } w^Tx \text{让输出变化最大？} }\]&lt;p&gt;因此它能够捕获：&lt;/p&gt;
+\[x_1+x_2\]&lt;p&gt;这种组合方向。&lt;/p&gt;
 &lt;p&gt;不过二者并非完全割裂。&lt;/p&gt;
 &lt;p&gt;Active Subspaces 可以进一步构造：&lt;/p&gt;
-\[
-\text{activity scores}
-\]&lt;p&gt;来衡量各原始参数在 active directions 中的贡献，并且已有理论工作把这些指标与 Sobol/derivative-based global sensitivity metrics 联系起来。&lt;/p&gt;
+\[\text{activity scores}\]&lt;p&gt;来衡量各原始参数在 active directions 中的贡献，并且已有理论工作把这些指标与 Sobol/derivative-based global sensitivity metrics 联系起来。&lt;/p&gt;
 &lt;p&gt;所以知识体系可以这样理解：&lt;/p&gt;
-\[
-\boxed{
-\text{Sobol：变量重要性}
-}
-\]\[
-\boxed{
-\text{Active Subspace：方向重要性}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{Sobol：变量重要性} }\]\[\boxed{ \text{Active Subspace：方向重要性} }\]&lt;hr&gt;
 &lt;h1 id=&#34;7-它真正依赖的是梯度&#34;&gt;7. 它真正依赖的是梯度
 &lt;/h1&gt;&lt;p&gt;如果能直接获得：&lt;/p&gt;
-\[
-\nabla f(x)
-\]&lt;p&gt;事情非常简单。&lt;/p&gt;
+\[\nabla f(x)\]&lt;p&gt;事情非常简单。&lt;/p&gt;
 &lt;p&gt;随机采样：&lt;/p&gt;
-\[
-x^{(1)},\ldots,x^{(N)}
-\]&lt;p&gt;然后计算：&lt;/p&gt;
-&lt;h1 id=&#34;hat-c&#34;&gt;[
-\hat C
-&lt;/h1&gt;&lt;p&gt;\frac1N
-\sum_{i=1}^N
-\nabla f_i\nabla f_i^T.
-]&lt;/p&gt;
-&lt;p&gt;最后做：&lt;/p&gt;
-\[
-\hat C=W\Lambda W^T.
-\]&lt;p&gt;伪代码几乎只有：&lt;/p&gt;
+\[x^{(1)},\ldots,x^{(N)}\]&lt;p&gt;然后计算：&lt;/p&gt;
+\[\hat C = \frac1N \sum_{i=1}^N \nabla f_i\nabla f_i^T.\]&lt;p&gt;最后做：&lt;/p&gt;
+\[\hat C=W\Lambda W^T.\]&lt;p&gt;伪代码几乎只有：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -3787,55 +1872,23 @@ x^{(1)},\ldots,x^{(N)}
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;问题当然是：&lt;/p&gt;
-\[
-\boxed{
-\nabla f\text{ 从哪里来？}
-}
-\]&lt;p&gt;如果每一个输入变量都做 finite difference：&lt;/p&gt;
-\[
-m=50
-\]&lt;p&gt;就意味着每个样本需要大约：&lt;/p&gt;
-\[
-51
-\]&lt;p&gt;次高保真计算。&lt;/p&gt;
+\[\boxed{ \nabla f\text{ 从哪里来？} }\]&lt;p&gt;如果每一个输入变量都做 finite difference：&lt;/p&gt;
+\[m=50\]&lt;p&gt;就意味着每个样本需要大约：&lt;/p&gt;
+\[51\]&lt;p&gt;次高保真计算。&lt;/p&gt;
 &lt;p&gt;这可能比直接训练 surrogate 还贵。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-为什么自动微分和伴随法让这个方法重新变得很有吸引力&#34;&gt;8. 为什么自动微分和伴随法让这个方法重新变得很有吸引力？
 &lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
-\[
-f(x)
-\]&lt;p&gt;来自一个 differentiable FEM / differentiable simulator。&lt;/p&gt;
+\[f(x)\]&lt;p&gt;来自一个 differentiable FEM / differentiable simulator。&lt;/p&gt;
 &lt;p&gt;自动微分可以直接给：&lt;/p&gt;
-\[
-\nabla_x f.
-\]&lt;p&gt;如果输出是一个标量：&lt;/p&gt;
-\[
-f,
-\]&lt;p&gt;reverse-mode AD 的梯度成本通常可以做到与少量 forward solves 同量级，而不是：&lt;/p&gt;
-\[
-O(m)
-\]&lt;p&gt;倍。&lt;/p&gt;
+\[\nabla_x f.\]&lt;p&gt;如果输出是一个标量：&lt;/p&gt;
+\[f,\]&lt;p&gt;reverse-mode AD 的梯度成本通常可以做到与少量 forward solves 同量级，而不是：&lt;/p&gt;
+\[O(m)\]&lt;p&gt;倍。&lt;/p&gt;
 &lt;p&gt;对 PDE/FEM，如果有 adjoint：&lt;/p&gt;
-&lt;h1 id=&#34;atlambda&#34;&gt;[
-A^T\lambda
-&lt;/h1&gt;&lt;p&gt;\frac{\partial f}{\partial u},
-]&lt;/p&gt;
-&lt;p&gt;然后：&lt;/p&gt;
-&lt;h1 id=&#34;fracdfdx&#34;&gt;[
-\frac{df}{dx}
-&lt;/h1&gt;&lt;h2 id=&#34;fracpartial-fpartial-x&#34;&gt;\frac{\partial f}{\partial x}
-&lt;/h2&gt;&lt;p&gt;\lambda^T
-\frac{\partial R}{\partial x},
-]&lt;/p&gt;
-&lt;p&gt;那么高维参数梯度也能高效获得。&lt;/p&gt;
+\[A^T\lambda = \frac{\partial f}{\partial u},\]&lt;p&gt;然后：&lt;/p&gt;
+\[\frac{df}{dx} = \frac{\partial f}{\partial x} - \lambda^T \frac{\partial R}{\partial x},\]&lt;p&gt;那么高维参数梯度也能高效获得。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-\text{Active Subspaces}
-+
-\text{AD / adjoint}
-}
-\]&lt;p&gt;是非常自然的一对组合。&lt;/p&gt;
+\[\boxed{ \text{Active Subspaces} + \text{AD / adjoint} }\]&lt;p&gt;是非常自然的一对组合。&lt;/p&gt;
 &lt;p&gt;这也是它对现代 differentiable physics 特别值得重新关注的原因。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-如果没有梯度怎么办&#34;&gt;9. 如果没有梯度怎么办？
@@ -3849,11 +1902,7 @@ A^T\lambda
 &lt;p&gt;Paul Constantine 的公开 &lt;code&gt;active_subspaces&lt;/code&gt; 实现就允许用户直接提供 gradients，也允许用已有输入输出样本做近似分析；工具还提供 bootstrap 区间和 subspace error 诊断。&lt;/p&gt;
 &lt;p&gt;更有意思的是 multifidelity 版本。&lt;/p&gt;
 &lt;p&gt;Lam、Zahm、Marzouk 和 Willcox 提出了 multifidelity active-subspace 方法：&lt;/p&gt;
-\[
-\boxed{
-\text{用便宜模型帮助估计高保真 active-subspace matrix}
-}
-\]&lt;p&gt;目标正是降低梯度维度缩减本身的成本。&lt;/p&gt;
+\[\boxed{ \text{用便宜模型帮助估计高保真 active-subspace matrix} }\]&lt;p&gt;目标正是降低梯度维度缩减本身的成本。&lt;/p&gt;
 &lt;p&gt;这和前面讲过的 MFMC 思想其实一脉相承：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;低保真模型不一定负责最终预测，也可以负责提取结构信息。&lt;/p&gt;
@@ -3861,40 +1910,15 @@ A^T\lambda
 &lt;hr&gt;
 &lt;h1 id=&#34;10-一个很重要的判断依据spectral-gap&#34;&gt;10. 一个很重要的判断依据：spectral gap
 &lt;/h1&gt;&lt;p&gt;假设得到：&lt;/p&gt;
-\[
-\lambda_1=12,
-\quad
-\lambda_2=8,
-\quad
-\lambda_3=0.7,
-\quad
-\lambda_4=0.3,
-\ldots
-\]&lt;p&gt;那么：&lt;/p&gt;
-\[
-\lambda_2\gg\lambda_3
-\]&lt;p&gt;意味着二维 active subspace 很有希望。&lt;/p&gt;
+\[\lambda_1=12, \quad \lambda_2=8, \quad \lambda_3=0.7, \quad \lambda_4=0.3, \ldots\]&lt;p&gt;那么：&lt;/p&gt;
+\[\lambda_2\gg\lambda_3\]&lt;p&gt;意味着二维 active subspace 很有希望。&lt;/p&gt;
 &lt;p&gt;但如果：&lt;/p&gt;
-\[
-12,\ 10,\ 9,\ 8,\ 7,\ldots
-\]&lt;p&gt;没有明显 gap，&lt;/p&gt;
+\[12,\ 10,\ 9,\ 8,\ 7,\ldots\]&lt;p&gt;没有明显 gap，&lt;/p&gt;
 &lt;p&gt;那就说明：&lt;/p&gt;
-\[
-\boxed{
-\text{这个问题可能根本没有漂亮的低维线性子空间。}
-}
-\]&lt;p&gt;这点很重要。&lt;/p&gt;
+\[\boxed{ \text{这个问题可能根本没有漂亮的低维线性子空间。} }\]&lt;p&gt;这点很重要。&lt;/p&gt;
 &lt;p&gt;Active Subspaces 不是：&lt;/p&gt;
-\[
-\boxed{
-\text{一个强行把所有高维问题变低维的方法}
-}
-\]&lt;p&gt;它首先是一种：&lt;/p&gt;
-\[
-\boxed{
-\text{检测低维方向结构是否存在}
-}
-\]&lt;p&gt;的方法。&lt;/p&gt;
+\[\boxed{ \text{一个强行把所有高维问题变低维的方法} }\]&lt;p&gt;它首先是一种：&lt;/p&gt;
+\[\boxed{ \text{检测低维方向结构是否存在} }\]&lt;p&gt;的方法。&lt;/p&gt;
 &lt;p&gt;如果谱不衰减，就应该接受：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;当前 QoI 的有效维度确实较高。&lt;/p&gt;
@@ -3903,259 +1927,91 @@ A^T\lambda
 &lt;hr&gt;
 &lt;h1 id=&#34;11-一个容易被忽略的严重限制它找的是全局平均重要方向&#34;&gt;11. 一个容易被忽略的严重限制：它找的是“全局平均重要方向”
 &lt;/h1&gt;&lt;p&gt;矩阵：&lt;/p&gt;
-&lt;h1 id=&#34;c-2&#34;&gt;[
-C
-&lt;/h1&gt;&lt;p&gt;E[\nabla f\nabla f^T]
-]&lt;/p&gt;
-&lt;p&gt;对整个：&lt;/p&gt;
-\[
-\rho(x)
-\]&lt;p&gt;取期望。&lt;/p&gt;
+\[C = E[\nabla f\nabla f^T]\]&lt;p&gt;对整个：&lt;/p&gt;
+\[\rho(x)\]&lt;p&gt;取期望。&lt;/p&gt;
 &lt;p&gt;所以它强调：&lt;/p&gt;
-\[
-\boxed{
-\text{在整个概率空间平均来说，哪些方向最重要。}
-}
-\]&lt;p&gt;但可靠性问题真正关心：&lt;/p&gt;
-\[
-g(x)\approx0
-\]&lt;p&gt;这一小块极限状态区域。&lt;/p&gt;
+\[\boxed{ \text{在整个概率空间平均来说，哪些方向最重要。} }\]&lt;p&gt;但可靠性问题真正关心：&lt;/p&gt;
+\[g(x)\approx0\]&lt;p&gt;这一小块极限状态区域。&lt;/p&gt;
 &lt;p&gt;这里会出现一个潜在冲突。&lt;/p&gt;
 &lt;p&gt;假设在 99.99% 的区域：&lt;/p&gt;
-\[
-x_1
-\]&lt;p&gt;决定响应。&lt;/p&gt;
+\[x_1\]&lt;p&gt;决定响应。&lt;/p&gt;
 &lt;p&gt;但极少数失效区域：&lt;/p&gt;
-\[
-x_7
-\]&lt;p&gt;突然决定：&lt;/p&gt;
-\[
-g(x)&lt;0.
-\]&lt;p&gt;那么全局 Active Subspace 完全可能认为：&lt;/p&gt;
-\[
-x_7
-\]&lt;p&gt;不重要。&lt;/p&gt;
+\[x_7\]&lt;p&gt;突然决定：&lt;/p&gt;
+\[g(x)&lt;0.\]&lt;p&gt;那么全局 Active Subspace 完全可能认为：&lt;/p&gt;
+\[x_7\]&lt;p&gt;不重要。&lt;/p&gt;
 &lt;p&gt;结果：&lt;/p&gt;
-\[
-\boxed{
-\text{对平均响应很好，
-对 }P_f\text{ 却很糟。}
-}
-\]&lt;p&gt;这是把 active subspace 用于可靠性时最应该警惕的问题。&lt;/p&gt;
+\[\boxed{ \text{对平均响应很好， 对 }P_f\text{ 却很糟。} }\]&lt;p&gt;这是把 active subspace 用于可靠性时最应该警惕的问题。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;12-这也是为什么现代可靠性方法会把-active-subspace-和-active-learning-耦合&#34;&gt;12. 这也是为什么现代可靠性方法会把 Active Subspace 和 active learning 耦合
 &lt;/h1&gt;&lt;p&gt;单独做：&lt;/p&gt;
-\[
-\text{global AS}
-\rightarrow
-\text{Kriging}
-\rightarrow
-P_f
-\]&lt;p&gt;有可能错过 failure-relevant directions。&lt;/p&gt;
+\[\text{global AS} \rightarrow \text{Kriging} \rightarrow P_f\]&lt;p&gt;有可能错过 failure-relevant directions。&lt;/p&gt;
 &lt;p&gt;2023 年 Kim、Wang 和 Song 在 &lt;em&gt;Structural Safety&lt;/em&gt; 提出的 adaptive active-subspace metamodeling 就专门处理这个问题：把&lt;/p&gt;
-\[
-\boxed{
-\text{Active Subspace}
-+
-\text{heteroscedastic Gaussian Process}
-+
-\text{active learning}
-}
-\]&lt;p&gt;耦合起来，使降维方向本身也随着对关键失效区域的学习而更新，而不是一次性固定。&lt;/p&gt;
+\[\boxed{ \text{Active Subspace} + \text{heteroscedastic Gaussian Process} + \text{active learning} }\]&lt;p&gt;耦合起来，使降维方向本身也随着对关键失效区域的学习而更新，而不是一次性固定。&lt;/p&gt;
 &lt;p&gt;这件事很有启发性：&lt;/p&gt;
-\[
-\boxed{
-\text{可靠性中的“重要方向”
-未必等于全局响应中的“重要方向”。}
-}
-\]&lt;p&gt;最终任务决定：&lt;/p&gt;
-\[
-\text{dimension reduction criterion}.
-\]&lt;hr&gt;
+\[\boxed{ \text{可靠性中的“重要方向” 未必等于全局响应中的“重要方向”。} }\]&lt;p&gt;最终任务决定：&lt;/p&gt;
+\[\text{dimension reduction criterion}.\]&lt;hr&gt;
 &lt;h1 id=&#34;13-为什么这比先做敏感度分析再删变量高级一层&#34;&gt;13. 为什么这比“先做敏感度分析，再删变量”高级一层？
 &lt;/h1&gt;&lt;p&gt;传统流程可能是：&lt;/p&gt;
-\[
-20\text{ 个变量}
-\]&lt;p&gt;先做灵敏度：&lt;/p&gt;
-\[
-x_1,x_3,x_7\text{ 最重要},
-\]&lt;p&gt;然后删除其他变量。&lt;/p&gt;
+\[20\text{ 个变量}\]&lt;p&gt;先做灵敏度：&lt;/p&gt;
+\[x_1,x_3,x_7\text{ 最重要},\]&lt;p&gt;然后删除其他变量。&lt;/p&gt;
 &lt;p&gt;这隐含假设：&lt;/p&gt;
-\[
-\boxed{
-\text{重要结构与原坐标轴对齐}
-}
-\]&lt;p&gt;但现实工程中很多规律是组合关系。&lt;/p&gt;
+\[\boxed{ \text{重要结构与原坐标轴对齐} }\]&lt;p&gt;但现实工程中很多规律是组合关系。&lt;/p&gt;
 &lt;p&gt;例如梁挠度：&lt;/p&gt;
-\[
-\delta
-\propto
-\frac{FL^3}{EI}.
-\]&lt;p&gt;取 log：&lt;/p&gt;
-&lt;h1 id=&#34;logdelta&#34;&gt;[
-\log\delta
-&lt;/h1&gt;&lt;h2 id=&#34;3log-l&#34;&gt;\log F
-+
-3\log L
-&lt;/h2&gt;&lt;h2 id=&#34;log-e&#34;&gt;\log E
-&lt;/h2&gt;&lt;p&gt;\log I.
-]&lt;/p&gt;
-&lt;p&gt;真正控制响应的是一个组合方向：&lt;/p&gt;
-\[
-\boxed{
-[1,\ 3,\ -1,\ -1]
-}
-\]&lt;p&gt;而不是“只留下 \(L\)”或“只留下 \(E\)”。&lt;/p&gt;
+\[\delta \propto \frac{FL^3}{EI}.\]&lt;p&gt;取 log：&lt;/p&gt;
+\[\log\delta = \log F + 3\log L - \log E - \log I.\]&lt;p&gt;真正控制响应的是一个组合方向：&lt;/p&gt;
+\[\boxed{ [1,\ 3,\ -1,\ -1] }\]&lt;p&gt;而不是“只留下 \(L\)”或“只留下 \(E\)”。&lt;/p&gt;
 &lt;p&gt;很多无量纲数其实也有类似结构：&lt;/p&gt;
-\[
-Re=\frac{\rho VL}{\mu},
-\]\[
-Ma=\frac{V}{c},
-\]\[
-Ca=\frac{\mu V}{\gamma}.
-\]&lt;p&gt;从某种意义上说，物理学长期以来就在寻找：&lt;/p&gt;
-\[
-\boxed{
-\text{真正控制系统行为的参数组合}
-}
-\]&lt;p&gt;Active Subspaces 是一种数据/梯度驱动版本的这种思想。&lt;/p&gt;
+\[Re=\frac{\rho VL}{\mu},\]\[Ma=\frac{V}{c},\]\[Ca=\frac{\mu V}{\gamma}.\]&lt;p&gt;从某种意义上说，物理学长期以来就在寻找：&lt;/p&gt;
+\[\boxed{ \text{真正控制系统行为的参数组合} }\]&lt;p&gt;Active Subspaces 是一种数据/梯度驱动版本的这种思想。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;14-这和-buckingham--定理有什么很有趣的区别&#34;&gt;14. 这和 Buckingham \(\Pi\) 定理有什么很有趣的区别？
 &lt;/h1&gt;&lt;p&gt;Buckingham \(\Pi\)：&lt;/p&gt;
-\[
-\boxed{
-\text{根据量纲约束找到允许的无量纲组合}
-}
-\]&lt;p&gt;Active Subspaces：&lt;/p&gt;
-\[
-\boxed{
-\text{根据模型响应梯度找到实际重要的组合}
-}
-\]&lt;p&gt;前者来自：&lt;/p&gt;
-\[
-\text{dimensional consistency},
-\]&lt;p&gt;后者来自：&lt;/p&gt;
-\[
-\text{response sensitivity}.
-\]&lt;p&gt;所以有可能：&lt;/p&gt;
+\[\boxed{ \text{根据量纲约束找到允许的无量纲组合} }\]&lt;p&gt;Active Subspaces：&lt;/p&gt;
+\[\boxed{ \text{根据模型响应梯度找到实际重要的组合} }\]&lt;p&gt;前者来自：&lt;/p&gt;
+\[\text{dimensional consistency},\]&lt;p&gt;后者来自：&lt;/p&gt;
+\[\text{response sensitivity}.\]&lt;p&gt;所以有可能：&lt;/p&gt;
 &lt;p&gt;Buckingham 告诉你系统允许：&lt;/p&gt;
-\[
-5
-\]&lt;p&gt;个独立无量纲组；&lt;/p&gt;
+\[5\]&lt;p&gt;个独立无量纲组；&lt;/p&gt;
 &lt;p&gt;Active Subspaces 又发现：&lt;/p&gt;
-\[
-f
-\]&lt;p&gt;实际上主要依赖其中：&lt;/p&gt;
-\[
-2
-\]&lt;p&gt;个方向。&lt;/p&gt;
+\[f\]&lt;p&gt;实际上主要依赖其中：&lt;/p&gt;
+\[2\]&lt;p&gt;个方向。&lt;/p&gt;
 &lt;p&gt;这是非常漂亮的层次关系：&lt;/p&gt;
-\[
-\boxed{
-\text{physics-based reduction}
-\rightarrow
-\text{response-based reduction}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{physics-based reduction} \rightarrow \text{response-based reduction} }\]&lt;hr&gt;
 &lt;h1 id=&#34;15-对代理模型最直接的价值改变维度诅咒的对象&#34;&gt;15. 对代理模型最直接的价值：改变“维度诅咒”的对象
 &lt;/h1&gt;&lt;p&gt;普通 Kriging：&lt;/p&gt;
-\[
-\hat f(x_1,\ldots,x_{20})
-\]&lt;p&gt;必须学习：&lt;/p&gt;
-\[
-20\text{ 维几何结构}.
-\]&lt;p&gt;如果 Active Subspaces 成功：&lt;/p&gt;
-\[
-f(x)
-\approx
-g(W_1^Tx),
-\]&lt;p&gt;那么 Kriging 只需要学习：&lt;/p&gt;
-\[
-\hat g(y_1,y_2).
-\]&lt;p&gt;这不是普通的数据压缩。&lt;/p&gt;
+\[\hat f(x_1,\ldots,x_{20})\]&lt;p&gt;必须学习：&lt;/p&gt;
+\[20\text{ 维几何结构}.\]&lt;p&gt;如果 Active Subspaces 成功：&lt;/p&gt;
+\[f(x) \approx g(W_1^Tx),\]&lt;p&gt;那么 Kriging 只需要学习：&lt;/p&gt;
+\[\hat g(y_1,y_2).\]&lt;p&gt;这不是普通的数据压缩。&lt;/p&gt;
 &lt;p&gt;因为你实际上把：&lt;/p&gt;
-\[
-\boxed{
-\text{代理模型的输入流形}
-}
-\]&lt;p&gt;重新定义了。&lt;/p&gt;
+\[\boxed{ \text{代理模型的输入流形} }\]&lt;p&gt;重新定义了。&lt;/p&gt;
 &lt;p&gt;于是很多原来需要：&lt;/p&gt;
-\[
-O(10^3)
-\]&lt;p&gt;甚至更多样本的问题，可能转化为一个真正低维的 response surface 问题。&lt;/p&gt;
+\[O(10^3)\]&lt;p&gt;甚至更多样本的问题，可能转化为一个真正低维的 response surface 问题。&lt;/p&gt;
 &lt;p&gt;Active Subspaces 的经典研究正是将这一结构用于 response surface construction、optimization、integration 等参数研究。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;16-对可靠性更值得迁移的一种思路failure-oriented-active-subspace&#34;&gt;16. 对可靠性更值得迁移的一种思路：Failure-oriented Active Subspace
 &lt;/h1&gt;&lt;p&gt;如果最终目标是：&lt;/p&gt;
-&lt;h1 id=&#34;p_f&#34;&gt;[
-P_f
-&lt;/h1&gt;&lt;p&gt;P[g(x)\le0],
-]&lt;/p&gt;
-&lt;p&gt;我会更倾向于思考：&lt;/p&gt;
-&lt;h1 id=&#34;c_f&#34;&gt;[
-\boxed{
-C_F
-&lt;/h1&gt;&lt;p&gt;E[
-w(x)
-\nabla g
-\nabla g^T
-]
-}
-]&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
-\[
-w(x)
-\]&lt;p&gt;在：&lt;/p&gt;
-\[
-g(x)\approx0
-\]&lt;p&gt;附近更大。&lt;/p&gt;
+\[P_f = P[g(x)\le0],\]&lt;p&gt;我会更倾向于思考：&lt;/p&gt;
+\[\boxed{ C_F = E[ w(x) \nabla g \nabla g^T ] }\]&lt;p&gt;其中：&lt;/p&gt;
+\[w(x)\]&lt;p&gt;在：&lt;/p&gt;
+\[g(x)\approx0\]&lt;p&gt;附近更大。&lt;/p&gt;
 &lt;p&gt;也就是说：&lt;/p&gt;
-\[
-\boxed{
-\text{不要平均学习整个响应空间的重要方向，
-而是学习“失效概率真正关心区域”的重要方向。}
-}
-\]&lt;p&gt;这并不是经典 Active Subspace 的唯一形式，但它体现了现代 adaptive reliability 工作背后的方向：让 feature-space reduction 与 failure-region learning 相互反馈。&lt;/p&gt;
+\[\boxed{ \text{不要平均学习整个响应空间的重要方向， 而是学习“失效概率真正关心区域”的重要方向。} }\]&lt;p&gt;这并不是经典 Active Subspace 的唯一形式，但它体现了现代 adaptive reliability 工作背后的方向：让 feature-space reduction 与 failure-region learning 相互反馈。&lt;/p&gt;
 &lt;p&gt;从研究方法上，这比：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“Active Subspace + Kriging 两种方法简单串联”&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;要更有价值。&lt;/p&gt;
 &lt;p&gt;因为真正的问题变成：&lt;/p&gt;
-\[
-\boxed{
-\text{用于概率估计的最优低维表示应该是什么？}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{用于概率估计的最优低维表示应该是什么？} }\]&lt;hr&gt;
 &lt;h1 id=&#34;17-对有限元软体动力学也有一个很强的启发&#34;&gt;17. 对有限元/软体动力学也有一个很强的启发
 &lt;/h1&gt;&lt;p&gt;假设材料模型有：&lt;/p&gt;
-\[
-20
-\]&lt;p&gt;个参数：&lt;/p&gt;
-\[
-\theta\in\mathbb R^{20}
-\]&lt;p&gt;而 QoI 是：&lt;/p&gt;
-&lt;h1 id=&#34;jtheta&#34;&gt;[
-J(\theta)
-&lt;/h1&gt;&lt;p&gt;\text{最大穿透}
-]&lt;/p&gt;
-&lt;p&gt;或：&lt;/p&gt;
-&lt;h1 id=&#34;jtheta-1&#34;&gt;[
-J(\theta)
-&lt;/h1&gt;&lt;p&gt;\text{最终形变量}.
-]&lt;/p&gt;
-&lt;p&gt;如果 differentiable solver 可以得到：&lt;/p&gt;
-\[
-\nabla_\theta J,
-\]&lt;p&gt;你可以直接构造：&lt;/p&gt;
-&lt;h1 id=&#34;c-3&#34;&gt;[
-C
-&lt;/h1&gt;&lt;p&gt;E[
-\nabla_\theta J
-\nabla_\theta J^T
-].
-]&lt;/p&gt;
-&lt;p&gt;然后判断：&lt;/p&gt;
+\[20\]&lt;p&gt;个参数：&lt;/p&gt;
+\[\theta\in\mathbb R^{20}\]&lt;p&gt;而 QoI 是：&lt;/p&gt;
+\[J(\theta) = \text{最大穿透}\]&lt;p&gt;或：&lt;/p&gt;
+\[J(\theta) = \text{最终形变量}.\]&lt;p&gt;如果 differentiable solver 可以得到：&lt;/p&gt;
+\[\nabla_\theta J,\]&lt;p&gt;你可以直接构造：&lt;/p&gt;
+\[C = E[ \nabla_\theta J \nabla_\theta J^T ].\]&lt;p&gt;然后判断：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;当前 solver 的行为到底受哪几个&lt;strong&gt;参数组合方向&lt;/strong&gt;控制？&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -4169,98 +2025,30 @@ C
 &lt;/ul&gt;
 &lt;p&gt;然后逐个看结果更系统。&lt;/p&gt;
 &lt;p&gt;尤其当两个参数存在 compensating effects：&lt;/p&gt;
-\[
-\text{stiffness}\uparrow
-\]&lt;p&gt;和：&lt;/p&gt;
-\[
-\text{timestep}\downarrow
-\]&lt;p&gt;可能沿某种组合方向产生相似系统行为。&lt;/p&gt;
+\[\text{stiffness}\uparrow\]&lt;p&gt;和：&lt;/p&gt;
+\[\text{timestep}\downarrow\]&lt;p&gt;可能沿某种组合方向产生相似系统行为。&lt;/p&gt;
 &lt;p&gt;Active Subspace 能把这种耦合方向显式找出来。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;一个值得亲手做的最小实验&#34;&gt;一个值得亲手做的最小实验
 &lt;/h2&gt;&lt;p&gt;假设：&lt;/p&gt;
-&lt;h1 id=&#34;fx&#34;&gt;[
-f(x)
-&lt;/h1&gt;&lt;p&gt;\sin(x_1+x_2)
-+
-0.02x_3^2
-+
-0.01x_4.
-]&lt;/p&gt;
-&lt;p&gt;输入：&lt;/p&gt;
-\[
-x_i\sim U[-1,1].
-\]&lt;p&gt;显然：&lt;/p&gt;
-\[
-x_1,x_2
-\]&lt;p&gt;不是“两个独立重要变量”。&lt;/p&gt;
+\[f(x) = \sin(x_1+x_2) + 0.02x_3^2 + 0.01x_4.\]&lt;p&gt;输入：&lt;/p&gt;
+\[x_i\sim U[-1,1].\]&lt;p&gt;显然：&lt;/p&gt;
+\[x_1,x_2\]&lt;p&gt;不是“两个独立重要变量”。&lt;/p&gt;
 &lt;p&gt;真正的主方向是：&lt;/p&gt;
-\[
-\boxed{
-w_1
-\approx
-\frac{1}{\sqrt2}
-(1,1,0,0)^T.
-}
-\]&lt;p&gt;计算：&lt;/p&gt;
-&lt;h1 id=&#34;nabla-f&#34;&gt;[
-\nabla f
-&lt;/h1&gt;&lt;p&gt;\begin{bmatrix}
-\cos(x_1+x_2)\
-\cos(x_1+x_2)\
-0.04x_3\
-0.01
-\end{bmatrix}.
-]&lt;/p&gt;
-&lt;p&gt;用几千个 Monte Carlo 样本估：&lt;/p&gt;
-\[
-C.
-\]&lt;p&gt;然后画：&lt;/p&gt;
-\[
-f(x)
-\]&lt;p&gt;对：&lt;/p&gt;
-\[
-y_1=w_1^Tx.
-\]&lt;p&gt;如果 active subspace 明显，你会看到原来四维散乱数据几乎塌缩成一条：&lt;/p&gt;
-\[
-\boxed{\text{一维曲线}}
-\]&lt;p&gt;这张图通常比读十页理论更能理解它到底在干什么。&lt;/p&gt;
+\[\boxed{ w_1 \approx \frac{1}{\sqrt2} (1,1,0,0)^T. }\]&lt;p&gt;计算：&lt;/p&gt;
+\[\nabla f = \begin{bmatrix} \cos(x_1+x_2)\\ \cos(x_1+x_2)\\ 0.04x_3\\ 0.01 \end{bmatrix}.\]&lt;p&gt;用几千个 Monte Carlo 样本估：&lt;/p&gt;
+\[C.\]&lt;p&gt;然后画：&lt;/p&gt;
+\[f(x)\]&lt;p&gt;对：&lt;/p&gt;
+\[y_1=w_1^Tx.\]&lt;p&gt;如果 active subspace 明显，你会看到原来四维散乱数据几乎塌缩成一条：&lt;/p&gt;
+\[\boxed{\text{一维曲线}}\]&lt;p&gt;这张图通常比读十页理论更能理解它到底在干什么。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Active Subspaces 最值得记住的是：&lt;/p&gt;
-\[
-\boxed{
-\text{高维问题的有效自由度，可能存在于“方向”里，而不是“变量”里。}
-}
-\]&lt;p&gt;所以面对高维代理模型，不应只问：&lt;/p&gt;
-\[
-\text{哪些变量可以删？}
-\]&lt;p&gt;还应该问：&lt;/p&gt;
-\[
-\boxed{
-\text{哪些变量组合才是真正控制输出的坐标？}
-}
-\]&lt;p&gt;这让它正好卡在几个知识体系之间：&lt;/p&gt;
-\[
-\text{global sensitivity}
-\]\[
-\downarrow
-\]\[
-\boxed{\text{Active Subspaces}}
-\]\[
-\downarrow
-\]\[
-\text{dimension-reduced surrogate}
-\]\[
-\downarrow
-\]\[
-\text{reliability / optimization / UQ}.
-\]&lt;p&gt;而对于可靠性分析，最值得进一步追的问题则是：&lt;/p&gt;
-\[
-\boxed{
-\text{“全局重要方向”与“失效概率重要方向”什么时候会不一致？}
-}
-\]&lt;p&gt;我认为这比简单把 20 维 Kriging 再优化一点核函数，更接近真正有研究价值的高维可靠性问题。&lt;/p&gt;
+\[\boxed{ \text{高维问题的有效自由度，可能存在于“方向”里，而不是“变量”里。} }\]&lt;p&gt;所以面对高维代理模型，不应只问：&lt;/p&gt;
+\[\text{哪些变量可以删？}\]&lt;p&gt;还应该问：&lt;/p&gt;
+\[\boxed{ \text{哪些变量组合才是真正控制输出的坐标？} }\]&lt;p&gt;这让它正好卡在几个知识体系之间：&lt;/p&gt;
+\[\text{global sensitivity}\]\[\downarrow\]\[\boxed{\text{Active Subspaces}}\]\[\downarrow\]\[\text{dimension-reduced surrogate}\]\[\downarrow\]\[\text{reliability / optimization / UQ}.\]&lt;p&gt;而对于可靠性分析，最值得进一步追的问题则是：&lt;/p&gt;
+\[\boxed{ \text{“全局重要方向”与“失效概率重要方向”什么时候会不一致？} }\]&lt;p&gt;我认为这比简单把 20 维 Kriging 再优化一点核函数，更接近真正有研究价值的高维可靠性问题。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
@@ -4296,22 +2084,12 @@ y_1=w_1^Tx.
 &lt;strong&gt;领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型&lt;/strong&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：&lt;/p&gt;
-$$
-\boxed{
-\text{到底什么误差值得消除？}
-}
-$$&lt;p&gt;传统自适应有限元通常试图降低：&lt;/p&gt;
-$$
-\|u-u_h\|
-$$&lt;p&gt;这样的全局误差，例如能量范数误差。&lt;/p&gt;
+$$\boxed{ \text{到底什么误差值得消除？} }$$&lt;p&gt;传统自适应有限元通常试图降低：&lt;/p&gt;
+$$\|u-u_h\|$$&lt;p&gt;这样的全局误差，例如能量范数误差。&lt;/p&gt;
 &lt;p&gt;但工程中我们通常并不真正关心整个场：&lt;/p&gt;
-$$
-u(x)
-$$&lt;p&gt;每个地方都同等准确。&lt;/p&gt;
+$$u(x)$$&lt;p&gt;每个地方都同等准确。&lt;/p&gt;
 &lt;p&gt;我们真正关心的往往是一个 &lt;strong&gt;Quantity of Interest，QoI&lt;/strong&gt;：&lt;/p&gt;
-$$
-J(u),
-$$&lt;p&gt;例如：&lt;/p&gt;
+$$J(u),$$&lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;某个孔边最大应力；&lt;/li&gt;
 &lt;li&gt;某个测点位移；&lt;/li&gt;
@@ -4321,230 +2099,107 @@ $$&lt;p&gt;例如：&lt;/p&gt;
 &lt;li&gt;可靠性极限状态 \(g(u)\)。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;DWR 的核心思想就是：&lt;/p&gt;
-$$
-\boxed{
-\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。}
-}
-$$&lt;p&gt;Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(&lt;a class=&#34;link&#34; href=&#34;https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com&#34;  title=&#34;An optimal control approach to a posteriori error estimation in finite element methods | Acta Numerica | Cambridge Core&#34;
+$$\boxed{ \text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} }$$&lt;p&gt;Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(&lt;a class=&#34;link&#34; href=&#34;https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com&#34;  title=&#34;An optimal control approach to a posteriori error estimation in finite element methods | Acta Numerica | Cambridge Core&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;剑桥大学出版社&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-为什么哪里有限元误差最大可能完全不是正确问题&#34;&gt;1. 为什么“哪里有限元误差最大”可能完全不是正确问题？
 &lt;/h2&gt;&lt;p&gt;假设你模拟一个带孔板拉伸。&lt;/p&gt;
 &lt;p&gt;你真正关心：&lt;/p&gt;
-$$
-J(u)=\sigma_{xx}(x_{\rm hole}),
-$$&lt;p&gt;即孔边某点的应力。&lt;/p&gt;
+$$J(u)=\sigma_{xx}(x_{\rm hole}),$$&lt;p&gt;即孔边某点的应力。&lt;/p&gt;
 &lt;p&gt;现在网格中有两个区域：&lt;/p&gt;
 &lt;h3 id=&#34;区域-a&#34;&gt;区域 A
 &lt;/h3&gt;&lt;p&gt;离孔非常远，但局部离散误差很大。&lt;/p&gt;
 &lt;h3 id=&#34;区域-b&#34;&gt;区域 B
 &lt;/h3&gt;&lt;p&gt;孔附近，局部误差只有 A 的一半。&lt;/p&gt;
 &lt;p&gt;传统 residual estimator 可能认为：&lt;/p&gt;
-$$
-\eta_A&gt;\eta_B
-$$&lt;p&gt;于是优先细化 A。&lt;/p&gt;
+$$\eta_A&gt;\eta_B$$&lt;p&gt;于是优先细化 A。&lt;/p&gt;
 &lt;p&gt;但问题是：&lt;/p&gt;
 &lt;p&gt;区域 A 的误差也许几乎不会传播到：&lt;/p&gt;
-$$
-\sigma_{xx}(x_{\rm hole}).
-$$&lt;p&gt;而区域 B 即使误差不算最大，却直接控制最终答案。&lt;/p&gt;
+$$\sigma_{xx}(x_{\rm hole}).$$&lt;p&gt;而区域 B 即使误差不算最大，却直接控制最终答案。&lt;/p&gt;
 &lt;p&gt;所以真正应该比较的是：&lt;/p&gt;
-$$
-\boxed{
-\text{local error magnitude}
-\times
-\text{QoI sensitivity}
-}
-$$&lt;p&gt;而不是：&lt;/p&gt;
-$$
-\boxed{
-\text{local error magnitude}
-}
-$$&lt;p&gt;本身。&lt;/p&gt;
+$$\boxed{ \text{local error magnitude} \times \text{QoI sensitivity} }$$&lt;p&gt;而不是：&lt;/p&gt;
+$$\boxed{ \text{local error magnitude} }$$&lt;p&gt;本身。&lt;/p&gt;
 &lt;p&gt;这就是 DWR 里那个 &lt;strong&gt;weighted&lt;/strong&gt; 的意义。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-先把有限元问题写成一个残差问题&#34;&gt;2. 先把有限元问题写成一个残差问题
 &lt;/h1&gt;&lt;p&gt;设连续问题：&lt;/p&gt;
-$$
-A(u)(v)=F(v),
-$$&lt;p&gt;有限元解：&lt;/p&gt;
-$$
-u_h.
-$$&lt;p&gt;定义 residual：&lt;/p&gt;
-&lt;h1 id=&#34;rhou_hv&#34;&gt;$$
-\boxed{
-\rho(u_h)(v)
-&lt;/h1&gt;&lt;p&gt;F(v)-A(u_h)(v).
-}
-$$&lt;/p&gt;
-&lt;p&gt;如果：&lt;/p&gt;
-$$
-u_h=u,
-$$&lt;p&gt;那么：&lt;/p&gt;
-$$
-\rho(u_h)=0.
-$$&lt;p&gt;所以 residual 告诉我们：&lt;/p&gt;
+$$A(u)(v)=F(v),$$&lt;p&gt;有限元解：&lt;/p&gt;
+$$u_h.$$&lt;p&gt;定义 residual：&lt;/p&gt;
+$$\boxed{ \rho(u_h)(v) = F(v)-A(u_h)(v). }$$&lt;p&gt;如果：&lt;/p&gt;
+$$u_h=u,$$&lt;p&gt;那么：&lt;/p&gt;
+$$\rho(u_h)=0.$$&lt;p&gt;所以 residual 告诉我们：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;当前有限元解在哪些地方没有严格满足原始 PDE。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;这和很多 a posteriori error estimator 一样。&lt;/p&gt;
 &lt;p&gt;但 DWR 不直接把 residual 当成最终误差指标。&lt;/p&gt;
 &lt;p&gt;它还需要回答：&lt;/p&gt;
-$$
-\boxed{
-\text{某个 residual 对 }J(u)\text{ 到底有多重要？}
-}
-$$&lt;p&gt;于是引入 &lt;strong&gt;dual / adjoint problem&lt;/strong&gt;。&lt;/p&gt;
+$$\boxed{ \text{某个 residual 对 }J(u)\text{ 到底有多重要？} }$$&lt;p&gt;于是引入 &lt;strong&gt;dual / adjoint problem&lt;/strong&gt;。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-dual-problem-到底在算什么&#34;&gt;3. Dual problem 到底在算什么？
 &lt;/h1&gt;&lt;p&gt;对线性问题，假设：&lt;/p&gt;
-$$
-Au=f.
-$$&lt;p&gt;我们关心：&lt;/p&gt;
-$$
-J(u)=c^Tu.
-$$&lt;p&gt;有限元误差：&lt;/p&gt;
-$$
-e=u-u_h.
-$$&lt;p&gt;目标误差：&lt;/p&gt;
-$$
-J(u)-J(u_h)=c^Te.
-$$&lt;p&gt;现在定义 adjoint：&lt;/p&gt;
-$$
-\boxed{
-A^Tz=c.
-}
-$$&lt;p&gt;于是：&lt;/p&gt;
-&lt;h1 id=&#34;cte&#34;&gt;$$
-c^Te
-&lt;/h1&gt;&lt;p&gt;z^TAe.
-$$&lt;/p&gt;
-&lt;p&gt;而：&lt;/p&gt;
-$$
-Ae=f-Au_h=r.
-$$&lt;p&gt;因此：&lt;/p&gt;
-&lt;h1 id=&#34;ju-ju_h&#34;&gt;$$
-\boxed{
-J(u)-J(u_h)
-&lt;/h1&gt;&lt;p&gt;z^Tr.
-}
-$$&lt;/p&gt;
-&lt;p&gt;这就是 DWR 最核心的一条公式。&lt;/p&gt;
+$$Au=f.$$&lt;p&gt;我们关心：&lt;/p&gt;
+$$J(u)=c^Tu.$$&lt;p&gt;有限元误差：&lt;/p&gt;
+$$e=u-u_h.$$&lt;p&gt;目标误差：&lt;/p&gt;
+$$J(u)-J(u_h)=c^Te.$$&lt;p&gt;现在定义 adjoint：&lt;/p&gt;
+$$\boxed{ A^Tz=c. }$$&lt;p&gt;于是：&lt;/p&gt;
+$$c^Te = z^TAe.$$&lt;p&gt;而：&lt;/p&gt;
+$$Ae=f-Au_h=r.$$&lt;p&gt;因此：&lt;/p&gt;
+$$\boxed{ J(u)-J(u_h) = z^Tr. }$$&lt;p&gt;这就是 DWR 最核心的一条公式。&lt;/p&gt;
 &lt;p&gt;可以拆成：&lt;/p&gt;
-&lt;h1 id=&#34;textqoi-error&#34;&gt;$$
-\boxed{
-\text{QoI error}
-&lt;/h1&gt;&lt;p&gt;\text{residual}
-\times
-\text{adjoint sensitivity}
-}
-$$&lt;/p&gt;
-&lt;p&gt;更准确地说，是 residual 在 dual solution 上的作用。&lt;/p&gt;
+$$\boxed{ \text{QoI error} = \text{residual} \times \text{adjoint sensitivity} }$$&lt;p&gt;更准确地说，是 residual 在 dual solution 上的作用。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-为什么-adjoint-可以理解成误差传播地图&#34;&gt;4. 为什么 adjoint 可以理解成“误差传播地图”？
 &lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
-$$
-z=A^{-T}c.
-$$&lt;p&gt;它回答的是：&lt;/p&gt;
+$$z=A^{-T}c.$$&lt;p&gt;它回答的是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;如果系统某个位置产生一点误差，这个误差最终会怎样影响 \(J\)？&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;所以：&lt;/p&gt;
-$$
-z(x)
-$$&lt;p&gt;不是 primal solution 的另一个版本。&lt;/p&gt;
+$$z(x)$$&lt;p&gt;不是 primal solution 的另一个版本。&lt;/p&gt;
 &lt;p&gt;它是一张：&lt;/p&gt;
-$$
-\boxed{\text{QoI sensitivity field}}
-$$&lt;p&gt;例如你关心出口流量，那么：&lt;/p&gt;
-$$
-z(x)
-$$&lt;p&gt;会告诉你：&lt;/p&gt;
+$$\boxed{\text{QoI sensitivity field}}$$&lt;p&gt;例如你关心出口流量，那么：&lt;/p&gt;
+$$z(x)$$&lt;p&gt;会告诉你：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;上游哪些局部 PDE 误差最容易最终改变出口流量？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;如果某个区域：&lt;/p&gt;
-$$
-z\approx0,
-$$&lt;p&gt;即使：&lt;/p&gt;
-$$
-|r|
-$$&lt;p&gt;很大，也可能：&lt;/p&gt;
-$$
-r z\approx0.
-$$&lt;p&gt;于是没必要优先在那里细化。&lt;/p&gt;
+$$z\approx0,$$&lt;p&gt;即使：&lt;/p&gt;
+$$|r|$$&lt;p&gt;很大，也可能：&lt;/p&gt;
+$$r z\approx0.$$&lt;p&gt;于是没必要优先在那里细化。&lt;/p&gt;
 &lt;p&gt;反过来某区域：&lt;/p&gt;
-$$
-r
-$$&lt;p&gt;中等，但：&lt;/p&gt;
-$$
-|z|\gg1,
-$$&lt;p&gt;其误差会强烈传播到 QoI。&lt;/p&gt;
+$$r$$&lt;p&gt;中等，但：&lt;/p&gt;
+$$|z|\gg1,$$&lt;p&gt;其误差会强烈传播到 QoI。&lt;/p&gt;
 &lt;p&gt;这就是 DWR 的真正物理意义。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;5-这与普通-residual-based-adaptivity-有什么根本区别&#34;&gt;5. 这与普通 residual-based adaptivity 有什么根本区别？
 &lt;/h1&gt;&lt;p&gt;普通 residual estimator 大概构造：&lt;/p&gt;
-$$
-\eta_K
-\sim
-\|r_K\|.
-$$&lt;p&gt;然后：&lt;/p&gt;
-$$
-\eta_K\uparrow
-\Rightarrow
-\text{refine element }K.
-$$&lt;p&gt;DWR 则近似：&lt;/p&gt;
-$$
-\boxed{
-\eta_K
-\sim
-\rho_K(u_h)\,
-(z-z_h)
-}
-$$&lt;p&gt;或者实际实现中的某种局部化近似。&lt;/p&gt;
+$$\eta_K \sim \|r_K\|.$$&lt;p&gt;然后：&lt;/p&gt;
+$$\eta_K\uparrow \Rightarrow \text{refine element }K.$$&lt;p&gt;DWR 则近似：&lt;/p&gt;
+$$\boxed{ \eta_K \sim \rho_K(u_h)\, (z-z_h) }$$&lt;p&gt;或者实际实现中的某种局部化近似。&lt;/p&gt;
 &lt;p&gt;其中：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(\rho_K\)：局部 primal residual；&lt;/li&gt;
 &lt;li&gt;\(z-z_h\)：dual/adjoint approximation error。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;于是：&lt;/p&gt;
-$$
-\boxed{
-\eta_K
-}
-$$&lt;p&gt;已经不是“这个元素错了多少”。&lt;/p&gt;
+$$\boxed{ \eta_K }$$&lt;p&gt;已经不是“这个元素错了多少”。&lt;/p&gt;
 &lt;p&gt;它表示：&lt;/p&gt;
-$$
-\boxed{
-\text{这个元素的离散误差对最终 QoI 贡献了多少。}
-}
-$$&lt;p&gt;deal.II 的经典 &lt;code&gt;step-14&lt;/code&gt; 教程就是围绕这一结构实现 dual weighted residual estimator，并直接比较 DWR、全局细化和 Kelly residual estimator 等不同自适应策略。(&lt;a class=&#34;link&#34; href=&#34;https://dealii.org/9.4.1/doxygen/deal.II/step_14.html?utm_source=chatgpt.com&#34;  title=&#34;The deal.II Library: The step-14 tutorial program&#34;
+$$\boxed{ \text{这个元素的离散误差对最终 QoI 贡献了多少。} }$$&lt;p&gt;deal.II 的经典 &lt;code&gt;step-14&lt;/code&gt; 教程就是围绕这一结构实现 dual weighted residual estimator，并直接比较 DWR、全局细化和 Kelly residual estimator 等不同自适应策略。(&lt;a class=&#34;link&#34; href=&#34;https://dealii.org/9.4.1/doxygen/deal.II/step_14.html?utm_source=chatgpt.com&#34;  title=&#34;The deal.II Library: The step-14 tutorial program&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;deal.II&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-一个直观例子不要把网格细在最热闹的地方&#34;&gt;6. 一个直观例子：不要把网格细在“最热闹”的地方
 &lt;/h1&gt;&lt;p&gt;假设二维导热：&lt;/p&gt;
-$$
--\nabla\cdot(k\nabla T)=q.
-$$&lt;p&gt;左边有一个复杂热源，导致：&lt;/p&gt;
-$$
-\nabla T
-$$&lt;p&gt;非常大。&lt;/p&gt;
+$$-\nabla\cdot(k\nabla T)=q.$$&lt;p&gt;左边有一个复杂热源，导致：&lt;/p&gt;
+$$\nabla T$$&lt;p&gt;非常大。&lt;/p&gt;
 &lt;p&gt;但你真正关心：&lt;/p&gt;
-&lt;h1 id=&#34;jt&#34;&gt;$$
-J(T)
-&lt;/h1&gt;&lt;p&gt;T(x_{\rm sensor}),
-$$&lt;/p&gt;
-&lt;p&gt;而传感器在右下角。&lt;/p&gt;
+$$J(T) = T(x_{\rm sensor}),$$&lt;p&gt;而传感器在右下角。&lt;/p&gt;
 &lt;p&gt;普通误差估计可能大量细化热源周围，因为那里：&lt;/p&gt;
-$$
-|r_K|
-$$&lt;p&gt;大。&lt;/p&gt;
+$$|r_K|$$&lt;p&gt;大。&lt;/p&gt;
 &lt;p&gt;DWR 的 dual problem 则从：&lt;/p&gt;
-$$
-x_{\rm sensor}
-$$&lt;p&gt;向整个域传播敏感度。&lt;/p&gt;
+$$x_{\rm sensor}$$&lt;p&gt;向整个域传播敏感度。&lt;/p&gt;
 &lt;p&gt;结果可能发现：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -4568,82 +2223,33 @@ $$&lt;p&gt;向整个域传播敏感度。&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;于是 DWR 会把网格优先细化到第二类区域。&lt;/p&gt;
 &lt;p&gt;这就是：&lt;/p&gt;
-$$
-\boxed{
-\text{goal-oriented adaptivity}
-}
-$$&lt;p&gt;真正比普通 adaptivity 高一层的地方。&lt;/p&gt;
+$$\boxed{ \text{goal-oriented adaptivity} }$$&lt;p&gt;真正比普通 adaptivity 高一层的地方。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;7-dwr-为什么和伴随法天然是一回事&#34;&gt;7. DWR 为什么和伴随法天然是一回事？
 &lt;/h1&gt;&lt;p&gt;如果你做过优化：&lt;/p&gt;
-$$
-\min_\theta J(u(\theta)),
-$$&lt;p&gt;而：&lt;/p&gt;
-$$
-R(u,\theta)=0,
-$$&lt;p&gt;你通常引入 adjoint：&lt;/p&gt;
-&lt;h1 id=&#34;lambda&#34;&gt;$$
-\left(
-\frac{\partial R}{\partial u}
-\right)^T
-\lambda
-&lt;/h1&gt;&lt;p&gt;\frac{\partial J}{\partial u}.
-$$&lt;/p&gt;
-&lt;p&gt;然后得到：&lt;/p&gt;
-$$
-\frac{dJ}{d\theta}.
-$$&lt;p&gt;DWR 用的也是同一个数学结构。&lt;/p&gt;
+$$\min_\theta J(u(\theta)),$$&lt;p&gt;而：&lt;/p&gt;
+$$R(u,\theta)=0,$$&lt;p&gt;你通常引入 adjoint：&lt;/p&gt;
+$$\left( \frac{\partial R}{\partial u} \right)^T \lambda = \frac{\partial J}{\partial u}.$$&lt;p&gt;然后得到：&lt;/p&gt;
+$$\frac{dJ}{d\theta}.$$&lt;p&gt;DWR 用的也是同一个数学结构。&lt;/p&gt;
 &lt;p&gt;区别只在用途：&lt;/p&gt;
 &lt;h3 id=&#34;优化中的-adjoint&#34;&gt;优化中的 adjoint
 &lt;/h3&gt;&lt;p&gt;回答：&lt;/p&gt;
-$$
-\boxed{
-\text{参数变化会怎样改变 }J？
-}
-$$&lt;h3 id=&#34;dwr-中的-adjoint&#34;&gt;DWR 中的 adjoint
+$$\boxed{ \text{参数变化会怎样改变 }J？ }$$&lt;h3 id=&#34;dwr-中的-adjoint&#34;&gt;DWR 中的 adjoint
 &lt;/h3&gt;&lt;p&gt;回答：&lt;/p&gt;
-$$
-\boxed{
-\text{局部离散误差会怎样改变 }J？
-}
-$$&lt;p&gt;所以：&lt;/p&gt;
-$$
-\boxed{
-\text{adjoint optimization}
-\quad\text{和}\quad
-\text{goal-oriented error estimation}
-}
-$$&lt;p&gt;其实是同一套 duality machinery 的两个应用。&lt;/p&gt;
+$$\boxed{ \text{局部离散误差会怎样改变 }J？ }$$&lt;p&gt;所以：&lt;/p&gt;
+$$\boxed{ \text{adjoint optimization} \quad\text{和}\quad \text{goal-oriented error estimation} }$$&lt;p&gt;其实是同一套 duality machinery 的两个应用。&lt;/p&gt;
 &lt;p&gt;这也是为什么 Becker–Rannacher 的经典框架直接从最优控制中的 duality 思想发展出来。(&lt;a class=&#34;link&#34; href=&#34;https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com&#34;  title=&#34;An optimal control approach to a posteriori error estimation in finite element methods | Acta Numerica | Cambridge Core&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;剑桥大学出版社&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-一个很深的结论误差没有绝对重要性&#34;&gt;8. 一个很深的结论：误差没有“绝对重要性”
 &lt;/h1&gt;&lt;p&gt;假设一个 FEM 解：&lt;/p&gt;
-$$
-u_h
-$$&lt;p&gt;有同样的离散误差。&lt;/p&gt;
+$$u_h$$&lt;p&gt;有同样的离散误差。&lt;/p&gt;
 &lt;p&gt;但你选择不同 QoI：&lt;/p&gt;
-$$
-J_1(u)=\text{左端位移},
-$$$$
-J_2(u)=\text{右端应力}.
-$$&lt;p&gt;你会得到两个不同 adjoint：&lt;/p&gt;
-$$
-z_1,
-\qquad
-z_2.
-$$&lt;p&gt;于是：&lt;/p&gt;
-$$
-\eta_K^{(1)}
-\neq
-\eta_K^{(2)}.
-$$&lt;p&gt;也就是说：&lt;/p&gt;
-$$
-\boxed{
-\text{同一个有限元模型，对于不同工程目标，最优网格可能完全不同。}
-}
-$$&lt;p&gt;这句话非常重要。&lt;/p&gt;
+$$J_1(u)=\text{左端位移},$$$$J_2(u)=\text{右端应力}.$$&lt;p&gt;你会得到两个不同 adjoint：&lt;/p&gt;
+$$z_1, \qquad z_2.$$&lt;p&gt;于是：&lt;/p&gt;
+$$\eta_K^{(1)} \neq \eta_K^{(2)}.$$&lt;p&gt;也就是说：&lt;/p&gt;
+$$\boxed{ \text{同一个有限元模型，对于不同工程目标，最优网格可能完全不同。} }$$&lt;p&gt;这句话非常重要。&lt;/p&gt;
 &lt;p&gt;工程上经常存在一种隐含假设：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“网格收敛了，所以所有输出都可信。”&lt;/p&gt;
@@ -4657,181 +2263,76 @@ $$&lt;p&gt;这句话非常重要。&lt;/p&gt;
 &lt;h1 id=&#34;9-为什么-dwr-中-dual-解通常要比-primal-解更丰富&#34;&gt;9. 为什么 DWR 中 dual 解通常要比 primal 解“更丰富”？
 &lt;/h1&gt;&lt;p&gt;这里有一个实现陷阱。&lt;/p&gt;
 &lt;p&gt;如果 primal：&lt;/p&gt;
-$$
-u_h\in V_h
-$$&lt;p&gt;而 dual：&lt;/p&gt;
-$$
-z_h\in V_h
-$$&lt;p&gt;使用完全相同的 Galerkin 空间，那么因为 Galerkin orthogonality：&lt;/p&gt;
-$$
-\rho(u_h)(z_h)=0.
-$$&lt;p&gt;于是 estimator 可能直接失去信息。&lt;/p&gt;
+$$u_h\in V_h$$&lt;p&gt;而 dual：&lt;/p&gt;
+$$z_h\in V_h$$&lt;p&gt;使用完全相同的 Galerkin 空间，那么因为 Galerkin orthogonality：&lt;/p&gt;
+$$\rho(u_h)(z_h)=0.$$&lt;p&gt;于是 estimator 可能直接失去信息。&lt;/p&gt;
 &lt;p&gt;因此实际 DWR 通常需要：&lt;/p&gt;
-$$
-\boxed{
-z_h
-\text{ 在更高阶或更细网格空间中计算}
-}
-$$&lt;p&gt;例如：&lt;/p&gt;
-$$
-P_1\text{ primal}
-$$&lt;p&gt;配：&lt;/p&gt;
-$$
-P_2\text{ dual}.
-$$&lt;p&gt;或者对 dual 做局部 reconstruction。&lt;/p&gt;
+$$\boxed{ z_h \text{ 在更高阶或更细网格空间中计算} }$$&lt;p&gt;例如：&lt;/p&gt;
+$$P_1\text{ primal}$$&lt;p&gt;配：&lt;/p&gt;
+$$P_2\text{ dual}.$$&lt;p&gt;或者对 dual 做局部 reconstruction。&lt;/p&gt;
 &lt;p&gt;这也是 DWR 比普通 residual estimator 更贵的原因之一：&lt;/p&gt;
-$$
-\boxed{
-\text{除了 primal solve，
-还要额外解一个 adjoint problem。}
-}
-$$&lt;p&gt;近期和经典实践都反复强调，高质量 dual approximation 是 DWR 是否有效的关键。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/1803.10643?utm_source=chatgpt.com&#34;  title=&#34;Numerical study of goal-oriented error control for stabilized finite element methods&#34;
+$$\boxed{ \text{除了 primal solve， 还要额外解一个 adjoint problem。} }$$&lt;p&gt;近期和经典实践都反复强调，高质量 dual approximation 是 DWR 是否有效的关键。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/1803.10643?utm_source=chatgpt.com&#34;  title=&#34;Numerical study of goal-oriented error control for stabilized finite element methods&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;10-那为什么还值得多解一次-adjoint&#34;&gt;10. 那为什么还值得多解一次 adjoint？
 &lt;/h1&gt;&lt;p&gt;因为它可能大幅减少：&lt;/p&gt;
-$$
-\boxed{\text{真正昂贵的 primal DOF}}
-$$&lt;p&gt;数量。&lt;/p&gt;
+$$\boxed{\text{真正昂贵的 primal DOF}}$$&lt;p&gt;数量。&lt;/p&gt;
 &lt;p&gt;假设普通 adaptivity 最终需要：&lt;/p&gt;
-$$
-2\times10^6
-$$&lt;p&gt;个单元，才能让整个场普遍很准。&lt;/p&gt;
+$$2\times10^6$$&lt;p&gt;个单元，才能让整个场普遍很准。&lt;/p&gt;
 &lt;p&gt;但最终你只关心：&lt;/p&gt;
-$$
-J(u).
-$$&lt;p&gt;Goal-oriented adaptivity 可能通过把 DOF 集中到真正影响 \(J\) 的区域，以远少于：&lt;/p&gt;
-$$
-2\times10^6
-$$&lt;p&gt;的网格达到相同：&lt;/p&gt;
-$$
-|J-J_h|.
-$$&lt;p&gt;所以付出一个 adjoint solve，换来的是：&lt;/p&gt;
-$$
-\boxed{
-\text{更聪明的 DOF allocation}
-}
-$$&lt;p&gt;这和前几期许多方法背后的共同思想一致：&lt;/p&gt;
-$$
-\boxed{
-\text{不要平均地给所有区域相同精度。}
-}
-$$&lt;p&gt;2024 年对非线性 \(p\)-Laplace 空间—时间 FEM 的工作仍在使用 DWR，就是因为工程目标往往是某个特定 functional，而不是整个解场的统一精度。(&lt;a class=&#34;link&#34; href=&#34;https://doi.org/10.1016/j.camwa.2024.05.017?utm_source=chatgpt.com&#34;  title=&#34;Goal-oriented adaptive space-time finite element methods for regularized parabolic p-Laplace problems - ScienceDirect&#34;
+$$J(u).$$&lt;p&gt;Goal-oriented adaptivity 可能通过把 DOF 集中到真正影响 \(J\) 的区域，以远少于：&lt;/p&gt;
+$$2\times10^6$$&lt;p&gt;的网格达到相同：&lt;/p&gt;
+$$|J-J_h|.$$&lt;p&gt;所以付出一个 adjoint solve，换来的是：&lt;/p&gt;
+$$\boxed{ \text{更聪明的 DOF allocation} }$$&lt;p&gt;这和前几期许多方法背后的共同思想一致：&lt;/p&gt;
+$$\boxed{ \text{不要平均地给所有区域相同精度。} }$$&lt;p&gt;2024 年对非线性 \(p\)-Laplace 空间—时间 FEM 的工作仍在使用 DWR，就是因为工程目标往往是某个特定 functional，而不是整个解场的统一精度。(&lt;a class=&#34;link&#34; href=&#34;https://doi.org/10.1016/j.camwa.2024.05.017?utm_source=chatgpt.com&#34;  title=&#34;Goal-oriented adaptive space-time finite element methods for regularized parabolic p-Laplace problems - ScienceDirect&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;数字对象标识符&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;11-它甚至可以控制求解器迭代误差&#34;&gt;11. 它甚至可以控制“求解器迭代误差”
 &lt;/h1&gt;&lt;p&gt;这点很容易被忽视。&lt;/p&gt;
 &lt;p&gt;假设 FEM 网格已经固定，但线性系统：&lt;/p&gt;
-$$
-Ku=f
-$$&lt;p&gt;只用 CG 迭代到某个 tolerance。&lt;/p&gt;
+$$Ku=f$$&lt;p&gt;只用 CG 迭代到某个 tolerance。&lt;/p&gt;
 &lt;p&gt;于是总误差包含：&lt;/p&gt;
-$$
-\boxed{
-\text{discretization error}
-+
-\text{algebraic solver error}.
-}
-$$&lt;p&gt;一般做法可能固定：&lt;/p&gt;
-$$
-\|r_{\rm linear}\|&lt;10^{-10}.
-$$&lt;p&gt;但这可能严重过度求解。&lt;/p&gt;
+$$\boxed{ \text{discretization error} + \text{algebraic solver error}. }$$&lt;p&gt;一般做法可能固定：&lt;/p&gt;
+$$\|r_{\rm linear}\|&lt;10^{-10}.$$&lt;p&gt;但这可能严重过度求解。&lt;/p&gt;
 &lt;p&gt;如果最终 QoI 只要求：&lt;/p&gt;
-$$
-10^{-3}
-$$&lt;p&gt;精度，那么线性系统没必要每一步都解到机器精度。&lt;/p&gt;
+$$10^{-3}$$&lt;p&gt;精度，那么线性系统没必要每一步都解到机器精度。&lt;/p&gt;
 &lt;p&gt;已有 DWR 工作直接把 discretization error 与 iterative solver error 同时纳入目标导向误差控制，并据此自动平衡 multigrid、Gauss–Seidel、CG 的迭代精度与网格误差。(&lt;a class=&#34;link&#34; href=&#34;https://portal.fis.tum.de/de/publications/goal-oriented-error-control-of-the-iterative-solution-of-finite-e/?utm_source=chatgpt.com&#34;  title=&#34;Goal-oriented error control of the iterative solution of finite element equations - Technische Universität München&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Technical University of Munich&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;这其实是一个非常高级的资源分配思想：&lt;/p&gt;
-$$
-\boxed{
-\text{solver tolerance 也应该由最终 QoI 决定。}
-}
-$$&lt;hr&gt;
+$$\boxed{ \text{solver tolerance 也应该由最终 QoI 决定。} }$$&lt;hr&gt;
 &lt;h1 id=&#34;12-对可靠性分析为什么特别有意思&#34;&gt;12. 对可靠性分析为什么特别有意思？
 &lt;/h1&gt;&lt;p&gt;假设极限状态：&lt;/p&gt;
-&lt;h1 id=&#34;gx&#34;&gt;$$
-g(X)
-&lt;/h1&gt;&lt;h2 id=&#34;sigma_rm-allow&#34;&gt;\sigma_{\rm allow}
-&lt;/h2&gt;&lt;p&gt;\sigma_{\max}(X).
-$$&lt;/p&gt;
-&lt;p&gt;传统 FEM 网格收敛可能看：&lt;/p&gt;
-$$
-\|u-u_h\|.
-$$&lt;p&gt;但可靠性真正关心的是：&lt;/p&gt;
-$$
-\boxed{
-g(X)
-}
-$$&lt;p&gt;尤其：&lt;/p&gt;
-$$
-g(X)\approx0
-$$&lt;p&gt;附近。&lt;/p&gt;
+$$g(X) = \sigma_{\rm allow} - \sigma_{\max}(X).$$&lt;p&gt;传统 FEM 网格收敛可能看：&lt;/p&gt;
+$$\|u-u_h\|.$$&lt;p&gt;但可靠性真正关心的是：&lt;/p&gt;
+$$\boxed{ g(X) }$$&lt;p&gt;尤其：&lt;/p&gt;
+$$g(X)\approx0$$&lt;p&gt;附近。&lt;/p&gt;
 &lt;p&gt;那么最合理的有限元误差控制目标其实应该围绕：&lt;/p&gt;
-$$
-J(u)=g(u)
-$$&lt;p&gt;或者：&lt;/p&gt;
-$$
-J(u)=\sigma_{\max}.
-$$&lt;p&gt;这样 DWR 可以告诉你：&lt;/p&gt;
+$$J(u)=g(u)$$&lt;p&gt;或者：&lt;/p&gt;
+$$J(u)=\sigma_{\max}.$$&lt;p&gt;这样 DWR 可以告诉你：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;哪些空间区域的 FEM 离散误差最可能改变“安全 / 失效”的判断？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;这比让整个结构统一达到：&lt;/p&gt;
-$$
-1\%
-$$&lt;p&gt;位移误差更有任务针对性。&lt;/p&gt;
+$$1\%$$&lt;p&gt;位移误差更有任务针对性。&lt;/p&gt;
 &lt;p&gt;甚至可以进一步思考：&lt;/p&gt;
-$$
-\boxed{
-\text{可靠性采样 adaptive}
-+
-\text{FEM mesh adaptive}
-}
-$$&lt;p&gt;两层同时存在。&lt;/p&gt;
+$$\boxed{ \text{可靠性采样 adaptive} + \text{FEM mesh adaptive} }$$&lt;p&gt;两层同时存在。&lt;/p&gt;
 &lt;p&gt;第一层决定：&lt;/p&gt;
-$$
-\text{哪个随机样本值得算？}
-$$&lt;p&gt;第二层决定：&lt;/p&gt;
-$$
-\text{这个随机样本内部，哪里值得细化？}
-$$&lt;p&gt;这是非常有潜力的多层资源分配结构。&lt;/p&gt;
+$$\text{哪个随机样本值得算？}$$&lt;p&gt;第二层决定：&lt;/p&gt;
+$$\text{这个随机样本内部，哪里值得细化？}$$&lt;p&gt;这是非常有潜力的多层资源分配结构。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-这和代理模型的关系也很紧&#34;&gt;13. 这和代理模型的关系也很紧
 &lt;/h1&gt;&lt;p&gt;假设你要训练代理：&lt;/p&gt;
-$$
-\hat g(X).
-$$&lt;p&gt;高保真训练数据来自 FEM：&lt;/p&gt;
-$$
-g_h(X).
-$$&lt;p&gt;但如果 FEM 自己带有：&lt;/p&gt;
-$$
-\epsilon_{\rm FEM}(X),
-$$&lt;p&gt;那么代理其实在学习：&lt;/p&gt;
-$$
-g(X)+\epsilon_{\rm FEM}(X).
-$$&lt;p&gt;很多 surrogate workflow 默认：&lt;/p&gt;
-$$
-\boxed{
-\text{HF label = truth}
-}
-$$&lt;p&gt;但实际上：&lt;/p&gt;
-$$
-\boxed{
-\text{HF simulation 也有数值误差。}
-}
-$$&lt;p&gt;如果 DWR 能提供：&lt;/p&gt;
-$$
-|J(u)-J(u_h)|
-$$&lt;p&gt;的局部估计，就可能让 surrogate training 进一步获得：&lt;/p&gt;
-$$
-\boxed{
-\text{label fidelity information}
-}
-$$&lt;p&gt;例如：&lt;/p&gt;
+$$\hat g(X).$$&lt;p&gt;高保真训练数据来自 FEM：&lt;/p&gt;
+$$g_h(X).$$&lt;p&gt;但如果 FEM 自己带有：&lt;/p&gt;
+$$\epsilon_{\rm FEM}(X),$$&lt;p&gt;那么代理其实在学习：&lt;/p&gt;
+$$g(X)+\epsilon_{\rm FEM}(X).$$&lt;p&gt;很多 surrogate workflow 默认：&lt;/p&gt;
+$$\boxed{ \text{HF label = truth} }$$&lt;p&gt;但实际上：&lt;/p&gt;
+$$\boxed{ \text{HF simulation 也有数值误差。} }$$&lt;p&gt;如果 DWR 能提供：&lt;/p&gt;
+$$|J(u)-J(u_h)|$$&lt;p&gt;的局部估计，就可能让 surrogate training 进一步获得：&lt;/p&gt;
+$$\boxed{ \text{label fidelity information} }$$&lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;FEM 误差大的样本重新细化；&lt;/li&gt;
 &lt;li&gt;FEM 误差小的样本直接接受；&lt;/li&gt;
@@ -4843,23 +2344,12 @@ $$&lt;p&gt;例如：&lt;/p&gt;
 &lt;h1 id=&#34;14-一个很重要的限制qoi-选错了整个自适应过程也会跟着错&#34;&gt;14. 一个很重要的限制：QoI 选错了，整个自适应过程也会跟着错
 &lt;/h1&gt;&lt;p&gt;DWR 是高度 goal-dependent 的。&lt;/p&gt;
 &lt;p&gt;如果你定义：&lt;/p&gt;
-$$
-J(u)=\text{tip displacement},
-$$&lt;p&gt;它会优化 tip displacement。&lt;/p&gt;
+$$J(u)=\text{tip displacement},$$&lt;p&gt;它会优化 tip displacement。&lt;/p&gt;
 &lt;p&gt;但如果后来突然关心：&lt;/p&gt;
-$$
-\sigma_{\max},
-$$&lt;p&gt;之前的网格未必适合。&lt;/p&gt;
+$$\sigma_{\max},$$&lt;p&gt;之前的网格未必适合。&lt;/p&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-$$
-\boxed{
-\text{DWR 把工程目标正式写进数值方法，
-同时也让结果对目标定义更敏感。}
-}
-$$&lt;p&gt;现实任务经常同时有多个 QoI：&lt;/p&gt;
-$$
-J_1,J_2,\ldots,J_m.
-$$&lt;p&gt;例如：&lt;/p&gt;
+$$\boxed{ \text{DWR 把工程目标正式写进数值方法， 同时也让结果对目标定义更敏感。} }$$&lt;p&gt;现实任务经常同时有多个 QoI：&lt;/p&gt;
+$$J_1,J_2,\ldots,J_m.$$&lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;位移；&lt;/li&gt;
 &lt;li&gt;应力；&lt;/li&gt;
@@ -4874,11 +2364,7 @@ $$&lt;p&gt;例如：&lt;/p&gt;
 &lt;h1 id=&#34;15-dwr-也不是严格保证误差上界的万能方法&#34;&gt;15. DWR 也不是严格保证误差上界的万能方法
 &lt;/h1&gt;&lt;p&gt;这点必须讲清楚。&lt;/p&gt;
 &lt;p&gt;经典 DWR 的优势是：&lt;/p&gt;
-$$
-\boxed{
-\text{非常 sharp、goal-specific}
-}
-$$&lt;p&gt;但实际 estimator 往往依赖：&lt;/p&gt;
+$$\boxed{ \text{非常 sharp、goal-specific} }$$&lt;p&gt;但实际 estimator 往往依赖：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;dual approximation；&lt;/li&gt;
 &lt;li&gt;higher-order reconstruction；&lt;/li&gt;
@@ -4886,23 +2372,13 @@ $$&lt;p&gt;但实际 estimator 往往依赖：&lt;/p&gt;
 &lt;li&gt;saturation assumptions。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;所以经典 DWR estimator 不应自动理解为：&lt;/p&gt;
-$$
-\boxed{\text{严格数学上界}}
-$$&lt;p&gt;与前面讲过的某些 certified reduced-basis bound 不完全一样。&lt;/p&gt;
+$$\boxed{\text{严格数学上界}}$$&lt;p&gt;与前面讲过的某些 certified reduced-basis bound 不完全一样。&lt;/p&gt;
 &lt;p&gt;后续工作一直在研究 DWR 的两侧估计、可靠性/效率以及 saturation assumption；例如 SIAM JSC 的两侧 a posteriori 分析明确讨论了这些条件以及 saturation assumption 可能失效的反例。(&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/18M1227275?utm_source=chatgpt.com&#34;  title=&#34;Two-Side a Posteriori Error Estimates for the Dual-Weighted Residual Method | SIAM Journal on Scientific Computing&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;工业与应用数学学会&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;因此要区分：&lt;/p&gt;
-$$
-\boxed{
-\text{sharp estimator}
-}
-$$&lt;p&gt;和：&lt;/p&gt;
-$$
-\boxed{
-\text{guaranteed upper bound}
-}
-$$&lt;p&gt;这两者不是同义词。&lt;/p&gt;
+$$\boxed{ \text{sharp estimator} }$$&lt;p&gt;和：&lt;/p&gt;
+$$\boxed{ \text{guaranteed upper bound} }$$&lt;p&gt;这两者不是同义词。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;16-它最近仍然在往哪里发展&#34;&gt;16. 它最近仍然在往哪里发展？
 &lt;/h1&gt;&lt;p&gt;DWR 并不是一个停留在 2001 年的老方法。&lt;/p&gt;
@@ -4918,11 +2394,7 @@ $$&lt;p&gt;这两者不是同义词。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;17-对自研物理求解器最值得迁移的一点&#34;&gt;17. 对自研物理求解器最值得迁移的一点
 &lt;/h1&gt;&lt;p&gt;DWR 最深刻的思想其实可以脱离 FEM：&lt;/p&gt;
-$$
-\boxed{
-\text{误差的重要程度，应由它对最终任务的影响决定。}
-}
-$$&lt;p&gt;假设软体求解器里同时存在：&lt;/p&gt;
+$$\boxed{ \text{误差的重要程度，应由它对最终任务的影响决定。} }$$&lt;p&gt;假设软体求解器里同时存在：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;contact residual；&lt;/li&gt;
 &lt;li&gt;volume residual；&lt;/li&gt;
@@ -4931,30 +2403,12 @@ $$&lt;p&gt;假设软体求解器里同时存在：&lt;/p&gt;
 &lt;li&gt;\(J\) error。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;你可能会自然地按：&lt;/p&gt;
-$$
-\max |r_i|
-$$&lt;p&gt;去决定哪个约束最该继续迭代。&lt;/p&gt;
+$$\max |r_i|$$&lt;p&gt;去决定哪个约束最该继续迭代。&lt;/p&gt;
 &lt;p&gt;但如果最终目标是：&lt;/p&gt;
-&lt;h1 id=&#34;jx&#34;&gt;$$
-J(x)
-&lt;/h1&gt;&lt;p&gt;\text{末端位置误差},
-$$&lt;/p&gt;
-&lt;p&gt;那么真正有价值的问题是：&lt;/p&gt;
-$$
-\boxed{
-\text{哪个 residual 对末端位置最敏感？}
-}
-$$&lt;p&gt;也就是说，理论上可以考虑：&lt;/p&gt;
-$$
-\text{residual magnitude}
-\times
-\text{task sensitivity}.
-$$&lt;p&gt;这就是一种非常通用的：&lt;/p&gt;
-$$
-\boxed{
-\text{goal-oriented solver budget allocation}
-}
-$$&lt;p&gt;思想。&lt;/p&gt;
+$$J(x) = \text{末端位置误差},$$&lt;p&gt;那么真正有价值的问题是：&lt;/p&gt;
+$$\boxed{ \text{哪个 residual 对末端位置最敏感？} }$$&lt;p&gt;也就是说，理论上可以考虑：&lt;/p&gt;
+$$\text{residual magnitude} \times \text{task sensitivity}.$$&lt;p&gt;这就是一种非常通用的：&lt;/p&gt;
+$$\boxed{ \text{goal-oriented solver budget allocation} }$$&lt;p&gt;思想。&lt;/p&gt;
 &lt;p&gt;对于游戏物理甚至可以想象：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;离摄像机近；&lt;/li&gt;
@@ -4966,12 +2420,8 @@ $$&lt;p&gt;思想。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;一个最小可实践例子&#34;&gt;一个最小可实践例子
 &lt;/h2&gt;&lt;p&gt;考虑 Poisson：&lt;/p&gt;
-$$
--\Delta u=f
-$$&lt;p&gt;目标量：&lt;/p&gt;
-$$
-J(u)=u(x_0).
-$$&lt;p&gt;流程可以概括为：&lt;/p&gt;
+$$-\Delta u=f$$&lt;p&gt;目标量：&lt;/p&gt;
+$$J(u)=u(x_0).$$&lt;p&gt;流程可以概括为：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -5019,54 +2469,15 @@ $$&lt;p&gt;流程可以概括为：&lt;/p&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;如果把 refinement history 和普通 residual estimator 对比，你很可能看到两套完全不同的网格：&lt;/p&gt;
-$$
-\boxed{
-\text{一个追求全场正确；
-一个追求最终答案正确。}
-}
-$$&lt;p&gt;这就是 DWR 最值得亲手验证的地方。&lt;/p&gt;
+$$\boxed{ \text{一个追求全场正确； 一个追求最终答案正确。} }$$&lt;p&gt;这就是 DWR 最值得亲手验证的地方。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;DWR 最重要的公式可以记成：&lt;/p&gt;
-$$
-\boxed{
-\text{QoI error}
-\approx
-\text{primal residual}
-\times
-\text{dual sensitivity}.
-}
-$$&lt;p&gt;但更值得留下的是它背后的观念：&lt;/p&gt;
-$$
-\boxed{
-\text{“误差大”不等于“误差重要”。}
-}
-$$&lt;p&gt;在整个知识体系里，它正好卡在：&lt;/p&gt;
-$$
-\text{FEM residual}
-$$$$
-\downarrow
-$$$$
-\boxed{\text{Adjoint / DWR}}
-$$$$
-\downarrow
-$$$$
-\text{Goal-oriented adaptivity}
-$$$$
-\downarrow
-$$$$
-\text{可靠性 / 优化 / UQ / surrogate}.
-$$&lt;p&gt;它让有限元从：&lt;/p&gt;
-$$
-\boxed{
-\text{“把解场算准”}
-}
-$$&lt;p&gt;进一步变成：&lt;/p&gt;
-$$
-\boxed{
-\text{“只把影响工程结论的那部分算准”。}
-}
-$$&lt;p&gt;对昂贵仿真来说，这个转变非常重要。&lt;/p&gt;
+$$\boxed{ \text{QoI error} \approx \text{primal residual} \times \text{dual sensitivity}. }$$&lt;p&gt;但更值得留下的是它背后的观念：&lt;/p&gt;
+$$\boxed{ \text{“误差大”不等于“误差重要”。} }$$&lt;p&gt;在整个知识体系里，它正好卡在：&lt;/p&gt;
+$$\text{FEM residual}$$$$\downarrow$$$$\boxed{\text{Adjoint / DWR}}$$$$\downarrow$$$$\text{Goal-oriented adaptivity}$$$$\downarrow$$$$\text{可靠性 / 优化 / UQ / surrogate}.$$&lt;p&gt;它让有限元从：&lt;/p&gt;
+$$\boxed{ \text{“把解场算准”} }$$&lt;p&gt;进一步变成：&lt;/p&gt;
+$$\boxed{ \text{“只把影响工程结论的那部分算准”。} }$$&lt;p&gt;对昂贵仿真来说，这个转变非常重要。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;

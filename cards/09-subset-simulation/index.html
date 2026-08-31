@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件” 主题：Subset Simulation（子集模拟，SuS）\n领域：可靠性 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：\n\\[ \\boxed{\\text{失效越稀有，普通 Monte Carlo 越浪费计算}} \\]它的核心思想却异常简单：\n不要直接寻找一个概率为 \\(10^{-6}\\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \\(0.1\\)，最后把这些条件概率乘起来。\nAu 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。\n1. 为什么普通 Monte Carlo 遇到小失效概率会失效？ 设极限状态函数：\n\\[ g(X) \\]规定：\n\\[ g(X)\\le0 \\]为失效。\n那么：\n\\[ P_f=P[g(X)\\le0]. \\]普通 Monte Carlo 估计：\n[ \\hat P_f \\frac1N \\sum_{i=1}^{N} I[g(X_i)\\le0]. ]\n如果：\n\\[ P_f=10^{-6}, \\]那么平均：\n\\[ 10^6 \\]个样本才能看到一次失效。\n但“看到一次”远远不够。\nBernoulli estimator 的变异系数近似：\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件” 主题：Subset Simulation（子集模拟，SuS）\n领域：可靠性 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：\n\\[\\boxed{\\text{失效越稀有，普通 Monte Carlo 越浪费计算}}\\]它的核心思想却异常简单：\n不要直接寻找一个概率为 \\(10^{-6}\\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \\(0.1\\)，最后把这些条件概率乘起来。\nAu 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。\n1. 为什么普通 Monte Carlo 遇到小失效概率会失效？ 设极限状态函数：\n\\[g(X)\\]规定：\n\\[g(X)\\le0\\]为失效。\n那么：\n\\[P_f=P[g(X)\\le0].\\]普通 Monte Carlo 估计：\n\\[\\hat P_f = \\frac1N \\sum_{i=1}^{N} I[g(X_i)\\le0].\\]如果：\n\\[P_f=10^{-6},\\]那么平均：\n\\[10^6\\]个样本才能看到一次失效。\n但“看到一次”远远不够。\nBernoulli estimator 的变异系数近似：\n\\[\\delta = \\sqrt{ \\frac{1-P_f}{NP_f} }.\\]如果希望：\n\\[\\delta=0.1,\\]那么约需要：\n\\[NP_f\\approx100,\\]也就是：\n\\[N\\approx10^8.\\]如果一次有限元仿真需要 10 秒：\n\\[10^8\\times10\\text{s}\\]已经完全没有工程意义。\n所以 rare-event reliability 的真正困难是：\n">
 <title>Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/09-subset-simulation/'>
 
 <link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件”">
-<meta property='og:description' content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件” 主题：Subset Simulation（子集模拟，SuS）\n领域：可靠性 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：\n\\[ \\boxed{\\text{失效越稀有，普通 Monte Carlo 越浪费计算}} \\]它的核心思想却异常简单：\n不要直接寻找一个概率为 \\(10^{-6}\\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \\(0.1\\)，最后把这些条件概率乘起来。\nAu 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。\n1. 为什么普通 Monte Carlo 遇到小失效概率会失效？ 设极限状态函数：\n\\[ g(X) \\]规定：\n\\[ g(X)\\le0 \\]为失效。\n那么：\n\\[ P_f=P[g(X)\\le0]. \\]普通 Monte Carlo 估计：\n[ \\hat P_f \\frac1N \\sum_{i=1}^{N} I[g(X_i)\\le0]. ]\n如果：\n\\[ P_f=10^{-6}, \\]那么平均：\n\\[ 10^6 \\]个样本才能看到一次失效。\n但“看到一次”远远不够。\nBernoulli estimator 的变异系数近似：\n">
+<meta property='og:description' content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件” 主题：Subset Simulation（子集模拟，SuS）\n领域：可靠性 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：\n\\[\\boxed{\\text{失效越稀有，普通 Monte Carlo 越浪费计算}}\\]它的核心思想却异常简单：\n不要直接寻找一个概率为 \\(10^{-6}\\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \\(0.1\\)，最后把这些条件概率乘起来。\nAu 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。\n1. 为什么普通 Monte Carlo 遇到小失效概率会失效？ 设极限状态函数：\n\\[g(X)\\]规定：\n\\[g(X)\\le0\\]为失效。\n那么：\n\\[P_f=P[g(X)\\le0].\\]普通 Monte Carlo 估计：\n\\[\\hat P_f = \\frac1N \\sum_{i=1}^{N} I[g(X_i)\\le0].\\]如果：\n\\[P_f=10^{-6},\\]那么平均：\n\\[10^6\\]个样本才能看到一次失效。\n但“看到一次”远远不够。\nBernoulli estimator 的变异系数近似：\n\\[\\delta = \\sqrt{ \\frac{1-P_f}{NP_f} }.\\]如果希望：\n\\[\\delta=0.1,\\]那么约需要：\n\\[NP_f\\approx100,\\]也就是：\n\\[N\\approx10^8.\\]如果一次有限元仿真需要 10 秒：\n\\[10^8\\times10\\text{s}\\]已经完全没有工程意义。\n所以 rare-event reliability 的真正困难是：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/09-subset-simulation/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='不确定性量化' /><meta property='article:tag' content='代理模型' /><meta property='article:published_time' content='2026-08-22T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-22T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件”">
-<meta name="twitter:description" content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件” 主题：Subset Simulation（子集模拟，SuS）\n领域：可靠性 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：\n\\[ \\boxed{\\text{失效越稀有，普通 Monte Carlo 越浪费计算}} \\]它的核心思想却异常简单：\n不要直接寻找一个概率为 \\(10^{-6}\\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \\(0.1\\)，最后把这些条件概率乘起来。\nAu 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。\n1. 为什么普通 Monte Carlo 遇到小失效概率会失效？ 设极限状态函数：\n\\[ g(X) \\]规定：\n\\[ g(X)\\le0 \\]为失效。\n那么：\n\\[ P_f=P[g(X)\\le0]. \\]普通 Monte Carlo 估计：\n[ \\hat P_f \\frac1N \\sum_{i=1}^{N} I[g(X_i)\\le0]. ]\n如果：\n\\[ P_f=10^{-6}, \\]那么平均：\n\\[ 10^6 \\]个样本才能看到一次失效。\n但“看到一次”远远不够。\nBernoulli estimator 的变异系数近似：\n">
+<meta name="twitter:description" content="Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件” 主题：Subset Simulation（子集模拟，SuS）\n领域：可靠性 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：\n\\[\\boxed{\\text{失效越稀有，普通 Monte Carlo 越浪费计算}}\\]它的核心思想却异常简单：\n不要直接寻找一个概率为 \\(10^{-6}\\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \\(0.1\\)，最后把这些条件概率乘起来。\nAu 和 Beck 在 2001 年发表的经典论文正式提出了这一结构，用于高维小失效概率估计。它后来成为结构可靠性中最重要的 rare-event simulation 方法之一。\n1. 为什么普通 Monte Carlo 遇到小失效概率会失效？ 设极限状态函数：\n\\[g(X)\\]规定：\n\\[g(X)\\le0\\]为失效。\n那么：\n\\[P_f=P[g(X)\\le0].\\]普通 Monte Carlo 估计：\n\\[\\hat P_f = \\frac1N \\sum_{i=1}^{N} I[g(X_i)\\le0].\\]如果：\n\\[P_f=10^{-6},\\]那么平均：\n\\[10^6\\]个样本才能看到一次失效。\n但“看到一次”远远不够。\nBernoulli estimator 的变异系数近似：\n\\[\\delta = \\sqrt{ \\frac{1-P_f}{NP_f} }.\\]如果希望：\n\\[\\delta=0.1,\\]那么约需要：\n\\[NP_f\\approx100,\\]也就是：\n\\[N\\approx10^8.\\]如果一次有限元仿真需要 10 秒：\n\\[10^8\\times10\\text{s}\\]已经完全没有工程意义。\n所以 rare-event reliability 的真正困难是：\n">
     </head>
     <body class="
     article-page
@@ -389,7 +389,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 5 分钟
+                    阅读时长: 4 分钟
                 </time>
             </div>
         
@@ -409,9 +409,7 @@
 <strong>领域：可靠性 × 不确定性量化 × 代理模型</strong><br>
 <strong>推荐阅读时间：约 8 分钟</strong></p>
 <p>今天选 Subset Simulation，是因为它解决了可靠性分析里一个非常根本的问题：</p>
-\[
-\boxed{\text{失效越稀有，普通 Monte Carlo 越浪费计算}}
-\]<p>它的核心思想却异常简单：</p>
+\[\boxed{\text{失效越稀有，普通 Monte Carlo 越浪费计算}}\]<p>它的核心思想却异常简单：</p>
 <blockquote>
 <p><strong>不要直接寻找一个概率为 \(10^{-6}\) 的事件，而是设计一系列嵌套事件，让每一级发生概率大约都是 \(0.1\)，最后把这些条件概率乘起来。</strong></p>
 </blockquote>
@@ -419,178 +417,57 @@
 <hr>
 <h2 id="1-为什么普通-monte-carlo-遇到小失效概率会失效">1. 为什么普通 Monte Carlo 遇到小失效概率会失效？
 </h2><p>设极限状态函数：</p>
-\[
-g(X)
-\]<p>规定：</p>
-\[
-g(X)\le0
-\]<p>为失效。</p>
+\[g(X)\]<p>规定：</p>
+\[g(X)\le0\]<p>为失效。</p>
 <p>那么：</p>
-\[
-P_f=P[g(X)\le0].
-\]<p>普通 Monte Carlo 估计：</p>
-<h1 id="hat-p_f">[
-\hat P_f
-</h1><p>\frac1N
-\sum_{i=1}^{N}
-I[g(X_i)\le0].
-]</p>
-<p>如果：</p>
-\[
-P_f=10^{-6},
-\]<p>那么平均：</p>
-\[
-10^6
-\]<p>个样本才能看到一次失效。</p>
+\[P_f=P[g(X)\le0].\]<p>普通 Monte Carlo 估计：</p>
+\[\hat P_f = \frac1N \sum_{i=1}^{N} I[g(X_i)\le0].\]<p>如果：</p>
+\[P_f=10^{-6},\]<p>那么平均：</p>
+\[10^6\]<p>个样本才能看到一次失效。</p>
 <p>但“看到一次”远远不够。</p>
 <p>Bernoulli estimator 的变异系数近似：</p>
-<h1 id="delta">[
-\delta
-</h1><p>\sqrt{
-\frac{1-P_f}{NP_f}
-}.
-]</p>
-<p>如果希望：</p>
-\[
-\delta=0.1,
-\]<p>那么约需要：</p>
-\[
-NP_f\approx100,
-\]<p>也就是：</p>
-\[
-N\approx10^8.
-\]<p>如果一次有限元仿真需要 10 秒：</p>
-\[
-10^8\times10\text{s}
-\]<p>已经完全没有工程意义。</p>
+\[\delta = \sqrt{ \frac{1-P_f}{NP_f} }.\]<p>如果希望：</p>
+\[\delta=0.1,\]<p>那么约需要：</p>
+\[NP_f\approx100,\]<p>也就是：</p>
+\[N\approx10^8.\]<p>如果一次有限元仿真需要 10 秒：</p>
+\[10^8\times10\text{s}\]<p>已经完全没有工程意义。</p>
 <p>所以 rare-event reliability 的真正困难是：</p>
-\[
-\boxed{
-\text{绝大多数昂贵计算都浪费在“显然安全”的区域}
-}
-\]<hr>
+\[\boxed{ \text{绝大多数昂贵计算都浪费在“显然安全”的区域} }\]<hr>
 <h1 id="2-subset-simulation-的核心人为建立一串中间失效事件">2. Subset Simulation 的核心：人为建立一串中间失效事件
 </h1><p>假设最终失效域是：</p>
-\[
-F=\{g(X)\le0\}.
-\]<p>构造：</p>
-\[
-F_1\supset F_2\supset\cdots\supset F_m=F.
-\]<p>那么根据概率乘法：</p>
-<h1 id="pf">[
-P(F)
-</h1><p>P(F_1)
-P(F_2|F_1)
-\cdots
-P(F_m|F_{m-1}).
-]</p>
-<p>如果我们故意让每一级：</p>
-\[
-P(F_i|F_{i-1})\approx p_0,
-\]<p>比如：</p>
-\[
-p_0=0.1,
-\]<p>而：</p>
-\[
-P_f=10^{-6},
-\]<p>那么大约：</p>
-<h1 id="10-6">[
-10^{-6}
-</h1><p>0.1^6.
-]</p>
-<p>于是原本一个：</p>
-\[
-10^{-6}
-\]<p>的稀有事件，变成 6 个：</p>
-\[
-10^{-1}
-\]<p>级别的条件事件。</p>
+\[F=\{g(X)\le0\}.\]<p>构造：</p>
+\[F_1\supset F_2\supset\cdots\supset F_m=F.\]<p>那么根据概率乘法：</p>
+\[P(F) = P(F_1) P(F_2|F_1) \cdots P(F_m|F_{m-1}).\]<p>如果我们故意让每一级：</p>
+\[P(F_i|F_{i-1})\approx p_0,\]<p>比如：</p>
+\[p_0=0.1,\]<p>而：</p>
+\[P_f=10^{-6},\]<p>那么大约：</p>
+\[10^{-6} = 0.1^6.\]<p>于是原本一个：</p>
+\[10^{-6}\]<p>的稀有事件，变成 6 个：</p>
+\[10^{-1}\]<p>级别的条件事件。</p>
 <p>这就是整个方法最核心的一步：</p>
-\[
-\boxed{
-\text{Rare event}
-\rightarrow
-\text{sequence of moderately rare events}
-}
-\]<p>原论文正是以这种 conditional probability decomposition 为基本思想。</p>
+\[\boxed{ \text{Rare event} \rightarrow \text{sequence of moderately rare events} }\]<p>原论文正是以这种 conditional probability decomposition 为基本思想。</p>
 <hr>
 <h1 id="3-中间事件到底是什么">3. 中间事件到底是什么？
 </h1><p>假设失效定义：</p>
-\[
-g(X)\le0.
-\]<p>Subset Simulation 不会一开始就要求：</p>
-\[
-g\le0.
-\]<p>而可能建立：</p>
-\[
-F_1=\{g(X)\le b_1\},
-\]\[
-F_2=\{g(X)\le b_2\},
-\]<p>……</p>
-\[
-F_m=\{g(X)\le0\},
-\]<p>其中：</p>
-\[
-b_1>b_2>\cdots>0.
-\]<p>例如某结构应力极限：</p>
-\[
-\sigma_{\rm allow}=500\text{ MPa}.
-\]<p>定义：</p>
-\[
-g=500-\sigma_{\max}.
-\]<p>那么 SuS 可能逐级关注：</p>
-\[
-\sigma_{\max}>300,
-\]<p>[</p>
-<blockquote>
-<p>380,
-]</p>
-</blockquote>
-<p>[</p>
-<blockquote>
-<p>440,
-]</p>
-</blockquote>
-<p>[</p>
-<blockquote>
-<p>475,
-]</p>
-</blockquote>
-<p>[</p>
-<blockquote>
-<ol start="500">
-<li></li>
-</ol>
-</blockquote>
-<p>]</p>
-<p>于是采样过程就像不断向失效域“推进”。</p>
+\[g(X)\le0.\]<p>Subset Simulation 不会一开始就要求：</p>
+\[g\le0.\]<p>而可能建立：</p>
+\[F_1=\{g(X)\le b_1\},\]\[F_2=\{g(X)\le b_2\},\]<p>……</p>
+\[F_m=\{g(X)\le0\},\]<p>其中：</p>
+\[b_1>b_2>\cdots>0.\]<p>例如某结构应力极限：</p>
+\[\sigma_{\rm allow}=500\text{ MPa}.\]<p>定义：</p>
+\[g=500-\sigma_{\max}.\]<p>那么 SuS 可能逐级关注：</p>
+\[\sigma_{\max}>300,\]\[>380,\]\[>440,\]\[>475,\]\[>500.\]<p>于是采样过程就像不断向失效域“推进”。</p>
 <hr>
 <h1 id="4-最巧妙的一步阈值通常不是提前规定的">4. 最巧妙的一步：阈值通常不是提前规定的
 </h1><p>假设每一级生成：</p>
-\[
-N=1000
-\]<p>个样本，并选择：</p>
-\[
-p_0=0.1.
-\]<p>第一轮普通随机采样后，把样本按照：</p>
-\[
-g(X)
-\]<p>排序。</p>
+\[N=1000\]<p>个样本，并选择：</p>
+\[p_0=0.1.\]<p>第一轮普通随机采样后，把样本按照：</p>
+\[g(X)\]<p>排序。</p>
 <p>直接取最危险的：</p>
-\[
-100
-\]<p>个样本。</p>
+\[100\]<p>个样本。</p>
 <p>第 100 个样本对应的 \(g\) 值就是：</p>
-\[
-b_1.
-\]<p>因此：</p>
-<h1 id="frac1001000">[
-P(F_1)
-\approx
-\frac{100}{1000}
-</h1><p>0.1.
-]</p>
-<p>下一层同理。</p>
+\[b_1.\]<p>因此：</p>
+\[P(F_1) \approx \frac{100}{1000} = 0.1.\]<p>下一层同理。</p>
 <p>于是 intermediate thresholds 是<strong>自适应生成的</strong>。</p>
 <p>你不需要提前知道失效面在哪里。</p>
 <p>这也是 Subset Simulation 在：</p>
@@ -604,66 +481,28 @@ P(F_1)
 <h1 id="5-但第二层样本从哪里来">5. 但第二层样本从哪里来？
 </h1><p>这是理解 SuS 最关键的一点。</p>
 <p>第一层：</p>
-\[
-X\sim p_X(x)
-\]<p>直接 Monte Carlo 即可。</p>
+\[X\sim p_X(x)\]<p>直接 Monte Carlo 即可。</p>
 <p>但第二层需要：</p>
-\[
-X\sim p(X|F_1).
-\]<p>也就是说：</p>
-\[
-\boxed{\text{只在 }F_1\text{ 内采样}}
-\]<p>第三层进一步要求：</p>
-\[
-X\sim p(X|F_2).
-\]<p>问题是这种条件分布一般无法直接采样。</p>
+\[X\sim p(X|F_1).\]<p>也就是说：</p>
+\[\boxed{\text{只在 }F_1\text{ 内采样}}\]<p>第三层进一步要求：</p>
+\[X\sim p(X|F_2).\]<p>问题是这种条件分布一般无法直接采样。</p>
 <p>所以经典 Subset Simulation 引入：</p>
-\[
-\boxed{\text{Markov Chain Monte Carlo}}
-\]<p>来生成 conditional samples。原始 SubSim/MCMC 以及后续 benchmark 工作都采用这一结构。</p>
+\[\boxed{\text{Markov Chain Monte Carlo}}\]<p>来生成 conditional samples。原始 SubSim/MCMC 以及后续 benchmark 工作都采用这一结构。</p>
 <hr>
 <h1 id="6-mcmc-在这里到底干什么">6. MCMC 在这里到底干什么？
 </h1><p>第一层结束后得到：</p>
-\[
-100
-\]<p>个满足：</p>
-\[
-F_1
-\]<p>的“种子样本”。</p>
+\[100\]<p>个满足：</p>
+\[F_1\]<p>的“种子样本”。</p>
 <p>从每个 seed 出发进行 MCMC：</p>
-\[
-X^{(0)}
-\rightarrow
-X^{(1)}
-\rightarrow
-X^{(2)}
-\rightarrow\cdots
-\]<p>但只接受满足：</p>
-\[
-X\in F_1
-\]<p>的状态。</p>
+\[X^{(0)} \rightarrow X^{(1)} \rightarrow X^{(2)} \rightarrow\cdots\]<p>但只接受满足：</p>
+\[X\in F_1\]<p>的状态。</p>
 <p>于是最终生成约：</p>
-\[
-1000
-\]<p>个：</p>
-\[
-X\sim p(X|F_1)
-\]<p>样本。</p>
+\[1000\]<p>个：</p>
+\[X\sim p(X|F_1)\]<p>样本。</p>
 <p>然后再找其中最危险的 10%：</p>
-\[
-F_2.
-\]<p>继续重复。</p>
+\[F_2.\]<p>继续重复。</p>
 <p>所以整个过程更准确地说是：</p>
-\[
-\boxed{
-\text{Monte Carlo}
-\rightarrow
-\text{conditional MCMC}
-\rightarrow
-\text{conditional MCMC}
-\rightarrow\cdots
-}
-\]<hr>
+\[\boxed{ \text{Monte Carlo} \rightarrow \text{conditional MCMC} \rightarrow \text{conditional MCMC} \rightarrow\cdots }\]<hr>
 <h1 id="7-它为什么会显著降低计算量">7. 它为什么会显著降低计算量？
 </h1><p>这里有一个非常重要的信息论直觉。</p>
 <p>普通 Monte Carlo：</p>
@@ -680,9 +519,7 @@ F_2.
 <p>“这个点安全。”</p>
 </blockquote>
 <p>但这对：</p>
-\[
-P_f=10^{-6}
-\]<p>几乎没有新信息。</p>
+\[P_f=10^{-6}\]<p>几乎没有新信息。</p>
 <p>Subset Simulation 则逐层：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -709,53 +546,24 @@ P_f=10^{-6}
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>也就是说后面的计算预算几乎都被集中到：</p>
-\[
-\boxed{\text{failure-relevant region}}
-\]<p>附近。</p>
+\[\boxed{\text{failure-relevant region}}\]<p>附近。</p>
 <p>这与 AK-MCS 的精神其实很接近：</p>
 <p>AK-MCS：</p>
-\[
-\text{高保真计算集中到 }g\approx0.
-\]<p>Subset Simulation：</p>
-\[
-\text{随机采样逐渐条件化到危险区域}.
-\]<p>共同原则都是：</p>
-\[
-\boxed{
-\text{不要平均地在整个输入空间浪费计算预算}
-}
-\]<hr>
+\[\text{高保真计算集中到 }g\approx0.\]<p>Subset Simulation：</p>
+\[\text{随机采样逐渐条件化到危险区域}.\]<p>共同原则都是：</p>
+\[\boxed{ \text{不要平均地在整个输入空间浪费计算预算} }\]<hr>
 <h1 id="8-一个非常容易忽视的问题sus-的样本不再独立">8. 一个非常容易忽视的问题：SuS 的样本不再独立
 </h1><p>普通 Monte Carlo：</p>
-\[
-X_1,\ldots,X_N
-\]<p>相互独立。</p>
+\[X_1,\ldots,X_N\]<p>相互独立。</p>
 <p>而 MCMC 生成：</p>
-\[
-X^{(1)},X^{(2)},\ldots
-\]<p>存在自相关。</p>
+\[X^{(1)},X^{(2)},\ldots\]<p>存在自相关。</p>
 <p>所以虽然每层名义上有：</p>
-\[
-N=1000,
-\]<p>其有效样本量可能只有：</p>
-\[
-N_{\rm eff}<1000.
-\]<p>可以粗略理解为：</p>
-\[
-N_{\rm eff}
-\approx
-\frac{N}
-{1+2\sum_{k=1}^{\infty}\rho_k}.
-\]<p>如果 chain mixing 很差：</p>
-\[
-\rho_k
-\]<p>长期很大，则：</p>
-\[
-N_{\rm eff}\ll N.
-\]<p>所以 SuS 的效率很大程度上取决于：</p>
-\[
-\boxed{\text{MCMC 能否在条件失效域中充分移动}}
-\]<p>而这也是它最大的弱点之一。</p>
+\[N=1000,\]<p>其有效样本量可能只有：</p>
+\[N_{\rm eff}<1000.\]<p>可以粗略理解为：</p>
+\[N_{\rm eff} \approx \frac{N} {1+2\sum_{k=1}^{\infty}\rho_k}.\]<p>如果 chain mixing 很差：</p>
+\[\rho_k\]<p>长期很大，则：</p>
+\[N_{\rm eff}\ll N.\]<p>所以 SuS 的效率很大程度上取决于：</p>
+\[\boxed{\text{MCMC 能否在条件失效域中充分移动}}\]<p>而这也是它最大的弱点之一。</p>
 <hr>
 <h1 id="9-多个失效岛会成为严重问题">9. 多个失效岛会成为严重问题
 </h1><p>假设 failure domain 有两个彼此分离区域：</p>
@@ -776,72 +584,35 @@ N_{\rm eff}\ll N.
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>第一层 MCMC 恰好只找到：</p>
-\[
-A
-\]<p>附近的 seed。</p>
+\[A\]<p>附近的 seed。</p>
 <p>后续：</p>
-\[
-F_1\rightarrow F_2\rightarrow F_3
-\]<p>就可能一直困在：</p>
-\[
-A
-\]<p>附近。</p>
+\[F_1\rightarrow F_2\rightarrow F_3\]<p>就可能一直困在：</p>
+\[A\]<p>附近。</p>
 <p>于是：</p>
-\[
-B
-\]<p>虽然贡献了真实失效概率，却被漏掉。</p>
+\[B\]<p>虽然贡献了真实失效概率，却被漏掉。</p>
 <p>这就是所谓：</p>
-\[
-\boxed{\text{mode trapping / poor exploration}}
-\]<p>问题。</p>
+\[\boxed{\text{mode trapping / poor exploration}}\]<p>问题。</p>
 <p>到 2026 年，这仍然是活跃研究方向。例如 2026 年提出的 <strong>Directional Subset Simulation</strong> 就明确针对多失效模式下 MCMC 容易困在输入空间局部区域的问题，通过方向性信息帮助中间层保留多个潜在失效方向。</p>
 <p>所以：</p>
-\[
-\boxed{
-\text{SuS解决 rare-event rarity，
-但不自动解决 multimodality}
-}
-\]<hr>
+\[\boxed{ \text{SuS解决 rare-event rarity， 但不自动解决 multimodality} }\]<hr>
 <h1 id="10-一个值得记住的参数">10. 一个值得记住的参数：\(p_0\)
 </h1><p>SuS 中通常选择：</p>
-\[
-p_0\approx0.1
-\]<p>左右。</p>
+\[p_0\approx0.1\]<p>左右。</p>
 <p>为什么不能：</p>
-\[
-p_0=0.9？
-\]<p>因为层数会非常多。</p>
+\[p_0=0.9？\]<p>因为层数会非常多。</p>
 <p>为什么不能：</p>
-\[
-p_0=10^{-4}？
-\]<p>因为每层又变成了 rare-event estimation。</p>
+\[p_0=10^{-4}？\]<p>因为每层又变成了 rare-event estimation。</p>
 <p>于是存在经典折中：</p>
-\[
-\boxed{
-\text{每层足够容易采到}
-+
-\text{层数不能太多}
-}
-\]<p>这也是为什么：</p>
-\[
-0.1
-\]<p>量级经常被使用。</p>
+\[\boxed{ \text{每层足够容易采到} + \text{层数不能太多} }\]<p>这也是为什么：</p>
+\[0.1\]<p>量级经常被使用。</p>
 <p>它并非神奇常数，更接近计算效率上的经验最优区域。</p>
 <hr>
 <h1 id="11-它和-form-有什么本质差异">11. 它和 FORM 有什么本质差异？
 </h1><p>FORM 寻找：</p>
-<h1 id="beta">[
-\beta
-</h1><p>\min_{g(u)=0}|u|,
-]</p>
-<p>即标准正态空间中最可能失效点。</p>
+\[\beta = \min_{g(u)=0}\|u\|,\]<p>即标准正态空间中最可能失效点。</p>
 <p>然后：</p>
-\[
-P_f\approx\Phi(-\beta).
-\]<p>本质上是：</p>
-\[
-\boxed{\text{局部几何近似}}
-\]<p>因此如果失效面比较规整，FORM 极其便宜。</p>
+\[P_f\approx\Phi(-\beta).\]<p>本质上是：</p>
+\[\boxed{\text{局部几何近似}}\]<p>因此如果失效面比较规整，FORM 极其便宜。</p>
 <p>但遇到：</p>
 <ul>
 <li>多失效模式；</li>
@@ -851,123 +622,48 @@ P_f\approx\Phi(-\beta).
 <p>一个 design point 很难描述完整失效概率。</p>
 <p>Subset Simulation 不需要近似失效面为一阶或二阶曲面。</p>
 <p>它直接采样：</p>
-\[
-P(F).
-\]<p>所以可以粗略记：</p>
-\[
-\boxed{
-\text{FORM：寻找最重要的失效点}
-}
-\]\[
-\boxed{
-\text{SuS：逐层探索整个失效区域}
-}
-\]<p>代价当然也更高。</p>
+\[P(F).\]<p>所以可以粗略记：</p>
+\[\boxed{ \text{FORM：寻找最重要的失效点} }\]\[\boxed{ \text{SuS：逐层探索整个失效区域} }\]<p>代价当然也更高。</p>
 <hr>
 <h1 id="12-它与-importance-sampling-又有什么区别">12. 它与 Importance Sampling 又有什么区别？
 </h1><p>Importance Sampling 需要构造：</p>
-\[
-q(x)
-\]<p>让样本更多落在失效区域。</p>
+\[q(x)\]<p>让样本更多落在失效区域。</p>
 <p>然后：</p>
-<h1 id="p_f">[
-P_f
-</h1><p>E_q
-\left[
-I_F(X)
-\frac{p(X)}{q(X)}
-\right].
-]</p>
-<p>难点在于：</p>
-\[
-\boxed{\text{怎样提前构造一个好的 }q(x)}
-\]<p>尤其高维、多峰失效域里很困难。</p>
+\[P_f = E_q \left[ I_F(X) \frac{p(X)}{q(X)} \right].\]<p>难点在于：</p>
+\[\boxed{\text{怎样提前构造一个好的 }q(x)}\]<p>尤其高维、多峰失效域里很困难。</p>
 <p>Subset Simulation 不直接构造全局：</p>
-\[
-q(x).
-\]<p>而是逐步得到：</p>
-\[
-p(X|F_1),
-\]\[
-p(X|F_2),
-\]<p>……</p>
+\[q(x).\]<p>而是逐步得到：</p>
+\[p(X|F_1),\]\[p(X|F_2),\]<p>……</p>
 <p>可以理解成一种：</p>
-\[
-\boxed{\text{自适应地学习重要区域}}
-\]<p>因此它在“不知道失效域在哪里”时尤其有优势。</p>
+\[\boxed{\text{自适应地学习重要区域}}\]<p>因此它在“不知道失效域在哪里”时尤其有优势。</p>
 <hr>
 <h1 id="13-sus-和代理模型结合时会出现一个很漂亮的结构">13. SuS 和代理模型结合时，会出现一个很漂亮的结构
 </h1><p>传统 SuS 最大成本仍然是：</p>
-\[
-g(X)
-\]<p>每个样本都要真实仿真。</p>
+\[g(X)\]<p>每个样本都要真实仿真。</p>
 <p>于是自然出现：</p>
-\[
-\boxed{
-\text{Kriging / NN}
-+
-\text{Subset Simulation}
-}
-\]<p>而 SuS 有一个天然优势：</p>
+\[\boxed{ \text{Kriging / NN} + \text{Subset Simulation} }\]<p>而 SuS 有一个天然优势：</p>
 <p>它每一层产生的样本都越来越靠近失效域。</p>
 <p>因此这些 conditional samples 本身就是很有价值的：</p>
-\[
-\boxed{\text{active-learning candidate pool}}
-\]<p>2024 年已有工作直接使用 intermediate-event MCMC samples 迭代优化 metamodel；相关现代 active-learning 文献也明确把 SuS 的中间条件样本作为代理模型主动采样候选池。</p>
+\[\boxed{\text{active-learning candidate pool}}\]<p>2024 年已有工作直接使用 intermediate-event MCMC samples 迭代优化 metamodel；相关现代 active-learning 文献也明确把 SuS 的中间条件样本作为代理模型主动采样候选池。</p>
 <p>这形成一个很自然的循环：</p>
-\[
-\text{SuS找到危险区域}
-\]\[
-\downarrow
-\]\[
-\text{surrogate重点学习危险区域}
-\]\[
-\downarrow
-\]\[
-\text{surrogate降低下一层SuS成本}.
-\]<p>这比先在整个输入空间训练一个“全局很准”的 surrogate 更符合可靠性任务本身。</p>
+\[\text{SuS找到危险区域}\]\[\downarrow\]\[\text{surrogate重点学习危险区域}\]\[\downarrow\]\[\text{surrogate降低下一层SuS成本}.\]<p>这比先在整个输入空间训练一个“全局很准”的 surrogate 更符合可靠性任务本身。</p>
 <hr>
 <h1 id="14-一个很新的发展multi-fidelity-subset-simulation">14. 一个很新的发展：Multi-fidelity Subset Simulation
 </h1><p>这也正好连接前几天讲过的 MFMC。</p>
 <p>2026 年发表的 <strong>Multi-fidelity Subset Simulation (MFSS)</strong> 把不同 fidelity 也纳入 rare-event simulation，把 fidelity 当作扩充空间中的随机变量，并通过 Bayes 关系恢复高保真失效概率，同时优化不同 fidelity 的采样预算。</p>
 <p>它试图解决：</p>
-\[
-\boxed{
-\text{SuS知道“去哪采”，
-multifidelity知道“用多贵的模型采”}
-}
-\]<p>所以可以把两类资源分配思想组合起来：</p>
-\[
-\boxed{
-\text{空间分配：在哪里算？}
-}
-\]\[
-\boxed{
-\text{精度分配：用什么模型算？}
-}
-\]<p>这是目前可靠性计算非常值得关注的一条路线。</p>
+\[\boxed{ \text{SuS知道“去哪采”， multifidelity知道“用多贵的模型采”} }\]<p>所以可以把两类资源分配思想组合起来：</p>
+\[\boxed{ \text{空间分配：在哪里算？} }\]\[\boxed{ \text{精度分配：用什么模型算？} }\]<p>这是目前可靠性计算非常值得关注的一条路线。</p>
 <hr>
 <h1 id="15-对可靠性研究最值得迁移的一点">15. 对可靠性研究最值得迁移的一点
 </h1><p>Subset Simulation 最深刻的地方不只是：</p>
-<h1 id="p_f-1">[
-P_f
-</h1><p>\prod_i P(F_i|F_{i-1}).
-]</p>
-<p>真正值得记住的是：</p>
-\[
-\boxed{\text{困难概率可以通过改变采样分布来变得容易。}}
-\]<p>普通 Monte Carlo 接受原始分布：</p>
-\[
-p_X(x)
-\]<p>给你的全部样本。</p>
+\[P_f = \prod_i P(F_i|F_{i-1}).\]<p>真正值得记住的是：</p>
+\[\boxed{\text{困难概率可以通过改变采样分布来变得容易。}}\]<p>普通 Monte Carlo 接受原始分布：</p>
+\[p_X(x)\]<p>给你的全部样本。</p>
 <p>SuS 则不断构造：</p>
-\[
-p(X|F_i),
-\]<p>让后续计算越来越聚焦目标事件。</p>
+\[p(X|F_i),\]<p>让后续计算越来越聚焦目标事件。</p>
 <p>因此它实际上在做一种：</p>
-\[
-\boxed{\text{distribution steering}}
-\]<p>这是一种非常普遍的思想。</p>
+\[\boxed{\text{distribution steering}}\]<p>这是一种非常普遍的思想。</p>
 <p>你会在很多地方再次看到：</p>
 <ul>
 <li>Importance Sampling；</li>
@@ -984,29 +680,11 @@ p(X|F_i),
 <hr>
 <h2 id="今天值得留下的一句话">今天值得留下的一句话
 </h2><p>AK-MCS 的问题是：</p>
-\[
-\boxed{\text{“哪个点最值得再做一次高保真计算？”}}
-\]<p>MFMC 的问题是：</p>
-\[
-\boxed{\text{“哪个便宜模型能帮助消除统计噪声？”}}
-\]<p>MLMC 的问题是：</p>
-\[
-\boxed{\text{“哪个精度层值得投入多少样本？”}}
-\]<p>而 Subset Simulation 问的是：</p>
-\[
-\boxed{
-\text{“怎样让采样分布本身逐渐迁移到失效区域？”}
-}
-\]<p>这四个问题其实正在组成一个完整的现代可靠性计算框架：</p>
-\[
-\text{where to sample}
-+
-\text{what fidelity}
-+
-\text{which surrogate}
-+
-\text{how to estimate }P_f.
-\]<p>如果以后考虑做可靠性方法研究，我会特别关注这种<strong>资源分配层面的组合创新</strong>，因为它比单独把 Kriging 的 \(R^2\) 再提高一点更接近真正昂贵工程模型的核心瓶颈。</p>
+\[\boxed{\text{“哪个点最值得再做一次高保真计算？”}}\]<p>MFMC 的问题是：</p>
+\[\boxed{\text{“哪个便宜模型能帮助消除统计噪声？”}}\]<p>MLMC 的问题是：</p>
+\[\boxed{\text{“哪个精度层值得投入多少样本？”}}\]<p>而 Subset Simulation 问的是：</p>
+\[\boxed{ \text{“怎样让采样分布本身逐渐迁移到失效区域？”} }\]<p>这四个问题其实正在组成一个完整的现代可靠性计算框架：</p>
+\[\text{where to sample} + \text{what fidelity} + \text{which surrogate} + \text{how to estimate }P_f.\]<p>如果以后考虑做可靠性方法研究，我会特别关注这种<strong>资源分配层面的组合创新</strong>，因为它比单独把 Kriging 的 \(R^2\) 再提高一点更接近真正昂贵工程模型的核心瓶颈。</p>
 <h3 id="拓展阅读">拓展阅读
 </h3><ol>
 <li>

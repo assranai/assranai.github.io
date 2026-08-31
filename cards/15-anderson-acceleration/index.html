@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向 主题：Anderson Acceleration（安德森加速，AA）\n领域：有限元 × 计算力学 × 数值优化\n推荐阅读时间：约 8 分钟\nAnderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：\n\\[ \\boxed{\\text{一个迭代器本来能收敛，只是收敛得太慢。}} \\]很多求解器都可以写成固定点形式：\n\\[ x_{k+1}=G(x_k). \\]例如：\nPicard iteration； local-global Projective Dynamics； 某些 PBD/Jacobi 迭代； nonlinear FEM splitting； ADMM； 多物理场 staggered coupling。 普通固定点迭代每一步只利用当前状态：\n\\[ x_k\\rightarrow G(x_k). \\]Anderson Acceleration 多问了一件事：\n过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？\n它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。\n1. 固定点求解器到底在干什么？ 假设要求解：\n\\[ F(x)=0. \\]你构造一个容易计算的映射：\n\\[ G(x), \\]使真正答案满足：\n\\[ x^*=G(x^*). \\]然后迭代：\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向 主题：Anderson Acceleration（安德森加速，AA）\n领域：有限元 × 计算力学 × 数值优化\n推荐阅读时间：约 8 分钟\nAnderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：\n\\[\\boxed{\\text{一个迭代器本来能收敛，只是收敛得太慢。}}\\]很多求解器都可以写成固定点形式：\n\\[x_{k+1}=G(x_k).\\]例如：\nPicard iteration； local-global Projective Dynamics； 某些 PBD/Jacobi 迭代； nonlinear FEM splitting； ADMM； 多物理场 staggered coupling。 普通固定点迭代每一步只利用当前状态：\n\\[x_k\\rightarrow G(x_k).\\]Anderson Acceleration 多问了一件事：\n过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？\n它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。\n1. 固定点求解器到底在干什么？ 假设要求解：\n\\[F(x)=0.\\]你构造一个容易计算的映射：\n\\[G(x),\\]使真正答案满足：\n\\[x^*=G(x^*).\\]然后迭代：\n\\[x_{k+1}=G(x_k).\\]定义 fixed-point residual：\n\\[\\boxed{ r_k=G(x_k)-x_k. }\\]如果：\n\\[r_k=0,\\]那么：\n\\[G(x_k)=x_k,\\]问题解决。\n所以固定点迭代实际上是在反复做：\n\\[x_{k+1}=x_k+r_k.\\]这非常便宜。\n问题是，如果：\n\\[G'(x^*)\\]的谱半径接近 1：\n">
 <title>Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/15-anderson-acceleration/'>
 
 <link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向">
-<meta property='og:description' content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向 主题：Anderson Acceleration（安德森加速，AA）\n领域：有限元 × 计算力学 × 数值优化\n推荐阅读时间：约 8 分钟\nAnderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：\n\\[ \\boxed{\\text{一个迭代器本来能收敛，只是收敛得太慢。}} \\]很多求解器都可以写成固定点形式：\n\\[ x_{k+1}=G(x_k). \\]例如：\nPicard iteration； local-global Projective Dynamics； 某些 PBD/Jacobi 迭代； nonlinear FEM splitting； ADMM； 多物理场 staggered coupling。 普通固定点迭代每一步只利用当前状态：\n\\[ x_k\\rightarrow G(x_k). \\]Anderson Acceleration 多问了一件事：\n过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？\n它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。\n1. 固定点求解器到底在干什么？ 假设要求解：\n\\[ F(x)=0. \\]你构造一个容易计算的映射：\n\\[ G(x), \\]使真正答案满足：\n\\[ x^*=G(x^*). \\]然后迭代：\n">
+<meta property='og:description' content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向 主题：Anderson Acceleration（安德森加速，AA）\n领域：有限元 × 计算力学 × 数值优化\n推荐阅读时间：约 8 分钟\nAnderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：\n\\[\\boxed{\\text{一个迭代器本来能收敛，只是收敛得太慢。}}\\]很多求解器都可以写成固定点形式：\n\\[x_{k+1}=G(x_k).\\]例如：\nPicard iteration； local-global Projective Dynamics； 某些 PBD/Jacobi 迭代； nonlinear FEM splitting； ADMM； 多物理场 staggered coupling。 普通固定点迭代每一步只利用当前状态：\n\\[x_k\\rightarrow G(x_k).\\]Anderson Acceleration 多问了一件事：\n过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？\n它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。\n1. 固定点求解器到底在干什么？ 假设要求解：\n\\[F(x)=0.\\]你构造一个容易计算的映射：\n\\[G(x),\\]使真正答案满足：\n\\[x^*=G(x^*).\\]然后迭代：\n\\[x_{k+1}=G(x_k).\\]定义 fixed-point residual：\n\\[\\boxed{ r_k=G(x_k)-x_k. }\\]如果：\n\\[r_k=0,\\]那么：\n\\[G(x_k)=x_k,\\]问题解决。\n所以固定点迭代实际上是在反复做：\n\\[x_{k+1}=x_k+r_k.\\]这非常便宜。\n问题是，如果：\n\\[G'(x^*)\\]的谱半径接近 1：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/15-anderson-acceleration/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='计算力学' /><meta property='article:tag' content='数值优化' /><meta property='article:published_time' content='2026-08-28T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-28T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向">
-<meta name="twitter:description" content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向 主题：Anderson Acceleration（安德森加速，AA）\n领域：有限元 × 计算力学 × 数值优化\n推荐阅读时间：约 8 分钟\nAnderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：\n\\[ \\boxed{\\text{一个迭代器本来能收敛，只是收敛得太慢。}} \\]很多求解器都可以写成固定点形式：\n\\[ x_{k+1}=G(x_k). \\]例如：\nPicard iteration； local-global Projective Dynamics； 某些 PBD/Jacobi 迭代； nonlinear FEM splitting； ADMM； 多物理场 staggered coupling。 普通固定点迭代每一步只利用当前状态：\n\\[ x_k\\rightarrow G(x_k). \\]Anderson Acceleration 多问了一件事：\n过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？\n它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。\n1. 固定点求解器到底在干什么？ 假设要求解：\n\\[ F(x)=0. \\]你构造一个容易计算的映射：\n\\[ G(x), \\]使真正答案满足：\n\\[ x^*=G(x^*). \\]然后迭代：\n">
+<meta name="twitter:description" content="Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向 主题：Anderson Acceleration（安德森加速，AA）\n领域：有限元 × 计算力学 × 数值优化\n推荐阅读时间：约 8 分钟\nAnderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：\n\\[\\boxed{\\text{一个迭代器本来能收敛，只是收敛得太慢。}}\\]很多求解器都可以写成固定点形式：\n\\[x_{k+1}=G(x_k).\\]例如：\nPicard iteration； local-global Projective Dynamics； 某些 PBD/Jacobi 迭代； nonlinear FEM splitting； ADMM； 多物理场 staggered coupling。 普通固定点迭代每一步只利用当前状态：\n\\[x_k\\rightarrow G(x_k).\\]Anderson Acceleration 多问了一件事：\n过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？\n它只保存很短的一段迭代历史，并解一个小型 least-squares problem，却常能显著减少昂贵的外层迭代次数。Walker 与 Ni 的经典分析还证明：在线性问题上，不截断历史的 Anderson acceleration 与 GMRES 在一定意义下“本质等价”；同时它也和 multisecant quasi-Newton 方法存在深刻联系。\n1. 固定点求解器到底在干什么？ 假设要求解：\n\\[F(x)=0.\\]你构造一个容易计算的映射：\n\\[G(x),\\]使真正答案满足：\n\\[x^*=G(x^*).\\]然后迭代：\n\\[x_{k+1}=G(x_k).\\]定义 fixed-point residual：\n\\[\\boxed{ r_k=G(x_k)-x_k. }\\]如果：\n\\[r_k=0,\\]那么：\n\\[G(x_k)=x_k,\\]问题解决。\n所以固定点迭代实际上是在反复做：\n\\[x_{k+1}=x_k+r_k.\\]这非常便宜。\n问题是，如果：\n\\[G'(x^*)\\]的谱半径接近 1：\n">
     </head>
     <body class="
     article-page
@@ -328,18 +328,6 @@
   </ol>
 
   <ol>
-    <li><a href="#x_kr_k">x_k+r_k</a></li>
-  </ol>
-
-  <ol>
-    <li><a href="#x_k">x_k</a></li>
-  </ol>
-
-  <ol>
-    <li><a href="#x_k-1">x_k</a></li>
-  </ol>
-
-  <ol>
     <li>
       <ol>
         <li><a href="#拓展阅读">拓展阅读</a></li>
@@ -401,7 +389,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 6 分钟
+                    阅读时长: 5 分钟
                 </time>
             </div>
         
@@ -421,12 +409,8 @@
 <strong>领域：有限元 × 计算力学 × 数值优化</strong><br>
 <strong>推荐阅读时间：约 8 分钟</strong></p>
 <p>Anderson Acceleration 值得学，因为它解决的是一个极其常见、但经常被低估的问题：</p>
-\[
-\boxed{\text{一个迭代器本来能收敛，只是收敛得太慢。}}
-\]<p>很多求解器都可以写成固定点形式：</p>
-\[
-x_{k+1}=G(x_k).
-\]<p>例如：</p>
+\[\boxed{\text{一个迭代器本来能收敛，只是收敛得太慢。}}\]<p>很多求解器都可以写成固定点形式：</p>
+\[x_{k+1}=G(x_k).\]<p>例如：</p>
 <ul>
 <li>Picard iteration；</li>
 <li>local-global Projective Dynamics；</li>
@@ -436,9 +420,7 @@ x_{k+1}=G(x_k).
 <li>多物理场 staggered coupling。</li>
 </ul>
 <p>普通固定点迭代每一步只利用当前状态：</p>
-\[
-x_k\rightarrow G(x_k).
-\]<p>Anderson Acceleration 多问了一件事：</p>
+\[x_k\rightarrow G(x_k).\]<p>Anderson Acceleration 多问了一件事：</p>
 <blockquote>
 <p><strong>过去几次迭代的残差是怎么变化的？能不能据此推测哪种线性组合会更快逼近固定点？</strong></p>
 </blockquote>
@@ -446,50 +428,22 @@ x_k\rightarrow G(x_k).
 <hr>
 <h2 id="1-固定点求解器到底在干什么">1. 固定点求解器到底在干什么？
 </h2><p>假设要求解：</p>
-\[
-F(x)=0.
-\]<p>你构造一个容易计算的映射：</p>
-\[
-G(x),
-\]<p>使真正答案满足：</p>
-\[
-x^*=G(x^*).
-\]<p>然后迭代：</p>
-\[
-x_{k+1}=G(x_k).
-\]<p>定义 fixed-point residual：</p>
-\[
-\boxed{
-r_k=G(x_k)-x_k.
-}
-\]<p>如果：</p>
-\[
-r_k=0,
-\]<p>那么：</p>
-\[
-G(x_k)=x_k,
-\]<p>问题解决。</p>
+\[F(x)=0.\]<p>你构造一个容易计算的映射：</p>
+\[G(x),\]<p>使真正答案满足：</p>
+\[x^*=G(x^*).\]<p>然后迭代：</p>
+\[x_{k+1}=G(x_k).\]<p>定义 fixed-point residual：</p>
+\[\boxed{ r_k=G(x_k)-x_k. }\]<p>如果：</p>
+\[r_k=0,\]<p>那么：</p>
+\[G(x_k)=x_k,\]<p>问题解决。</p>
 <p>所以固定点迭代实际上是在反复做：</p>
-\[
-x_{k+1}=x_k+r_k.
-\]<p>这非常便宜。</p>
+\[x_{k+1}=x_k+r_k.\]<p>这非常便宜。</p>
 <p>问题是，如果：</p>
-\[
-G'(x^*)
-\]<p>的谱半径接近 1：</p>
-\[
-\rho(G')\lesssim1,
-\]<p>那么误差：</p>
-\[
-e_{k+1}\approx G'(x^*)e_k
-\]<p>每一步只减少一点。</p>
+\[G'(x^*)\]<p>的谱半径接近 1：</p>
+\[\rho(G')\lesssim1,\]<p>那么误差：</p>
+\[e_{k+1}\approx G'(x^*)e_k\]<p>每一步只减少一点。</p>
 <p>例如：</p>
-\[
-\|e_{k+1}\|=0.95\|e_k\|.
-\]<p>100 次以后还有：</p>
-\[
-0.95^{100}\approx0.006.
-\]<p>对于一个每次迭代都要做：</p>
+\[\|e_{k+1}\|=0.95\|e_k\|.\]<p>100 次以后还有：</p>
+\[0.95^{100}\approx0.006.\]<p>对于一个每次迭代都要做：</p>
 <ul>
 <li>constraint projection；</li>
 <li>sparse solve；</li>
@@ -500,109 +454,39 @@ e_{k+1}\approx G'(x^*)e_k
 <hr>
 <h1 id="2-anderson-的核心残差历史其实包含了局部-jacobian-信息">2. Anderson 的核心：残差历史其实包含了局部 Jacobian 信息
 </h1><p>现在假设已经得到：</p>
-\[
-x_{k-m},\ldots,x_k.
-\]<p>同时有：</p>
-\[
-r_{k-m},\ldots,r_k.
-\]<p>如果残差从：</p>
-\[
-r_{k-1}
-\]<p>变成：</p>
-\[
-r_k,
-\]<p>那么：</p>
-\[
-\Delta r_k=r_k-r_{k-1}.
-\]<p>而状态变化：</p>
-\[
-\Delta x_k=x_k-x_{k-1}.
-\]<p>局部线性化下：</p>
-\[
-\Delta r
-\approx
-J_r\,\Delta x.
-\]<p>于是每一组：</p>
-\[
-(\Delta x,\Delta r)
-\]<p>其实都在告诉你：</p>
-\[
-\boxed{
-\text{未知 residual Jacobian 在某个方向上大概是什么样子。}
-}
-\]<p>Newton 法会直接计算：</p>
-\[
-J_r.
-\]<p>Anderson 不计算它。</p>
+\[x_{k-m},\ldots,x_k.\]<p>同时有：</p>
+\[r_{k-m},\ldots,r_k.\]<p>如果残差从：</p>
+\[r_{k-1}\]<p>变成：</p>
+\[r_k,\]<p>那么：</p>
+\[\Delta r_k=r_k-r_{k-1}.\]<p>而状态变化：</p>
+\[\Delta x_k=x_k-x_{k-1}.\]<p>局部线性化下：</p>
+\[\Delta r \approx J_r\,\Delta x.\]<p>于是每一组：</p>
+\[(\Delta x,\Delta r)\]<p>其实都在告诉你：</p>
+\[\boxed{ \text{未知 residual Jacobian 在某个方向上大概是什么样子。} }\]<p>Newton 法会直接计算：</p>
+\[J_r.\]<p>Anderson 不计算它。</p>
 <p>它从最近几步：</p>
-\[
-\Delta x_1,\Delta r_1,\dots
-\]<p>反推局部行为。</p>
+\[\Delta x_1,\Delta r_1,\dots\]<p>反推局部行为。</p>
 <p>这就是它与：</p>
-\[
-\boxed{\text{quasi-Newton / multisecant}}
-\]<p>联系起来的原因。Walker–Ni 对这一关系进行了系统讨论，并引用 Fang–Saad 的 multisecant 解释。</p>
+\[\boxed{\text{quasi-Newton / multisecant}}\]<p>联系起来的原因。Walker–Ni 对这一关系进行了系统讨论，并引用 Fang–Saad 的 multisecant 解释。</p>
 <hr>
 <h1 id="3-算法核心其实只是一个很小的最小二乘">3. 算法核心其实只是一个很小的最小二乘
 </h1><p>定义最近 \(m\) 次 residual difference：</p>
-\[
-\Delta R_k=
-[
-\Delta r_{k-m+1},\ldots,\Delta r_k
-]
-\]<p>以及：</p>
-\[
-\Delta X_k=
-[
-\Delta x_{k-m+1},\ldots,\Delta x_k
-].
-\]<p>先解：</p>
-<h1 id="gamma">[
-\boxed{
-\gamma
-</h1><p>\arg\min_\gamma
-|
-r_k-\Delta R_k\gamma
-|_2
-}
-]</p>
-<p>意思是：</p>
+\[\Delta R_k= [ \Delta r_{k-m+1},\ldots,\Delta r_k ]\]<p>以及：</p>
+\[\Delta X_k= [ \Delta x_{k-m+1},\ldots,\Delta x_k ].\]<p>先解：</p>
+\[\boxed{ \gamma = \arg\min_\gamma \| r_k-\Delta R_k\gamma \|_2 }\]<p>意思是：</p>
 <blockquote>
 <p>能不能用过去残差变化的线性组合，尽可能解释当前 residual？</p>
 </blockquote>
 <p>然后使用一种常见 AA 更新：</p>
-<h1 id="x_k1">[
-\boxed{
-x_{k+1}
-</h1><h2 id="x_kr_k">x_k+r_k
-</h2><p>(\Delta X_k+\Delta R_k)\gamma.
-}
-]</p>
-<p>普通 fixed-point：</p>
-\[
-x_{k+1}=x_k+r_k.
-\]<p>AA 则额外增加：</p>
-\[
--(\Delta X+\Delta R)\gamma.
-\]<p>也就是：</p>
-\[
-\boxed{
-\text{利用历史信息修正当前 fixed-point direction。}
-}
-\]<p>而这个 least-squares 的维度只有：</p>
-\[
-m.
-\]<p>实践中：</p>
-\[
-m=3\sim10
-\]<p>就很常见。</p>
+\[\boxed{ x_{k+1} = x_k+r_k - (\Delta X_k+\Delta R_k)\gamma. }\]<p>普通 fixed-point：</p>
+\[x_{k+1}=x_k+r_k.\]<p>AA 则额外增加：</p>
+\[-(\Delta X+\Delta R)\gamma.\]<p>也就是：</p>
+\[\boxed{ \text{利用历史信息修正当前 fixed-point direction。} }\]<p>而这个 least-squares 的维度只有：</p>
+\[m.\]<p>实践中：</p>
+\[m=3\sim10\]<p>就很常见。</p>
 <p>所以即使：</p>
-\[
-x\in\mathbb R^{10^6},
-\]<p>真正新增的核心优化问题可能只是一个：</p>
-\[
-5\times5
-\]<p>级别的小问题。</p>
+\[x\in\mathbb R^{10^6},\]<p>真正新增的核心优化问题可能只是一个：</p>
+\[5\times5\]<p>级别的小问题。</p>
 <hr>
 <h1 id="4-一个二维直觉普通迭代为什么会之字形">4. 一个二维直觉：普通迭代为什么会“之字形”
 </h1><p>假设你在二维状态空间里迭代：</p>
@@ -627,21 +511,13 @@ x\in\mathbb R^{10^6},
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>每一次 fixed-point map 都在纠正误差，但两个方向的收缩速度不同，于是出现：</p>
-\[
-\boxed{\text{zig-zag}}
-\]<p>过去几次 residual：</p>
-\[
-r_{k-2},r_{k-1},r_k
-\]<p>已经透露出：</p>
+\[\boxed{\text{zig-zag}}\]<p>过去几次 residual：</p>
+\[r_{k-2},r_{k-1},r_k\]<p>已经透露出：</p>
 <blockquote>
 <p>“我每次都在这两个方向之间来回过度修正。”</p>
 </blockquote>
 <p>Anderson 做的事情近似是：</p>
-\[
-\boxed{
-\text{寻找这些历史更新的一个组合，使预测 residual 最小。}
-}
-\]<p>于是可能直接得到：</p>
+\[\boxed{ \text{寻找这些历史更新的一个组合，使预测 residual 最小。} }\]<p>于是可能直接得到：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -665,120 +541,50 @@ r_{k-2},r_{k-1},r_k
 <hr>
 <h1 id="5-为什么这个-gmres-联系这么重要">5. 为什么这个 GMRES 联系这么重要？
 </h1><p>考虑线性系统：</p>
-\[
-Ax=b.
-\]<p>Jacobi / Richardson 一类迭代可以写成：</p>
-\[
-x_{k+1}=Gx_k+c.
-\]<p>普通 fixed-point 每次只能：</p>
-\[
-e_{k+1}=Ge_k.
-\]<p>因此误差方向受到：</p>
-\[
-G^k e_0
-\]<p>控制。</p>
+\[Ax=b.\]<p>Jacobi / Richardson 一类迭代可以写成：</p>
+\[x_{k+1}=Gx_k+c.\]<p>普通 fixed-point 每次只能：</p>
+\[e_{k+1}=Ge_k.\]<p>因此误差方向受到：</p>
+\[G^k e_0\]<p>控制。</p>
 <p>GMRES 则在 Krylov 子空间：</p>
-<h1 id="mathcal-k_m">[
-\mathcal K_m
-</h1><p>\operatorname{span}
-{
-r_0,Ar_0,A^2r_0,\dots
-}
-]</p>
-<p>中寻找最小 residual 的解。</p>
+\[\mathcal K_m = \operatorname{span} \{ r_0,Ar_0,A^2r_0,\dots \}\]<p>中寻找最小 residual 的解。</p>
 <p>Anderson 虽然没显式建立 Krylov basis，却通过：</p>
-\[
-\boxed{\text{历史 residual 的线性组合}}
-\]<p>实现了类似的 residual minimization。</p>
+\[\boxed{\text{历史 residual 的线性组合}}\]<p>实现了类似的 residual minimization。</p>
 <p>因此可以把它粗略理解成：</p>
-\[
-\boxed{
-\text{nonlinear fixed-point iteration 上的“轻量 Krylov 化”。}
-}
-\]<p>这个理解比“给迭代加个 momentum”更接近它的数值本质。</p>
+\[\boxed{ \text{nonlinear fixed-point iteration 上的“轻量 Krylov 化”。} }\]<p>这个理解比“给迭代加个 momentum”更接近它的数值本质。</p>
 <hr>
 <h1 id="6-它为什么特别适合-projective-dynamics--local-global-solver">6. 它为什么特别适合 Projective Dynamics / local-global solver？
 </h1><p>回忆 PD：</p>
-\[
-x_k
-\xrightarrow{\text{local}}
-p_k
-\xrightarrow{\text{global}}
-x_{k+1}.
-\]<p>整个 local-global iteration 可以视为：</p>
-\[
-\boxed{
-x_{k+1}=G(x_k).
-}
-\]<p>PD 的优势：</p>
+\[x_k \xrightarrow{\text{local}} p_k \xrightarrow{\text{global}} x_{k+1}.\]<p>整个 local-global iteration 可以视为：</p>
+\[\boxed{ x_{k+1}=G(x_k). }\]<p>PD 的优势：</p>
 <ul>
 <li>每次 iteration 很便宜；</li>
 <li>固定 global matrix 可预分解；</li>
 <li>稳定；</li>
 </ul>
 <p>但缺点之一是：</p>
-\[
-\boxed{\text{高精度收敛阶段可能很慢。}}
-\]<p>2018 年 Peng 等在 ACM TOG/SIGGRAPH 工作中，直接把每个 local-global step 当作固定点映射，用 Anderson acceleration 加速 geometry optimization 和 physics simulation；论文报告，AA 能显著减少达到高精度所需的迭代次数，而单次迭代只增加很小额外成本。</p>
+\[\boxed{\text{高精度收敛阶段可能很慢。}}\]<p>2018 年 Peng 等在 ACM TOG/SIGGRAPH 工作中，直接把每个 local-global step 当作固定点映射，用 Anderson acceleration 加速 geometry optimization 和 physics simulation；论文报告，AA 能显著减少达到高精度所需的迭代次数，而单次迭代只增加很小额外成本。</p>
 <p>这正好解释为什么 AA 和 PD 很般配：</p>
-\[
-\boxed{
-\text{PD 提供一个便宜但线性收敛的 }G(x)
-}
-\]\[
-+
-\]\[
-\boxed{
-\text{AA 用历史信息提高这个 }G\text{ 的有效收敛速度}
-}
-\]<p>而不必把整个 solver 改写成 Newton FEM。</p>
+\[\boxed{ \text{PD 提供一个便宜但线性收敛的 }G(x) }\]\[+\]\[\boxed{ \text{AA 用历史信息提高这个 }G\text{ 的有效收敛速度} }\]<p>而不必把整个 solver 改写成 Newton FEM。</p>
 <hr>
 <h1 id="7-这对-pbdxpbd-有什么潜在意义">7. 这对 PBD/XPBD 有什么潜在意义？
 </h1><p>如果一个 constraint solve 是：</p>
-<h1 id="xk1">[
-x^{(k+1)}
-</h1><p>G(x^{(k)}),
-]</p>
-<p>那么原则上也可以做 AA。</p>
+\[x^{(k+1)} = G(x^{(k)}),\]<p>那么原则上也可以做 AA。</p>
 <p>例如 GPU Jacobi PBD：</p>
-\[
-x^{k}
-\rightarrow
-\text{all constraint corrections}
-\rightarrow
-x^{k+1}.
-\]<p>如果 stiff material 下需要：</p>
-\[
-30\sim100
-\]<p>轮 Jacobi 才足够硬，AA 可以尝试用最近几轮的位置/residual 历史提高收敛。</p>
+\[x^{k} \rightarrow \text{all constraint corrections} \rightarrow x^{k+1}.\]<p>如果 stiff material 下需要：</p>
+\[30\sim100\]<p>轮 Jacobi 才足够硬，AA 可以尝试用最近几轮的位置/residual 历史提高收敛。</p>
 <p>2019 年一项面向交互式软体的工作就将 Anderson acceleration 加入 PBD/Jacobi 框架，以改善 stiff material 的收敛，同时使用 graph coloring 等方法实现 GPU 实时计算。</p>
 <p>不过这里有一个重要条件：</p>
-\[
-\boxed{
-\text{最好加速“完整一轮 solver map”，
-而不是随便加速单个 constraint correction。}
-}
-\]<p>因为 AA 假设你有一个相对稳定的：</p>
-\[
-G:x\mapsto x'.
-\]<p>如果 Gauss-Seidel 顺序、active contact set、clamp 状态每次剧烈变化，那么：</p>
-\[
-G
-\]<p>本身就在跳变，历史信息就可能失去意义。</p>
+\[\boxed{ \text{最好加速“完整一轮 solver map”， 而不是随便加速单个 constraint correction。} }\]<p>因为 AA 假设你有一个相对稳定的：</p>
+\[G:x\mapsto x'.\]<p>如果 Gauss-Seidel 顺序、active contact set、clamp 状态每次剧烈变化，那么：</p>
+\[G\]<p>本身就在跳变，历史信息就可能失去意义。</p>
 <hr>
 <h1 id="8-为什么-anderson-有时反而会把-solver-搞炸">8. 为什么 Anderson 有时反而会把 solver 搞炸？
 </h1><p>这是它最需要警惕的地方。</p>
 <p>普通 fixed-point 假设：</p>
-\[
-G(x_k)
-\]<p>本身有某种稳定性。</p>
+\[G(x_k)\]<p>本身有某种稳定性。</p>
 <p>Anderson 却做：</p>
-\[
-\boxed{\text{extrapolation}}
-\]<p>也就是说：</p>
-\[
-x_{k+1}
-\]<p>可能落在历史状态的凸包之外。</p>
+\[\boxed{\text{extrapolation}}\]<p>也就是说：</p>
+\[x_{k+1}\]<p>可能落在历史状态的凸包之外。</p>
 <p>如果非线性很强，例如：</p>
 <ul>
 <li>contact active set 改变；</li>
@@ -788,36 +594,18 @@ x_{k+1}
 </ul>
 <p>历史线性模型可能完全失效。</p>
 <p>于是：</p>
-\[
-\gamma
-\]<p>可能非常大，</p>
+\[\gamma\]<p>可能非常大，</p>
 <p>导致：</p>
-\[
-\|x_{k+1}-x_k\|\gg1.
-\]<p>这也是为什么 graphics 中真正实用的 AA 往往需要：</p>
-\[
-\boxed{\text{safeguard}}
-\]<p>Peng 等 2018 年的方法并没有盲目接受 AA step，而是加入目标能量下降判据，从而解决经典 AA 的稳定性问题并保证其 local-global 框架的全局收敛性质。</p>
+\[\|x_{k+1}-x_k\|\gg1.\]<p>这也是为什么 graphics 中真正实用的 AA 往往需要：</p>
+\[\boxed{\text{safeguard}}\]<p>Peng 等 2018 年的方法并没有盲目接受 AA step，而是加入目标能量下降判据，从而解决经典 AA 的稳定性问题并保证其 local-global 框架的全局收敛性质。</p>
 <hr>
 <h1 id="9-一个非常重要的工程原则aa-应该是加速器不是基础稳定器">9. 一个非常重要的工程原则：AA 应该是“加速器”，不是“基础稳定器”
 </h1><p>假设原始 iteration：</p>
-\[
-x_{k+1}=G(x_k)
-\]<p>本身会发散：</p>
-\[
-\rho(G')>1.
-\]<p>不要期待 AA 一定把它救回来。</p>
+\[x_{k+1}=G(x_k)\]<p>本身会发散：</p>
+\[\rho(G')>1.\]<p>不要期待 AA 一定把它救回来。</p>
 <p>它有时确实能扩大实际收敛区，但工程上更合理的顺序仍然是：</p>
-\[
-\boxed{
-\text{先有一个靠谱的 baseline iteration}
-}
-\]<p>然后：</p>
-\[
-\boxed{
-\text{再用 Anderson 降低 iteration count。}
-}
-\]<p>也就是说，如果 XPBD 出现：</p>
+\[\boxed{ \text{先有一个靠谱的 baseline iteration} }\]<p>然后：</p>
+\[\boxed{ \text{再用 Anderson 降低 iteration count。} }\]<p>也就是说，如果 XPBD 出现：</p>
 <ul>
 <li>四面体反转；</li>
 <li>NaN；</li>
@@ -826,32 +614,18 @@ x_{k+1}=G(x_k)
 </ul>
 <p>AA 几乎肯定不是第一治疗手段。</p>
 <p>它解决的是：</p>
-\[
-\boxed{\text{slow convergence}}
-\]<p>而不是：</p>
-\[
-\boxed{\text{wrong formulation}}.
-\]<p>这一区分很重要。</p>
+\[\boxed{\text{slow convergence}}\]<p>而不是：</p>
+\[\boxed{\text{wrong formulation}}.\]<p>这一区分很重要。</p>
 <hr>
 <h1 id="10-history-length--为什么不能无限加">10. History length \(m\) 为什么不能无限加？
 </h1><p>乍看：</p>
-\[
-m\uparrow
-\]<p>拥有更多信息，似乎越好。</p>
+\[m\uparrow\]<p>拥有更多信息，似乎越好。</p>
 <p>但 residual differences：</p>
-\[
-\Delta r_i
-\]<p>可能逐渐变得近似线性相关。</p>
+\[\Delta r_i\]<p>可能逐渐变得近似线性相关。</p>
 <p>于是 least-squares matrix：</p>
-\[
-\Delta R
-\]<p>条件数：</p>
-\[
-\kappa(\Delta R)\uparrow.
-\]<p>此时：</p>
-\[
-\gamma
-\]<p>会非常敏感。</p>
+\[\Delta R\]<p>条件数：</p>
+\[\kappa(\Delta R)\uparrow.\]<p>此时：</p>
+\[\gamma\]<p>会非常敏感。</p>
 <p>同时：</p>
 <ul>
 <li>内存增加；</li>
@@ -859,9 +633,7 @@ m\uparrow
 <li>旧历史越来越不代表当前局部非线性。</li>
 </ul>
 <p>因此 practical AA 通常只保存：</p>
-\[
-\boxed{m\approx3\sim10}
-\]<p>步历史，并可能：</p>
+\[\boxed{m\approx3\sim10}\]<p>步历史，并可能：</p>
 <ul>
 <li>restart；</li>
 <li>regularize；</li>
@@ -872,18 +644,9 @@ m\uparrow
 <hr>
 <h1 id="11-它和-newton-的真正关系在哪里">11. 它和 Newton 的真正关系在哪里？
 </h1><p>Newton：</p>
-<h1 id="x_k1-1">[
-x_{k+1}
-</h1><h2 id="x_k">x_k
-</h2><p>J_r(x_k)^{-1}r_k.
-]</p>
-<p>优点：</p>
-\[
-\boxed{\text{利用完整局部导数}}
-\]<p>缺点：</p>
-\[
-J_r
-\]<p>可能：</p>
+\[x_{k+1} = x_k - J_r(x_k)^{-1}r_k.\]<p>优点：</p>
+\[\boxed{\text{利用完整局部导数}}\]<p>缺点：</p>
+\[J_r\]<p>可能：</p>
 <ul>
 <li>很贵；</li>
 <li>难推；</li>
@@ -891,56 +654,23 @@ J_r
 <li>难 factorize。</li>
 </ul>
 <p>Anderson 近似在做：</p>
-<h1 id="x_k1-2">[
-x_{k+1}
-</h1><h2 id="x_k-1">x_k
-</h2><p>H_k r_k,
-]</p>
-<p>其中：</p>
-\[
-H_k
-\]<p>不是显式构造的完整矩阵，而是通过历史：</p>
-\[
-(\Delta x_i,\Delta r_i)
-\]<p>满足若干 secant conditions。</p>
+\[x_{k+1} = x_k - H_k r_k,\]<p>其中：</p>
+\[H_k\]<p>不是显式构造的完整矩阵，而是通过历史：</p>
+\[(\Delta x_i,\Delta r_i)\]<p>满足若干 secant conditions。</p>
 <p>所以可以把三类方法排成：</p>
-\[
-\boxed{
-\text{Fixed point}
-}
-\]<p>几乎不利用导数信息；</p>
-\[
-\boxed{
-\text{Anderson / multisecant}
-}
-\]<p>从历史中低成本推断部分 Jacobian 信息；</p>
-\[
-\boxed{
-\text{Newton}
-}
-\]<p>显式使用完整 Jacobian/Hessian。</p>
+\[\boxed{ \text{Fixed point} }\]<p>几乎不利用导数信息；</p>
+\[\boxed{ \text{Anderson / multisecant} }\]<p>从历史中低成本推断部分 Jacobian 信息；</p>
+\[\boxed{ \text{Newton} }\]<p>显式使用完整 Jacobian/Hessian。</p>
 <p>AA 正好卡在两者中间。</p>
 <p>这也是它特别适合实时求解器的原因之一。</p>
 <hr>
 <h1 id="12-一个很有价值的类比aa-是solver-的短期记忆">12. 一个很有价值的类比：AA 是“solver 的短期记忆”
 </h1><p>普通迭代是：</p>
-\[
-\boxed{\text{memoryless}}
-\]<p>每一步只看：</p>
-\[
-x_k.
-\]<p>Anderson 有：</p>
-\[
-\boxed{\text{short-term memory}}
-\]<p>它记住：</p>
-\[
-(x_{k-j},r_{k-j}).
-\]<p>这些历史不是用来“平均答案”，而是用来估计：</p>
-\[
-\boxed{
-\text{当前 nonlinear map 的局部响应结构。}
-}
-\]<p>所以 AA 揭示了一个很普遍的设计原则：</p>
+\[\boxed{\text{memoryless}}\]<p>每一步只看：</p>
+\[x_k.\]<p>Anderson 有：</p>
+\[\boxed{\text{short-term memory}}\]<p>它记住：</p>
+\[(x_{k-j},r_{k-j}).\]<p>这些历史不是用来“平均答案”，而是用来估计：</p>
+\[\boxed{ \text{当前 nonlinear map 的局部响应结构。} }\]<p>所以 AA 揭示了一个很普遍的设计原则：</p>
 <blockquote>
 <p><strong>如果求解器每轮都产生昂贵的信息，不要在下一轮全部丢掉。</strong></p>
 </blockquote>
@@ -956,32 +686,16 @@ x_k.
 <hr>
 <h1 id="13-对接触问题为什么要更谨慎">13. 对接触问题为什么要更谨慎？
 </h1><p>假设：</p>
-\[
-G(x)
-\]<p>中包含 contact projection。</p>
+\[G(x)\]<p>中包含 contact projection。</p>
 <p>上一轮：</p>
-\[
-\text{contact A active}
-\]<p>下一轮：</p>
-\[
-\text{contact A inactive},
-\quad
-\text{contact B active}.
-\]<p>那么 residual map 可能是非光滑的。</p>
+\[\text{contact A active}\]<p>下一轮：</p>
+\[\text{contact A inactive}, \quad \text{contact B active}.\]<p>那么 residual map 可能是非光滑的。</p>
 <p>经典 AA 理论最舒服的场景还是：</p>
-\[
-G
-\]<p>足够平滑、局部 contractive。</p>
+\[G\]<p>足够平滑、局部 contractive。</p>
 <p>不过后续研究已经把理论推进到某些 nonsmooth fixed-point 问题，并证明在“平滑 contraction + Lipschitz 较小的 nonsmooth component”等条件下仍能建立收敛结果。</p>
 <p>但对物理引擎而言，这仍然意味着：</p>
-\[
-\boxed{
-\text{contact-heavy iteration 应配合 restart / safeguard。}
-}
-\]<p>例如检测：</p>
-\[
-\text{active set 大幅变化}
-\]<p>时直接清空 AA history，通常是很合理的工程策略。</p>
+\[\boxed{ \text{contact-heavy iteration 应配合 restart / safeguard。} }\]<p>例如检测：</p>
+\[\text{active set 大幅变化}\]<p>时直接清空 AA history，通常是很合理的工程策略。</p>
 <hr>
 <h1 id="14-一个很适合自研求解器的最小实现">14. 一个很适合自研求解器的最小实现
 </h1><p>假设已经有：</p>
@@ -1045,9 +759,7 @@ G
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>这种结构非常吸引人，因为 AA 可以成为：</p>
-\[
-\boxed{\text{solver wrapper}}
-\]<p>而不是侵入：</p>
+\[\boxed{\text{solver wrapper}}\]<p>而不是侵入：</p>
 <ul>
 <li>constraint kernel；</li>
 <li>FEM constitutive law；</li>
@@ -1060,74 +772,28 @@ G
 </h1><p>如果要判断 AA 是否值得加入，不要一开始看 FPS。</p>
 <p>先选一个<strong>没有碰撞、没有塑性、确定能收敛</strong>的 stiff soft-body case。</p>
 <p>记录：</p>
-\[
-\|r_k\|
-\]<p>随 iteration：</p>
-\[
-k
-\]<p>的变化。</p>
+\[\|r_k\|\]<p>随 iteration：</p>
+\[k\]<p>的变化。</p>
 <p>比较：</p>
-\[
-\text{baseline}
-\]<p>与：</p>
-\[
-m=2,\ 4,\ 6
-\]<p>的 AA。</p>
+\[\text{baseline}\]<p>与：</p>
+\[m=2,\ 4,\ 6\]<p>的 AA。</p>
 <p>最值得看的不是：</p>
-\[
-\text{最终形状}
-\]<p>而是：</p>
-\[
-\log\|r_k\|
-\]<p>曲线。</p>
+\[\text{最终形状}\]<p>而是：</p>
+\[\log\|r_k\|\]<p>曲线。</p>
 <p>如果 baseline：</p>
-\[
-\|r_{k+1}\|\approx0.92\|r_k\|,
-\]<p>而 AA 很快变成明显更陡的下降曲线，就说明：</p>
-\[
-\boxed{\text{问题主要是 fixed-point convergence rate。}}
-\]<p>如果 residual 本来就在：</p>
-\[
-\text{oscillate / diverge / NaN},
-\]<p>那么应该先修 formulation。</p>
+\[\|r_{k+1}\|\approx0.92\|r_k\|,\]<p>而 AA 很快变成明显更陡的下降曲线，就说明：</p>
+\[\boxed{\text{问题主要是 fixed-point convergence rate。}}\]<p>如果 residual 本来就在：</p>
+\[\text{oscillate / diverge / NaN},\]<p>那么应该先修 formulation。</p>
 <hr>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
 </h1><p>Anderson Acceleration 最值得记住的不是那个 least-squares 公式，而是：</p>
-\[
-\boxed{
-\text{迭代历史本身就是对未知 Jacobian 的观测数据。}
-}
-\]<p>普通 fixed-point solver 每轮算完：</p>
-\[
-x_k\rightarrow x_{k+1}
-\]<p>以后，把之前的信息全部扔掉。</p>
+\[\boxed{ \text{迭代历史本身就是对未知 Jacobian 的观测数据。} }\]<p>普通 fixed-point solver 每轮算完：</p>
+\[x_k\rightarrow x_{k+1}\]<p>以后，把之前的信息全部扔掉。</p>
 <p>AA 则利用最近几轮：</p>
-\[
-\Delta x,\Delta r
-\]<p>构造一个非常廉价的局部模型。</p>
+\[\Delta x,\Delta r\]<p>构造一个非常廉价的局部模型。</p>
 <p>所以它在整个知识体系中的位置非常漂亮：</p>
-\[
-\text{Fixed-point / PBD / PD}
-\]\[
-\downarrow
-\]\[
-\boxed{\text{Anderson / multisecant acceleration}}
-\]\[
-\downarrow
-\]\[
-\text{quasi-Newton}
-\]\[
-\downarrow
-\]\[
-\text{full Newton / Newton-Krylov}.
-\]<p>对于实时物理求解器而言，这条路线尤其值得学，因为它代表一种非常实用的工程哲学：</p>
-\[
-\boxed{
-\text{如果单次迭代已经足够便宜和鲁棒，
-优先想办法让它少迭代几次，
-而不一定要把整个 solver 换成更昂贵的方法。}
-}
-\]<h3 id="拓展阅读">拓展阅读
+\[\text{Fixed-point / PBD / PD}\]\[\downarrow\]\[\boxed{\text{Anderson / multisecant acceleration}}\]\[\downarrow\]\[\text{quasi-Newton}\]\[\downarrow\]\[\text{full Newton / Newton-Krylov}.\]<p>对于实时物理求解器而言，这条路线尤其值得学，因为它代表一种非常实用的工程哲学：</p>
+\[\boxed{ \text{如果单次迭代已经足够便宜和鲁棒， 优先想办法让它少迭代几次， 而不一定要把整个 solver 换成更昂贵的方法。} }\]<h3 id="拓展阅读">拓展阅读
 </h3><ol>
 <li>
 <p><strong>Walker &amp; Ni, <em>Anderson Acceleration for Fixed-Point Iterations</em>, SIAM Journal on Numerical Analysis, 2011</strong>。最重要的理论入口，尤其值得看 AA 与 GMRES、quasi-Newton 的关系以及 implementation considerations。<br>

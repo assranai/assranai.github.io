@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器” 主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[ \\boxed{ \\text{普通代理：学习 }x\\mapsto y } \\]而 Neural Operator 试图学习：\n\\[ \\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} } \\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[ x= (E,\\nu,F,\\text{gap}) \\]输出：\n\\[ y= \\sigma_{\\max}. \\]Kriging、MLP、XGBoost 都可以学习：\n\\[ f:\\mathbb R^4\\rightarrow\\mathbb R. \\]这个问题本质上是：\n\\[ \\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}} \\]即使输出不是一个标量，而是：\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器” 主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[\\boxed{ \\text{普通代理：学习 }x\\mapsto y }\\]而 Neural Operator 试图学习：\n\\[\\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} }\\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[x= (E,\\nu,F,\\text{gap})\\]输出：\n\\[y= \\sigma_{\\max}.\\]Kriging、MLP、XGBoost 都可以学习：\n\\[f:\\mathbb R^4\\rightarrow\\mathbb R.\\]这个问题本质上是：\n\\[\\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}}\\]即使输出不是一个标量，而是：\n\\[1000\\]个节点位移：\n\\[u\\in\\mathbb R^{3000},\\]你仍然是在学习：\n\\[\\mathbb R^4\\rightarrow\\mathbb R^{3000}.\\]问题是，这个：\n\\[3000\\]其实来自某一次具体网格离散。\n一旦：\n\\[3000\\rightarrow12000\\]节点数变了，普通网络的输出维度通常也跟着失效。\n这说明它真正学习的是：\n\\[\\boxed{\\text{某个离散问题}}\\]而不是：\n">
 <title>Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/13-neural-operator/'>
 
 <link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”">
-<meta property='og:description' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器” 主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[ \\boxed{ \\text{普通代理：学习 }x\\mapsto y } \\]而 Neural Operator 试图学习：\n\\[ \\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} } \\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[ x= (E,\\nu,F,\\text{gap}) \\]输出：\n\\[ y= \\sigma_{\\max}. \\]Kriging、MLP、XGBoost 都可以学习：\n\\[ f:\\mathbb R^4\\rightarrow\\mathbb R. \\]这个问题本质上是：\n\\[ \\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}} \\]即使输出不是一个标量，而是：\n">
+<meta property='og:description' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器” 主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[\\boxed{ \\text{普通代理：学习 }x\\mapsto y }\\]而 Neural Operator 试图学习：\n\\[\\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} }\\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[x= (E,\\nu,F,\\text{gap})\\]输出：\n\\[y= \\sigma_{\\max}.\\]Kriging、MLP、XGBoost 都可以学习：\n\\[f:\\mathbb R^4\\rightarrow\\mathbb R.\\]这个问题本质上是：\n\\[\\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}}\\]即使输出不是一个标量，而是：\n\\[1000\\]个节点位移：\n\\[u\\in\\mathbb R^{3000},\\]你仍然是在学习：\n\\[\\mathbb R^4\\rightarrow\\mathbb R^{3000}.\\]问题是，这个：\n\\[3000\\]其实来自某一次具体网格离散。\n一旦：\n\\[3000\\rightarrow12000\\]节点数变了，普通网络的输出维度通常也跟着失效。\n这说明它真正学习的是：\n\\[\\boxed{\\text{某个离散问题}}\\]而不是：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/13-neural-operator/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='科学机器学习' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:published_time' content='2026-08-26T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-26T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”">
-<meta name="twitter:description" content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器” 主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[ \\boxed{ \\text{普通代理：学习 }x\\mapsto y } \\]而 Neural Operator 试图学习：\n\\[ \\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} } \\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[ x= (E,\\nu,F,\\text{gap}) \\]输出：\n\\[ y= \\sigma_{\\max}. \\]Kriging、MLP、XGBoost 都可以学习：\n\\[ f:\\mathbb R^4\\rightarrow\\mathbb R. \\]这个问题本质上是：\n\\[ \\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}} \\]即使输出不是一个标量，而是：\n">
+<meta name="twitter:description" content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器” 主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[\\boxed{ \\text{普通代理：学习 }x\\mapsto y }\\]而 Neural Operator 试图学习：\n\\[\\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} }\\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[x= (E,\\nu,F,\\text{gap})\\]输出：\n\\[y= \\sigma_{\\max}.\\]Kriging、MLP、XGBoost 都可以学习：\n\\[f:\\mathbb R^4\\rightarrow\\mathbb R.\\]这个问题本质上是：\n\\[\\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}}\\]即使输出不是一个标量，而是：\n\\[1000\\]个节点位移：\n\\[u\\in\\mathbb R^{3000},\\]你仍然是在学习：\n\\[\\mathbb R^4\\rightarrow\\mathbb R^{3000}.\\]问题是，这个：\n\\[3000\\]其实来自某一次具体网格离散。\n一旦：\n\\[3000\\rightarrow12000\\]节点数变了，普通网络的输出维度通常也跟着失效。\n这说明它真正学习的是：\n\\[\\boxed{\\text{某个离散问题}}\\]而不是：\n">
     </head>
     <body class="
     article-page
@@ -389,7 +389,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 6 分钟
+                    阅读时长: 5 分钟
                 </time>
             </div>
         
@@ -409,122 +409,50 @@
 <strong>领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程</strong><br>
 <strong>推荐阅读时间：约 8–10 分钟</strong></p>
 <p>今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：</p>
-\[
-\boxed{
-\text{普通代理：学习 }x\mapsto y
-}
-\]<p>而 Neural Operator 试图学习：</p>
-\[
-\boxed{
-\mathcal G:\text{输入函数}\mapsto\text{输出函数}
-}
-\]<p>这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：<strong>模型参数可以独立于具体离散分辨率</strong>。</p>
+\[\boxed{ \text{普通代理：学习 }x\mapsto y }\]<p>而 Neural Operator 试图学习：</p>
+\[\boxed{ \mathcal G:\text{输入函数}\mapsto\text{输出函数} }\]<p>这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：<strong>模型参数可以独立于具体离散分辨率</strong>。</p>
 <p>这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。</p>
 <hr>
 <h2 id="1-普通代理模型到底在学什么">1. 普通代理模型到底在学什么？
 </h2><p>假设有限元模型输入：</p>
-\[
-x=
-(E,\nu,F,\text{gap})
-\]<p>输出：</p>
-\[
-y=
-\sigma_{\max}.
-\]<p>Kriging、MLP、XGBoost 都可以学习：</p>
-\[
-f:\mathbb R^4\rightarrow\mathbb R.
-\]<p>这个问题本质上是：</p>
-\[
-\boxed{\text{有限维向量}\rightarrow\text{有限维向量}}
-\]<p>即使输出不是一个标量，而是：</p>
-\[
-1000
-\]<p>个节点位移：</p>
-\[
-u\in\mathbb R^{3000},
-\]<p>你仍然是在学习：</p>
-\[
-\mathbb R^4\rightarrow\mathbb R^{3000}.
-\]<p>问题是，这个：</p>
-\[
-3000
-\]<p>其实来自某一次具体网格离散。</p>
+\[x= (E,\nu,F,\text{gap})\]<p>输出：</p>
+\[y= \sigma_{\max}.\]<p>Kriging、MLP、XGBoost 都可以学习：</p>
+\[f:\mathbb R^4\rightarrow\mathbb R.\]<p>这个问题本质上是：</p>
+\[\boxed{\text{有限维向量}\rightarrow\text{有限维向量}}\]<p>即使输出不是一个标量，而是：</p>
+\[1000\]<p>个节点位移：</p>
+\[u\in\mathbb R^{3000},\]<p>你仍然是在学习：</p>
+\[\mathbb R^4\rightarrow\mathbb R^{3000}.\]<p>问题是，这个：</p>
+\[3000\]<p>其实来自某一次具体网格离散。</p>
 <p>一旦：</p>
-\[
-3000\rightarrow12000
-\]<p>节点数变了，普通网络的输出维度通常也跟着失效。</p>
+\[3000\rightarrow12000\]<p>节点数变了，普通网络的输出维度通常也跟着失效。</p>
 <p>这说明它真正学习的是：</p>
-\[
-\boxed{\text{某个离散问题}}
-\]<p>而不是：</p>
-\[
-\boxed{\text{连续物理问题本身}}
-\]<p>Neural Operator 正是在这一点上换了问题定义。</p>
+\[\boxed{\text{某个离散问题}}\]<p>而不是：</p>
+\[\boxed{\text{连续物理问题本身}}\]<p>Neural Operator 正是在这一点上换了问题定义。</p>
 <hr>
 <h1 id="2-pde-本来就是函数到函数的映射">2. PDE 本来就是“函数到函数”的映射
 </h1><p>考虑 Darcy 方程：</p>
-\[
--\nabla\cdot(a(x)\nabla u(x))=f(x).
-\]<p>输入并不只是几个数字。</p>
+\[-\nabla\cdot(a(x)\nabla u(x))=f(x).\]<p>输入并不只是几个数字。</p>
 <p>材料系数：</p>
-\[
-a(x)
-\]<p>本身就是一个空间函数。</p>
+\[a(x)\]<p>本身就是一个空间函数。</p>
 <p>输出：</p>
-\[
-u(x)
-\]<p>也是函数。</p>
+\[u(x)\]<p>也是函数。</p>
 <p>因此真正的物理关系其实是：</p>
-\[
-\boxed{
-\mathcal G:
-a(x)\mapsto u(x)
-}
-\]<p>这里：</p>
-\[
-\mathcal G
-\]<p>就是 PDE 的 <strong>solution operator</strong>。</p>
+\[\boxed{ \mathcal G: a(x)\mapsto u(x) }\]<p>这里：</p>
+\[\mathcal G\]<p>就是 PDE 的 <strong>solution operator</strong>。</p>
 <p>传统 FEM 做的事情是：</p>
-\[
-a(x)
-\]<p>先离散成：</p>
-\[
-a_h\in\mathbb R^N,
-\]<p>然后求：</p>
-\[
-u_h\in\mathbb R^N.
-\]<p>而 Neural Operator 的目标是在概念上直接逼近：</p>
-\[
-\boxed{
-\mathcal G:a\mapsto u
-}
-\]<p>而不是固定某个：</p>
-\[
-N.
-\]<p>所以 Neural Operator 的真正跃迁在于：</p>
-\[
-\boxed{
-\text{learning functions}
-\rightarrow
-\text{learning operators}
-}
-\]<p>DeepONet 和 Neural Operator/FNO 都建立在这一思想上。DeepONet 2021 直接从 operator universal approximation theorem 出发构造 branch/trunk 网络；Kovachki 等则给出了更统一的 neural operator 框架。</p>
+\[a(x)\]<p>先离散成：</p>
+\[a_h\in\mathbb R^N,\]<p>然后求：</p>
+\[u_h\in\mathbb R^N.\]<p>而 Neural Operator 的目标是在概念上直接逼近：</p>
+\[\boxed{ \mathcal G:a\mapsto u }\]<p>而不是固定某个：</p>
+\[N.\]<p>所以 Neural Operator 的真正跃迁在于：</p>
+\[\boxed{ \text{learning functions} \rightarrow \text{learning operators} }\]<p>DeepONet 和 Neural Operator/FNO 都建立在这一思想上。DeepONet 2021 直接从 operator universal approximation theorem 出发构造 branch/trunk 网络；Kovachki 等则给出了更统一的 neural operator 框架。</p>
 <hr>
 <h1 id="3-为什么这对-fem-surrogate-很关键">3. 为什么这对 FEM surrogate 很关键？
 </h1><p>假设你想代理：</p>
-\[
-E(x)\rightarrow u(x).
-\]<p>传统做法可能把有限元场展平：</p>
-\[
-u=
-[u_1,u_2,\dots,u_N]
-\]<p>然后训练网络。</p>
+\[E(x)\rightarrow u(x).\]<p>传统做法可能把有限元场展平：</p>
+\[u= [u_1,u_2,\dots,u_N]\]<p>然后训练网络。</p>
 <p>这种方式的麻烦是：</p>
-\[
-\boxed{
-\text{mesh topology / node count 被硬编码进模型}
-}
-\]<p>而工程模型很容易发生：</p>
+\[\boxed{ \text{mesh topology / node count 被硬编码进模型} }\]<p>而工程模型很容易发生：</p>
 <ul>
 <li>网格细化；</li>
 <li>采样分辨率变化；</li>
@@ -533,16 +461,8 @@ u=
 <li>不同离散尺度。</li>
 </ul>
 <p>Neural Operator 更希望满足：</p>
-\[
-\boxed{
-\text{train on one discretization}
-\rightarrow
-\text{evaluate on another discretization}
-}
-\]<p>这就是所谓：</p>
-\[
-\boxed{\text{discretization invariance}}
-\]<p>JMLR 的统一理论论文把它列为 neural operator 的关键设计属性；官方 NeuralOperator 库也直接把“resolution invariant”作为其核心定位。</p>
+\[\boxed{ \text{train on one discretization} \rightarrow \text{evaluate on another discretization} }\]<p>这就是所谓：</p>
+\[\boxed{\text{discretization invariance}}\]<p>JMLR 的统一理论论文把它列为 neural operator 的关键设计属性；官方 NeuralOperator 库也直接把“resolution invariant”作为其核心定位。</p>
 <p>不过这里要很谨慎：</p>
 <blockquote>
 <p><strong>“resolution invariant”不等于“任何新网格、新几何、新 PDE 都能零误差泛化”。</strong></p>
@@ -552,54 +472,18 @@ u=
 <h1 id="4-fno-是怎么做到这一点的">4. FNO 是怎么做到这一点的？
 </h1><p>Fourier Neural Operator 是目前最经典的一种 Neural Operator。</p>
 <p>它的一层可以粗略写成：</p>
-<h1 id="v_l1x">[
-v_{l+1}(x)
-</h1><p>\sigma
-\left[
-Wv_l(x)
-+
-\mathcal K_\theta v_l(x)
-\right].
-]</p>
-<p>其中：</p>
-\[
-W
-\]<p>是局部线性变换，</p>
+\[v_{l+1}(x) = \sigma \left[ Wv_l(x) + \mathcal K_\theta v_l(x) \right].\]<p>其中：</p>
+\[W\]<p>是局部线性变换，</p>
 <p>而：</p>
-\[
-\mathcal K_\theta
-\]<p>是一个积分算子：</p>
-<h1 id="mathcal-kvx">[
-(\mathcal Kv)(x)
-</h1><p>\int_D
-\kappa_\theta(x,y)v(y),dy.
-]</p>
-<p>FNO 的关键是：</p>
+\[\mathcal K_\theta\]<p>是一个积分算子：</p>
+\[(\mathcal Kv)(x) = \int_D \kappa_\theta(x,y)v(y)\,dy.\]<p>FNO 的关键是：</p>
 <blockquote>
 <p>不直接在物理空间学习这个巨大 kernel，而是在 Fourier 空间参数化它。</p>
 </blockquote>
 <p>因为卷积满足：</p>
-<h1 id="mathcal-fkv">[
-\mathcal F(K*v)
-</h1><p>\mathcal F(K)\mathcal F(v).
-]</p>
-<p>于是实际计算大致变成：</p>
-\[
-\boxed{
-v
-\xrightarrow{\mathrm{FFT}}
-\hat v
-\xrightarrow{\text{低频模态线性变换}}
-R_\theta\hat v
-\xrightarrow{\mathrm{IFFT}}
-\tilde v
-}
-\]<p>再加局部项和非线性：</p>
-<h1 id="v_l1">[
-v_{l+1}
-</h1><p>\sigma(\tilde v+Wv_l).
-]</p>
-<p>官方 FNO 理论指南也把 Fourier layer 总结为：</p>
+\[\mathcal F(K*v) = \mathcal F(K)\mathcal F(v).\]<p>于是实际计算大致变成：</p>
+\[\boxed{ v \xrightarrow{\mathrm{FFT}} \hat v \xrightarrow{\text{低频模态线性变换}} R_\theta\hat v \xrightarrow{\mathrm{IFFT}} \tilde v }\]<p>再加局部项和非线性：</p>
+\[v_{l+1} = \sigma(\tilde v+Wv_l).\]<p>官方 FNO 理论指南也把 Fourier layer 总结为：</p>
 <ol>
 <li>Fourier transform；</li>
 <li>对保留的低频 Fourier modes 做可学习线性变换；</li>
@@ -610,39 +494,19 @@ v_{l+1}
 </h1><p>这里有两个原因。</p>
 <p>第一，FFT 很便宜。</p>
 <p>若物理空间做全局积分：</p>
-<h1 id="mathcal-kvx-1">[
-(\mathcal Kv)(x)
-</h1><p>\int\kappa(x,y)v(y)dy,
-]</p>
-<p>离散后朴素成本可能接近：</p>
-\[
-O(N^2).
-\]<p>FFT 卷积可以做到大致：</p>
-\[
-O(N\log N).
-\]<p>第二，很多 PDE 的大尺度结构主要集中在低频模态。</p>
+\[(\mathcal Kv)(x) = \int\kappa(x,y)v(y)dy,\]<p>离散后朴素成本可能接近：</p>
+\[O(N^2).\]<p>FFT 卷积可以做到大致：</p>
+\[O(N\log N).\]<p>第二，很多 PDE 的大尺度结构主要集中在低频模态。</p>
 <p>因此 FNO 通常只保留：</p>
-\[
-k\le k_{\max}
-\]<p>的部分 Fourier modes。</p>
+\[k\le k_{\max}\]<p>的部分 Fourier modes。</p>
 <p>高频直接截断。</p>
 <p>这既降低成本，也相当于一种：</p>
-\[
-\boxed{\text{learned spectral model reduction}}
-\]<p>所以 FNO 可以粗略理解成：</p>
-\[
-\boxed{
-\text{谱方法的表示能力}
-+
-\text{神经网络学习未知算子}
-}
-\]<p>这也是它和传统 CNN 最大的不同之一：CNN 每层通常主要做局部邻域传播，而 FNO 的 Fourier convolution 一层就可以产生全局耦合。</p>
+\[\boxed{\text{learned spectral model reduction}}\]<p>所以 FNO 可以粗略理解成：</p>
+\[\boxed{ \text{谱方法的表示能力} + \text{神经网络学习未知算子} }\]<p>这也是它和传统 CNN 最大的不同之一：CNN 每层通常主要做局部邻域传播，而 FNO 的 Fourier convolution 一层就可以产生全局耦合。</p>
 <hr>
 <h1 id="6-一个直观例子随机材料场到位移场">6. 一个直观例子：随机材料场到位移场
 </h1><p>假设二维弹性体的 Young 模量不是一个标量，而是：</p>
-\[
-E(x,y).
-\]<p>你可能有局部软区：</p>
+\[E(x,y).\]<p>你可能有局部软区：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -658,23 +522,11 @@ E(x,y).
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>给定载荷以后，希望得到：</p>
-\[
-u_x(x,y),\quad u_y(x,y).
-\]<p>传统 Kriging 如果把每个网格点：</p>
-\[
-E_1,\dots,E_{10000}
-\]<p>全当输入，把：</p>
-\[
-u_1,\dots,u_{20000}
-\]<p>全当输出，会变成一个极高维回归。</p>
+\[u_x(x,y),\quad u_y(x,y).\]<p>传统 Kriging 如果把每个网格点：</p>
+\[E_1,\dots,E_{10000}\]<p>全当输入，把：</p>
+\[u_1,\dots,u_{20000}\]<p>全当输出，会变成一个极高维回归。</p>
 <p>Neural Operator 的问题定义则更自然：</p>
-\[
-\boxed{
-E(x,y)
-\mapsto
-u(x,y)
-}
-\]<p>于是模型真正学习的是：</p>
+\[\boxed{ E(x,y) \mapsto u(x,y) }\]<p>于是模型真正学习的是：</p>
 <blockquote>
 <p>“不同空间分布的材料场，会怎样改变整个结构响应场？”</p>
 </blockquote>
@@ -689,91 +541,31 @@ u(x,y)
 <hr>
 <h1 id="7-这与-pod--reduced-basis-的差别很值得分清">7. 这与 POD / Reduced Basis 的差别很值得分清
 </h1><p>前几期讲过 Reduced Basis：</p>
-\[
-u(x;\mu)
-\approx
-\sum_{i=1}^r a_i(\mu)\phi_i(x).
-\]<p>它先构造：</p>
-\[
-\{\phi_i\}
-\]<p>这样的低维物理解空间。</p>
+\[u(x;\mu) \approx \sum_{i=1}^r a_i(\mu)\phi_i(x).\]<p>它先构造：</p>
+\[\{\phi_i\}\]<p>这样的低维物理解空间。</p>
 <p>然后只学习：</p>
-\[
-\mu\mapsto a_i.
-\]<p>所以 RB 的思路是：</p>
-\[
-\boxed{
-\text{找到低维物理子空间}
-+
-\text{在里面求解}
-}
-\]<p>Neural Operator 则更倾向：</p>
-\[
-\boxed{
-\text{直接学习完整 solution operator}
-}
-\]<p>优势是灵活、表达力强。</p>
+\[\mu\mapsto a_i.\]<p>所以 RB 的思路是：</p>
+\[\boxed{ \text{找到低维物理子空间} + \text{在里面求解} }\]<p>Neural Operator 则更倾向：</p>
+\[\boxed{ \text{直接学习完整 solution operator} }\]<p>优势是灵活、表达力强。</p>
 <p>代价是：</p>
-\[
-\boxed{
-\text{通常缺少传统 ROM 那样直接的误差认证和物理保证}
-}
-\]<p>因此两者在知识体系里并不是竞争关系。</p>
+\[\boxed{ \text{通常缺少传统 ROM 那样直接的误差认证和物理保证} }\]<p>因此两者在知识体系里并不是竞争关系。</p>
 <p>更适合这样理解：</p>
-\[
-\text{RB/POD}
-\quad\longleftrightarrow\quad
-\text{physics-driven model reduction}
-\]\[
-\text{Neural Operator}
-\quad\longleftrightarrow\quad
-\text{data-driven operator approximation}.
-\]<hr>
+\[\text{RB/POD} \quad\longleftrightarrow\quad \text{physics-driven model reduction}\]\[\text{Neural Operator} \quad\longleftrightarrow\quad \text{data-driven operator approximation}.\]<hr>
 <h1 id="8-它学的是求解器这句话要怎么准确理解">8. “它学的是求解器”这句话要怎么准确理解？
 </h1><p>假设 PDE 由参数：</p>
-\[
-a(x)
-\]<p>决定。</p>
+\[a(x)\]<p>决定。</p>
 <p>传统数值求解器每来一个新输入：</p>
-\[
-a^{(i)}
-\]<p>都执行：</p>
-\[
-\boxed{
-\text{assemble}
-\rightarrow
-\text{solve}
-}
-\]<p>Neural Operator 在训练阶段见过大量：</p>
-\[
-a^{(i)}\rightarrow u^{(i)}.
-\]<p>训练完成后，新输入直接：</p>
-\[
-a^{(*)}
-\xrightarrow{\mathcal G_\theta}
-u^{(*)}.
-\]<p>所以：</p>
-\[
-\boxed{
-\text{昂贵 PDE solve}
-}
-\]<p>变成：</p>
-\[
-\boxed{
-\text{一次神经网络 forward}
-}
-\]<p>原始 FNO 论文在 Burgers、Darcy 和 Navier–Stokes 等 PDE 上展示了这种能力，并报告在其测试设置中相较传统数值求解可达到最高约三个数量级的推理加速。</p>
+\[a^{(i)}\]<p>都执行：</p>
+\[\boxed{ \text{assemble} \rightarrow \text{solve} }\]<p>Neural Operator 在训练阶段见过大量：</p>
+\[a^{(i)}\rightarrow u^{(i)}.\]<p>训练完成后，新输入直接：</p>
+\[a^{(*)} \xrightarrow{\mathcal G_\theta} u^{(*)}.\]<p>所以：</p>
+\[\boxed{ \text{昂贵 PDE solve} }\]<p>变成：</p>
+\[\boxed{ \text{一次神经网络 forward} }\]<p>原始 FNO 论文在 Burgers、Darcy 和 Navier–Stokes 等 PDE 上展示了这种能力，并报告在其测试设置中相较传统数值求解可达到最高约三个数量级的推理加速。</p>
 <p>但这里特别要强调：</p>
-\[
-\boxed{\text{训练成本没有消失}}
-\]<p>你仍然要先获得高质量：</p>
-\[
-(a_i,u_i)
-\]<p>训练数据。</p>
+\[\boxed{\text{训练成本没有消失}}\]<p>你仍然要先获得高质量：</p>
+\[(a_i,u_i)\]<p>训练数据。</p>
 <p>所以它真正适合的是：</p>
-\[
-\boxed{\text{many-query setting}}
-\]<p>例如：</p>
+\[\boxed{\text{many-query setting}}\]<p>例如：</p>
 <ul>
 <li>Monte Carlo；</li>
 <li>参数优化；</li>
@@ -785,30 +577,19 @@ u^{(*)}.
 <hr>
 <h1 id="9-为什么零样本超分辨率很吸引人">9. 为什么“零样本超分辨率”很吸引人？
 </h1><p>FNO 原始工作一个很著名的结果是：</p>
-\[
-\boxed{\text{zero-shot super-resolution}}
-\]<p>例如较低分辨率训练：</p>
-\[
-64\times64
-\]<p>然后更高分辨率评价。</p>
+\[\boxed{\text{zero-shot super-resolution}}\]<p>例如较低分辨率训练：</p>
+\[64\times64\]<p>然后更高分辨率评价。</p>
 <p>为什么理论上可以这么做？</p>
 <p>因为学习参数主要作用于：</p>
-\[
-\boxed{\text{Fourier modes}}
-\]<p>而不是固定的：</p>
-\[
-64\times64
-\]<p>神经元连接。</p>
+\[\boxed{\text{Fourier modes}}\]<p>而不是固定的：</p>
+\[64\times64\]<p>神经元连接。</p>
 <p>换句话说，模型学习的是近似连续频谱算子。</p>
 <p>换一个采样密度，只是在更细的 grid 上评价同一个 learned operator。</p>
 <p>这正是 neural operator 与普通固定尺寸 CNN 的重要结构差异。</p>
 <hr>
 <h1 id="10-但这件事有一个很重要的限制高频细节可能正是-fno-的弱点">10. 但这件事有一个很重要的限制：高频细节可能正是 FNO 的弱点
 </h1><p>FNO 最常见的实现会截断高 Fourier modes：</p>
-\[
-\hat v_k=0,
-\qquad |k|>k_{\max}.
-\]<p>这本来是效率来源。</p>
+\[\hat v_k=0, \qquad |k|>k_{\max}.\]<p>这本来是效率来源。</p>
 <p>但如果问题真正重要的信息恰好来自：</p>
 <ul>
 <li>冲击波；</li>
@@ -818,57 +599,27 @@ u^{(*)}.
 <li>高梯度应力集中；</li>
 </ul>
 <p>那么：</p>
-\[
-\boxed{\text{低频全局表示可能过度平滑}}
-\]<p>这不是一个次要实现细节，而是 FNO 架构本身的 inductive bias。</p>
+\[\boxed{\text{低频全局表示可能过度平滑}}\]<p>这不是一个次要实现细节，而是 FNO 架构本身的 inductive bias。</p>
 <p>2024 年 ICML 的 Local Neural Operator 工作就直接指出：FNO 的 global operations 容易 over-smoothing，可能无法捕捉局部细节；引入局部积分核和微分算子后，其测试中相对 \(L^2\) 误差进一步降低了 34–72%。</p>
 <p>这说明 Neural Operator 当前一个很重要的发展方向是：</p>
-\[
-\boxed{
-\text{global operator}
-+
-\text{local differential structure}
-}
-\]<hr>
+\[\boxed{ \text{global operator} + \text{local differential structure} }\]<hr>
 <h1 id="11-这对有限元问题尤其重要">11. 这对有限元问题尤其重要
 </h1><p>在很多结构问题中：</p>
-\[
-\text{global displacement}
-\]<p>其实很好预测。</p>
+\[\text{global displacement}\]<p>其实很好预测。</p>
 <p>难的是：</p>
-\[
-\boxed{
-\text{local stress concentration}
-}
-\]<p>例如孔边：</p>
-\[
-\sigma_{\max}
-\]<p>可能来自非常小的局部区域。</p>
+\[\boxed{ \text{local stress concentration} }\]<p>例如孔边：</p>
+\[\sigma_{\max}\]<p>可能来自非常小的局部区域。</p>
 <p>那么一个场模型即使：</p>
-\[
-\|u-\hat u\|_{L^2}
-\]<p>很小，</p>
+\[\|u-\hat u\|_{L^2}\]<p>很小，</p>
 <p>也不代表：</p>
-\[
-\max_x\sigma(x)
-\]<p>准确。</p>
+\[\max_x\sigma(x)\]<p>准确。</p>
 <p>因为：</p>
-\[
-\sigma=C:\nabla u
-\]<p>对梯度误差更敏感。</p>
+\[\sigma=C:\nabla u\]<p>对梯度误差更敏感。</p>
 <p>所以如果把 Neural Operator 用于可靠性分析，不能只看：</p>
-\[
-\boxed{\text{field }L^2\text{ error}}
-\]<p>还应该检查：</p>
-\[
-\|\nabla u-\nabla\hat u\|,
-\]<p>极值误差：</p>
-\[
-|\sigma_{\max}-\hat\sigma_{\max}|,
-\]<p>以及失效边界：</p>
-\[
-g(X)=0
-\]<p>附近的分类错误。</p>
+\[\boxed{\text{field }L^2\text{ error}}\]<p>还应该检查：</p>
+\[\|\nabla u-\nabla\hat u\|,\]<p>极值误差：</p>
+\[|\sigma_{\max}-\hat\sigma_{\max}|,\]<p>以及失效边界：</p>
+\[g(X)=0\]<p>附近的分类错误。</p>
 <p>这和前面 AK-MCS 的思想再次接上了：</p>
 <blockquote>
 <p><strong>最终任务需要什么信息，代理模型就应该围绕什么误差训练和评价。</strong></p>
@@ -876,85 +627,33 @@ g(X)=0
 <hr>
 <h1 id="12-它对可靠性研究的真正价值在哪里">12. 它对可靠性研究的真正价值在哪里？
 </h1><p>假设随机输入不再是：</p>
-\[
-X=(x_1,x_2,x_3),
-\]<p>而是随机场：</p>
-\[
-E(x,\omega),
-\]\[
-p(x,\omega),
-\]\[
-T(x,\omega).
-\]<p>传统 Kriging 很容易遭遇：</p>
-\[
-\boxed{\text{输入维数爆炸}}
-\]<p>因为随机场离散后：</p>
-\[
-10000
-\]<p>个网格点就是：</p>
-\[
-10000
-\]<p>维输入。</p>
+\[X=(x_1,x_2,x_3),\]<p>而是随机场：</p>
+\[E(x,\omega),\]\[p(x,\omega),\]\[T(x,\omega).\]<p>传统 Kriging 很容易遭遇：</p>
+\[\boxed{\text{输入维数爆炸}}\]<p>因为随机场离散后：</p>
+\[10000\]<p>个网格点就是：</p>
+\[10000\]<p>维输入。</p>
 <p>通常要先做：</p>
-\[
-\text{Karhunen–Loève expansion}
-\]<p>降成几十个随机变量。</p>
+\[\text{Karhunen–Loève expansion}\]<p>降成几十个随机变量。</p>
 <p>Neural Operator 则允许更直接地接受：</p>
-\[
-\boxed{\text{field input}}
-\]<p>因此特别适合：</p>
-\[
-\text{random field}
-\rightarrow
-\text{response field}.
-\]<p>再从：</p>
-\[
-u(x)
-\]<p>提取：</p>
-\[
-g(u)
-\]<p>做可靠性计算。</p>
+\[\boxed{\text{field input}}\]<p>因此特别适合：</p>
+\[\text{random field} \rightarrow \text{response field}.\]<p>再从：</p>
+\[u(x)\]<p>提取：</p>
+\[g(u)\]<p>做可靠性计算。</p>
 <p>所以它在可靠性里的潜力不只是“替代 Kriging”。</p>
 <p>它更可能改变：</p>
-\[
-\boxed{\text{高维随机场可靠性}}
-\]<p>这一类问题的建模方式。</p>
+\[\boxed{\text{高维随机场可靠性}}\]<p>这一类问题的建模方式。</p>
 <hr>
 <h1 id="13-对软体动力学也有一个很强的迁移">13. 对软体动力学也有一个很强的迁移
 </h1><p>考虑：</p>
-\[
-u(x,t)
-\]<p>或者：</p>
-\[
-x(X,t).
-\]<p>理论上可以训练 operator：</p>
-\[
-\boxed{
-(x_t,v_t,\text{material},f_{\rm ext})
-\mapsto
-(x_{t+\Delta t},v_{t+\Delta t})
-}
-\]<p>这已经很接近：</p>
-\[
-\boxed{\text{learned timestepper}}
-\]<p>甚至可以直接学习：</p>
-\[
-\text{initial state}
-\mapsto
-\text{whole trajectory}.
-\]<p>但对于物理引擎，有一个巨大问题：</p>
-\[
-\boxed{\text{rollout stability}}
-\]<p>即单步：</p>
-\[
-1\%\text{ error}
-\]<p>连续滚动：</p>
-\[
-1000
-\]<p>步后不一定还是：</p>
-\[
-1\%.
-\]<p>可能逐步偏离物理流形。</p>
+\[u(x,t)\]<p>或者：</p>
+\[x(X,t).\]<p>理论上可以训练 operator：</p>
+\[\boxed{ (x_t,v_t,\text{material},f_{\rm ext}) \mapsto (x_{t+\Delta t},v_{t+\Delta t}) }\]<p>这已经很接近：</p>
+\[\boxed{\text{learned timestepper}}\]<p>甚至可以直接学习：</p>
+\[\text{initial state} \mapsto \text{whole trajectory}.\]<p>但对于物理引擎，有一个巨大问题：</p>
+\[\boxed{\text{rollout stability}}\]<p>即单步：</p>
+\[1\%\text{ error}\]<p>连续滚动：</p>
+\[1000\]<p>步后不一定还是：</p>
+\[1\%.\]<p>可能逐步偏离物理流形。</p>
 <p>尤其涉及：</p>
 <ul>
 <li>contact；</li>
@@ -965,30 +664,16 @@ x(X,t).
 </ul>
 <p>这类硬结构时，纯数据驱动 operator 可能给出视觉上合理、物理上非法的状态。</p>
 <p>所以在实时物理里，更有吸引力的方向往往是：</p>
-\[
-\boxed{
-\text{learned operator}
-+
-\text{physics constraints / correction / projection}
-}
-\]<p>而不是彻底删除 solver。</p>
+\[\boxed{ \text{learned operator} + \text{physics constraints / correction / projection} }\]<p>而不是彻底删除 solver。</p>
 <hr>
 <h1 id="14-一个非常值得实践的最小实验">14. 一个非常值得实践的最小实验
 </h1><p>如果想真正理解 Neural Operator，我建议不要一开始做 Navier–Stokes。</p>
 <p>可以做一个非常简单的 2D Poisson/Darcy 问题：</p>
-\[
--\nabla\cdot(a(x)\nabla u)=f.
-\]<p>生成：</p>
-\[
-N=1000
-\]<p>个随机：</p>
-\[
-a(x,y)
-\]<p>场。</p>
+\[-\nabla\cdot(a(x)\nabla u)=f.\]<p>生成：</p>
+\[N=1000\]<p>个随机：</p>
+\[a(x,y)\]<p>场。</p>
 <p>FEM/FDM 求：</p>
-\[
-u(x,y).
-\]<p>然后训练 FNO：</p>
+\[u(x,y).\]<p>然后训练 FNO：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -1024,43 +709,19 @@ u(x,y).
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>最值得做的实验不是单纯看训练误差，而是：</p>
-\[
-\boxed{\text{64×64 训练}}
-\]<p>然后：</p>
-\[
-\boxed{\text{128×128 测试}}
-\]<p>再检查：</p>
-\[
-L^2\text{ error},
-\]\[
-H^1\text{ error},
-\]<p>以及 PDE residual：</p>
-\[
-\|-\nabla\cdot(a\nabla\hat u)-f\|.
-\]<p>这样你会直接看见：</p>
-\[
-\boxed{
-\text{“预测一个数组”}
-\]<p>和：</p>
-\[
-\boxed{
-\text{“学习一个离散无关算子”}
-}
-\]<p>之间到底差在哪里。</p>
+\[\boxed{\text{64×64 训练}}\]<p>然后：</p>
+\[\boxed{\text{128×128 测试}}\]<p>再检查：</p>
+\[L^2\text{ error},\]\[H^1\text{ error},\]<p>以及 PDE residual：</p>
+\[\|-\nabla\cdot(a\nabla\hat u)-f\|.\]<p>这样你会直接看见：</p>
+\[\boxed{ \text{“预测一个数组”}\]<p>和：</p>
+\[\boxed{ \text{“学习一个离散无关算子”} }\]<p>之间到底差在哪里。</p>
 <p>官方 <code>neuraloperator</code> 项目已经提供 FNO、TFNO、训练流程和理论指南，适合作为直接实现入口。</p>
 <hr>
 <h1 id="15-最值得警惕的一点neural-operator-仍然没有真正理解-pde">15. 最值得警惕的一点：Neural Operator 仍然没有真正“理解 PDE”
 </h1><p>这是科学机器学习里非常容易夸大的地方。</p>
 <p>如果训练数据全部来自某个：</p>
-\[
-\mathcal P_{\rm train},
-\]<p>那么网络实际学到的是：</p>
-\[
-\boxed{
-\mathcal G
-\text{ 在训练分布附近的近似}
-}
-\]<p>它并不自动拥有：</p>
+\[\mathcal P_{\rm train},\]<p>那么网络实际学到的是：</p>
+\[\boxed{ \mathcal G \text{ 在训练分布附近的近似} }\]<p>它并不自动拥有：</p>
 <ul>
 <li>守恒律；</li>
 <li>最大值原理；</li>
@@ -1070,23 +731,11 @@ H^1\text{ error},
 <li>OOD 保证。</li>
 </ul>
 <p>因此：</p>
-\[
-\boxed{
-\text{operator learning}
-\neq
-\text{numerical analysis guarantee}
-}
-\]<p>这一点对工程应用特别重要。</p>
+\[\boxed{ \text{operator learning} \neq \text{numerical analysis guarantee} }\]<p>这一点对工程应用特别重要。</p>
 <p>它非常适合作为：</p>
-\[
-\boxed{\text{快速 many-query surrogate}}
-\]<p>但如果任务要求：</p>
-\[
-10^{-6}\text{ 失效概率}
-\]<p>或者：</p>
-\[
-\text{严格无穿透}
-\]<p>那么仍然需要：</p>
+\[\boxed{\text{快速 many-query surrogate}}\]<p>但如果任务要求：</p>
+\[10^{-6}\text{ 失效概率}\]<p>或者：</p>
+\[\text{严格无穿透}\]<p>那么仍然需要：</p>
 <ul>
 <li>certification；</li>
 <li>residual checking；</li>
@@ -1098,27 +747,9 @@ H^1\text{ error},
 <hr>
 <h2 id="今天值得留下的一句话">今天值得留下的一句话
 </h2><p>Neural Operator 最深刻的地方，可以浓缩成：</p>
-\[
-\boxed{
-\text{它试图代理的不是一个响应面，而是一整个“输入场到解场”的求解过程。}
-}
-\]<p>所以它在知识体系中的位置大约是：</p>
-\[
-\text{Kriging / MLP surrogate}
-\]\[
-\downarrow
-\]\[
-\boxed{\text{Neural Operator}}
-\]\[
-\downarrow
-\]\[
-\text{learned PDE solver / scientific foundation model}.
-\]<p>它真正值得学的原因并不是“FNO 很流行”，而是它迫使我们重新思考一个问题：</p>
-\[
-\boxed{
-\text{代理模型究竟应该学习最终输出，还是学习产生这些输出的算子？}
-}
-\]<p>对于随机场可靠性、多工况有限元、数字孪生和 AI 驱动求解器，这个区别会越来越重要。</p>
+\[\boxed{ \text{它试图代理的不是一个响应面，而是一整个“输入场到解场”的求解过程。} }\]<p>所以它在知识体系中的位置大约是：</p>
+\[\text{Kriging / MLP surrogate}\]\[\downarrow\]\[\boxed{\text{Neural Operator}}\]\[\downarrow\]\[\text{learned PDE solver / scientific foundation model}.\]<p>它真正值得学的原因并不是“FNO 很流行”，而是它迫使我们重新思考一个问题：</p>
+\[\boxed{ \text{代理模型究竟应该学习最终输出，还是学习产生这些输出的算子？} }\]<p>对于随机场可靠性、多工况有限元、数字孪生和 AI 驱动求解器，这个区别会越来越重要。</p>
 <h3 id="拓展阅读">拓展阅读
 </h3><ol>
 <li>

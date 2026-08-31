@@ -18,122 +18,50 @@
 &lt;strong&gt;领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：&lt;/p&gt;
-\[
-\boxed{
-\text{普通代理：学习 }x\mapsto y
-}
-\]&lt;p&gt;而 Neural Operator 试图学习：&lt;/p&gt;
-\[
-\boxed{
-\mathcal G:\text{输入函数}\mapsto\text{输出函数}
-}
-\]&lt;p&gt;这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：&lt;strong&gt;模型参数可以独立于具体离散分辨率&lt;/strong&gt;。&lt;/p&gt;
+\[\boxed{ \text{普通代理：学习 }x\mapsto y }\]&lt;p&gt;而 Neural Operator 试图学习：&lt;/p&gt;
+\[\boxed{ \mathcal G:\text{输入函数}\mapsto\text{输出函数} }\]&lt;p&gt;这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：&lt;strong&gt;模型参数可以独立于具体离散分辨率&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-普通代理模型到底在学什么&#34;&gt;1. 普通代理模型到底在学什么？
 &lt;/h2&gt;&lt;p&gt;假设有限元模型输入：&lt;/p&gt;
-\[
-x=
-(E,\nu,F,\text{gap})
-\]&lt;p&gt;输出：&lt;/p&gt;
-\[
-y=
-\sigma_{\max}.
-\]&lt;p&gt;Kriging、MLP、XGBoost 都可以学习：&lt;/p&gt;
-\[
-f:\mathbb R^4\rightarrow\mathbb R.
-\]&lt;p&gt;这个问题本质上是：&lt;/p&gt;
-\[
-\boxed{\text{有限维向量}\rightarrow\text{有限维向量}}
-\]&lt;p&gt;即使输出不是一个标量，而是：&lt;/p&gt;
-\[
-1000
-\]&lt;p&gt;个节点位移：&lt;/p&gt;
-\[
-u\in\mathbb R^{3000},
-\]&lt;p&gt;你仍然是在学习：&lt;/p&gt;
-\[
-\mathbb R^4\rightarrow\mathbb R^{3000}.
-\]&lt;p&gt;问题是，这个：&lt;/p&gt;
-\[
-3000
-\]&lt;p&gt;其实来自某一次具体网格离散。&lt;/p&gt;
+\[x= (E,\nu,F,\text{gap})\]&lt;p&gt;输出：&lt;/p&gt;
+\[y= \sigma_{\max}.\]&lt;p&gt;Kriging、MLP、XGBoost 都可以学习：&lt;/p&gt;
+\[f:\mathbb R^4\rightarrow\mathbb R.\]&lt;p&gt;这个问题本质上是：&lt;/p&gt;
+\[\boxed{\text{有限维向量}\rightarrow\text{有限维向量}}\]&lt;p&gt;即使输出不是一个标量，而是：&lt;/p&gt;
+\[1000\]&lt;p&gt;个节点位移：&lt;/p&gt;
+\[u\in\mathbb R^{3000},\]&lt;p&gt;你仍然是在学习：&lt;/p&gt;
+\[\mathbb R^4\rightarrow\mathbb R^{3000}.\]&lt;p&gt;问题是，这个：&lt;/p&gt;
+\[3000\]&lt;p&gt;其实来自某一次具体网格离散。&lt;/p&gt;
 &lt;p&gt;一旦：&lt;/p&gt;
-\[
-3000\rightarrow12000
-\]&lt;p&gt;节点数变了，普通网络的输出维度通常也跟着失效。&lt;/p&gt;
+\[3000\rightarrow12000\]&lt;p&gt;节点数变了，普通网络的输出维度通常也跟着失效。&lt;/p&gt;
 &lt;p&gt;这说明它真正学习的是：&lt;/p&gt;
-\[
-\boxed{\text{某个离散问题}}
-\]&lt;p&gt;而不是：&lt;/p&gt;
-\[
-\boxed{\text{连续物理问题本身}}
-\]&lt;p&gt;Neural Operator 正是在这一点上换了问题定义。&lt;/p&gt;
+\[\boxed{\text{某个离散问题}}\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\boxed{\text{连续物理问题本身}}\]&lt;p&gt;Neural Operator 正是在这一点上换了问题定义。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-pde-本来就是函数到函数的映射&#34;&gt;2. PDE 本来就是“函数到函数”的映射
 &lt;/h1&gt;&lt;p&gt;考虑 Darcy 方程：&lt;/p&gt;
-\[
--\nabla\cdot(a(x)\nabla u(x))=f(x).
-\]&lt;p&gt;输入并不只是几个数字。&lt;/p&gt;
+\[-\nabla\cdot(a(x)\nabla u(x))=f(x).\]&lt;p&gt;输入并不只是几个数字。&lt;/p&gt;
 &lt;p&gt;材料系数：&lt;/p&gt;
-\[
-a(x)
-\]&lt;p&gt;本身就是一个空间函数。&lt;/p&gt;
+\[a(x)\]&lt;p&gt;本身就是一个空间函数。&lt;/p&gt;
 &lt;p&gt;输出：&lt;/p&gt;
-\[
-u(x)
-\]&lt;p&gt;也是函数。&lt;/p&gt;
+\[u(x)\]&lt;p&gt;也是函数。&lt;/p&gt;
 &lt;p&gt;因此真正的物理关系其实是：&lt;/p&gt;
-\[
-\boxed{
-\mathcal G:
-a(x)\mapsto u(x)
-}
-\]&lt;p&gt;这里：&lt;/p&gt;
-\[
-\mathcal G
-\]&lt;p&gt;就是 PDE 的 &lt;strong&gt;solution operator&lt;/strong&gt;。&lt;/p&gt;
+\[\boxed{ \mathcal G: a(x)\mapsto u(x) }\]&lt;p&gt;这里：&lt;/p&gt;
+\[\mathcal G\]&lt;p&gt;就是 PDE 的 &lt;strong&gt;solution operator&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;传统 FEM 做的事情是：&lt;/p&gt;
-\[
-a(x)
-\]&lt;p&gt;先离散成：&lt;/p&gt;
-\[
-a_h\in\mathbb R^N,
-\]&lt;p&gt;然后求：&lt;/p&gt;
-\[
-u_h\in\mathbb R^N.
-\]&lt;p&gt;而 Neural Operator 的目标是在概念上直接逼近：&lt;/p&gt;
-\[
-\boxed{
-\mathcal G:a\mapsto u
-}
-\]&lt;p&gt;而不是固定某个：&lt;/p&gt;
-\[
-N.
-\]&lt;p&gt;所以 Neural Operator 的真正跃迁在于：&lt;/p&gt;
-\[
-\boxed{
-\text{learning functions}
-\rightarrow
-\text{learning operators}
-}
-\]&lt;p&gt;DeepONet 和 Neural Operator/FNO 都建立在这一思想上。DeepONet 2021 直接从 operator universal approximation theorem 出发构造 branch/trunk 网络；Kovachki 等则给出了更统一的 neural operator 框架。&lt;/p&gt;
+\[a(x)\]&lt;p&gt;先离散成：&lt;/p&gt;
+\[a_h\in\mathbb R^N,\]&lt;p&gt;然后求：&lt;/p&gt;
+\[u_h\in\mathbb R^N.\]&lt;p&gt;而 Neural Operator 的目标是在概念上直接逼近：&lt;/p&gt;
+\[\boxed{ \mathcal G:a\mapsto u }\]&lt;p&gt;而不是固定某个：&lt;/p&gt;
+\[N.\]&lt;p&gt;所以 Neural Operator 的真正跃迁在于：&lt;/p&gt;
+\[\boxed{ \text{learning functions} \rightarrow \text{learning operators} }\]&lt;p&gt;DeepONet 和 Neural Operator/FNO 都建立在这一思想上。DeepONet 2021 直接从 operator universal approximation theorem 出发构造 branch/trunk 网络；Kovachki 等则给出了更统一的 neural operator 框架。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-为什么这对-fem-surrogate-很关键&#34;&gt;3. 为什么这对 FEM surrogate 很关键？
 &lt;/h1&gt;&lt;p&gt;假设你想代理：&lt;/p&gt;
-\[
-E(x)\rightarrow u(x).
-\]&lt;p&gt;传统做法可能把有限元场展平：&lt;/p&gt;
-\[
-u=
-[u_1,u_2,\dots,u_N]
-\]&lt;p&gt;然后训练网络。&lt;/p&gt;
+\[E(x)\rightarrow u(x).\]&lt;p&gt;传统做法可能把有限元场展平：&lt;/p&gt;
+\[u= [u_1,u_2,\dots,u_N]\]&lt;p&gt;然后训练网络。&lt;/p&gt;
 &lt;p&gt;这种方式的麻烦是：&lt;/p&gt;
-\[
-\boxed{
-\text{mesh topology / node count 被硬编码进模型}
-}
-\]&lt;p&gt;而工程模型很容易发生：&lt;/p&gt;
+\[\boxed{ \text{mesh topology / node count 被硬编码进模型} }\]&lt;p&gt;而工程模型很容易发生：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;网格细化；&lt;/li&gt;
 &lt;li&gt;采样分辨率变化；&lt;/li&gt;
@@ -142,16 +70,8 @@ u=
 &lt;li&gt;不同离散尺度。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;Neural Operator 更希望满足：&lt;/p&gt;
-\[
-\boxed{
-\text{train on one discretization}
-\rightarrow
-\text{evaluate on another discretization}
-}
-\]&lt;p&gt;这就是所谓：&lt;/p&gt;
-\[
-\boxed{\text{discretization invariance}}
-\]&lt;p&gt;JMLR 的统一理论论文把它列为 neural operator 的关键设计属性；官方 NeuralOperator 库也直接把“resolution invariant”作为其核心定位。&lt;/p&gt;
+\[\boxed{ \text{train on one discretization} \rightarrow \text{evaluate on another discretization} }\]&lt;p&gt;这就是所谓：&lt;/p&gt;
+\[\boxed{\text{discretization invariance}}\]&lt;p&gt;JMLR 的统一理论论文把它列为 neural operator 的关键设计属性；官方 NeuralOperator 库也直接把“resolution invariant”作为其核心定位。&lt;/p&gt;
 &lt;p&gt;不过这里要很谨慎：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;“resolution invariant”不等于“任何新网格、新几何、新 PDE 都能零误差泛化”。&lt;/strong&gt;&lt;/p&gt;
@@ -161,54 +81,18 @@ u=
 &lt;h1 id=&#34;4-fno-是怎么做到这一点的&#34;&gt;4. FNO 是怎么做到这一点的？
 &lt;/h1&gt;&lt;p&gt;Fourier Neural Operator 是目前最经典的一种 Neural Operator。&lt;/p&gt;
 &lt;p&gt;它的一层可以粗略写成：&lt;/p&gt;
-&lt;h1 id=&#34;v_l1x&#34;&gt;[
-v_{l+1}(x)
-&lt;/h1&gt;&lt;p&gt;\sigma
-\left[
-Wv_l(x)
-+
-\mathcal K_\theta v_l(x)
-\right].
-]&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
-\[
-W
-\]&lt;p&gt;是局部线性变换，&lt;/p&gt;
+\[v_{l+1}(x) = \sigma \left[ Wv_l(x) + \mathcal K_\theta v_l(x) \right].\]&lt;p&gt;其中：&lt;/p&gt;
+\[W\]&lt;p&gt;是局部线性变换，&lt;/p&gt;
 &lt;p&gt;而：&lt;/p&gt;
-\[
-\mathcal K_\theta
-\]&lt;p&gt;是一个积分算子：&lt;/p&gt;
-&lt;h1 id=&#34;mathcal-kvx&#34;&gt;[
-(\mathcal Kv)(x)
-&lt;/h1&gt;&lt;p&gt;\int_D
-\kappa_\theta(x,y)v(y),dy.
-]&lt;/p&gt;
-&lt;p&gt;FNO 的关键是：&lt;/p&gt;
+\[\mathcal K_\theta\]&lt;p&gt;是一个积分算子：&lt;/p&gt;
+\[(\mathcal Kv)(x) = \int_D \kappa_\theta(x,y)v(y)\,dy.\]&lt;p&gt;FNO 的关键是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;不直接在物理空间学习这个巨大 kernel，而是在 Fourier 空间参数化它。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;因为卷积满足：&lt;/p&gt;
-&lt;h1 id=&#34;mathcal-fkv&#34;&gt;[
-\mathcal F(K*v)
-&lt;/h1&gt;&lt;p&gt;\mathcal F(K)\mathcal F(v).
-]&lt;/p&gt;
-&lt;p&gt;于是实际计算大致变成：&lt;/p&gt;
-\[
-\boxed{
-v
-\xrightarrow{\mathrm{FFT}}
-\hat v
-\xrightarrow{\text{低频模态线性变换}}
-R_\theta\hat v
-\xrightarrow{\mathrm{IFFT}}
-\tilde v
-}
-\]&lt;p&gt;再加局部项和非线性：&lt;/p&gt;
-&lt;h1 id=&#34;v_l1&#34;&gt;[
-v_{l+1}
-&lt;/h1&gt;&lt;p&gt;\sigma(\tilde v+Wv_l).
-]&lt;/p&gt;
-&lt;p&gt;官方 FNO 理论指南也把 Fourier layer 总结为：&lt;/p&gt;
+\[\mathcal F(K*v) = \mathcal F(K)\mathcal F(v).\]&lt;p&gt;于是实际计算大致变成：&lt;/p&gt;
+\[\boxed{ v \xrightarrow{\mathrm{FFT}} \hat v \xrightarrow{\text{低频模态线性变换}} R_\theta\hat v \xrightarrow{\mathrm{IFFT}} \tilde v }\]&lt;p&gt;再加局部项和非线性：&lt;/p&gt;
+\[v_{l+1} = \sigma(\tilde v+Wv_l).\]&lt;p&gt;官方 FNO 理论指南也把 Fourier layer 总结为：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;Fourier transform；&lt;/li&gt;
 &lt;li&gt;对保留的低频 Fourier modes 做可学习线性变换；&lt;/li&gt;
@@ -219,39 +103,19 @@ v_{l+1}
 &lt;/h1&gt;&lt;p&gt;这里有两个原因。&lt;/p&gt;
 &lt;p&gt;第一，FFT 很便宜。&lt;/p&gt;
 &lt;p&gt;若物理空间做全局积分：&lt;/p&gt;
-&lt;h1 id=&#34;mathcal-kvx-1&#34;&gt;[
-(\mathcal Kv)(x)
-&lt;/h1&gt;&lt;p&gt;\int\kappa(x,y)v(y)dy,
-]&lt;/p&gt;
-&lt;p&gt;离散后朴素成本可能接近：&lt;/p&gt;
-\[
-O(N^2).
-\]&lt;p&gt;FFT 卷积可以做到大致：&lt;/p&gt;
-\[
-O(N\log N).
-\]&lt;p&gt;第二，很多 PDE 的大尺度结构主要集中在低频模态。&lt;/p&gt;
+\[(\mathcal Kv)(x) = \int\kappa(x,y)v(y)dy,\]&lt;p&gt;离散后朴素成本可能接近：&lt;/p&gt;
+\[O(N^2).\]&lt;p&gt;FFT 卷积可以做到大致：&lt;/p&gt;
+\[O(N\log N).\]&lt;p&gt;第二，很多 PDE 的大尺度结构主要集中在低频模态。&lt;/p&gt;
 &lt;p&gt;因此 FNO 通常只保留：&lt;/p&gt;
-\[
-k\le k_{\max}
-\]&lt;p&gt;的部分 Fourier modes。&lt;/p&gt;
+\[k\le k_{\max}\]&lt;p&gt;的部分 Fourier modes。&lt;/p&gt;
 &lt;p&gt;高频直接截断。&lt;/p&gt;
 &lt;p&gt;这既降低成本，也相当于一种：&lt;/p&gt;
-\[
-\boxed{\text{learned spectral model reduction}}
-\]&lt;p&gt;所以 FNO 可以粗略理解成：&lt;/p&gt;
-\[
-\boxed{
-\text{谱方法的表示能力}
-+
-\text{神经网络学习未知算子}
-}
-\]&lt;p&gt;这也是它和传统 CNN 最大的不同之一：CNN 每层通常主要做局部邻域传播，而 FNO 的 Fourier convolution 一层就可以产生全局耦合。&lt;/p&gt;
+\[\boxed{\text{learned spectral model reduction}}\]&lt;p&gt;所以 FNO 可以粗略理解成：&lt;/p&gt;
+\[\boxed{ \text{谱方法的表示能力} + \text{神经网络学习未知算子} }\]&lt;p&gt;这也是它和传统 CNN 最大的不同之一：CNN 每层通常主要做局部邻域传播，而 FNO 的 Fourier convolution 一层就可以产生全局耦合。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-一个直观例子随机材料场到位移场&#34;&gt;6. 一个直观例子：随机材料场到位移场
 &lt;/h1&gt;&lt;p&gt;假设二维弹性体的 Young 模量不是一个标量，而是：&lt;/p&gt;
-\[
-E(x,y).
-\]&lt;p&gt;你可能有局部软区：&lt;/p&gt;
+\[E(x,y).\]&lt;p&gt;你可能有局部软区：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -267,23 +131,11 @@ E(x,y).
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;给定载荷以后，希望得到：&lt;/p&gt;
-\[
-u_x(x,y),\quad u_y(x,y).
-\]&lt;p&gt;传统 Kriging 如果把每个网格点：&lt;/p&gt;
-\[
-E_1,\dots,E_{10000}
-\]&lt;p&gt;全当输入，把：&lt;/p&gt;
-\[
-u_1,\dots,u_{20000}
-\]&lt;p&gt;全当输出，会变成一个极高维回归。&lt;/p&gt;
+\[u_x(x,y),\quad u_y(x,y).\]&lt;p&gt;传统 Kriging 如果把每个网格点：&lt;/p&gt;
+\[E_1,\dots,E_{10000}\]&lt;p&gt;全当输入，把：&lt;/p&gt;
+\[u_1,\dots,u_{20000}\]&lt;p&gt;全当输出，会变成一个极高维回归。&lt;/p&gt;
 &lt;p&gt;Neural Operator 的问题定义则更自然：&lt;/p&gt;
-\[
-\boxed{
-E(x,y)
-\mapsto
-u(x,y)
-}
-\]&lt;p&gt;于是模型真正学习的是：&lt;/p&gt;
+\[\boxed{ E(x,y) \mapsto u(x,y) }\]&lt;p&gt;于是模型真正学习的是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“不同空间分布的材料场，会怎样改变整个结构响应场？”&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -298,91 +150,31 @@ u(x,y)
 &lt;hr&gt;
 &lt;h1 id=&#34;7-这与-pod--reduced-basis-的差别很值得分清&#34;&gt;7. 这与 POD / Reduced Basis 的差别很值得分清
 &lt;/h1&gt;&lt;p&gt;前几期讲过 Reduced Basis：&lt;/p&gt;
-\[
-u(x;\mu)
-\approx
-\sum_{i=1}^r a_i(\mu)\phi_i(x).
-\]&lt;p&gt;它先构造：&lt;/p&gt;
-\[
-\{\phi_i\}
-\]&lt;p&gt;这样的低维物理解空间。&lt;/p&gt;
+\[u(x;\mu) \approx \sum_{i=1}^r a_i(\mu)\phi_i(x).\]&lt;p&gt;它先构造：&lt;/p&gt;
+\[\{\phi_i\}\]&lt;p&gt;这样的低维物理解空间。&lt;/p&gt;
 &lt;p&gt;然后只学习：&lt;/p&gt;
-\[
-\mu\mapsto a_i.
-\]&lt;p&gt;所以 RB 的思路是：&lt;/p&gt;
-\[
-\boxed{
-\text{找到低维物理子空间}
-+
-\text{在里面求解}
-}
-\]&lt;p&gt;Neural Operator 则更倾向：&lt;/p&gt;
-\[
-\boxed{
-\text{直接学习完整 solution operator}
-}
-\]&lt;p&gt;优势是灵活、表达力强。&lt;/p&gt;
+\[\mu\mapsto a_i.\]&lt;p&gt;所以 RB 的思路是：&lt;/p&gt;
+\[\boxed{ \text{找到低维物理子空间} + \text{在里面求解} }\]&lt;p&gt;Neural Operator 则更倾向：&lt;/p&gt;
+\[\boxed{ \text{直接学习完整 solution operator} }\]&lt;p&gt;优势是灵活、表达力强。&lt;/p&gt;
 &lt;p&gt;代价是：&lt;/p&gt;
-\[
-\boxed{
-\text{通常缺少传统 ROM 那样直接的误差认证和物理保证}
-}
-\]&lt;p&gt;因此两者在知识体系里并不是竞争关系。&lt;/p&gt;
+\[\boxed{ \text{通常缺少传统 ROM 那样直接的误差认证和物理保证} }\]&lt;p&gt;因此两者在知识体系里并不是竞争关系。&lt;/p&gt;
 &lt;p&gt;更适合这样理解：&lt;/p&gt;
-\[
-\text{RB/POD}
-\quad\longleftrightarrow\quad
-\text{physics-driven model reduction}
-\]\[
-\text{Neural Operator}
-\quad\longleftrightarrow\quad
-\text{data-driven operator approximation}.
-\]&lt;hr&gt;
+\[\text{RB/POD} \quad\longleftrightarrow\quad \text{physics-driven model reduction}\]\[\text{Neural Operator} \quad\longleftrightarrow\quad \text{data-driven operator approximation}.\]&lt;hr&gt;
 &lt;h1 id=&#34;8-它学的是求解器这句话要怎么准确理解&#34;&gt;8. “它学的是求解器”这句话要怎么准确理解？
 &lt;/h1&gt;&lt;p&gt;假设 PDE 由参数：&lt;/p&gt;
-\[
-a(x)
-\]&lt;p&gt;决定。&lt;/p&gt;
+\[a(x)\]&lt;p&gt;决定。&lt;/p&gt;
 &lt;p&gt;传统数值求解器每来一个新输入：&lt;/p&gt;
-\[
-a^{(i)}
-\]&lt;p&gt;都执行：&lt;/p&gt;
-\[
-\boxed{
-\text{assemble}
-\rightarrow
-\text{solve}
-}
-\]&lt;p&gt;Neural Operator 在训练阶段见过大量：&lt;/p&gt;
-\[
-a^{(i)}\rightarrow u^{(i)}.
-\]&lt;p&gt;训练完成后，新输入直接：&lt;/p&gt;
-\[
-a^{(*)}
-\xrightarrow{\mathcal G_\theta}
-u^{(*)}.
-\]&lt;p&gt;所以：&lt;/p&gt;
-\[
-\boxed{
-\text{昂贵 PDE solve}
-}
-\]&lt;p&gt;变成：&lt;/p&gt;
-\[
-\boxed{
-\text{一次神经网络 forward}
-}
-\]&lt;p&gt;原始 FNO 论文在 Burgers、Darcy 和 Navier–Stokes 等 PDE 上展示了这种能力，并报告在其测试设置中相较传统数值求解可达到最高约三个数量级的推理加速。&lt;/p&gt;
+\[a^{(i)}\]&lt;p&gt;都执行：&lt;/p&gt;
+\[\boxed{ \text{assemble} \rightarrow \text{solve} }\]&lt;p&gt;Neural Operator 在训练阶段见过大量：&lt;/p&gt;
+\[a^{(i)}\rightarrow u^{(i)}.\]&lt;p&gt;训练完成后，新输入直接：&lt;/p&gt;
+\[a^{(*)} \xrightarrow{\mathcal G_\theta} u^{(*)}.\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{昂贵 PDE solve} }\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{ \text{一次神经网络 forward} }\]&lt;p&gt;原始 FNO 论文在 Burgers、Darcy 和 Navier–Stokes 等 PDE 上展示了这种能力，并报告在其测试设置中相较传统数值求解可达到最高约三个数量级的推理加速。&lt;/p&gt;
 &lt;p&gt;但这里特别要强调：&lt;/p&gt;
-\[
-\boxed{\text{训练成本没有消失}}
-\]&lt;p&gt;你仍然要先获得高质量：&lt;/p&gt;
-\[
-(a_i,u_i)
-\]&lt;p&gt;训练数据。&lt;/p&gt;
+\[\boxed{\text{训练成本没有消失}}\]&lt;p&gt;你仍然要先获得高质量：&lt;/p&gt;
+\[(a_i,u_i)\]&lt;p&gt;训练数据。&lt;/p&gt;
 &lt;p&gt;所以它真正适合的是：&lt;/p&gt;
-\[
-\boxed{\text{many-query setting}}
-\]&lt;p&gt;例如：&lt;/p&gt;
+\[\boxed{\text{many-query setting}}\]&lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Monte Carlo；&lt;/li&gt;
 &lt;li&gt;参数优化；&lt;/li&gt;
@@ -394,30 +186,19 @@ u^{(*)}.
 &lt;hr&gt;
 &lt;h1 id=&#34;9-为什么零样本超分辨率很吸引人&#34;&gt;9. 为什么“零样本超分辨率”很吸引人？
 &lt;/h1&gt;&lt;p&gt;FNO 原始工作一个很著名的结果是：&lt;/p&gt;
-\[
-\boxed{\text{zero-shot super-resolution}}
-\]&lt;p&gt;例如较低分辨率训练：&lt;/p&gt;
-\[
-64\times64
-\]&lt;p&gt;然后更高分辨率评价。&lt;/p&gt;
+\[\boxed{\text{zero-shot super-resolution}}\]&lt;p&gt;例如较低分辨率训练：&lt;/p&gt;
+\[64\times64\]&lt;p&gt;然后更高分辨率评价。&lt;/p&gt;
 &lt;p&gt;为什么理论上可以这么做？&lt;/p&gt;
 &lt;p&gt;因为学习参数主要作用于：&lt;/p&gt;
-\[
-\boxed{\text{Fourier modes}}
-\]&lt;p&gt;而不是固定的：&lt;/p&gt;
-\[
-64\times64
-\]&lt;p&gt;神经元连接。&lt;/p&gt;
+\[\boxed{\text{Fourier modes}}\]&lt;p&gt;而不是固定的：&lt;/p&gt;
+\[64\times64\]&lt;p&gt;神经元连接。&lt;/p&gt;
 &lt;p&gt;换句话说，模型学习的是近似连续频谱算子。&lt;/p&gt;
 &lt;p&gt;换一个采样密度，只是在更细的 grid 上评价同一个 learned operator。&lt;/p&gt;
 &lt;p&gt;这正是 neural operator 与普通固定尺寸 CNN 的重要结构差异。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;10-但这件事有一个很重要的限制高频细节可能正是-fno-的弱点&#34;&gt;10. 但这件事有一个很重要的限制：高频细节可能正是 FNO 的弱点
 &lt;/h1&gt;&lt;p&gt;FNO 最常见的实现会截断高 Fourier modes：&lt;/p&gt;
-\[
-\hat v_k=0,
-\qquad |k|&gt;k_{\max}.
-\]&lt;p&gt;这本来是效率来源。&lt;/p&gt;
+\[\hat v_k=0, \qquad |k|&gt;k_{\max}.\]&lt;p&gt;这本来是效率来源。&lt;/p&gt;
 &lt;p&gt;但如果问题真正重要的信息恰好来自：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;冲击波；&lt;/li&gt;
@@ -427,57 +208,27 @@ u^{(*)}.
 &lt;li&gt;高梯度应力集中；&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;那么：&lt;/p&gt;
-\[
-\boxed{\text{低频全局表示可能过度平滑}}
-\]&lt;p&gt;这不是一个次要实现细节，而是 FNO 架构本身的 inductive bias。&lt;/p&gt;
+\[\boxed{\text{低频全局表示可能过度平滑}}\]&lt;p&gt;这不是一个次要实现细节，而是 FNO 架构本身的 inductive bias。&lt;/p&gt;
 &lt;p&gt;2024 年 ICML 的 Local Neural Operator 工作就直接指出：FNO 的 global operations 容易 over-smoothing，可能无法捕捉局部细节；引入局部积分核和微分算子后，其测试中相对 \(L^2\) 误差进一步降低了 34–72%。&lt;/p&gt;
 &lt;p&gt;这说明 Neural Operator 当前一个很重要的发展方向是：&lt;/p&gt;
-\[
-\boxed{
-\text{global operator}
-+
-\text{local differential structure}
-}
-\]&lt;hr&gt;
+\[\boxed{ \text{global operator} + \text{local differential structure} }\]&lt;hr&gt;
 &lt;h1 id=&#34;11-这对有限元问题尤其重要&#34;&gt;11. 这对有限元问题尤其重要
 &lt;/h1&gt;&lt;p&gt;在很多结构问题中：&lt;/p&gt;
-\[
-\text{global displacement}
-\]&lt;p&gt;其实很好预测。&lt;/p&gt;
+\[\text{global displacement}\]&lt;p&gt;其实很好预测。&lt;/p&gt;
 &lt;p&gt;难的是：&lt;/p&gt;
-\[
-\boxed{
-\text{local stress concentration}
-}
-\]&lt;p&gt;例如孔边：&lt;/p&gt;
-\[
-\sigma_{\max}
-\]&lt;p&gt;可能来自非常小的局部区域。&lt;/p&gt;
+\[\boxed{ \text{local stress concentration} }\]&lt;p&gt;例如孔边：&lt;/p&gt;
+\[\sigma_{\max}\]&lt;p&gt;可能来自非常小的局部区域。&lt;/p&gt;
 &lt;p&gt;那么一个场模型即使：&lt;/p&gt;
-\[
-\|u-\hat u\|_{L^2}
-\]&lt;p&gt;很小，&lt;/p&gt;
+\[\|u-\hat u\|_{L^2}\]&lt;p&gt;很小，&lt;/p&gt;
 &lt;p&gt;也不代表：&lt;/p&gt;
-\[
-\max_x\sigma(x)
-\]&lt;p&gt;准确。&lt;/p&gt;
+\[\max_x\sigma(x)\]&lt;p&gt;准确。&lt;/p&gt;
 &lt;p&gt;因为：&lt;/p&gt;
-\[
-\sigma=C:\nabla u
-\]&lt;p&gt;对梯度误差更敏感。&lt;/p&gt;
+\[\sigma=C:\nabla u\]&lt;p&gt;对梯度误差更敏感。&lt;/p&gt;
 &lt;p&gt;所以如果把 Neural Operator 用于可靠性分析，不能只看：&lt;/p&gt;
-\[
-\boxed{\text{field }L^2\text{ error}}
-\]&lt;p&gt;还应该检查：&lt;/p&gt;
-\[
-\|\nabla u-\nabla\hat u\|,
-\]&lt;p&gt;极值误差：&lt;/p&gt;
-\[
-|\sigma_{\max}-\hat\sigma_{\max}|,
-\]&lt;p&gt;以及失效边界：&lt;/p&gt;
-\[
-g(X)=0
-\]&lt;p&gt;附近的分类错误。&lt;/p&gt;
+\[\boxed{\text{field }L^2\text{ error}}\]&lt;p&gt;还应该检查：&lt;/p&gt;
+\[\|\nabla u-\nabla\hat u\|,\]&lt;p&gt;极值误差：&lt;/p&gt;
+\[|\sigma_{\max}-\hat\sigma_{\max}|,\]&lt;p&gt;以及失效边界：&lt;/p&gt;
+\[g(X)=0\]&lt;p&gt;附近的分类错误。&lt;/p&gt;
 &lt;p&gt;这和前面 AK-MCS 的思想再次接上了：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;最终任务需要什么信息，代理模型就应该围绕什么误差训练和评价。&lt;/strong&gt;&lt;/p&gt;
@@ -485,85 +236,33 @@ g(X)=0
 &lt;hr&gt;
 &lt;h1 id=&#34;12-它对可靠性研究的真正价值在哪里&#34;&gt;12. 它对可靠性研究的真正价值在哪里？
 &lt;/h1&gt;&lt;p&gt;假设随机输入不再是：&lt;/p&gt;
-\[
-X=(x_1,x_2,x_3),
-\]&lt;p&gt;而是随机场：&lt;/p&gt;
-\[
-E(x,\omega),
-\]\[
-p(x,\omega),
-\]\[
-T(x,\omega).
-\]&lt;p&gt;传统 Kriging 很容易遭遇：&lt;/p&gt;
-\[
-\boxed{\text{输入维数爆炸}}
-\]&lt;p&gt;因为随机场离散后：&lt;/p&gt;
-\[
-10000
-\]&lt;p&gt;个网格点就是：&lt;/p&gt;
-\[
-10000
-\]&lt;p&gt;维输入。&lt;/p&gt;
+\[X=(x_1,x_2,x_3),\]&lt;p&gt;而是随机场：&lt;/p&gt;
+\[E(x,\omega),\]\[p(x,\omega),\]\[T(x,\omega).\]&lt;p&gt;传统 Kriging 很容易遭遇：&lt;/p&gt;
+\[\boxed{\text{输入维数爆炸}}\]&lt;p&gt;因为随机场离散后：&lt;/p&gt;
+\[10000\]&lt;p&gt;个网格点就是：&lt;/p&gt;
+\[10000\]&lt;p&gt;维输入。&lt;/p&gt;
 &lt;p&gt;通常要先做：&lt;/p&gt;
-\[
-\text{Karhunen–Loève expansion}
-\]&lt;p&gt;降成几十个随机变量。&lt;/p&gt;
+\[\text{Karhunen–Loève expansion}\]&lt;p&gt;降成几十个随机变量。&lt;/p&gt;
 &lt;p&gt;Neural Operator 则允许更直接地接受：&lt;/p&gt;
-\[
-\boxed{\text{field input}}
-\]&lt;p&gt;因此特别适合：&lt;/p&gt;
-\[
-\text{random field}
-\rightarrow
-\text{response field}.
-\]&lt;p&gt;再从：&lt;/p&gt;
-\[
-u(x)
-\]&lt;p&gt;提取：&lt;/p&gt;
-\[
-g(u)
-\]&lt;p&gt;做可靠性计算。&lt;/p&gt;
+\[\boxed{\text{field input}}\]&lt;p&gt;因此特别适合：&lt;/p&gt;
+\[\text{random field} \rightarrow \text{response field}.\]&lt;p&gt;再从：&lt;/p&gt;
+\[u(x)\]&lt;p&gt;提取：&lt;/p&gt;
+\[g(u)\]&lt;p&gt;做可靠性计算。&lt;/p&gt;
 &lt;p&gt;所以它在可靠性里的潜力不只是“替代 Kriging”。&lt;/p&gt;
 &lt;p&gt;它更可能改变：&lt;/p&gt;
-\[
-\boxed{\text{高维随机场可靠性}}
-\]&lt;p&gt;这一类问题的建模方式。&lt;/p&gt;
+\[\boxed{\text{高维随机场可靠性}}\]&lt;p&gt;这一类问题的建模方式。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-对软体动力学也有一个很强的迁移&#34;&gt;13. 对软体动力学也有一个很强的迁移
 &lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
-\[
-u(x,t)
-\]&lt;p&gt;或者：&lt;/p&gt;
-\[
-x(X,t).
-\]&lt;p&gt;理论上可以训练 operator：&lt;/p&gt;
-\[
-\boxed{
-(x_t,v_t,\text{material},f_{\rm ext})
-\mapsto
-(x_{t+\Delta t},v_{t+\Delta t})
-}
-\]&lt;p&gt;这已经很接近：&lt;/p&gt;
-\[
-\boxed{\text{learned timestepper}}
-\]&lt;p&gt;甚至可以直接学习：&lt;/p&gt;
-\[
-\text{initial state}
-\mapsto
-\text{whole trajectory}.
-\]&lt;p&gt;但对于物理引擎，有一个巨大问题：&lt;/p&gt;
-\[
-\boxed{\text{rollout stability}}
-\]&lt;p&gt;即单步：&lt;/p&gt;
-\[
-1\%\text{ error}
-\]&lt;p&gt;连续滚动：&lt;/p&gt;
-\[
-1000
-\]&lt;p&gt;步后不一定还是：&lt;/p&gt;
-\[
-1\%.
-\]&lt;p&gt;可能逐步偏离物理流形。&lt;/p&gt;
+\[u(x,t)\]&lt;p&gt;或者：&lt;/p&gt;
+\[x(X,t).\]&lt;p&gt;理论上可以训练 operator：&lt;/p&gt;
+\[\boxed{ (x_t,v_t,\text{material},f_{\rm ext}) \mapsto (x_{t+\Delta t},v_{t+\Delta t}) }\]&lt;p&gt;这已经很接近：&lt;/p&gt;
+\[\boxed{\text{learned timestepper}}\]&lt;p&gt;甚至可以直接学习：&lt;/p&gt;
+\[\text{initial state} \mapsto \text{whole trajectory}.\]&lt;p&gt;但对于物理引擎，有一个巨大问题：&lt;/p&gt;
+\[\boxed{\text{rollout stability}}\]&lt;p&gt;即单步：&lt;/p&gt;
+\[1\%\text{ error}\]&lt;p&gt;连续滚动：&lt;/p&gt;
+\[1000\]&lt;p&gt;步后不一定还是：&lt;/p&gt;
+\[1\%.\]&lt;p&gt;可能逐步偏离物理流形。&lt;/p&gt;
 &lt;p&gt;尤其涉及：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;contact；&lt;/li&gt;
@@ -574,30 +273,16 @@ x(X,t).
 &lt;/ul&gt;
 &lt;p&gt;这类硬结构时，纯数据驱动 operator 可能给出视觉上合理、物理上非法的状态。&lt;/p&gt;
 &lt;p&gt;所以在实时物理里，更有吸引力的方向往往是：&lt;/p&gt;
-\[
-\boxed{
-\text{learned operator}
-+
-\text{physics constraints / correction / projection}
-}
-\]&lt;p&gt;而不是彻底删除 solver。&lt;/p&gt;
+\[\boxed{ \text{learned operator} + \text{physics constraints / correction / projection} }\]&lt;p&gt;而不是彻底删除 solver。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;14-一个非常值得实践的最小实验&#34;&gt;14. 一个非常值得实践的最小实验
 &lt;/h1&gt;&lt;p&gt;如果想真正理解 Neural Operator，我建议不要一开始做 Navier–Stokes。&lt;/p&gt;
 &lt;p&gt;可以做一个非常简单的 2D Poisson/Darcy 问题：&lt;/p&gt;
-\[
--\nabla\cdot(a(x)\nabla u)=f.
-\]&lt;p&gt;生成：&lt;/p&gt;
-\[
-N=1000
-\]&lt;p&gt;个随机：&lt;/p&gt;
-\[
-a(x,y)
-\]&lt;p&gt;场。&lt;/p&gt;
+\[-\nabla\cdot(a(x)\nabla u)=f.\]&lt;p&gt;生成：&lt;/p&gt;
+\[N=1000\]&lt;p&gt;个随机：&lt;/p&gt;
+\[a(x,y)\]&lt;p&gt;场。&lt;/p&gt;
 &lt;p&gt;FEM/FDM 求：&lt;/p&gt;
-\[
-u(x,y).
-\]&lt;p&gt;然后训练 FNO：&lt;/p&gt;
+\[u(x,y).\]&lt;p&gt;然后训练 FNO：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -633,43 +318,19 @@ u(x,y).
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;最值得做的实验不是单纯看训练误差，而是：&lt;/p&gt;
-\[
-\boxed{\text{64×64 训练}}
-\]&lt;p&gt;然后：&lt;/p&gt;
-\[
-\boxed{\text{128×128 测试}}
-\]&lt;p&gt;再检查：&lt;/p&gt;
-\[
-L^2\text{ error},
-\]\[
-H^1\text{ error},
-\]&lt;p&gt;以及 PDE residual：&lt;/p&gt;
-\[
-\|-\nabla\cdot(a\nabla\hat u)-f\|.
-\]&lt;p&gt;这样你会直接看见：&lt;/p&gt;
-\[
-\boxed{
-\text{“预测一个数组”}
-\]&lt;p&gt;和：&lt;/p&gt;
-\[
-\boxed{
-\text{“学习一个离散无关算子”}
-}
-\]&lt;p&gt;之间到底差在哪里。&lt;/p&gt;
+\[\boxed{\text{64×64 训练}}\]&lt;p&gt;然后：&lt;/p&gt;
+\[\boxed{\text{128×128 测试}}\]&lt;p&gt;再检查：&lt;/p&gt;
+\[L^2\text{ error},\]\[H^1\text{ error},\]&lt;p&gt;以及 PDE residual：&lt;/p&gt;
+\[\|-\nabla\cdot(a\nabla\hat u)-f\|.\]&lt;p&gt;这样你会直接看见：&lt;/p&gt;
+\[\boxed{ \text{“预测一个数组”}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \text{“学习一个离散无关算子”} }\]&lt;p&gt;之间到底差在哪里。&lt;/p&gt;
 &lt;p&gt;官方 &lt;code&gt;neuraloperator&lt;/code&gt; 项目已经提供 FNO、TFNO、训练流程和理论指南，适合作为直接实现入口。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;15-最值得警惕的一点neural-operator-仍然没有真正理解-pde&#34;&gt;15. 最值得警惕的一点：Neural Operator 仍然没有真正“理解 PDE”
 &lt;/h1&gt;&lt;p&gt;这是科学机器学习里非常容易夸大的地方。&lt;/p&gt;
 &lt;p&gt;如果训练数据全部来自某个：&lt;/p&gt;
-\[
-\mathcal P_{\rm train},
-\]&lt;p&gt;那么网络实际学到的是：&lt;/p&gt;
-\[
-\boxed{
-\mathcal G
-\text{ 在训练分布附近的近似}
-}
-\]&lt;p&gt;它并不自动拥有：&lt;/p&gt;
+\[\mathcal P_{\rm train},\]&lt;p&gt;那么网络实际学到的是：&lt;/p&gt;
+\[\boxed{ \mathcal G \text{ 在训练分布附近的近似} }\]&lt;p&gt;它并不自动拥有：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;守恒律；&lt;/li&gt;
 &lt;li&gt;最大值原理；&lt;/li&gt;
@@ -679,23 +340,11 @@ H^1\text{ error},
 &lt;li&gt;OOD 保证。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-\[
-\boxed{
-\text{operator learning}
-\neq
-\text{numerical analysis guarantee}
-}
-\]&lt;p&gt;这一点对工程应用特别重要。&lt;/p&gt;
+\[\boxed{ \text{operator learning} \neq \text{numerical analysis guarantee} }\]&lt;p&gt;这一点对工程应用特别重要。&lt;/p&gt;
 &lt;p&gt;它非常适合作为：&lt;/p&gt;
-\[
-\boxed{\text{快速 many-query surrogate}}
-\]&lt;p&gt;但如果任务要求：&lt;/p&gt;
-\[
-10^{-6}\text{ 失效概率}
-\]&lt;p&gt;或者：&lt;/p&gt;
-\[
-\text{严格无穿透}
-\]&lt;p&gt;那么仍然需要：&lt;/p&gt;
+\[\boxed{\text{快速 many-query surrogate}}\]&lt;p&gt;但如果任务要求：&lt;/p&gt;
+\[10^{-6}\text{ 失效概率}\]&lt;p&gt;或者：&lt;/p&gt;
+\[\text{严格无穿透}\]&lt;p&gt;那么仍然需要：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;certification；&lt;/li&gt;
 &lt;li&gt;residual checking；&lt;/li&gt;
@@ -707,27 +356,9 @@ H^1\text{ error},
 &lt;hr&gt;
 &lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h2&gt;&lt;p&gt;Neural Operator 最深刻的地方，可以浓缩成：&lt;/p&gt;
-\[
-\boxed{
-\text{它试图代理的不是一个响应面，而是一整个“输入场到解场”的求解过程。}
-}
-\]&lt;p&gt;所以它在知识体系中的位置大约是：&lt;/p&gt;
-\[
-\text{Kriging / MLP surrogate}
-\]\[
-\downarrow
-\]\[
-\boxed{\text{Neural Operator}}
-\]\[
-\downarrow
-\]\[
-\text{learned PDE solver / scientific foundation model}.
-\]&lt;p&gt;它真正值得学的原因并不是“FNO 很流行”，而是它迫使我们重新思考一个问题：&lt;/p&gt;
-\[
-\boxed{
-\text{代理模型究竟应该学习最终输出，还是学习产生这些输出的算子？}
-}
-\]&lt;p&gt;对于随机场可靠性、多工况有限元、数字孪生和 AI 驱动求解器，这个区别会越来越重要。&lt;/p&gt;
+\[\boxed{ \text{它试图代理的不是一个响应面，而是一整个“输入场到解场”的求解过程。} }\]&lt;p&gt;所以它在知识体系中的位置大约是：&lt;/p&gt;
+\[\text{Kriging / MLP surrogate}\]\[\downarrow\]\[\boxed{\text{Neural Operator}}\]\[\downarrow\]\[\text{learned PDE solver / scientific foundation model}.\]&lt;p&gt;它真正值得学的原因并不是“FNO 很流行”，而是它迫使我们重新思考一个问题：&lt;/p&gt;
+\[\boxed{ \text{代理模型究竟应该学习最终输出，还是学习产生这些输出的算子？} }\]&lt;p&gt;对于随机场可靠性、多工况有限元、数字孪生和 AI 驱动求解器，这个区别会越来越重要。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;
@@ -765,74 +396,32 @@ H^1\text{ error},
 &lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × GPU 系统&lt;/strong&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;PagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：&lt;/p&gt;
-$$
-\boxed{\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}
-$$&lt;p&gt;vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 &lt;strong&gt;20.4%–38.2%&lt;/strong&gt;；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 &lt;strong&gt;2–4× serving throughput&lt;/strong&gt;。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+$$\boxed{\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}$$&lt;p&gt;vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 &lt;strong&gt;20.4%–38.2%&lt;/strong&gt;；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 &lt;strong&gt;2–4× serving throughput&lt;/strong&gt;。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;更值得学的是它背后的思想：&lt;/p&gt;
-$$
-\boxed{\text{资源布局本身，也是算法的一部分。}}
-$$&lt;hr&gt;
+$$\boxed{\text{资源布局本身，也是算法的一部分。}}$$&lt;hr&gt;
 &lt;h2 id=&#34;1-为什么-llm-推理会突然变成内存管理问题&#34;&gt;1. 为什么 LLM 推理会突然变成“内存管理问题”？
 &lt;/h2&gt;&lt;p&gt;自回归模型生成第 \(t\) 个 token 时，需要：&lt;/p&gt;
-$$
-q_t
-$$&lt;p&gt;与之前所有 token 的：&lt;/p&gt;
-$$
-k_1,\ldots,k_t
-$$&lt;p&gt;计算 attention。&lt;/p&gt;
+$$q_t$$&lt;p&gt;与之前所有 token 的：&lt;/p&gt;
+$$k_1,\ldots,k_t$$&lt;p&gt;计算 attention。&lt;/p&gt;
 &lt;p&gt;如果每生成一个 token 都重新计算过去所有 token 的 \(K,V\)，浪费极大。&lt;/p&gt;
 &lt;p&gt;所以推理系统保存：&lt;/p&gt;
-$$
-\boxed{\text{KV Cache}}
-$$&lt;p&gt;即每层过去所有 token 的：&lt;/p&gt;
-$$
-K,V.
-$$&lt;p&gt;下一步只计算新 token 的：&lt;/p&gt;
-$$
-K_t,V_t
-$$&lt;p&gt;再读取历史 cache。&lt;/p&gt;
+$$\boxed{\text{KV Cache}}$$&lt;p&gt;即每层过去所有 token 的：&lt;/p&gt;
+$$K,V.$$&lt;p&gt;下一步只计算新 token 的：&lt;/p&gt;
+$$K_t,V_t$$&lt;p&gt;再读取历史 cache。&lt;/p&gt;
 &lt;p&gt;因此 decode 阶段大致变成：&lt;/p&gt;
-$$
-\text{计算一个新 token}
-+
-\boxed{\text{读取越来越大的历史 KV}}
-$$&lt;p&gt;而且生成过程严格自回归：&lt;/p&gt;
-$$
-x_1\rightarrow x_2\rightarrow\cdots
-$$&lt;p&gt;单请求的 GPU 并行度并不高。原始 vLLM 论文指出，这使 generation/decode 阶段高度 memory-bound，提高吞吐量的关键之一是同时 batch 更多请求。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+$$\text{计算一个新 token} + \boxed{\text{读取越来越大的历史 KV}}$$&lt;p&gt;而且生成过程严格自回归：&lt;/p&gt;
+$$x_1\rightarrow x_2\rightarrow\cdots$$&lt;p&gt;单请求的 GPU 并行度并不高。原始 vLLM 论文指出，这使 generation/decode 阶段高度 memory-bound，提高吞吐量的关键之一是同时 batch 更多请求。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;于是产生了一个链条：&lt;/p&gt;
-$$
-\boxed{
-\text{KV Cache 占用}
-\rightarrow
-\text{能容纳多少并发 sequence}
-\rightarrow
-\text{batch size}
-\rightarrow
-\text{GPU utilization}
-\rightarrow
-\text{吞吐量}
-}
-$$&lt;p&gt;所以浪费 10 GB 显存并不只是“浪费 10 GB”。&lt;/p&gt;
+$$\boxed{ \text{KV Cache 占用} \rightarrow \text{能容纳多少并发 sequence} \rightarrow \text{batch size} \rightarrow \text{GPU utilization} \rightarrow \text{吞吐量} }$$&lt;p&gt;所以浪费 10 GB 显存并不只是“浪费 10 GB”。&lt;/p&gt;
 &lt;p&gt;它可能意味着：&lt;/p&gt;
-$$
-\boxed{\text{少跑一大批并发请求。}}
-$$&lt;hr&gt;
+$$\boxed{\text{少跑一大批并发请求。}}$$&lt;hr&gt;
 &lt;h1 id=&#34;2-kv-cache-到底有多大&#34;&gt;2. KV Cache 到底有多大？
 &lt;/h1&gt;&lt;p&gt;对于传统 multi-head/GQA Transformer，一个 token 的 KV Cache 大致为：&lt;/p&gt;
-&lt;h1 id=&#34;m_rm-token&#34;&gt;$$
-M_{\rm token}
-&lt;/h1&gt;&lt;p&gt;2
-\times L
-\times H_{\rm KV}
-\times d_{\rm head}
-\times b
-$$&lt;/p&gt;
-&lt;p&gt;其中：&lt;/p&gt;
+$$M_{\rm token} = 2 \times L \times H_{\rm KV} \times d_{\rm head} \times b$$&lt;p&gt;其中：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(2\)：Key + Value；&lt;/li&gt;
 &lt;li&gt;\(L\)：Transformer 层数；&lt;/li&gt;
@@ -841,33 +430,14 @@ $$&lt;/p&gt;
 &lt;li&gt;\(b\)：每个元素字节数。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;举一个示意模型：&lt;/p&gt;
-$$
-L=32,\quad
-H_{\rm KV}=8,\quad
-d_{\rm head}=128,
-$$&lt;p&gt;BF16：&lt;/p&gt;
-$$
-b=2.
-$$&lt;p&gt;那么：&lt;/p&gt;
-&lt;h1 id=&#34;m_rm-token-1&#34;&gt;$$
-M_{\rm token}
-&lt;/h1&gt;&lt;h1 id=&#34;2times32times8times128times2&#34;&gt;2\times32\times8\times128\times2
-&lt;/h1&gt;&lt;p&gt;128\text{ KB/token}.
-$$&lt;/p&gt;
-&lt;p&gt;一个：&lt;/p&gt;
-$$
-8192
-$$&lt;p&gt;token sequence 就大约需要：&lt;/p&gt;
-$$
-\boxed{1\text{ GB KV Cache}}
-$$&lt;p&gt;这还只是一个请求。&lt;/p&gt;
+$$L=32,\quad H_{\rm KV}=8,\quad d_{\rm head}=128,$$&lt;p&gt;BF16：&lt;/p&gt;
+$$b=2.$$&lt;p&gt;那么：&lt;/p&gt;
+$$M_{\rm token} = 2\times32\times8\times128\times2 = 128\text{ KB/token}.$$&lt;p&gt;一个：&lt;/p&gt;
+$$8192$$&lt;p&gt;token sequence 就大约需要：&lt;/p&gt;
+$$\boxed{1\text{ GB KV Cache}}$$&lt;p&gt;这还只是一个请求。&lt;/p&gt;
 &lt;p&gt;如果同时服务：&lt;/p&gt;
-$$
-40
-$$&lt;p&gt;条长 sequence：&lt;/p&gt;
-$$
-\approx40\text{ GB}.
-$$&lt;p&gt;所以长上下文时代，KV Cache 很容易从“附属数据”变成 inference infrastructure 的核心资源。&lt;/p&gt;
+$$40$$&lt;p&gt;条长 sequence：&lt;/p&gt;
+$$\approx40\text{ GB}.$$&lt;p&gt;所以长上下文时代，KV Cache 很容易从“附属数据”变成 inference infrastructure 的核心资源。&lt;/p&gt;
 &lt;p&gt;vLLM 原论文举的历史例子更夸张：OPT-13B FP16 每 token KV 约 800 KB，因此长度 2048 的单个请求最大约需 1.6 GB KV Cache。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
@@ -885,11 +455,7 @@ $$&lt;p&gt;所以长上下文时代，KV Cache 很容易从“附属数据”变
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;服务器不知道实际会生成：&lt;/p&gt;
-$$
-50？
-\quad500？
-\quad2000？
-$$&lt;p&gt;token。&lt;/p&gt;
+$$50？ \quad500？ \quad2000？$$&lt;p&gt;token。&lt;/p&gt;
 &lt;p&gt;旧式做法很自然：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;为安全起见，先给它分配能够容纳最大长度的连续 tensor。&lt;/p&gt;
@@ -935,13 +501,7 @@ $$&lt;p&gt;token。&lt;/p&gt;
 &lt;li&gt;释放。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;这就是经典动态内存管理问题：&lt;/p&gt;
-$$
-\boxed{
-\text{internal fragmentation}
-+
-\text{external fragmentation}
-}
-$$&lt;p&gt;vLLM 团队测得，当时一些连续分配方案中真正用于 token state 的 KV 空间比例最低只有约 20.4%。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+$$\boxed{ \text{internal fragmentation} + \text{external fragmentation} }$$&lt;p&gt;vLLM 团队测得，当时一些连续分配方案中真正用于 token state 的 KV 空间比例最低只有约 20.4%。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;这时继续优化矩阵乘 kernel 已经无法解决根本问题。&lt;/p&gt;
@@ -979,14 +539,8 @@ $$&lt;p&gt;vLLM 团队测得，当时一些连续分配方案中真正用于 tok
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;通过：&lt;/p&gt;
-$$
-\boxed{\text{page table}}
-$$&lt;p&gt;建立：&lt;/p&gt;
-$$
-\text{logical page}
-\rightarrow
-\text{physical frame}.
-$$&lt;p&gt;PagedAttention 把这个思想迁移过来：&lt;/p&gt;
+$$\boxed{\text{page table}}$$&lt;p&gt;建立：&lt;/p&gt;
+$$\text{logical page} \rightarrow \text{physical frame}.$$&lt;p&gt;PagedAttention 把这个思想迁移过来：&lt;/p&gt;
 &lt;table&gt;
 	&lt;thead&gt;
 			&lt;tr&gt;
@@ -1018,9 +572,7 @@ $$&lt;p&gt;PagedAttention 把这个思想迁移过来：&lt;/p&gt;
 	&lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;于是一个 sequence：&lt;/p&gt;
-$$
-[1,2,3,4,5,\ldots]
-$$&lt;p&gt;逻辑上连续，&lt;/p&gt;
+$$[1,2,3,4,5,\ldots]$$&lt;p&gt;逻辑上连续，&lt;/p&gt;
 &lt;p&gt;但 KV 可以实际存成：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1047,48 +599,23 @@ $$&lt;p&gt;逻辑上连续，&lt;/p&gt;
 &lt;h1 id=&#34;5-它并没有近似-attention&#34;&gt;5. 它并没有近似 Attention
 &lt;/h1&gt;&lt;p&gt;这是一个很重要的澄清。&lt;/p&gt;
 &lt;p&gt;正常 attention：&lt;/p&gt;
-&lt;h1 id=&#34;a_ij&#34;&gt;$$
-a_{ij}
-&lt;/h1&gt;&lt;p&gt;\operatorname{softmax}
-\left(
-\frac{q_i^Tk_j}{\sqrt d}
-\right).
-$$&lt;/p&gt;
-&lt;p&gt;PagedAttention 仍然读取这些：&lt;/p&gt;
-$$
-K,V
-$$&lt;p&gt;完成 attention。&lt;/p&gt;
+$$a_{ij} = \operatorname{softmax} \left( \frac{q_i^Tk_j}{\sqrt d} \right).$$&lt;p&gt;PagedAttention 仍然读取这些：&lt;/p&gt;
+$$K,V$$&lt;p&gt;完成 attention。&lt;/p&gt;
 &lt;p&gt;变化的是：&lt;/p&gt;
-$$
-\boxed{\text{这些 }K,V\text{ 在物理显存中的布局}}
-$$&lt;p&gt;因此它本质上属于：&lt;/p&gt;
-$$
-\boxed{\text{memory virtualization}}
-$$&lt;p&gt;而不是：&lt;/p&gt;
-$$
-\text{sparse attention}
-$$&lt;p&gt;或：&lt;/p&gt;
-$$
-\text{approximate attention}.
-$$&lt;p&gt;vLLM 官方当前实现仍以固定 token 数的 cache block 为基本管理单元，其 cache 配置中明确包含 &lt;code&gt;block_size&lt;/code&gt;、KV Cache memory size、prefix caching、KV offloading 等参数。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/config/cache/&#34;  title=&#34;cache - vLLM&#34;
+$$\boxed{\text{这些 }K,V\text{ 在物理显存中的布局}}$$&lt;p&gt;因此它本质上属于：&lt;/p&gt;
+$$\boxed{\text{memory virtualization}}$$&lt;p&gt;而不是：&lt;/p&gt;
+$$\text{sparse attention}$$&lt;p&gt;或：&lt;/p&gt;
+$$\text{approximate attention}.$$&lt;p&gt;vLLM 官方当前实现仍以固定 token 数的 cache block 为基本管理单元，其 cache 配置中明确包含 &lt;code&gt;block_size&lt;/code&gt;、KV Cache memory size、prefix caching、KV offloading 等参数。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/config/cache/&#34;  title=&#34;cache - vLLM&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-为什么分页以后碎片突然变得容易控制&#34;&gt;6. 为什么分页以后碎片突然变得容易控制？
 &lt;/h1&gt;&lt;p&gt;假设 block size 为：&lt;/p&gt;
-$$
-B=16\text{ tokens}.
-$$&lt;p&gt;一个 100 token 请求需要：&lt;/p&gt;
-$$
-\left\lceil\frac{100}{16}\right\rceil=7
-$$&lt;p&gt;个 block。&lt;/p&gt;
+$$B=16\text{ tokens}.$$&lt;p&gt;一个 100 token 请求需要：&lt;/p&gt;
+$$\left\lceil\frac{100}{16}\right\rceil=7$$&lt;p&gt;个 block。&lt;/p&gt;
 &lt;p&gt;真正浪费只发生在最后一个 block：&lt;/p&gt;
-$$
-112-100=12\text{ tokens}.
-$$&lt;p&gt;因此内部碎片上界从“可能预留整个最大 sequence”缩小到：&lt;/p&gt;
-$$
-\boxed{&lt;1\text{ block/request}}
-$$&lt;p&gt;同时所有 physical block 都同样大小：&lt;/p&gt;
+$$112-100=12\text{ tokens}.$$&lt;p&gt;因此内部碎片上界从“可能预留整个最大 sequence”缩小到：&lt;/p&gt;
+$$\boxed{&lt;1\text{ block/request}}$$&lt;p&gt;同时所有 physical block 都同样大小：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1123,9 +650,7 @@ $$&lt;p&gt;同时所有 physical block 都同样大小：&lt;/p&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;prompt 的：&lt;/p&gt;
-$$
-K,V
-$$&lt;p&gt;被复制 8 份。&lt;/p&gt;
+$$K,V$$&lt;p&gt;被复制 8 份。&lt;/p&gt;
 &lt;p&gt;Paged memory 允许：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1144,16 +669,12 @@ $$&lt;p&gt;被复制 8 份。&lt;/p&gt;
 &lt;/div&gt;&lt;p&gt;多个 logical sequences 指向相同 physical KV blocks。&lt;/p&gt;
 &lt;p&gt;只有发生分叉后才分配自己的 block。&lt;/p&gt;
 &lt;p&gt;这其实就是：&lt;/p&gt;
-$$
-\boxed{\text{Copy-on-Write}}
-$$&lt;p&gt;思想。&lt;/p&gt;
+$$\boxed{\text{Copy-on-Write}}$$&lt;p&gt;思想。&lt;/p&gt;
 &lt;p&gt;原论文在 beam search 场景中报告，block sharing 在其测试中最高可以节省约 55% 的 KV memory。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;这个能力后来也自然演化出了：&lt;/p&gt;
-$$
-\boxed{\text{Prefix Caching}}
-$$&lt;p&gt;如果不同请求拥有完全相同的 prefix，就可以复用已经计算好的 KV blocks。vLLM 官方实现使用 block tokens 与此前 prefix 来标识 cache block。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html&#34;  title=&#34;Implementation — vLLM&#34;
+$$\boxed{\text{Prefix Caching}}$$&lt;p&gt;如果不同请求拥有完全相同的 prefix，就可以复用已经计算好的 KV blocks。vLLM 官方实现使用 block tokens 与此前 prefix 来标识 cache block。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html&#34;  title=&#34;Implementation — vLLM&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
@@ -1204,95 +725,42 @@ $$&lt;p&gt;如果不同请求拥有完全相同的 prefix，就可以复用已�
 &lt;/div&gt;&lt;p&gt;这样 GPU 更容易持续吃满。&lt;/p&gt;
 &lt;p&gt;问题是：如果 E 进来时 GPU 没有一块足够大的&lt;strong&gt;连续 KV 空间&lt;/strong&gt;，调度器仍然无法放进去。&lt;/p&gt;
 &lt;p&gt;PagedAttention 提供：&lt;/p&gt;
-$$
-\boxed{\text{细粒度可组合显存}}
-$$&lt;p&gt;Continuous batching 提供：&lt;/p&gt;
-$$
-\boxed{\text{细粒度 request scheduling}}
-$$&lt;p&gt;二者结合后才真正形成：&lt;/p&gt;
-$$
-\boxed{
-\text{空出来一点资源}
-\Rightarrow
-\text{马上拿去服务另一个请求}
-}
-$$&lt;p&gt;vLLM 官方目前仍把 PagedAttention 和 continuous batching 同时列为其高吞吐 serving 的核心能力。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com&#34;  title=&#34;vLLM - vLLM&#34;
+$$\boxed{\text{细粒度可组合显存}}$$&lt;p&gt;Continuous batching 提供：&lt;/p&gt;
+$$\boxed{\text{细粒度 request scheduling}}$$&lt;p&gt;二者结合后才真正形成：&lt;/p&gt;
+$$\boxed{ \text{空出来一点资源} \Rightarrow \text{马上拿去服务另一个请求} }$$&lt;p&gt;vLLM 官方目前仍把 PagedAttention 和 continuous batching 同时列为其高吞吐 serving 的核心能力。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com&#34;  title=&#34;vLLM - vLLM&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-它和-flashattention-到底是什么关系&#34;&gt;9. 它和 FlashAttention 到底是什么关系？
 &lt;/h1&gt;&lt;p&gt;这两个名字很容易混在一起，但解决的是不同层的问题。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;FlashAttention&lt;/strong&gt; 问：&lt;/p&gt;
-$$
-\boxed{
-\text{一次 attention computation 怎样减少 HBM↔SRAM 数据搬运？}
-}
-$$&lt;p&gt;它通过 tiling、kernel fusion 等方式降低 GPU 内存层级间的 IO，是：&lt;/p&gt;
-$$
-\boxed{\text{kernel / algorithmic IO optimization}}
-$$&lt;p&gt;。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com&#34;  title=&#34;FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness&#34;
+$$\boxed{ \text{一次 attention computation 怎样减少 HBM↔SRAM 数据搬运？} }$$&lt;p&gt;它通过 tiling、kernel fusion 等方式降低 GPU 内存层级间的 IO，是：&lt;/p&gt;
+$$\boxed{\text{kernel / algorithmic IO optimization}}$$&lt;p&gt;。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com&#34;  title=&#34;FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;PagedAttention&lt;/strong&gt; 问：&lt;/p&gt;
-$$
-\boxed{
-\text{几百个动态 sequence 的历史 KV 到底怎样放进 GPU memory？}
-}
-$$&lt;p&gt;它属于：&lt;/p&gt;
-$$
-\boxed{\text{serving memory management}}
-$$&lt;p&gt;所以可以简单记成：&lt;/p&gt;
-$$
-\boxed{
-\text{FlashAttention：一次 Attention 怎样算得更高效}
-}
-$$$$
-\boxed{
-\text{PagedAttention：大量请求的 KV 怎样活得更高效}
-}
-$$&lt;p&gt;现代系统完全可以同时使用两类优化；当前 vLLM 文档也明确列出了 FlashAttention/FlashInfer 等 optimized kernel 与其 KV Cache 管理能力。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com&#34;  title=&#34;vLLM - vLLM&#34;
+$$\boxed{ \text{几百个动态 sequence 的历史 KV 到底怎样放进 GPU memory？} }$$&lt;p&gt;它属于：&lt;/p&gt;
+$$\boxed{\text{serving memory management}}$$&lt;p&gt;所以可以简单记成：&lt;/p&gt;
+$$\boxed{ \text{FlashAttention：一次 Attention 怎样算得更高效} }$$$$\boxed{ \text{PagedAttention：大量请求的 KV 怎样活得更高效} }$$&lt;p&gt;现代系统完全可以同时使用两类优化；当前 vLLM 文档也明确列出了 FlashAttention/FlashInfer 等 optimized kernel 与其 KV Cache 管理能力。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com&#34;  title=&#34;vLLM - vLLM&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;10-pagedattention-真正改变的是容量--吞吐的转换率&#34;&gt;10. PagedAttention 真正改变的是“容量 → 吞吐”的转换率
 &lt;/h1&gt;&lt;p&gt;假设 GPU 能给 KV Cache 留：&lt;/p&gt;
-$$
-40\text{ GB}.
-$$&lt;p&gt;方案 A 的有效利用率只有：&lt;/p&gt;
-$$
-40\%.
-$$&lt;p&gt;真正保存 token states：&lt;/p&gt;
-$$
-16\text{ GB}.
-$$&lt;p&gt;方案 B 达到：&lt;/p&gt;
-$$
-95\%.
-$$&lt;p&gt;真正使用：&lt;/p&gt;
-$$
-38\text{ GB}.
-$$&lt;p&gt;即使：&lt;/p&gt;
+$$40\text{ GB}.$$&lt;p&gt;方案 A 的有效利用率只有：&lt;/p&gt;
+$$40\%.$$&lt;p&gt;真正保存 token states：&lt;/p&gt;
+$$16\text{ GB}.$$&lt;p&gt;方案 B 达到：&lt;/p&gt;
+$$95\%.$$&lt;p&gt;真正使用：&lt;/p&gt;
+$$38\text{ GB}.$$&lt;p&gt;即使：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;GPU FLOPS 没变；&lt;/li&gt;
 &lt;li&gt;模型没变；&lt;/li&gt;
 &lt;li&gt;attention 数学没变；&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;可同时驻留的请求数可能提高：&lt;/p&gt;
-&lt;p&gt;$$&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;2\times.
-$$&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;decode 又恰恰需要 batch 才能有效利用 GPU。&lt;/p&gt;
+$$&gt;2\times.$$&lt;p&gt;decode 又恰恰需要 batch 才能有效利用 GPU。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
-$$
-\boxed{
-\text{memory utilization}
-\rightarrow
-\text{batch capacity}
-\rightarrow
-\text{compute utilization}
-}
-$$&lt;p&gt;形成乘法效应。&lt;/p&gt;
+$$\boxed{ \text{memory utilization} \rightarrow \text{batch capacity} \rightarrow \text{compute utilization} }$$&lt;p&gt;形成乘法效应。&lt;/p&gt;
 &lt;p&gt;这解释了为什么一个“内存分配算法”能最终体现为明显的 tokens/s 提升。原始 vLLM 实验报告的 2–4× throughput 增益本质上正来自这种系统级连锁。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
@@ -1310,13 +778,7 @@ $$&lt;p&gt;形成乘法效应。&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;访问很简单。&lt;/p&gt;
 &lt;p&gt;paged KV 需要：&lt;/p&gt;
-$$
-\text{logical block}
-\rightarrow
-\text{block table}
-\rightarrow
-\text{physical block}.
-$$&lt;p&gt;这会增加：&lt;/p&gt;
+$$\text{logical block} \rightarrow \text{block table} \rightarrow \text{physical block}.$$&lt;p&gt;这会增加：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;地址间接寻址；&lt;/li&gt;
 &lt;li&gt;metadata；&lt;/li&gt;
@@ -1325,37 +787,18 @@ $$&lt;p&gt;这会增加：&lt;/p&gt;
 &lt;li&gt;block size 调优问题。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;block 太大：&lt;/p&gt;
-$$
-\Rightarrow
-\text{最后一页浪费增加}.
-$$&lt;p&gt;block 太小：&lt;/p&gt;
-$$
-\Rightarrow
-\text{block table、调度和 kernel overhead 增加}.
-$$&lt;p&gt;所以 PagedAttention 的真正贡献并不是“分页一定快”。&lt;/p&gt;
+$$\Rightarrow \text{最后一页浪费增加}.$$&lt;p&gt;block 太小：&lt;/p&gt;
+$$\Rightarrow \text{block table、调度和 kernel overhead 增加}.$$&lt;p&gt;所以 PagedAttention 的真正贡献并不是“分页一定快”。&lt;/p&gt;
 &lt;p&gt;而是：&lt;/p&gt;
-$$
-\boxed{
-\text{用一点访问复杂度，
-换取大量更有价值的并发容量。}
-}
-$$&lt;p&gt;这是典型 systems trade-off。&lt;/p&gt;
+$$\boxed{ \text{用一点访问复杂度， 换取大量更有价值的并发容量。} }$$&lt;p&gt;这是典型 systems trade-off。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;12-它也没有解决长上下文的所有问题&#34;&gt;12. 它也没有解决长上下文的所有问题
 &lt;/h1&gt;&lt;p&gt;PagedAttention 解决：&lt;/p&gt;
-$$
-\boxed{\text{KV Cache allocation efficiency}}
-$$&lt;p&gt;但如果上下文从：&lt;/p&gt;
-$$
-8K\rightarrow1M,
-$$&lt;p&gt;历史 KV 本身仍然巨大。&lt;/p&gt;
+$$\boxed{\text{KV Cache allocation efficiency}}$$&lt;p&gt;但如果上下文从：&lt;/p&gt;
+$$8K\rightarrow1M,$$&lt;p&gt;历史 KV 本身仍然巨大。&lt;/p&gt;
 &lt;p&gt;即使：&lt;/p&gt;
-$$
-100\%
-$$&lt;p&gt;利用显存，&lt;/p&gt;
-$$
-1M\text{ token KV}
-$$&lt;p&gt;还是 1M token KV。&lt;/p&gt;
+$$100\%$$&lt;p&gt;利用显存，&lt;/p&gt;
+$$1M\text{ token KV}$$&lt;p&gt;还是 1M token KV。&lt;/p&gt;
 &lt;p&gt;而普通 attention 的计算量问题也不会因为 paging 自动消失。&lt;/p&gt;
 &lt;p&gt;因此后续方向包括：&lt;/p&gt;
 &lt;ul&gt;
@@ -1371,27 +814,13 @@ $$&lt;p&gt;还是 1M token KV。&lt;/p&gt;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;所以 PagedAttention 更准确的位置是：&lt;/p&gt;
-$$
-\boxed{
-\text{KV Cache 系统架构的基础设施层}
-}
-$$&lt;p&gt;而不是长上下文问题的终点。&lt;/p&gt;
+$$\boxed{ \text{KV Cache 系统架构的基础设施层} }$$&lt;p&gt;而不是长上下文问题的终点。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-对-ai-agent-系统尤其有价值的启发&#34;&gt;13. 对 AI Agent 系统尤其有价值的启发
 &lt;/h1&gt;&lt;p&gt;Agent workload 往往不是简单：&lt;/p&gt;
-$$
-\text{prompt}\rightarrow\text{一次回答}.
-$$&lt;p&gt;而可能是：&lt;/p&gt;
-$$
-\text{system prompt}
-+\text{长历史}
-+\text{工具调用}
-+\text{新 observation}
-+\text{继续推理}.
-$$&lt;p&gt;于是大量请求可能共享：&lt;/p&gt;
-$$
-\boxed{\text{相同或部分相同的 prefix}}
-$$&lt;p&gt;例如同一 Agent 的：&lt;/p&gt;
+$$\text{prompt}\rightarrow\text{一次回答}.$$&lt;p&gt;而可能是：&lt;/p&gt;
+$$\text{system prompt} +\text{长历史} +\text{工具调用} +\text{新 observation} +\text{继续推理}.$$&lt;p&gt;于是大量请求可能共享：&lt;/p&gt;
+$$\boxed{\text{相同或部分相同的 prefix}}$$&lt;p&gt;例如同一 Agent 的：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;system instructions；&lt;/li&gt;
 &lt;li&gt;tool definitions；&lt;/li&gt;
@@ -1399,9 +828,7 @@ $$&lt;p&gt;例如同一 Agent 的：&lt;/p&gt;
 &lt;li&gt;cached documents。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;这时 KV Cache 开始具有一种很有意思的性质：&lt;/p&gt;
-$$
-\boxed{\text{它已经不只是 inference 临时内存，而是一种可复用计算状态。}}
-$$&lt;p&gt;一旦这样理解，问题自然会从：&lt;/p&gt;
+$$\boxed{\text{它已经不只是 inference 临时内存，而是一种可复用计算状态。}}$$&lt;p&gt;一旦这样理解，问题自然会从：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;怎样运行一次模型？&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -1410,21 +837,11 @@ $$&lt;p&gt;一旦这样理解，问题自然会从：&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;怎样管理、寻址、共享、淘汰一大批模型中间状态？&lt;/strong&gt;&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;这越来越像：&lt;/p&gt;
-$$
-\text{数据库}
-+
-\text{操作系统}
-+
-\text{分布式缓存}
-$$&lt;p&gt;问题，而不只是深度学习问题。&lt;/p&gt;
+$$\text{数据库} + \text{操作系统} + \text{分布式缓存}$$&lt;p&gt;问题，而不只是深度学习问题。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;14-对物理引擎科学计算也有一个很强的迁移&#34;&gt;14. 对物理引擎/科学计算也有一个很强的迁移
 &lt;/h1&gt;&lt;p&gt;PagedAttention 最深层的思想其实与 Attention 无关：&lt;/p&gt;
-$$
-\boxed{
-\text{logical continuity 不需要 physical continuity。}
-}
-$$&lt;p&gt;这在大型 simulation system 中也很有价值。&lt;/p&gt;
+$$\boxed{ \text{logical continuity 不需要 physical continuity。} }$$&lt;p&gt;这在大型 simulation system 中也很有价值。&lt;/p&gt;
 &lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;粒子池；&lt;/li&gt;
@@ -1435,13 +852,9 @@ $$&lt;p&gt;这在大型 simulation system 中也很有价值。&lt;/p&gt;
 &lt;li&gt;GPU constraint batches。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;如果对象数量：&lt;/p&gt;
-$$
-N(t)
-$$&lt;p&gt;动态增长、删除、分裂，&lt;/p&gt;
+$$N(t)$$&lt;p&gt;动态增长、删除、分裂，&lt;/p&gt;
 &lt;p&gt;强行要求：&lt;/p&gt;
-$$
-\boxed{\text{每个逻辑对象拥有连续可扩张物理数组}}
-$$&lt;p&gt;往往会制造：&lt;/p&gt;
+$$\boxed{\text{每个逻辑对象拥有连续可扩张物理数组}}$$&lt;p&gt;往往会制造：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;realloc；&lt;/li&gt;
 &lt;li&gt;memcpy；&lt;/li&gt;
@@ -1449,44 +862,14 @@ $$&lt;p&gt;往往会制造：&lt;/p&gt;
 &lt;li&gt;over-reservation。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;PagedAttention 的思考方式是：&lt;/p&gt;
-$$
-\boxed{
-\text{逻辑数据结构}
-\quad\neq\quad
-\text{物理内存布局}
-}
-$$&lt;p&gt;中间加入：&lt;/p&gt;
-$$
-\boxed{\text{indirection layer}}
-$$&lt;p&gt;以后，调度器获得了巨大的自由度。&lt;/p&gt;
+$$\boxed{ \text{逻辑数据结构} \quad\neq\quad \text{物理内存布局} }$$&lt;p&gt;中间加入：&lt;/p&gt;
+$$\boxed{\text{indirection layer}}$$&lt;p&gt;以后，调度器获得了巨大的自由度。&lt;/p&gt;
 &lt;p&gt;这是一种极其通用的高性能系统设计方法。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;一个很实用的部署诊断思路&#34;&gt;一个很实用的部署诊断思路
 &lt;/h2&gt;&lt;p&gt;如果以后部署自己的 LLM/Agent 服务，不要只监控：&lt;/p&gt;
-$$
-\text{GPU utilization}.
-$$&lt;p&gt;至少应该同时看：&lt;/p&gt;
-$$
-\boxed{
-\text{KV cache utilization}
-}
-$$$$
-\boxed{
-\text{running / waiting requests}
-}
-$$$$
-\boxed{
-\text{tokens/s}
-}
-$$$$
-\boxed{
-\text{TTFT}
-}
-$$$$
-\boxed{
-\text{inter-token latency}
-}
-$$&lt;p&gt;如果出现：&lt;/p&gt;
+$$\text{GPU utilization}.$$&lt;p&gt;至少应该同时看：&lt;/p&gt;
+$$\boxed{ \text{KV cache utilization} }$$$$\boxed{ \text{running / waiting requests} }$$$$\boxed{ \text{tokens/s} }$$$$\boxed{ \text{TTFT} }$$$$\boxed{ \text{inter-token latency} }$$&lt;p&gt;如果出现：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1500,12 +883,8 @@ $$&lt;p&gt;如果出现：&lt;/p&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;那么瓶颈很可能并不在：&lt;/p&gt;
-$$
-\text{更多 TFLOPS}
-$$&lt;p&gt;而在：&lt;/p&gt;
-$$
-\boxed{\text{serving memory capacity / scheduling}}
-$$&lt;p&gt;这一层。&lt;/p&gt;
+$$\text{更多 TFLOPS}$$&lt;p&gt;而在：&lt;/p&gt;
+$$\boxed{\text{serving memory capacity / scheduling}}$$&lt;p&gt;这一层。&lt;/p&gt;
 &lt;p&gt;这是做 AI 全栈工程时非常重要的性能诊断转变。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
@@ -1514,41 +893,14 @@ $$&lt;p&gt;这一层。&lt;/p&gt;
 &lt;p&gt;“把 KV Cache 分成 block。”&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;更重要的是：&lt;/p&gt;
-$$
-\boxed{
-\text{LLM serving 的性能，不能只从神经网络计算图理解。}
-}
-$$&lt;p&gt;模型进入真实服务以后：&lt;/p&gt;
-$$
-\text{模型结构}
-$$&lt;p&gt;只是系统中的一层。&lt;/p&gt;
+$$\boxed{ \text{LLM serving 的性能，不能只从神经网络计算图理解。} }$$&lt;p&gt;模型进入真实服务以后：&lt;/p&gt;
+$$\text{模型结构}$$&lt;p&gt;只是系统中的一层。&lt;/p&gt;
 &lt;p&gt;下面还有：&lt;/p&gt;
-$$
-\boxed{
-\text{GPU kernel}
-+
-\text{memory allocator}
-+
-\text{scheduler}
-+
-\text{cache}
-+
-\text{distributed runtime}.
-}
-$$&lt;p&gt;PagedAttention 特别漂亮的地方在于，它没有发明一个更聪明的 Transformer，而是把操作系统中已经成熟几十年的：&lt;/p&gt;
-$$
-\boxed{\text{virtual memory}}
-$$&lt;p&gt;重新映射到：&lt;/p&gt;
-$$
-\boxed{\text{KV Cache}}
-$$&lt;p&gt;上。&lt;/p&gt;
+$$\boxed{ \text{GPU kernel} + \text{memory allocator} + \text{scheduler} + \text{cache} + \text{distributed runtime}. }$$&lt;p&gt;PagedAttention 特别漂亮的地方在于，它没有发明一个更聪明的 Transformer，而是把操作系统中已经成熟几十年的：&lt;/p&gt;
+$$\boxed{\text{virtual memory}}$$&lt;p&gt;重新映射到：&lt;/p&gt;
+$$\boxed{\text{KV Cache}}$$&lt;p&gt;上。&lt;/p&gt;
 &lt;p&gt;最后得到的启发非常普遍：&lt;/p&gt;
-$$
-\boxed{
-\text{当一种资源具有“大小动态变化、生命周期不确定、存在共享机会”的特点时，
-优先考虑把逻辑地址与物理存储解耦。}
-}
-$$&lt;p&gt;这是一个远远超出 LLM serving 的工程思想。&lt;/p&gt;
+$$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确定、存在共享机会”的特点时， 优先考虑把逻辑地址与物理存储解耦。} }$$&lt;p&gt;这是一个远远超出 LLM serving 的工程思想。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;ol&gt;
 &lt;li&gt;

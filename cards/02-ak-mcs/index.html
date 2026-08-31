@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界 主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning\n领域：可靠性 × 代理模型 × 科学机器学习\n推荐阅读时间：约 7 分钟\nAK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：\n\\[ \\boxed{\\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}} \\]这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。\n1. 可靠性问题其实不是普通回归问题 设极限状态函数为：\n\\[ g(\\mathbf x) \\]通常规定：\n\\[ g(\\mathbf x)>0 \\quad \\text{安全} \\]\\[ g(\\mathbf x)\\le 0 \\quad \\text{失效}. \\]失效概率：\n\\[ P_f=P[g(\\mathbf X)\\le0]. \\]如果直接用 Monte Carlo：\n[ \\hat P_f \\frac{1}{N} \\sum_{i=1}^N I[g(\\mathbf x_i)\\le0]. ]\n真正昂贵的是：\n\\[ g(\\mathbf x_i) \\]可能意味着一次完整的 FEM、CFD 或多体动力学仿真。\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界 主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning\n领域：可靠性 × 代理模型 × 科学机器学习\n推荐阅读时间：约 7 分钟\nAK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：\n\\[\\boxed{\\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}}\\]这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。\n1. 可靠性问题其实不是普通回归问题 设极限状态函数为：\n\\[g(\\mathbf x)\\]通常规定：\n\\[g(\\mathbf x)>0 \\quad \\text{安全}\\]\\[g(\\mathbf x)\\le 0 \\quad \\text{失效}.\\]失效概率：\n\\[P_f=P[g(\\mathbf X)\\le0].\\]如果直接用 Monte Carlo：\n\\[\\hat P_f = \\frac{1}{N} \\sum_{i=1}^N I[g(\\mathbf x_i)\\le0].\\]真正昂贵的是：\n\\[g(\\mathbf x_i)\\]可能意味着一次完整的 FEM、CFD 或多体动力学仿真。\n假设：\n\\[P_f=10^{-4},\\]为了稳定估计这个概率，通常需要大量样本。\n问题随之出现：\n\\[10^5\\sim10^7\\]次高保真模型调用往往不可接受。\n于是自然想到：\n用 Kriging 代替真实模型。\n但这里很容易掉进一个坑。\n2. 全局 \\(R^2\\) 高，不代表可靠度准确 假设真实极限状态面是：\n">
 <title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/02-ak-mcs/'>
 
 <link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界">
-<meta property='og:description' content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界 主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning\n领域：可靠性 × 代理模型 × 科学机器学习\n推荐阅读时间：约 7 分钟\nAK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：\n\\[ \\boxed{\\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}} \\]这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。\n1. 可靠性问题其实不是普通回归问题 设极限状态函数为：\n\\[ g(\\mathbf x) \\]通常规定：\n\\[ g(\\mathbf x)>0 \\quad \\text{安全} \\]\\[ g(\\mathbf x)\\le 0 \\quad \\text{失效}. \\]失效概率：\n\\[ P_f=P[g(\\mathbf X)\\le0]. \\]如果直接用 Monte Carlo：\n[ \\hat P_f \\frac{1}{N} \\sum_{i=1}^N I[g(\\mathbf x_i)\\le0]. ]\n真正昂贵的是：\n\\[ g(\\mathbf x_i) \\]可能意味着一次完整的 FEM、CFD 或多体动力学仿真。\n">
+<meta property='og:description' content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界 主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning\n领域：可靠性 × 代理模型 × 科学机器学习\n推荐阅读时间：约 7 分钟\nAK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：\n\\[\\boxed{\\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}}\\]这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。\n1. 可靠性问题其实不是普通回归问题 设极限状态函数为：\n\\[g(\\mathbf x)\\]通常规定：\n\\[g(\\mathbf x)>0 \\quad \\text{安全}\\]\\[g(\\mathbf x)\\le 0 \\quad \\text{失效}.\\]失效概率：\n\\[P_f=P[g(\\mathbf X)\\le0].\\]如果直接用 Monte Carlo：\n\\[\\hat P_f = \\frac{1}{N} \\sum_{i=1}^N I[g(\\mathbf x_i)\\le0].\\]真正昂贵的是：\n\\[g(\\mathbf x_i)\\]可能意味着一次完整的 FEM、CFD 或多体动力学仿真。\n假设：\n\\[P_f=10^{-4},\\]为了稳定估计这个概率，通常需要大量样本。\n问题随之出现：\n\\[10^5\\sim10^7\\]次高保真模型调用往往不可接受。\n于是自然想到：\n用 Kriging 代替真实模型。\n但这里很容易掉进一个坑。\n2. 全局 \\(R^2\\) 高，不代表可靠度准确 假设真实极限状态面是：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/02-ak-mcs/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='科学机器学习' /><meta property='article:published_time' content='2026-08-15T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-15T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界">
-<meta name="twitter:description" content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界 主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning\n领域：可靠性 × 代理模型 × 科学机器学习\n推荐阅读时间：约 7 分钟\nAK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：\n\\[ \\boxed{\\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}} \\]这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。\n1. 可靠性问题其实不是普通回归问题 设极限状态函数为：\n\\[ g(\\mathbf x) \\]通常规定：\n\\[ g(\\mathbf x)>0 \\quad \\text{安全} \\]\\[ g(\\mathbf x)\\le 0 \\quad \\text{失效}. \\]失效概率：\n\\[ P_f=P[g(\\mathbf X)\\le0]. \\]如果直接用 Monte Carlo：\n[ \\hat P_f \\frac{1}{N} \\sum_{i=1}^N I[g(\\mathbf x_i)\\le0]. ]\n真正昂贵的是：\n\\[ g(\\mathbf x_i) \\]可能意味着一次完整的 FEM、CFD 或多体动力学仿真。\n">
+<meta name="twitter:description" content="AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界 主题：Active Kriging–Monte Carlo Simulation（AK-MCS）与 U-learning\n领域：可靠性 × 代理模型 × 科学机器学习\n推荐阅读时间：约 7 分钟\nAK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：\n\\[\\boxed{\\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}}\\]这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。\n1. 可靠性问题其实不是普通回归问题 设极限状态函数为：\n\\[g(\\mathbf x)\\]通常规定：\n\\[g(\\mathbf x)>0 \\quad \\text{安全}\\]\\[g(\\mathbf x)\\le 0 \\quad \\text{失效}.\\]失效概率：\n\\[P_f=P[g(\\mathbf X)\\le0].\\]如果直接用 Monte Carlo：\n\\[\\hat P_f = \\frac{1}{N} \\sum_{i=1}^N I[g(\\mathbf x_i)\\le0].\\]真正昂贵的是：\n\\[g(\\mathbf x_i)\\]可能意味着一次完整的 FEM、CFD 或多体动力学仿真。\n假设：\n\\[P_f=10^{-4},\\]为了稳定估计这个概率，通常需要大量样本。\n问题随之出现：\n\\[10^5\\sim10^7\\]次高保真模型调用往往不可接受。\n于是自然想到：\n用 Kriging 代替真实模型。\n但这里很容易掉进一个坑。\n2. 全局 \\(R^2\\) 高，不代表可靠度准确 假设真实极限状态面是：\n">
     </head>
     <body class="
     article-page
@@ -328,10 +328,6 @@
   </ol>
 
   <ol>
-    <li><a href="#sigma_rm-allow">\sigma_{\rm allow}</a></li>
-  </ol>
-
-  <ol>
     <li>
       <ol>
         <li><a href="#高维">高维</a></li>
@@ -423,41 +419,19 @@
 <strong>领域：可靠性 × 代理模型 × 科学机器学习</strong><br>
 <strong>推荐阅读时间：约 7 分钟</strong></p>
 <p>AK-MCS 值得学，不只是因为它“能少算几次有限元”。它更重要的价值在于重新定义了代理模型的任务：</p>
-\[
-\boxed{\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}}
-\]<p>这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。</p>
+\[\boxed{\text{可靠性代理模型不需要全局拟合得很好，只需要把失效分类做对}}\]<p>这与普通回归思维有很大区别。AK-MCS 是 Echard、Gayton 和 Lemaire 在 2011 年提出的经典主动学习可靠性方法，此后大量方法都可以视为对它的采样函数、可靠度估计器、停止准则或代理模型的改造。2022 年的一项系统综述甚至把 AK-MCS 与 EGRA 称作这个领域的两个里程碑框架。</p>
 <hr>
 <h2 id="1-可靠性问题其实不是普通回归问题">1. 可靠性问题其实不是普通回归问题
 </h2><p>设极限状态函数为：</p>
-\[
-g(\mathbf x)
-\]<p>通常规定：</p>
-\[
-g(\mathbf x)>0 \quad \text{安全}
-\]\[
-g(\mathbf x)\le 0 \quad \text{失效}.
-\]<p>失效概率：</p>
-\[
-P_f=P[g(\mathbf X)\le0].
-\]<p>如果直接用 Monte Carlo：</p>
-<h1 id="hat-p_f">[
-\hat P_f
-</h1><p>\frac{1}{N}
-\sum_{i=1}^N
-I[g(\mathbf x_i)\le0].
-]</p>
-<p>真正昂贵的是：</p>
-\[
-g(\mathbf x_i)
-\]<p>可能意味着一次完整的 FEM、CFD 或多体动力学仿真。</p>
+\[g(\mathbf x)\]<p>通常规定：</p>
+\[g(\mathbf x)>0 \quad \text{安全}\]\[g(\mathbf x)\le 0 \quad \text{失效}.\]<p>失效概率：</p>
+\[P_f=P[g(\mathbf X)\le0].\]<p>如果直接用 Monte Carlo：</p>
+\[\hat P_f = \frac{1}{N} \sum_{i=1}^N I[g(\mathbf x_i)\le0].\]<p>真正昂贵的是：</p>
+\[g(\mathbf x_i)\]<p>可能意味着一次完整的 FEM、CFD 或多体动力学仿真。</p>
 <p>假设：</p>
-\[
-P_f=10^{-4},
-\]<p>为了稳定估计这个概率，通常需要大量样本。</p>
+\[P_f=10^{-4},\]<p>为了稳定估计这个概率，通常需要大量样本。</p>
 <p>问题随之出现：</p>
-\[
-10^5\sim10^7
-\]<p>次高保真模型调用往往不可接受。</p>
+\[10^5\sim10^7\]<p>次高保真模型调用往往不可接受。</p>
 <p>于是自然想到：</p>
 <blockquote>
 <p>用 Kriging 代替真实模型。</p>
@@ -466,30 +440,12 @@ P_f=10^{-4},
 <hr>
 <h1 id="2-全局--高不代表可靠度准确">2. 全局 \(R^2\) 高，不代表可靠度准确
 </h1><p>假设真实极限状态面是：</p>
-\[
-g(x_1,x_2)=0.
-\]<p>你训练出一个 Kriging：</p>
-\[
-\hat g(\mathbf x).
-\]<p>普通代理建模通常优化：</p>
-<h1 id="mathrmrmse">[
-\mathrm{RMSE}
-</h1><p>\sqrt{
-\frac1N
-\sum_i
-(g_i-\hat g_i)^2
-}
-]</p>
-<p>或者追求：</p>
-\[
-R^2\rightarrow1.
-\]<p>但可靠性计算实际上只关心：</p>
-\[
-\boxed{\operatorname{sign}g(\mathbf x)}
-\]<p>尤其是在：</p>
-\[
-g(\mathbf x)\approx0
-\]<p>附近。</p>
+\[g(x_1,x_2)=0.\]<p>你训练出一个 Kriging：</p>
+\[\hat g(\mathbf x).\]<p>普通代理建模通常优化：</p>
+\[\mathrm{RMSE} = \sqrt{ \frac1N \sum_i (g_i-\hat g_i)^2 }\]<p>或者追求：</p>
+\[R^2\rightarrow1.\]<p>但可靠性计算实际上只关心：</p>
+\[\boxed{\operatorname{sign}g(\mathbf x)}\]<p>尤其是在：</p>
+\[g(\mathbf x)\approx0\]<p>附近。</p>
 <p>举个极端例子。</p>
 <p>两个区域：</p>
 <div class="highlight"><div class="chroma">
@@ -514,169 +470,70 @@ g(\mathbf x)\approx0
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>A 的误差：</p>
-\[
-|100-90|=10
-\]<p>很大，但可靠性分类仍正确：</p>
-\[
-100>0,\qquad90>0.
-\]<p>B 的误差：</p>
-\[
-|0.02-(-0.01)|=0.03
-\]<p>非常小，但：</p>
-\[
-+\rightarrow-
-\]<p>安全样本被直接判成失效。</p>
+\[|100-90|=10\]<p>很大，但可靠性分类仍正确：</p>
+\[100>0,\qquad90>0.\]<p>B 的误差：</p>
+\[|0.02-(-0.01)|=0.03\]<p>非常小，但：</p>
+\[+\rightarrow-\]<p>安全样本被直接判成失效。</p>
 <p>对于 \(P_f\) 来说，第二个误差可能远比第一个严重。</p>
 <p>因此可靠性问题真正对应的是：</p>
-\[
-\boxed{\text{classification accuracy near }g=0}
-\]<p>而不是：</p>
-\[
-\text{global regression accuracy}.
-\]<p>这就是 AK-MCS 的思想起点。</p>
+\[\boxed{\text{classification accuracy near }g=0}\]<p>而不是：</p>
+\[\text{global regression accuracy}.\]<p>这就是 AK-MCS 的思想起点。</p>
 <hr>
 <h1 id="3-kriging-恰好提供了主动学习需要的两个量">3. Kriging 恰好提供了主动学习需要的两个量
 </h1><p>Kriging 对某个输入 \(\mathbf x\) 给出：</p>
-\[
-G(\mathbf x)
-\sim
-\mathcal N
-\left(
-\mu(\mathbf x),
-\sigma^2(\mathbf x)
-\right).
-\]<p>其中：</p>
-\[
-\mu(\mathbf x)
-\]<p>是预测均值，</p>
-\[
-\sigma(\mathbf x)
-\]<p>是预测不确定性。</p>
+\[G(\mathbf x) \sim \mathcal N \left( \mu(\mathbf x), \sigma^2(\mathbf x) \right).\]<p>其中：</p>
+\[\mu(\mathbf x)\]<p>是预测均值，</p>
+\[\sigma(\mathbf x)\]<p>是预测不确定性。</p>
 <p>于是我们可以问：</p>
 <blockquote>
 <p>这个点被错误分类的可能性有多大？</p>
 </blockquote>
 <p>如果</p>
-\[
-|\mu|\gg\sigma,
-\]<p>例如：</p>
-\[
-\mu=10,\qquad\sigma=0.1,
-\]<p>那么几乎肯定：</p>
-\[
-g>0.
-\]<p>没有必要再花一次昂贵 FEM。</p>
+\[|\mu|\gg\sigma,\]<p>例如：</p>
+\[\mu=10,\qquad\sigma=0.1,\]<p>那么几乎肯定：</p>
+\[g>0.\]<p>没有必要再花一次昂贵 FEM。</p>
 <p>反过来，如果：</p>
-\[
-\mu=0.05,\qquad\sigma=0.1,
-\]<p>那么这个点到底属于：</p>
-\[
-g>0
-\]<p>还是</p>
-\[
-g<0
-\]<p>非常不确定。</p>
+\[\mu=0.05,\qquad\sigma=0.1,\]<p>那么这个点到底属于：</p>
+\[g>0\]<p>还是</p>
+\[g<0\]<p>非常不确定。</p>
 <p>于是 Echard 等提出非常简单的学习函数：</p>
-<h1 id="umathbf-x">[
-\boxed{
-U(\mathbf x)
-</h1><p>\frac{|\mu(\mathbf x)|}
-{\sigma(\mathbf x)}
-}
-]</p>
-<p>AK-MCS 每轮寻找：</p>
-<h1 id="mathbf-x">[
-\mathbf x^*
-</h1><p>\arg\min U(\mathbf x).
-]</p>
-<p>也就是优先计算：</p>
-\[
-\boxed{
-\text{离失效面近}
-+
-\text{预测又不确定}
-}
-\]<p>的样本。</p>
+\[\boxed{ U(\mathbf x) = \frac{|\mu(\mathbf x)|} {\sigma(\mathbf x)} }\]<p>AK-MCS 每轮寻找：</p>
+\[\mathbf x^* = \arg\min U(\mathbf x).\]<p>也就是优先计算：</p>
+\[\boxed{ \text{离失效面近} + \text{预测又不确定} }\]<p>的样本。</p>
 <hr>
 <h1 id="4-为什么--函数这么聪明">4. 为什么 \(U\) 函数这么聪明？
 </h1><p>这个式子看起来非常简单：</p>
-\[
-U=\frac{|\mu|}{\sigma}.
-\]<p>但它同时编码了两个需求。</p>
+\[U=\frac{|\mu|}{\sigma}.\]<p>但它同时编码了两个需求。</p>
 <p>如果：</p>
-\[
-|\mu|\rightarrow0,
-\]<p>说明预测点靠近：</p>
-\[
-g=0.
-\]<p>这是 <strong>exploitation</strong>：</p>
+\[|\mu|\rightarrow0,\]<p>说明预测点靠近：</p>
+\[g=0.\]<p>这是 <strong>exploitation</strong>：</p>
 <blockquote>
 <p>去研究我们已经认为可能存在失效边界的位置。</p>
 </blockquote>
 <p>如果：</p>
-\[
-\sigma\rightarrow\infty,
-\]<p>则：</p>
-\[
-U\rightarrow0.
-\]<p>这是 <strong>exploration</strong>：</p>
+\[\sigma\rightarrow\infty,\]<p>则：</p>
+\[U\rightarrow0.\]<p>这是 <strong>exploration</strong>：</p>
 <blockquote>
 <p>去研究代理模型没有把握的位置。</p>
 </blockquote>
 <p>所以 U-learning 实际是在做：</p>
-\[
-\boxed{
-\text{boundary exploitation}
-+
-\text{uncertainty exploration}
-}
-\]<p>这正是主动学习 acquisition function 的核心结构。</p>
+\[\boxed{ \text{boundary exploitation} + \text{uncertainty exploration} }\]<p>这正是主动学习 acquisition function 的核心结构。</p>
 <p>从机器学习视角看，它和 Bayesian optimization 中 EI、UCB 的思路非常接近。</p>
 <hr>
 <h1 id="5-一个更深的解释-本质上是分类置信度">5. 一个更深的解释：\(U\) 本质上是“分类置信度”
 </h1><p>假设：</p>
-\[
-G(\mathbf x)
-\sim
-N(\mu,\sigma^2).
-\]<p>如果：</p>
-\[
-\mu>0,
-\]<p>代理模型认为该点安全。</p>
+\[G(\mathbf x) \sim N(\mu,\sigma^2).\]<p>如果：</p>
+\[\mu>0,\]<p>代理模型认为该点安全。</p>
 <p>但真正失效的概率为：</p>
-<h1 id="pgle0">[
-P(G\le0)
-</h1><p>\Phi
-\left(
--\frac{\mu}{\sigma}
-\right).
-]</p>
-<p>因此：</p>
-<h1 id="p_rm-misclass">[
-P_{\rm misclass}
-</h1><p>\Phi(-U).
-]</p>
-<p>所以：</p>
-\[
-U=2
-\]<p>时：</p>
-\[
-P_{\rm misclass}
-\approx2.3\%.
-\]<p>这解释了 AK-MCS 中经典的：</p>
-\[
-U\ge2
-\]<p>停止思想。</p>
+\[P(G\le0) = \Phi \left( -\frac{\mu}{\sigma} \right).\]<p>因此：</p>
+\[P_{\rm misclass} = \Phi(-U).\]<p>所以：</p>
+\[U=2\]<p>时：</p>
+\[P_{\rm misclass} \approx2.3\%.\]<p>这解释了 AK-MCS 中经典的：</p>
+\[U\ge2\]<p>停止思想。</p>
 <p>当所有候选点都满足：</p>
-\[
-U\ge2,
-\]<p>意味着每个候选样本的 Kriging 分类都有相对较高置信度。</p>
+\[U\ge2,\]<p>意味着每个候选样本的 Kriging 分类都有相对较高置信度。</p>
 <p>因此它优化的目标非常明确：</p>
-\[
-\boxed{
-\text{让失效/安全分类足够可靠}
-}
-\]<p>而不是把整个响应面磨得越来越光滑。</p>
+\[\boxed{ \text{让失效/安全分类足够可靠} }\]<p>而不是把整个响应面磨得越来越光滑。</p>
 <hr>
 <h1 id="6-ak-mcs-实际如何运行">6. AK-MCS 实际如何运行
 </h1><p>算法结构可以压缩成：</p>
@@ -726,56 +583,19 @@ U\ge2,
 </div>
 </div><p>这里有一个非常漂亮的计算分工：</p>
 <p>真实模型负责：</p>
-\[
-N_{\rm HF}\sim几十\text{到几百}
-\]<p>次昂贵计算。</p>
+\[N_{\rm HF}\sim几十\text{到几百}\]<p>次昂贵计算。</p>
 <p>而：</p>
-\[
-10^5\sim10^7
-\]<p>个 Monte Carlo 点则交给极便宜的 Kriging。</p>
+\[10^5\sim10^7\]<p>个 Monte Carlo 点则交给极便宜的 Kriging。</p>
 <p>因此 AK-MCS 可以理解为：</p>
-\[
-\boxed{
-\text{Kriging负责降低单次成本}
-+
-\text{Active Learning负责减少训练点}
-+
-\text{MCS负责概率积分}
-}
-\]<p>这三个模块实际上相互独立。后来的统一研究框架也把主动可靠性分析拆成四个模块：</p>
-\[
-\boxed{
-\text{surrogate}
-+
-\text{reliability estimator}
-+
-\text{learning function}
-+
-\text{stopping criterion}
-}
-\]<p>这是一种很适合研究创新的模块化视角。</p>
+\[\boxed{ \text{Kriging负责降低单次成本} + \text{Active Learning负责减少训练点} + \text{MCS负责概率积分} }\]<p>这三个模块实际上相互独立。后来的统一研究框架也把主动可靠性分析拆成四个模块：</p>
+\[\boxed{ \text{surrogate} + \text{reliability estimator} + \text{learning function} + \text{stopping criterion} }\]<p>这是一种很适合研究创新的模块化视角。</p>
 <hr>
 <h1 id="7-为什么这对有限元问题特别有效">7. 为什么这对有限元问题特别有效？
 </h1><p>假设：</p>
-\[
-x_1=\text{材料模量},
-\]\[
-x_2=\text{间隙},
-\]\[
-x_3=\text{载荷},
-\]<p>有限元输出最大应力：</p>
-\[
-\sigma_{\max}(\mathbf x).
-\]<p>定义：</p>
-<h1 id="gmathbf-x">[
-g(\mathbf x)
-</h1><h2 id="sigma_rm-allow">\sigma_{\rm allow}
-</h2><p>\sigma_{\max}(\mathbf x).
-]</p>
-<p>普通 DoE 可能大量采样：</p>
-\[
-g\gg0
-\]<p>的安全区域。</p>
+\[x_1=\text{材料模量},\]\[x_2=\text{间隙},\]\[x_3=\text{载荷},\]<p>有限元输出最大应力：</p>
+\[\sigma_{\max}(\mathbf x).\]<p>定义：</p>
+\[g(\mathbf x) = \sigma_{\rm allow} - \sigma_{\max}(\mathbf x).\]<p>普通 DoE 可能大量采样：</p>
+\[g\gg0\]<p>的安全区域。</p>
 <p>例如：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -820,89 +640,44 @@ g\gg0
 </div>
 </div><p>即极限状态面附近。</p>
 <p>因此它实际上做的是：</p>
-\[
-\boxed{
-\text{information allocation}
-}
-\]<p>而不仅仅是 surrogate fitting。</p>
+\[\boxed{ \text{information allocation} }\]<p>而不仅仅是 surrogate fitting。</p>
 <hr>
 <h1 id="8-这也是为什么缺一个变量后--暴跌需要谨慎解释">8. 这也是为什么“缺一个变量后 \(R^2\) 暴跌”需要谨慎解释
 </h1><p>这里有一个非常重要的研究启发。</p>
 <p>假设完整输入：</p>
-\[
-g(x_1,x_2,x_3).
-\]<p>删除：</p>
-\[
-x_3
-\]<p>以后，得到：</p>
-\[
-\hat g(x_1,x_2).
-\]<p>如果 \(R^2\)：</p>
-\[
-0.96\rightarrow0.4,
-\]<p>通常会马上得出：</p>
+\[g(x_1,x_2,x_3).\]<p>删除：</p>
+\[x_3\]<p>以后，得到：</p>
+\[\hat g(x_1,x_2).\]<p>如果 \(R^2\)：</p>
+\[0.96\rightarrow0.4,\]<p>通常会马上得出：</p>
 <blockquote>
 <p>模型坏了。</p>
 </blockquote>
 <p>但可靠性问题真正应该再问一步：</p>
-\[
-\boxed{
-\operatorname{sign}(\hat g)
-\text{ 在 }g\approx0\text{ 区域还能不能保持正确？}
-}
-\]<p>可能出现两种完全不同的结果：</p>
+\[\boxed{ \operatorname{sign}(\hat g) \text{ 在 }g\approx0\text{ 区域还能不能保持正确？} }\]<p>可能出现两种完全不同的结果：</p>
 <p><strong>情况 A</strong></p>
-\[
-R^2=0.4
-\]<p>但 limit-state classification 很准确。</p>
+\[R^2=0.4\]<p>但 limit-state classification 很准确。</p>
 <p>则：</p>
-\[
-P_f
-\]<p>仍可能很好。</p>
+\[P_f\]<p>仍可能很好。</p>
 <p><strong>情况 B</strong></p>
-\[
-R^2=0.95
-\]<p>但少数失效边界点发生错判。</p>
+\[R^2=0.95\]<p>但少数失效边界点发生错判。</p>
 <p>则：</p>
-\[
-P_f
-\]<p>可能严重偏差。</p>
+\[P_f\]<p>可能严重偏差。</p>
 <p>因此对于可靠性代理模型，更适合关注：</p>
-\[
-P_{\rm misclass},
-\]\[
-\text{limit-state error},
-\]\[
-|\Delta P_f|,
-\]<p>而不能只看：</p>
-\[
-R^2,\quad RMSE.
-\]<p>这正是 AK-MCS 给出的评价范式转变。</p>
+\[P_{\rm misclass},\]\[\text{limit-state error},\]\[|\Delta P_f|,\]<p>而不能只看：</p>
+\[R^2,\quad RMSE.\]<p>这正是 AK-MCS 给出的评价范式转变。</p>
 <hr>
 <h1 id="9-ak-mcs-的局限在哪里">9. AK-MCS 的局限在哪里？
 </h1><p>AK-MCS 并非万能。</p>
 <p>最明显的问题是：</p>
 <h3 id="高维">高维
 </h3><p>随着维数增加：</p>
-\[
-d\uparrow
-\]<p>Gaussian Process 本身训练和候选集搜索都会越来越困难。</p>
+\[d\uparrow\]<p>Gaussian Process 本身训练和候选集搜索都会越来越困难。</p>
 <h3 id="极小失效概率">极小失效概率
 </h3><p>如果：</p>
-\[
-P_f\sim10^{-8},
-\]<p>crude Monte Carlo 候选池本身就会非常低效。</p>
+\[P_f\sim10^{-8},\]<p>crude Monte Carlo 候选池本身就会非常低效。</p>
 <p>因此常见改进是：</p>
-\[
-\text{AK}
-+
-\text{Importance Sampling},
-\]<p>或者：</p>
-\[
-\text{AK}
-+
-\text{Subset Simulation}.
-\]<p>Echard 等随后就在 2012 年发展了结合 importance sampling 与 Kriging 的方法，用于更小失效概率。</p>
+\[\text{AK} + \text{Importance Sampling},\]<p>或者：</p>
+\[\text{AK} + \text{Subset Simulation}.\]<p>Echard 等随后就在 2012 年发展了结合 importance sampling 与 Kriging 的方法，用于更小失效概率。</p>
 <h3 id="多个失效区域">多个失效区域
 </h3><p>如果存在多个相互分离的 failure islands：</p>
 <div class="highlight"><div class="chroma">
@@ -934,43 +709,24 @@ P_f\sim10^{-8},
 <hr>
 <h1 id="10-一个很新的方向给-ak-mcs-加统计认证">10. 一个很新的方向：给 AK-MCS 加“统计认证”
 </h1><p>经典 AK-MCS 中：</p>
-\[
-\sigma_{\rm GP}
-\]<p>来自 Gaussian Process 自身的概率模型。</p>
+\[\sigma_{\rm GP}\]<p>来自 Gaussian Process 自身的概率模型。</p>
 <p>问题是：</p>
 <blockquote>
 <p>如果 GP 模型假设本身错了呢？</p>
 </blockquote>
 <p>2026 年 6 月出现的一项工作提出 <strong>AK-MCS-C2</strong>，把 conformal prediction 与 AK-MCS 结合，希望给 surrogate classification error 提供更弱分布假设下的统计保证，尤其针对小样本和 rare-event reliability。这个方向目前仍比较新，适合作为“代理模型不确定性如何真正进入可靠度可信度”的研究入口。</p>
 <p>这背后实际上对应一个越来越重要的问题：</p>
-\[
-\boxed{
-\text{我们不仅要估计 }P_f，
-\text{还要知道这个 }P_f\text{ 有多可信。}
-}
-\]<hr>
+\[\boxed{ \text{我们不仅要估计 }P_f， \text{还要知道这个 }P_f\text{ 有多可信。} }\]<hr>
 <h1 id="今天最值得留下的一点">今天最值得留下的一点
 </h1><p>AK-MCS 最深刻的地方可以浓缩成一句：</p>
-\[
-\boxed{
-\text{采样策略应当服务于最终任务，而不是服务于代理模型本身。}
-}
-\]<p>如果任务是预测温度场：</p>
-\[
-\text{global RMSE}
-\]<p>可能很重要。</p>
+\[\boxed{ \text{采样策略应当服务于最终任务，而不是服务于代理模型本身。} }\]<p>如果任务是预测温度场：</p>
+\[\text{global RMSE}\]<p>可能很重要。</p>
 <p>如果任务是优化：</p>
-\[
-\text{optimum neighborhood}
-\]<p>更重要。</p>
+\[\text{optimum neighborhood}\]<p>更重要。</p>
 <p>如果任务是可靠性：</p>
-\[
-\boxed{\text{limit-state surface}}
-\]<p>才是信息最有价值的位置。</p>
+\[\boxed{\text{limit-state surface}}\]<p>才是信息最有价值的位置。</p>
 <p>因此在做任何代理模型之前，一个比“选什么核函数”更重要的问题是：</p>
-\[
-\boxed{\text{我真正需要这个 surrogate 判断什么？}}
-\]<hr>
+\[\boxed{\text{我真正需要这个 surrogate 判断什么？}}\]<hr>
 <h3 id="拓展阅读">拓展阅读
 </h3><p>原始方法首选 Echard, Gayton &amp; Lemaire, <em>AK-MCS: An active learning reliability method combining Kriging and Monte Carlo Simulation</em>, <strong>Structural Safety, 2011</strong>。这是整个方法族最值得先读的一篇。</p>
 <p>想建立完整知识地图，推荐 Moustapha, Marelli &amp; Sudret, <em>Active learning for structural reliability: Survey, general framework and benchmark</em>。作者把大量方法统一拆成 surrogate、reliability estimator、learning function 和 stopping criterion，并进行了大规模 benchmark。</p>

@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[ \\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}} \\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[ \\boxed{\\text{particle}\\leftrightarrow\\text{grid}} \\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[ \\boxed{\\text{Particles}} \\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[ \\boxed{\\text{Grid}} \\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[ \\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}. \\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[\\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}}\\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[\\boxed{\\text{particle}\\leftrightarrow\\text{grid}}\\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[\\boxed{\\text{Particles}}\\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[\\boxed{\\text{Grid}}\\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[\\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}.\\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
 <title>APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/06-apic/'>
 
 <link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”">
-<meta property='og:description' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[ \\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}} \\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[ \\boxed{\\text{particle}\\leftrightarrow\\text{grid}} \\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[ \\boxed{\\text{Particles}} \\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[ \\boxed{\\text{Grid}} \\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[ \\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}. \\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
+<meta property='og:description' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[\\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}}\\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[\\boxed{\\text{particle}\\leftrightarrow\\text{grid}}\\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[\\boxed{\\text{Particles}}\\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[\\boxed{\\text{Grid}}\\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[\\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}.\\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/06-apic/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='计算力学' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='软体动力学' /><meta property='article:tag' content='流体' /><meta property='article:tag' content='数值方法' /><meta property='article:published_time' content='2026-08-19T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-19T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”">
-<meta name="twitter:description" content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[ \\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}} \\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[ \\boxed{\\text{particle}\\leftrightarrow\\text{grid}} \\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[ \\boxed{\\text{Particles}} \\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[ \\boxed{\\text{Grid}} \\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[ \\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}. \\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
+<meta name="twitter:description" content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[\\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}}\\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[\\boxed{\\text{particle}\\leftrightarrow\\text{grid}}\\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[\\boxed{\\text{Particles}}\\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[\\boxed{\\text{Grid}}\\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[\\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}.\\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
     </head>
     <body class="
     article-page
@@ -410,7 +410,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 5 分钟
+                    阅读时长: 4 分钟
                 </time>
             </div>
         
@@ -430,20 +430,14 @@
 <strong>领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法</strong><br>
 <strong>推荐阅读时间：约 8 分钟</strong></p>
 <p>今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：</p>
-\[
-\boxed{\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}}
-\]<p>APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。</p>
+\[\boxed{\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}}\]<p>APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。</p>
 <p>这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。</p>
 <p>它只改变：</p>
-\[
-\boxed{\text{particle}\leftrightarrow\text{grid}}
-\]<p>之间到底传递多少信息。</p>
+\[\boxed{\text{particle}\leftrightarrow\text{grid}}\]<p>之间到底传递多少信息。</p>
 <hr>
 <h2 id="1-先理解-mpmpic-为什么需要来回搬数据">1. 先理解 MPM/PIC 为什么需要“来回搬数据”
 </h2><p>MPM 一类方法有两套表示：</p>
-\[
-\boxed{\text{Particles}}
-\]<p>负责携带材料：</p>
+\[\boxed{\text{Particles}}\]<p>负责携带材料：</p>
 <ul>
 <li>质量；</li>
 <li>位置；</li>
@@ -453,9 +447,7 @@
 <li>材料参数；</li>
 </ul>
 <p>而临时背景网格：</p>
-\[
-\boxed{\text{Grid}}
-\]<p>负责：</p>
+\[\boxed{\text{Grid}}\]<p>负责：</p>
 <ul>
 <li>汇聚质量；</li>
 <li>计算动量；</li>
@@ -464,15 +456,7 @@
 <li>求解运动。</li>
 </ul>
 <p>一个典型时间步近似是：</p>
-\[
-\text{Particles}
-\xrightarrow{\mathrm{P2G}}
-\text{Grid}
-\xrightarrow{\text{physics}}
-\text{Grid}
-\xrightarrow{\mathrm{G2P}}
-\text{Particles}.
-\]<p>这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。</p>
+\[\text{Particles} \xrightarrow{\mathrm{P2G}} \text{Grid} \xrightarrow{\text{physics}} \text{Grid} \xrightarrow{\mathrm{G2P}} \text{Particles}.\]<p>这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。</p>
 <p>于是出现了一个非常关键的问题：</p>
 <blockquote>
 <p>粒子上的连续速度场，被映射到网格，再映射回来以后，还剩下多少原始运动信息？</p>
@@ -481,145 +465,57 @@
 <hr>
 <h1 id="2-pic-的问题一个粒子只记住一个速度">2. PIC 的问题：一个粒子只记住一个速度
 </h1><p>传统 PIC 中，每个粒子基本只携带：</p>
-\[
-(x_p,v_p).
-\]<p>也就是说，对粒子附近的速度场，它采用：</p>
-\[
-v(x)\approx v_p.
-\]<p>这是一个<strong>零阶局部模型</strong>：</p>
-\[
-\boxed{\text{局部速度场是常数}}
-\]<p>P2G 时：</p>
-\[
-m_i=\sum_p w_{ip}m_p,
-\]<h1 id="m_i-v_i">[
-m_i v_i
-</h1><p>\sum_p
-w_{ip}m_pv_p.
-]</p>
-<p>网格算完之后，再插值回来：</p>
-<h1 id="v_pn1">[
-v_p^{n+1}
-</h1><p>\sum_iw_{ip}v_i^{n+1}.
-]</p>
-<p>问题就在这里。</p>
+\[(x_p,v_p).\]<p>也就是说，对粒子附近的速度场，它采用：</p>
+\[v(x)\approx v_p.\]<p>这是一个<strong>零阶局部模型</strong>：</p>
+\[\boxed{\text{局部速度场是常数}}\]<p>P2G 时：</p>
+\[m_i=\sum_p w_{ip}m_p,\]\[m_i v_i = \sum_p w_{ip}m_pv_p.\]<p>网格算完之后，再插值回来：</p>
+\[v_p^{n+1} = \sum_iw_{ip}v_i^{n+1}.\]<p>问题就在这里。</p>
 <p>假设真实局部运动是一个旋转：</p>
-\[
-v(x)=\omega\times(x-x_c).
-\]<p>在空间不同位置：</p>
-\[
-v(x_1)\neq v(x_2).
-\]<p>但传统 PIC 的一个粒子只留下一个：</p>
-\[
-v_p.
-\]<p>局部速度梯度：</p>
-\[
-\nabla v
-\]<p>就没有被粒子显式保存。</p>
+\[v(x)=\omega\times(x-x_c).\]<p>在空间不同位置：</p>
+\[v(x_1)\neq v(x_2).\]<p>但传统 PIC 的一个粒子只留下一个：</p>
+\[v_p.\]<p>局部速度梯度：</p>
+\[\nabla v\]<p>就没有被粒子显式保存。</p>
 <p>因此：</p>
-\[
-\text{particle}
-\rightarrow
-\text{grid}
-\rightarrow
-\text{particle}
-\]<p>实际上包含一次信息压缩。</p>
+\[\text{particle} \rightarrow \text{grid} \rightarrow \text{particle}\]<p>实际上包含一次信息压缩。</p>
 <p>APIC 原论文把 PIC 耗散的核心来源直接归结为这种 transfer 中的信息损失。</p>
 <hr>
 <h1 id="3-一个直观例子旋转的刚体块">3. 一个直观例子：旋转的刚体块
 </h1><p>考虑一团材料纯刚体旋转。</p>
 <p>真实速度：</p>
-\[
-v(x)=v_c+\omega\times(x-x_c).
-\]<p>这个速度场不是常数，而是一个<strong>线性/仿射速度场</strong>。</p>
+\[v(x)=v_c+\omega\times(x-x_c).\]<p>这个速度场不是常数，而是一个<strong>线性/仿射速度场</strong>。</p>
 <p>可以写成：</p>
-\[
-v(x)=v_c+C(x-x_c),
-\]<p>其中对于纯旋转：</p>
-\[
-C=
-[\omega]_\times.
-\]<p>现在让 PIC 反复执行：</p>
-\[
-P2G\rightarrow G2P.
-\]<p>粒子只记录：</p>
-\[
-v_p,
-\]<p>于是旋转速度场中的空间变化被不断重新插值和平均。</p>
+\[v(x)=v_c+C(x-x_c),\]<p>其中对于纯旋转：</p>
+\[C= [\omega]_\times.\]<p>现在让 PIC 反复执行：</p>
+\[P2G\rightarrow G2P.\]<p>粒子只记录：</p>
+\[v_p,\]<p>于是旋转速度场中的空间变化被不断重新插值和平均。</p>
 <p>结果表现为：</p>
-\[
-\omega\downarrow
-\]<p>即系统逐渐丢失旋转运动。</p>
+\[\omega\downarrow\]<p>即系统逐渐丢失旋转运动。</p>
 <p>宏观上你看到的是：</p>
-\[
-\boxed{\text{numerical dissipation}}
-\]<p>但微观原因实际上是：</p>
-\[
-\boxed{\text{representation loss}}
-\]<p>而不一定是阻尼项。</p>
+\[\boxed{\text{numerical dissipation}}\]<p>但微观原因实际上是：</p>
+\[\boxed{\text{representation loss}}\]<p>而不一定是阻尼项。</p>
 <p>这正是 APIC 最值得记住的洞察。</p>
 <hr>
 <h1 id="4-flip-为什么没有那么耗散">4. FLIP 为什么没有那么耗散？
 </h1><p>FLIP 采取另一种做法。</p>
 <p>它不简单把网格的新速度覆盖粒子：</p>
-<h1 id="v_pn1-1">[
-v_p^{n+1}
-</h1><p>\sum_i w_{ip}v_i^{n+1}.
-]</p>
-<p>而是把网格上的<strong>速度增量</strong>传给粒子：</p>
-<h1 id="v_pn1-2">[
-v_p^{n+1}
-</h1><p>v_p^n
-+
-\sum_iw_{ip}
-\left(
-v_i^{n+1}-v_i^n
-\right).
-]</p>
-<p>所以粒子原本拥有的信息：</p>
-\[
-v_p^n
-\]<p>不会被每步重新投影掉。</p>
+\[v_p^{n+1} = \sum_i w_{ip}v_i^{n+1}.\]<p>而是把网格上的<strong>速度增量</strong>传给粒子：</p>
+\[v_p^{n+1} = v_p^n + \sum_iw_{ip} \left( v_i^{n+1}-v_i^n \right).\]<p>所以粒子原本拥有的信息：</p>
+\[v_p^n\]<p>不会被每步重新投影掉。</p>
 <p>这就是为什么 FLIP 通常耗散更小。</p>
 <p>但代价也随之而来。</p>
 <p>粒子可以保存一些网格无法解析的 velocity modes；这些信息不会被 PIC 那样的投影过程过滤掉，于是可能不断积累。APIC 后续的角动量守恒分析明确指出，FLIP 缺少 PIC 的 filtering property，因此可能积累粒子速度模式并出现数值不稳定。</p>
 <p>因此可以把两者粗略理解为：</p>
-\[
-\boxed{
-\text{PIC：过滤太强}
-}
-\]\[
-\boxed{
-\text{FLIP：过滤太弱}
-}
-\]<p>这比简单理解成“PIC 有阻尼、FLIP 没阻尼”准确得多。</p>
+\[\boxed{ \text{PIC：过滤太强} }\]\[\boxed{ \text{FLIP：过滤太弱} }\]<p>这比简单理解成“PIC 有阻尼、FLIP 没阻尼”准确得多。</p>
 <hr>
 <h1 id="5-apic-的核心粒子多保存一个局部速度梯度">5. APIC 的核心：粒子多保存一个局部速度梯度
 </h1><p>APIC 的突破其实很简单。</p>
 <p>传统粒子：</p>
-\[
-(x_p,v_p)
-\]<p>升级成：</p>
-\[
-\boxed{(x_p,v_p,C_p)}
-\]<p>其中：</p>
-\[
-C_p
-\]<p>描述粒子附近的 affine velocity field：</p>
-<h1 id="vx">[
-\boxed{
-v(x)
-</h1><p>v_p+
-C_p(x-x_p)
-}
-]</p>
-<p>于是传统 PIC 的局部表示：</p>
-\[
-v(x)\approx v_p
-\]<p>从零阶升级为：</p>
-\[
-v(x)\approx v_p+C_p(x-x_p).
-\]<p>这意味着一个粒子不只知道：</p>
+\[(x_p,v_p)\]<p>升级成：</p>
+\[\boxed{(x_p,v_p,C_p)}\]<p>其中：</p>
+\[C_p\]<p>描述粒子附近的 affine velocity field：</p>
+\[\boxed{ v(x) = v_p+ C_p(x-x_p) }\]<p>于是传统 PIC 的局部表示：</p>
+\[v(x)\approx v_p\]<p>从零阶升级为：</p>
+\[v(x)\approx v_p+C_p(x-x_p).\]<p>这意味着一个粒子不只知道：</p>
 <blockquote>
 <p>“我在往哪里移动。”</p>
 </blockquote>
@@ -629,63 +525,24 @@ v(x)\approx v_p+C_p(x-x_p).
 </blockquote>
 <p>例如：</p>
 <h3 id="平移">平移
-</h3>\[
-C_p=0.
-\]<h3 id="刚体旋转">刚体旋转
-</h3>\[
-C_p=[\omega]_\times.
-\]<h3 id="剪切">剪切
+</h3>\[C_p=0.\]<h3 id="刚体旋转">刚体旋转
+</h3>\[C_p=[\omega]_\times.\]<h3 id="剪切">剪切
 </h3><p>可能有：</p>
-\[
-C_p=
-\begin{bmatrix}
-0 & \gamma\\
-0 & 0
-\end{bmatrix}.
-\]<h3 id="拉伸">拉伸
+\[C_p= \begin{bmatrix} 0 & \gamma\\ 0 & 0 \end{bmatrix}.\]<h3 id="拉伸">拉伸
 </h3><p>可能有：</p>
-\[
-C_p=
-\begin{bmatrix}
-a&0\\
-0&b
-\end{bmatrix}.
-\]<p>因此一个 APIC particle 实际上带着一个“小型局部速度场”。</p>
+\[C_p= \begin{bmatrix} a&0\\ 0&b \end{bmatrix}.\]<p>因此一个 APIC particle 实际上带着一个“小型局部速度场”。</p>
 <p>这正是作者所谓 <strong>locally affine rather than locally constant velocity representation</strong>。</p>
 <hr>
 <h1 id="6-p2g-因此发生了本质变化">6. P2G 因此发生了本质变化
 </h1><p>传统 PIC：</p>
-<h1 id="m_i-v_i-1">[
-m_i v_i
-</h1><p>\sum_p
-w_{ip}m_pv_p.
-]</p>
-<p>APIC 则近似变成：</p>
-<h1 id="m_i-v_i-2">[
-m_i v_i
-</h1><p>\sum_p
-w_{ip}m_p
-\left[
-v_p+C_p(x_i-x_p)
-\right].
-]</p>
-<p>注意后面的：</p>
-\[
-\boxed{
-C_p(x_i-x_p)
-}
-\]<p>就是 APIC 多出来的信息。</p>
+\[m_i v_i = \sum_p w_{ip}m_pv_p.\]<p>APIC 则近似变成：</p>
+\[m_i v_i = \sum_p w_{ip}m_p \left[ v_p+C_p(x_i-x_p) \right].\]<p>注意后面的：</p>
+\[\boxed{ C_p(x_i-x_p) }\]<p>就是 APIC 多出来的信息。</p>
 <p>假设一个粒子处于旋转速度场。</p>
 <p>如果只传：</p>
-\[
-v_p,
-\]<p>网格不知道该粒子周围存在旋转。</p>
+\[v_p,\]<p>网格不知道该粒子周围存在旋转。</p>
 <p>但 APIC 会告诉相邻节点：</p>
-\[
-v_i
-\approx
-v_p+C_p(x_i-x_p).
-\]<p>于是网格得到的不是一块常值速度：</p>
+\[v_i \approx v_p+C_p(x_i-x_p).\]<p>于是网格得到的不是一块常值速度：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -713,102 +570,51 @@ v_p+C_p(x_i-x_p).
 </div>
 </div><p>这样的局部变化。</p>
 <p>所以：</p>
-\[
-P2G
-\]<p>过程中不再把 affine velocity modes 全部压扁掉。</p>
+\[P2G\]<p>过程中不再把 affine velocity modes 全部压扁掉。</p>
 <hr>
 <h1 id="7-为什么它还能解决角动量问题">7. 为什么它还能解决角动量问题？
 </h1><p>这是 APIC 更深的一层。</p>
 <p>一个粒子的总运动并不只有：</p>
-\[
-m_pv_p
-\]<p>对应的平移动量。</p>
+\[m_pv_p\]<p>对应的平移动量。</p>
 <p>局部 affine field：</p>
-\[
-C_p
-\]<p>还包含粒子附近的旋转信息。</p>
+\[C_p\]<p>还包含粒子附近的旋转信息。</p>
 <p>因此 APIC 在 particle-grid transfer 中可以同时维护：</p>
-\[
-\boxed{\text{linear momentum}}
-\]<p>以及：</p>
-\[
-\boxed{\text{angular momentum}}.
-\]<p>后续严格分析证明 APIC transfer 可以精确保持线动量和角动量；结合 midpoint rule 更新 grid momentum 时，完整步骤也可以做到两者的精确守恒。</p>
+\[\boxed{\text{linear momentum}}\]<p>以及：</p>
+\[\boxed{\text{angular momentum}}.\]<p>后续严格分析证明 APIC transfer 可以精确保持线动量和角动量；结合 midpoint rule 更新 grid momentum 时，完整步骤也可以做到两者的精确守恒。</p>
 <p>这解释了一个非常有价值的现象：</p>
 <blockquote>
 <p>APIC 的低耗散不是靠“少一点 damping parameter”获得的。</p>
 </blockquote>
 <p>它来自：</p>
-\[
-\boxed{\text{状态空间变丰富}}
-\]<p>使原来无法表达的角动量信息有地方存储。</p>
+\[\boxed{\text{状态空间变丰富}}\]<p>使原来无法表达的角动量信息有地方存储。</p>
 <hr>
 <h1 id="8-这和-fem-中的阶次其实有相似思想">8. 这和 FEM 中的“阶次”其实有相似思想
 </h1><p>这里有一个很适合迁移的理解。</p>
 <p>传统 PIC particle：</p>
-\[
-v(x)\approx v_p
-\]<p>是局部：</p>
-\[
-P_0
-\]<p>式描述。</p>
+\[v(x)\approx v_p\]<p>是局部：</p>
+\[P_0\]<p>式描述。</p>
 <p>APIC：</p>
-\[
-v(x)\approx v_p+C_p(x-x_p)
-\]<p>加入一阶项：</p>
-\[
-P_1.
-\]<p>于是一个自然的问题是：</p>
+\[v(x)\approx v_p+C_p(x-x_p)\]<p>加入一阶项：</p>
+\[P_1.\]<p>于是一个自然的问题是：</p>
 <blockquote>
 <p>为什么停在 affine？</p>
 </blockquote>
 <p>完全可以继续：</p>
-<h1 id="vx-1">[
-v(x)
-</h1><p>v_p+
-C_p(x-x_p)
-+
-Q_p:(x-x_p)^2+\cdots
-]</p>
-<p>这正是后来的 <strong>PolyPIC（Polynomial Particle-In-Cell）</strong> 思路：进一步丰富粒子携带的局部速度场表示。相关工作明确把 APIC 看成粒子局部模式扩展的一部分。</p>
+\[v(x) = v_p+ C_p(x-x_p) + Q_p:(x-x_p)^2+\cdots\]<p>这正是后来的 <strong>PolyPIC（Polynomial Particle-In-Cell）</strong> 思路：进一步丰富粒子携带的局部速度场表示。相关工作明确把 APIC 看成粒子局部模式扩展的一部分。</p>
 <p>所以：</p>
-\[
-\boxed{
-\text{PIC}
-\rightarrow
-\text{APIC}
-\rightarrow
-\text{PolyPIC}
-}
-\]<p>其实可以理解为：</p>
-\[
-\boxed{
-\text{particle velocity basis enrichment}
-}
-\]<p>与有限元里：</p>
-\[
-P_1\rightarrow P_2\rightarrow P_3
-\]<p>提高 approximation space 的思想有相似性。</p>
+\[\boxed{ \text{PIC} \rightarrow \text{APIC} \rightarrow \text{PolyPIC} }\]<p>其实可以理解为：</p>
+\[\boxed{ \text{particle velocity basis enrichment} }\]<p>与有限元里：</p>
+\[P_1\rightarrow P_2\rightarrow P_3\]<p>提高 approximation space 的思想有相似性。</p>
 <hr>
 <h1 id="9-mls-mpm-又把-apic-推进了一步">9. MLS-MPM 又把 APIC 推进了一步
 </h1><p>2018 年 Hu 等提出 <strong>Moving Least Squares MPM（MLS-MPM）</strong>。</p>
 <p>这篇工作很重要，因为它说明 APIC 不只是一个经验性的 transfer trick。</p>
 <p>从 Moving Least Squares 的角度出发，可以自然推导出 APIC，甚至进一步得到 PolyPIC，并让 particle-grid transfer 与一种 Galerkin-style weak-form discretization 相一致。</p>
 <p>这意味着：</p>
-\[
-\boxed{
-\text{APIC transfer}
-}
-\]<p>可以被理解成一种：</p>
-\[
-\boxed{
-\text{局部函数重构}
-}
-\]<p>问题。</p>
+\[\boxed{ \text{APIC transfer} }\]<p>可以被理解成一种：</p>
+\[\boxed{ \text{局部函数重构} }\]<p>问题。</p>
 <p>已知粒子附近的数据，我们希望找：</p>
-\[
-v(x)=v_p+C_p(x-x_p)
-\]<p>这样的局部函数，使它尽可能好地解释附近网格/粒子信息。</p>
+\[v(x)=v_p+C_p(x-x_p)\]<p>这样的局部函数，使它尽可能好地解释附近网格/粒子信息。</p>
 <p>于是 APIC 与：</p>
 <ul>
 <li>moving least squares；</li>
@@ -822,75 +628,31 @@ v(x)=v_p+C_p(x-x_p)
 <h1 id="10-apic-有一个容易混淆的点-不是材料形变梯度">10. APIC 有一个容易混淆的点：\(C_p\) 不是材料形变梯度 \(F_p\)
 </h1><p>这是实现 MPM 时特别容易混在一起的两个量。</p>
 <p>材料形变梯度：</p>
-<h1 id="f_p">[
-F_p
-</h1><p>\frac{\partial x}{\partial X}
-]</p>
-<p>描述：</p>
-\[
-\boxed{\text{material deformation}}
-\]<p>并进入 constitutive model：</p>
-\[
-P=P(F).
-\]<p>例如 Neo-Hookean：</p>
-<h1 id="psif">[
-\Psi(F)
-</h1><p>\frac{\mu}{2}
-(\operatorname{tr}(F^TF)-d)
--\mu\ln J
-+
-\frac{\lambda}{2}(\ln J)^2.
-]</p>
-<p>而 APIC：</p>
-\[
-C_p
-\]<p>描述：</p>
-\[
-\boxed{\text{local velocity variation}}
-\]<p>近似：</p>
-\[
-C_p\approx\nabla v.
-\]<p>二者有联系：</p>
-<h1 id="dot-f">[
-\dot F
-</h1><p>(\nabla v)F,
-]</p>
-<p>但职责不同：</p>
-\[
-\boxed{
-F_p:\ \text{材料状态}
-}
-\]\[
-\boxed{
-C_p:\ \text{传输状态}
-}
-\]<p>这个区分非常重要。</p>
+\[F_p = \frac{\partial x}{\partial X}\]<p>描述：</p>
+\[\boxed{\text{material deformation}}\]<p>并进入 constitutive model：</p>
+\[P=P(F).\]<p>例如 Neo-Hookean：</p>
+\[\Psi(F) = \frac{\mu}{2} (\operatorname{tr}(F^TF)-d) -\mu\ln J + \frac{\lambda}{2}(\ln J)^2.\]<p>而 APIC：</p>
+\[C_p\]<p>描述：</p>
+\[\boxed{\text{local velocity variation}}\]<p>近似：</p>
+\[C_p\approx\nabla v.\]<p>二者有联系：</p>
+\[\dot F = (\nabla v)F,\]<p>但职责不同：</p>
+\[\boxed{ F_p:\ \text{材料状态} }\]\[\boxed{ C_p:\ \text{传输状态} }\]<p>这个区分非常重要。</p>
 <hr>
 <h1 id="11-它真正揭示的求解器设计原则">11. 它真正揭示的求解器设计原则
 </h1><p>现在把 APIC 从 MPM 中抽出来。</p>
 <p>假设一个模拟器不断在：</p>
-\[
-A\rightarrow B\rightarrow A
-\]<p>两个 representation 之间转换。</p>
+\[A\rightarrow B\rightarrow A\]<p>两个 representation 之间转换。</p>
 <p>如果：</p>
-\[
-A
-\]<p>可以描述 100 个自由度的信息，而：</p>
-\[
-B
-\]<p>只能表示其中 70 个，那么即使两边：</p>
+\[A\]<p>可以描述 100 个自由度的信息，而：</p>
+\[B\]<p>只能表示其中 70 个，那么即使两边：</p>
 <ul>
 <li>时间积分完全正确；</li>
 <li>材料模型完全正确；</li>
 <li>force calculation 完全正确，</li>
 </ul>
 <p>每次：</p>
-\[
-A\rightarrow B\rightarrow A
-\]<p>依然会发生：</p>
-\[
-\boxed{\text{information loss}}
-\]<p>表现出来可能就是：</p>
+\[A\rightarrow B\rightarrow A\]<p>依然会发生：</p>
+\[\boxed{\text{information loss}}\]<p>表现出来可能就是：</p>
 <ul>
 <li>damping；</li>
 <li>smoothing；</li>
@@ -902,92 +664,40 @@ A\rightarrow B\rightarrow A
 <hr>
 <h1 id="12-这与你熟悉的-xpbd软体问题其实有直接联系">12. 这与你熟悉的 XPBD/软体问题其实有直接联系
 </h1><p>考虑：</p>
-\[
-x
-\rightarrow
-\text{constraint solve}
-\rightarrow
-x'
-\]<p>然后速度通过：</p>
-<h1 id="vn1">[
-v^{n+1}
-</h1><p>\frac{x^{n+1}-x^n}{h}
-]</p>
-<p>重建。</p>
+\[x \rightarrow \text{constraint solve} \rightarrow x'\]<p>然后速度通过：</p>
+\[v^{n+1} = \frac{x^{n+1}-x^n}{h}\]<p>重建。</p>
 <p>你实际上也在进行一种：</p>
-\[
-\boxed{
-\text{state representation transfer}
-}
-\]<p>原本系统有：</p>
-\[
-(x^n,v^n)
-\]<p>两个状态；</p>
+\[\boxed{ \text{state representation transfer} }\]<p>原本系统有：</p>
+\[(x^n,v^n)\]<p>两个状态；</p>
 <p>position solve 改变：</p>
-\[
-x,
-\]<p>最后又从位置差重新构造：</p>
-\[
-v.
-\]<p>如果 constraint projection 中某种运动模式无法被保持，那么：</p>
-\[
-v^n
-\]<p>中原来存在的信息可能在：</p>
-\[
-x\rightarrow v
-\]<p>重建过程中消失。</p>
+\[x,\]<p>最后又从位置差重新构造：</p>
+\[v.\]<p>如果 constraint projection 中某种运动模式无法被保持，那么：</p>
+\[v^n\]<p>中原来存在的信息可能在：</p>
+\[x\rightarrow v\]<p>重建过程中消失。</p>
 <p>于是你看到：</p>
-\[
-KE\downarrow.
-\]<p>这时候继续问：</p>
+\[KE\downarrow.\]<p>这时候继续问：</p>
 <blockquote>
 <p>“哪个 damping parameter 太大？”</p>
 </blockquote>
 <p>可能找不到答案。</p>
 <p>更应该问：</p>
-\[
-\boxed{
-\text{整个时间步的不同 representation 是否携带相同的信息空间？}
-}
-\]<p>这就是 APIC 能迁移到 XPBD/物理求解器设计上的真正价值。</p>
+\[\boxed{ \text{整个时间步的不同 representation 是否携带相同的信息空间？} }\]<p>这就是 APIC 能迁移到 XPBD/物理求解器设计上的真正价值。</p>
 <hr>
 <h1 id="13-一个很好的工程测试transfer-null-test">13. 一个很好的工程测试：Transfer Null Test
 </h1><p>如果以后实现 MPM/APIC，我非常建议单独测试 transfer，而不要直接上完整材料仿真。</p>
 <p>设置：</p>
-\[
-f_{\rm internal}=0,
-\]\[
-f_{\rm external}=0,
-\]<p>不进行 constitutive update。</p>
+\[f_{\rm internal}=0,\]\[f_{\rm external}=0,\]<p>不进行 constitutive update。</p>
 <p>只不断：</p>
-\[
-P2G\rightarrow G2P.
-\]<p>然后分别初始化：</p>
+\[P2G\rightarrow G2P.\]<p>然后分别初始化：</p>
 <h3 id="test-a常速度场">Test A：常速度场
-</h3>\[
-v(x)=c
-\]<p>检查：</p>
-\[
-\Delta P.
-\]<h3 id="test-b刚体旋转">Test B：刚体旋转
-</h3>\[
-v(x)=\omega\times x
-\]<p>检查：</p>
-\[
-\Delta L.
-\]<h3 id="test-c线性速度场">Test C：线性速度场
-</h3>\[
-v(x)=Ax+b
-\]<p>检查：</p>
-\[
-\|v^{(k)}-v^{(0)}\|.
-\]<p>如果一个方法经过：</p>
-\[
-100
-\]<p>次纯 transfer 后，旋转逐渐停下来，那么你已经证明：</p>
-\[
-\boxed{\text{耗散来自 transfer}}
-\]<p>而与：</p>
+</h3>\[v(x)=c\]<p>检查：</p>
+\[\Delta P.\]<h3 id="test-b刚体旋转">Test B：刚体旋转
+</h3>\[v(x)=\omega\times x\]<p>检查：</p>
+\[\Delta L.\]<h3 id="test-c线性速度场">Test C：线性速度场
+</h3>\[v(x)=Ax+b\]<p>检查：</p>
+\[\|v^{(k)}-v^{(0)}\|.\]<p>如果一个方法经过：</p>
+\[100\]<p>次纯 transfer 后，旋转逐渐停下来，那么你已经证明：</p>
+\[\boxed{\text{耗散来自 transfer}}\]<p>而与：</p>
 <ul>
 <li>constitutive model；</li>
 <li>timestep；</li>
@@ -1000,9 +710,7 @@ v(x)=Ax+b
 <h1 id="14-apic-的局限">14. APIC 的局限
 </h1><p>APIC 并没有消灭 MPM 的其他误差来源。</p>
 <p>它主要处理的是：</p>
-\[
-\boxed{\text{particle-grid velocity transfer}}
-\]<p>这一层。</p>
+\[\boxed{\text{particle-grid velocity transfer}}\]<p>这一层。</p>
 <p>MPM 仍然可能受到：</p>
 <ul>
 <li>interpolation kernel；</li>
@@ -1016,41 +724,16 @@ v(x)=Ax+b
 <p>等因素影响。</p>
 <p>例如近年来对 MPM 的研究仍在处理 cell-crossing error 和 transfer kernel 连续性问题。2024 年提出的 CK-MPM 就专门针对传统 MPM kernel 的稳定性、扩散和计算支撑域之间的权衡，并明确保持与 APIC/MLS-MPM 的兼容。</p>
 <p>因此 APIC 在知识体系中的位置更准确地说是：</p>
-\[
-\boxed{
-\text{constitutive law}
-\quad\vert\quad
-\underbrace{\textbf{particle-grid transfer}}_{\text{APIC}}
-\quad\vert\quad
-\text{grid solver}
-}
-\]<p>它解决的是中间这一层，而不是完整 MPM 的所有数值问题。</p>
+\[\boxed{ \text{constitutive law} \quad\vert\quad \underbrace{\textbf{particle-grid transfer}}_{\text{APIC}} \quad\vert\quad \text{grid solver} }\]<p>它解决的是中间这一层，而不是完整 MPM 的所有数值问题。</p>
 <hr>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
 </h1><p>APIC 最值得记住的其实不是：</p>
-<h1 id="v_i">[
-v_i
-</h1><p>\sum_p w_{ip}
-\left[v_p+C_p(x_i-x_p)\right].
-]</p>
-<p>而是：</p>
-\[
-\boxed{
-\text{如果一个数值方法不断丢失某种物理量，
-先检查算法内部的 representation 是否有能力表示它。}
-}
-\]<p>PIC 的问题并不只是“参数太耗散”。</p>
+\[v_i = \sum_p w_{ip} \left[v_p+C_p(x_i-x_p)\right].\]<p>而是：</p>
+\[\boxed{ \text{如果一个数值方法不断丢失某种物理量， 先检查算法内部的 representation 是否有能力表示它。} }\]<p>PIC 的问题并不只是“参数太耗散”。</p>
 <p>它原来的粒子状态：</p>
-\[
-(x_p,v_p)
-\]<p>根本没有足够的局部自由度来携带完整的一阶速度结构。</p>
+\[(x_p,v_p)\]<p>根本没有足够的局部自由度来携带完整的一阶速度结构。</p>
 <p>APIC 的解决方案于是非常干净：</p>
-\[
-\boxed{
-\text{不要补偿丢掉的信息，
-让状态表示从一开始就能够携带它。}
-}
-\]<p>这是一种比调 damping、clamp 或 blending coefficient 更深一层的求解器设计思想。</p>
+\[\boxed{ \text{不要补偿丢掉的信息， 让状态表示从一开始就能够携带它。} }\]<p>这是一种比调 damping、clamp 或 blending coefficient 更深一层的求解器设计思想。</p>
 <h3 id="拓展阅读">拓展阅读
 </h3><ol>
 <li>
