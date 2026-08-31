@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存” 主题：PagedAttention 与 KV Cache 虚拟内存化 领域：AI 全栈工程 × 大模型推理 × GPU 系统 推荐阅读时间：约 8–10 分钟\nPagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：\n$$ \\boxed{\\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}} $$vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 20.4%–38.2%；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 2–4× serving throughput。(arXiv)\n更值得学的是它背后的思想：\n$$ \\boxed{\\text{资源布局本身，也是算法的一部分。}} $$ 1. 为什么 LLM 推理会突然变成“内存管理问题”？ 自回归模型生成第 \\(t\\) 个 token 时，需要：\n">
+<title>PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/18-paged-attention/'>
+
+<link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”">
+<meta property='og:description' content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存” 主题：PagedAttention 与 KV Cache 虚拟内存化 领域：AI 全栈工程 × 大模型推理 × GPU 系统 推荐阅读时间：约 8–10 分钟\nPagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：\n$$ \\boxed{\\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}} $$vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 20.4%–38.2%；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 2–4× serving throughput。(arXiv)\n更值得学的是它背后的思想：\n$$ \\boxed{\\text{资源布局本身，也是算法的一部分。}} $$ 1. 为什么 LLM 推理会突然变成“内存管理问题”？ 自回归模型生成第 \\(t\\) 个 token 时，需要：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/18-paged-attention/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:tag' content='大模型推理' /><meta property='article:tag' content='GPU 系统' /><meta property='article:published_time' content='2026-08-31T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-31T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”">
+<meta name="twitter:description" content="PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存” 主题：PagedAttention 与 KV Cache 虚拟内存化 领域：AI 全栈工程 × 大模型推理 × GPU 系统 推荐阅读时间：约 8–10 分钟\nPagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：\n$$ \\boxed{\\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}} $$vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 20.4%–38.2%；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 2–4× serving throughput。(arXiv)\n更值得学的是它背后的思想：\n$$ \\boxed{\\text{资源布局本身，也是算法的一部分。}} $$ 1. 为什么 LLM 推理会突然变成“内存管理问题”？ 自回归模型生成第 \\(t\\) 个 token 时，需要：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-为什么-llm-推理会突然变成内存管理问题">1. 为什么 LLM 推理会突然变成“内存管理问题”？</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#一个很实用的部署诊断思路">一个很实用的部署诊断思路</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/18-paged-attention/">PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-31T00:00:00Z'>Aug 31, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 7 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="pagedattentionllm-推理的关键突破有时不是更快算-attention而是像操作系统一样管理显存">PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”
+</h1><p><strong>主题：PagedAttention 与 KV Cache 虚拟内存化</strong>
+<strong>领域：AI 全栈工程 × 大模型推理 × GPU 系统</strong>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>PagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：</p>
+$$
+\boxed{\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}
+$$<p>vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 <strong>20.4%–38.2%</strong>；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 <strong>2–4× serving throughput</strong>。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<p>更值得学的是它背后的思想：</p>
+$$
+\boxed{\text{资源布局本身，也是算法的一部分。}}
+$$<hr>
+<h2 id="1-为什么-llm-推理会突然变成内存管理问题">1. 为什么 LLM 推理会突然变成“内存管理问题”？
+</h2><p>自回归模型生成第 \(t\) 个 token 时，需要：</p>
+$$
+q_t
+$$<p>与之前所有 token 的：</p>
+$$
+k_1,\ldots,k_t
+$$<p>计算 attention。</p>
+<p>如果每生成一个 token 都重新计算过去所有 token 的 \(K,V\)，浪费极大。</p>
+<p>所以推理系统保存：</p>
+$$
+\boxed{\text{KV Cache}}
+$$<p>即每层过去所有 token 的：</p>
+$$
+K,V.
+$$<p>下一步只计算新 token 的：</p>
+$$
+K_t,V_t
+$$<p>再读取历史 cache。</p>
+<p>因此 decode 阶段大致变成：</p>
+$$
+\text{计算一个新 token}
++
+\boxed{\text{读取越来越大的历史 KV}}
+$$<p>而且生成过程严格自回归：</p>
+$$
+x_1\rightarrow x_2\rightarrow\cdots
+$$<p>单请求的 GPU 并行度并不高。原始 vLLM 论文指出，这使 generation/decode 阶段高度 memory-bound，提高吞吐量的关键之一是同时 batch 更多请求。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<p>于是产生了一个链条：</p>
+$$
+\boxed{
+\text{KV Cache 占用}
+\rightarrow
+\text{能容纳多少并发 sequence}
+\rightarrow
+\text{batch size}
+\rightarrow
+\text{GPU utilization}
+\rightarrow
+\text{吞吐量}
+}
+$$<p>所以浪费 10 GB 显存并不只是“浪费 10 GB”。</p>
+<p>它可能意味着：</p>
+$$
+\boxed{\text{少跑一大批并发请求。}}
+$$<hr>
+<h1 id="2-kv-cache-到底有多大">2. KV Cache 到底有多大？
+</h1><p>对于传统 multi-head/GQA Transformer，一个 token 的 KV Cache 大致为：</p>
+<h1 id="m_rm-token">$$
+M_{\rm token}
+</h1><p>2
+\times L
+\times H_{\rm KV}
+\times d_{\rm head}
+\times b
+$$</p>
+<p>其中：</p>
+<ul>
+<li>\(2\)：Key + Value；</li>
+<li>\(L\)：Transformer 层数；</li>
+<li>\(H_{\rm KV}\)：KV heads；</li>
+<li>\(d_{\rm head}\)：head dimension；</li>
+<li>\(b\)：每个元素字节数。</li>
+</ul>
+<p>举一个示意模型：</p>
+$$
+L=32,\quad
+H_{\rm KV}=8,\quad
+d_{\rm head}=128,
+$$<p>BF16：</p>
+$$
+b=2.
+$$<p>那么：</p>
+<h1 id="m_rm-token-1">$$
+M_{\rm token}
+</h1><h1 id="2times32times8times128times2">2\times32\times8\times128\times2
+</h1><p>128\text{ KB/token}.
+$$</p>
+<p>一个：</p>
+$$
+8192
+$$<p>token sequence 就大约需要：</p>
+$$
+\boxed{1\text{ GB KV Cache}}
+$$<p>这还只是一个请求。</p>
+<p>如果同时服务：</p>
+$$
+40
+$$<p>条长 sequence：</p>
+$$
+\approx40\text{ GB}.
+$$<p>所以长上下文时代，KV Cache 很容易从“附属数据”变成 inference infrastructure 的核心资源。</p>
+<p>vLLM 原论文举的历史例子更夸张：OPT-13B FP16 每 token KV 约 800 KB，因此长度 2048 的单个请求最大约需 1.6 GB KV Cache。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<hr>
+<h1 id="3-真正麻烦的还不是大而是长度事先不知道">3. 真正麻烦的还不是“大”，而是长度事先不知道
+</h1><p>假设用户请求：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Prompt：500 tokens
+</span></span><span class="line"><span class="cl">最大输出：2000 tokens
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>服务器不知道实际会生成：</p>
+$$
+50？
+\quad500？
+\quad2000？
+$$<p>token。</p>
+<p>旧式做法很自然：</p>
+<blockquote>
+<p>为安全起见，先给它分配能够容纳最大长度的连续 tensor。</p>
+</blockquote>
+<p>于是可能预留：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">| used | used | used | future future future future future |
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果请求 300 token 就结束：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">| actual KV |              wasted memory                |
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>与此同时，GPU 上还有很多不同长度请求：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">AAAAAAA
+</span></span><span class="line"><span class="cl">BBBB
+</span></span><span class="line"><span class="cl">CCCCCCCCCCCC
+</span></span><span class="line"><span class="cl">DD
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>它们不断：</p>
+<ul>
+<li>生成 token；</li>
+<li>增长；</li>
+<li>完成；</li>
+<li>释放。</li>
+</ul>
+<p>这就是经典动态内存管理问题：</p>
+$$
+\boxed{
+\text{internal fragmentation}
++
+\text{external fragmentation}
+}
+$$<p>vLLM 团队测得，当时一些连续分配方案中真正用于 token state 的 KV 空间比例最低只有约 20.4%。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<p>这时继续优化矩阵乘 kernel 已经无法解决根本问题。</p>
+<hr>
+<h1 id="4-pagedattention-的核心其实来自操作系统">4. PagedAttention 的核心其实来自操作系统
+</h1><p>操作系统几十年前遇到过几乎同样的问题。</p>
+<p>一个进程认为自己拥有连续虚拟地址：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Page 0
+</span></span><span class="line"><span class="cl">Page 1
+</span></span><span class="line"><span class="cl">Page 2
+</span></span><span class="line"><span class="cl">Page 3
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>但实际 RAM 可以放成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Physical frame 17 ← Page 0
+</span></span><span class="line"><span class="cl">Physical frame  3 ← Page 1
+</span></span><span class="line"><span class="cl">Physical frame 52 ← Page 2
+</span></span><span class="line"><span class="cl">Physical frame  8 ← Page 3
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>通过：</p>
+$$
+\boxed{\text{page table}}
+$$<p>建立：</p>
+$$
+\text{logical page}
+\rightarrow
+\text{physical frame}.
+$$<p>PagedAttention 把这个思想迁移过来：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>OS</th>
+					<th>LLM</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>process</td>
+					<td>sequence/request</td>
+			</tr>
+			<tr>
+					<td>virtual page</td>
+					<td>logical KV block</td>
+			</tr>
+			<tr>
+					<td>physical frame</td>
+					<td>GPU KV block</td>
+			</tr>
+			<tr>
+					<td>page table</td>
+					<td>block table</td>
+			</tr>
+			<tr>
+					<td>bytes</td>
+					<td>token KV states</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>于是一个 sequence：</p>
+$$
+[1,2,3,4,5,\ldots]
+$$<p>逻辑上连续，</p>
+<p>但 KV 可以实际存成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">logical:
+</span></span><span class="line"><span class="cl">B0 → B1 → B2 → B3
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">physical GPU memory:
+</span></span><span class="line"><span class="cl">B2 | free | B0 | other | B3 | B1
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>attention kernel 根据 block table 去取。</p>
+<p><strong>物理连续性不再是逻辑连续性的必要条件。</strong></p>
+<p>这就是 PagedAttention 最核心的突破。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<hr>
+<h1 id="5-它并没有近似-attention">5. 它并没有近似 Attention
+</h1><p>这是一个很重要的澄清。</p>
+<p>正常 attention：</p>
+<h1 id="a_ij">$$
+a_{ij}
+</h1><p>\operatorname{softmax}
+\left(
+\frac{q_i^Tk_j}{\sqrt d}
+\right).
+$$</p>
+<p>PagedAttention 仍然读取这些：</p>
+$$
+K,V
+$$<p>完成 attention。</p>
+<p>变化的是：</p>
+$$
+\boxed{\text{这些 }K,V\text{ 在物理显存中的布局}}
+$$<p>因此它本质上属于：</p>
+$$
+\boxed{\text{memory virtualization}}
+$$<p>而不是：</p>
+$$
+\text{sparse attention}
+$$<p>或：</p>
+$$
+\text{approximate attention}.
+$$<p>vLLM 官方当前实现仍以固定 token 数的 cache block 为基本管理单元，其 cache 配置中明确包含 <code>block_size</code>、KV Cache memory size、prefix caching、KV offloading 等参数。(<a class="link" href="https://docs.vllm.ai/en/stable/api/vllm/config/cache/"  title="cache - vLLM"
+     target="_blank" rel="noopener"
+    >vLLM</a>)</p>
+<hr>
+<h1 id="6-为什么分页以后碎片突然变得容易控制">6. 为什么分页以后碎片突然变得容易控制？
+</h1><p>假设 block size 为：</p>
+$$
+B=16\text{ tokens}.
+$$<p>一个 100 token 请求需要：</p>
+$$
+\left\lceil\frac{100}{16}\right\rceil=7
+$$<p>个 block。</p>
+<p>真正浪费只发生在最后一个 block：</p>
+$$
+112-100=12\text{ tokens}.
+$$<p>因此内部碎片上界从“可能预留整个最大 sequence”缩小到：</p>
+$$
+\boxed{<1\text{ block/request}}
+$$<p>同时所有 physical block 都同样大小：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">[block][block][block][block][block]
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>任何释放出来的 block 都可以供另一个 sequence 使用。</p>
+<p>这基本消除了经典意义上的 external fragmentation。原论文正是通过固定大小 block、按需分配实现 near-zero KV Cache memory waste。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<hr>
+<h1 id="7-更厉害的是page-还能共享">7. 更厉害的是：page 还能共享
+</h1><p>假设用户要求：</p>
+<blockquote>
+<p>对同一个 prompt 生成 8 个候选答案。</p>
+</blockquote>
+<p>传统方式容易得到：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Prompt KV + Output A
+</span></span><span class="line"><span class="cl">Prompt KV + Output B
+</span></span><span class="line"><span class="cl">Prompt KV + Output C
+</span></span><span class="line"><span class="cl">...
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>prompt 的：</p>
+$$
+K,V
+$$<p>被复制 8 份。</p>
+<p>Paged memory 允许：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">                 ┌→ Output A blocks
+</span></span><span class="line"><span class="cl">Shared Prompt ───┼→ Output B blocks
+</span></span><span class="line"><span class="cl">                 ├→ Output C blocks
+</span></span><span class="line"><span class="cl">                 └→ Output D blocks
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>多个 logical sequences 指向相同 physical KV blocks。</p>
+<p>只有发生分叉后才分配自己的 block。</p>
+<p>这其实就是：</p>
+$$
+\boxed{\text{Copy-on-Write}}
+$$<p>思想。</p>
+<p>原论文在 beam search 场景中报告，block sharing 在其测试中最高可以节省约 55% 的 KV memory。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<p>这个能力后来也自然演化出了：</p>
+$$
+\boxed{\text{Prefix Caching}}
+$$<p>如果不同请求拥有完全相同的 prefix，就可以复用已经计算好的 KV blocks。vLLM 官方实现使用 block tokens 与此前 prefix 来标识 cache block。(<a class="link" href="https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html"  title="Implementation — vLLM"
+     target="_blank" rel="noopener"
+    >vLLM</a>)</p>
+<hr>
+<h1 id="8-pagedattention-和-continuous-batching-为什么经常一起出现">8. PagedAttention 和 Continuous Batching 为什么经常一起出现？
+</h1><p>这是理解 serving stack 的关键。</p>
+<p>Continuous batching 做的是：</p>
+<blockquote>
+<p>一个 request 完成，就立即把新 request 加入执行 batch。</p>
+</blockquote>
+<p>因此 batch 不再：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">等所有请求结束
+</span></span><span class="line"><span class="cl">→ 换下一批
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>而是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">iteration 1:
+</span></span><span class="line"><span class="cl">A B C D
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">iteration 2:
+</span></span><span class="line"><span class="cl">A B C D
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">C 完成
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">iteration 3:
+</span></span><span class="line"><span class="cl">A B E D
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这样 GPU 更容易持续吃满。</p>
+<p>问题是：如果 E 进来时 GPU 没有一块足够大的<strong>连续 KV 空间</strong>，调度器仍然无法放进去。</p>
+<p>PagedAttention 提供：</p>
+$$
+\boxed{\text{细粒度可组合显存}}
+$$<p>Continuous batching 提供：</p>
+$$
+\boxed{\text{细粒度 request scheduling}}
+$$<p>二者结合后才真正形成：</p>
+$$
+\boxed{
+\text{空出来一点资源}
+\Rightarrow
+\text{马上拿去服务另一个请求}
+}
+$$<p>vLLM 官方目前仍把 PagedAttention 和 continuous batching 同时列为其高吞吐 serving 的核心能力。(<a class="link" href="https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com"  title="vLLM - vLLM"
+     target="_blank" rel="noopener"
+    >vLLM</a>)</p>
+<hr>
+<h1 id="9-它和-flashattention-到底是什么关系">9. 它和 FlashAttention 到底是什么关系？
+</h1><p>这两个名字很容易混在一起，但解决的是不同层的问题。</p>
+<p><strong>FlashAttention</strong> 问：</p>
+$$
+\boxed{
+\text{一次 attention computation 怎样减少 HBM↔SRAM 数据搬运？}
+}
+$$<p>它通过 tiling、kernel fusion 等方式降低 GPU 内存层级间的 IO，是：</p>
+$$
+\boxed{\text{kernel / algorithmic IO optimization}}
+$$<p>。(<a class="link" href="https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com"  title="FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<p><strong>PagedAttention</strong> 问：</p>
+$$
+\boxed{
+\text{几百个动态 sequence 的历史 KV 到底怎样放进 GPU memory？}
+}
+$$<p>它属于：</p>
+$$
+\boxed{\text{serving memory management}}
+$$<p>所以可以简单记成：</p>
+$$
+\boxed{
+\text{FlashAttention：一次 Attention 怎样算得更高效}
+}
+$$$$
+\boxed{
+\text{PagedAttention：大量请求的 KV 怎样活得更高效}
+}
+$$<p>现代系统完全可以同时使用两类优化；当前 vLLM 文档也明确列出了 FlashAttention/FlashInfer 等 optimized kernel 与其 KV Cache 管理能力。(<a class="link" href="https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com"  title="vLLM - vLLM"
+     target="_blank" rel="noopener"
+    >vLLM</a>)</p>
+<hr>
+<h1 id="10-pagedattention-真正改变的是容量--吞吐的转换率">10. PagedAttention 真正改变的是“容量 → 吞吐”的转换率
+</h1><p>假设 GPU 能给 KV Cache 留：</p>
+$$
+40\text{ GB}.
+$$<p>方案 A 的有效利用率只有：</p>
+$$
+40\%.
+$$<p>真正保存 token states：</p>
+$$
+16\text{ GB}.
+$$<p>方案 B 达到：</p>
+$$
+95\%.
+$$<p>真正使用：</p>
+$$
+38\text{ GB}.
+$$<p>即使：</p>
+<ul>
+<li>GPU FLOPS 没变；</li>
+<li>模型没变；</li>
+<li>attention 数学没变；</li>
+</ul>
+<p>可同时驻留的请求数可能提高：</p>
+<p>$$</p>
+<blockquote>
+<p>2\times.
+$$</p>
+</blockquote>
+<p>decode 又恰恰需要 batch 才能有效利用 GPU。</p>
+<p>所以：</p>
+$$
+\boxed{
+\text{memory utilization}
+\rightarrow
+\text{batch capacity}
+\rightarrow
+\text{compute utilization}
+}
+$$<p>形成乘法效应。</p>
+<p>这解释了为什么一个“内存分配算法”能最终体现为明显的 tokens/s 提升。原始 vLLM 实验报告的 2–4× throughput 增益本质上正来自这种系统级连锁。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<hr>
+<h1 id="11-这个方法的代价是什么">11. 这个方法的代价是什么？
+</h1><p>Paging 绝不是免费午餐。</p>
+<p>连续 KV：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">base_ptr + offset
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>访问很简单。</p>
+<p>paged KV 需要：</p>
+$$
+\text{logical block}
+\rightarrow
+\text{block table}
+\rightarrow
+\text{physical block}.
+$$<p>这会增加：</p>
+<ul>
+<li>地址间接寻址；</li>
+<li>metadata；</li>
+<li>kernel 复杂度；</li>
+<li>非连续内存访问；</li>
+<li>block size 调优问题。</li>
+</ul>
+<p>block 太大：</p>
+$$
+\Rightarrow
+\text{最后一页浪费增加}.
+$$<p>block 太小：</p>
+$$
+\Rightarrow
+\text{block table、调度和 kernel overhead 增加}.
+$$<p>所以 PagedAttention 的真正贡献并不是“分页一定快”。</p>
+<p>而是：</p>
+$$
+\boxed{
+\text{用一点访问复杂度，
+换取大量更有价值的并发容量。}
+}
+$$<p>这是典型 systems trade-off。</p>
+<hr>
+<h1 id="12-它也没有解决长上下文的所有问题">12. 它也没有解决长上下文的所有问题
+</h1><p>PagedAttention 解决：</p>
+$$
+\boxed{\text{KV Cache allocation efficiency}}
+$$<p>但如果上下文从：</p>
+$$
+8K\rightarrow1M,
+$$<p>历史 KV 本身仍然巨大。</p>
+<p>即使：</p>
+$$
+100\%
+$$<p>利用显存，</p>
+$$
+1M\text{ token KV}
+$$<p>还是 1M token KV。</p>
+<p>而普通 attention 的计算量问题也不会因为 paging 自动消失。</p>
+<p>因此后续方向包括：</p>
+<ul>
+<li>GQA/MQA：减少 KV heads；</li>
+<li>FP8/低比特 KV Cache；</li>
+<li>KV eviction/compression；</li>
+<li>sliding-window/sparse attention；</li>
+<li>prefix caching；</li>
+<li>CPU/NVMe KV offloading；</li>
+<li>disaggregated prefill/decode。</li>
+</ul>
+<p>当前 vLLM 稳定版配置已经显式支持 KV Cache dtype、memory bytes、prefix caching 和 KV offloading 等机制。(<a class="link" href="https://docs.vllm.ai/en/stable/api/vllm/config/cache/"  title="cache - vLLM"
+     target="_blank" rel="noopener"
+    >vLLM</a>)</p>
+<p>所以 PagedAttention 更准确的位置是：</p>
+$$
+\boxed{
+\text{KV Cache 系统架构的基础设施层}
+}
+$$<p>而不是长上下文问题的终点。</p>
+<hr>
+<h1 id="13-对-ai-agent-系统尤其有价值的启发">13. 对 AI Agent 系统尤其有价值的启发
+</h1><p>Agent workload 往往不是简单：</p>
+$$
+\text{prompt}\rightarrow\text{一次回答}.
+$$<p>而可能是：</p>
+$$
+\text{system prompt}
++\text{长历史}
++\text{工具调用}
++\text{新 observation}
++\text{继续推理}.
+$$<p>于是大量请求可能共享：</p>
+$$
+\boxed{\text{相同或部分相同的 prefix}}
+$$<p>例如同一 Agent 的：</p>
+<ul>
+<li>system instructions；</li>
+<li>tool definitions；</li>
+<li>repository context；</li>
+<li>cached documents。</li>
+</ul>
+<p>这时 KV Cache 开始具有一种很有意思的性质：</p>
+$$
+\boxed{\text{它已经不只是 inference 临时内存，而是一种可复用计算状态。}}
+$$<p>一旦这样理解，问题自然会从：</p>
+<blockquote>
+<p>怎样运行一次模型？</p>
+</blockquote>
+<p>升级成：</p>
+<blockquote>
+<p><strong>怎样管理、寻址、共享、淘汰一大批模型中间状态？</strong></p>
+</blockquote>
+<p>这越来越像：</p>
+$$
+\text{数据库}
++
+\text{操作系统}
++
+\text{分布式缓存}
+$$<p>问题，而不只是深度学习问题。</p>
+<hr>
+<h1 id="14-对物理引擎科学计算也有一个很强的迁移">14. 对物理引擎/科学计算也有一个很强的迁移
+</h1><p>PagedAttention 最深层的思想其实与 Attention 无关：</p>
+$$
+\boxed{
+\text{logical continuity 不需要 physical continuity。}
+}
+$$<p>这在大型 simulation system 中也很有价值。</p>
+<p>例如：</p>
+<ul>
+<li>粒子池；</li>
+<li>contact manifold；</li>
+<li>sparse grid；</li>
+<li>dynamic mesh；</li>
+<li>ECS component storage；</li>
+<li>GPU constraint batches。</li>
+</ul>
+<p>如果对象数量：</p>
+$$
+N(t)
+$$<p>动态增长、删除、分裂，</p>
+<p>强行要求：</p>
+$$
+\boxed{\text{每个逻辑对象拥有连续可扩张物理数组}}
+$$<p>往往会制造：</p>
+<ul>
+<li>realloc；</li>
+<li>memcpy；</li>
+<li>fragmentation；</li>
+<li>over-reservation。</li>
+</ul>
+<p>PagedAttention 的思考方式是：</p>
+$$
+\boxed{
+\text{逻辑数据结构}
+\quad\neq\quad
+\text{物理内存布局}
+}
+$$<p>中间加入：</p>
+$$
+\boxed{\text{indirection layer}}
+$$<p>以后，调度器获得了巨大的自由度。</p>
+<p>这是一种极其通用的高性能系统设计方法。</p>
+<hr>
+<h2 id="一个很实用的部署诊断思路">一个很实用的部署诊断思路
+</h2><p>如果以后部署自己的 LLM/Agent 服务，不要只监控：</p>
+$$
+\text{GPU utilization}.
+$$<p>至少应该同时看：</p>
+$$
+\boxed{
+\text{KV cache utilization}
+}
+$$$$
+\boxed{
+\text{running / waiting requests}
+}
+$$$$
+\boxed{
+\text{tokens/s}
+}
+$$$$
+\boxed{
+\text{TTFT}
+}
+$$$$
+\boxed{
+\text{inter-token latency}
+}
+$$<p>如果出现：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">GPU compute utilization：不高
+</span></span><span class="line"><span class="cl">KV cache：接近满
+</span></span><span class="line"><span class="cl">waiting requests：很多
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>那么瓶颈很可能并不在：</p>
+$$
+\text{更多 TFLOPS}
+$$<p>而在：</p>
+$$
+\boxed{\text{serving memory capacity / scheduling}}
+$$<p>这一层。</p>
+<p>这是做 AI 全栈工程时非常重要的性能诊断转变。</p>
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>PagedAttention 最值得记住的并不是：</p>
+<blockquote>
+<p>“把 KV Cache 分成 block。”</p>
+</blockquote>
+<p>更重要的是：</p>
+$$
+\boxed{
+\text{LLM serving 的性能，不能只从神经网络计算图理解。}
+}
+$$<p>模型进入真实服务以后：</p>
+$$
+\text{模型结构}
+$$<p>只是系统中的一层。</p>
+<p>下面还有：</p>
+$$
+\boxed{
+\text{GPU kernel}
++
+\text{memory allocator}
++
+\text{scheduler}
++
+\text{cache}
++
+\text{distributed runtime}.
+}
+$$<p>PagedAttention 特别漂亮的地方在于，它没有发明一个更聪明的 Transformer，而是把操作系统中已经成熟几十年的：</p>
+$$
+\boxed{\text{virtual memory}}
+$$<p>重新映射到：</p>
+$$
+\boxed{\text{KV Cache}}
+$$<p>上。</p>
+<p>最后得到的启发非常普遍：</p>
+$$
+\boxed{
+\text{当一种资源具有“大小动态变化、生命周期不确定、存在共享机会”的特点时，
+优先考虑把逻辑地址与物理存储解耦。}
+}
+$$<p>这是一个远远超出 LLM serving 的工程思想。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><ol>
+<li>
+<p><strong>Kwon et al., <em>Efficient Memory Management for Large Language Model Serving with PagedAttention</em>, SOSP 2023</strong>。原始论文，也是今天最值得读的来源；重点建议看 §3 Memory Challenges、§4 PagedAttention/KV Cache Manager 和评估中的 memory waste。(<a class="link" href="https://arxiv.org/abs/2309.06180"  title="Efficient Memory Management for Large Language Model Serving with PagedAttention"
+     target="_blank" rel="noopener"
+    >arXiv</a>)
+<a class="link" href="https://arxiv.org/abs/2309.06180?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+    >论文页面</a></p>
+</li>
+<li>
+<p><strong>vLLM 官方 PagedAttention / KV Cache 文档</strong>。适合从概念进入现在的工程实现，官方 API 已经直接暴露 block size、KV Cache memory、cache dtype、prefix caching 和 offloading 等配置。(<a class="link" href="https://docs.vllm.ai/en/v0.16.0/api/vllm/v1/attention/ops/paged_attn/?utm_source=chatgpt.com"  title="paged_attn - vLLM"
+     target="_blank" rel="noopener"
+    >vLLM</a>)
+<a class="link" href="https://docs.vllm.ai/?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+    >vLLM 官方文档</a></p>
+</li>
+<li>
+<p><strong>vLLM Automatic Prefix Caching Implementation</strong>。很适合继续理解“paged memory → block sharing → prefix caching”这条演化路线，以及 block 如何通过 token/prefix 被唯一识别。(<a class="link" href="https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html"  title="Implementation — vLLM"
+     target="_blank" rel="noopener"
+    >vLLM</a>)</p>
+</li>
+<li>
+<p><strong>Dao et al., <em>FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</em>, NeurIPS 2022</strong>。建议与 PagedAttention 对照阅读：前者优化 attention kernel 的 HBM↔SRAM IO，后者优化 serving 时 KV Cache 的生命周期与物理布局。(<a class="link" href="https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com"  title="FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+</li>
+<li>
+<p>如果继续追近期 KV 系统方向，可以关注 <strong>KV Cache quantization、eviction、offloading、prefix caching 和 prefill/decode disaggregation</strong>；当前 vLLM 已经把其中多项纳入生产 serving stack，这条线比单独研究某一个 CUDA kernel 更接近现代 LLM inference system 的全貌。(<a class="link" href="https://docs.vllm.ai/en/stable/api/vllm/?utm_source=chatgpt.com"  title="vllm - vLLM"
+     target="_blank" rel="noopener"
+    >vLLM</a>)</p>
+</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/">AI 全栈工程</a>
+        
+            <a href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86/">大模型推理</a>
+        
+            <a href="/tags/gpu-%E7%B3%BB%E7%BB%9F/">GPU 系统</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

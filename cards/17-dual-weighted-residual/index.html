@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定 主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计） 领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型 推荐阅读时间：约 8–10 分钟\n今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：\n$$ \\boxed{ \\text{到底什么误差值得消除？} } $$传统自适应有限元通常试图降低：\n$$ \\|u-u_h\\| $$这样的全局误差，例如能量范数误差。\n但工程中我们通常并不真正关心整个场：\n$$ u(x) $$每个地方都同等准确。\n我们真正关心的往往是一个 Quantity of Interest，QoI：\n$$ J(u), $$例如：\n某个孔边最大应力； 某个测点位移； 出口平均流量； 升力/阻力； 某个时间的接触力； 可靠性极限状态 \\(g(u)\\)。 DWR 的核心思想就是：\n$$ \\boxed{ \\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} } $$Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(剑桥大学出版社)\n">
+<title>Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/17-dual-weighted-residual/'>
+
+<link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定">
+<meta property='og:description' content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定 主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计） 领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型 推荐阅读时间：约 8–10 分钟\n今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：\n$$ \\boxed{ \\text{到底什么误差值得消除？} } $$传统自适应有限元通常试图降低：\n$$ \\|u-u_h\\| $$这样的全局误差，例如能量范数误差。\n但工程中我们通常并不真正关心整个场：\n$$ u(x) $$每个地方都同等准确。\n我们真正关心的往往是一个 Quantity of Interest，QoI：\n$$ J(u), $$例如：\n某个孔边最大应力； 某个测点位移； 出口平均流量； 升力/阻力； 某个时间的接触力； 可靠性极限状态 \\(g(u)\\)。 DWR 的核心思想就是：\n$$ \\boxed{ \\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} } $$Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(剑桥大学出版社)\n">
+<meta property='og:url' content='https://assranai.github.io/cards/17-dual-weighted-residual/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='数值优化' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='代理模型' /><meta property='article:published_time' content='2026-08-30T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-30T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定">
+<meta name="twitter:description" content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定 主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计） 领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型 推荐阅读时间：约 8–10 分钟\n今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：\n$$ \\boxed{ \\text{到底什么误差值得消除？} } $$传统自适应有限元通常试图降低：\n$$ \\|u-u_h\\| $$这样的全局误差，例如能量范数误差。\n但工程中我们通常并不真正关心整个场：\n$$ u(x) $$每个地方都同等准确。\n我们真正关心的往往是一个 Quantity of Interest，QoI：\n$$ J(u), $$例如：\n某个孔边最大应力； 某个测点位移； 出口平均流量； 升力/阻力； 某个时间的接触力； 可靠性极限状态 \\(g(u)\\)。 DWR 的核心思想就是：\n$$ \\boxed{ \\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} } $$Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(剑桥大学出版社)\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-为什么哪里有限元误差最大可能完全不是正确问题">1. 为什么“哪里有限元误差最大”可能完全不是正确问题？</a>
+      <ol>
+        <li><a href="#区域-a">区域 A</a></li>
+        <li><a href="#区域-b">区域 B</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#优化中的-adjoint">优化中的 adjoint</a></li>
+        <li><a href="#dwr-中的-adjoint">DWR 中的 adjoint</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li><a href="#sigma_rm-allow">\sigma_{\rm allow}</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#一个最小可实践例子">一个最小可实践例子</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/17-dual-weighted-residual/">Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-08-30T00:00:00Z'>Aug 30, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 7 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="dual-weighted-residual网格该细化哪里不应由哪里误差大决定而应由哪里误差会影响最终答案决定">Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定
+</h1><p><strong>主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计）</strong>
+<strong>领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型</strong>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：</p>
+$$
+\boxed{
+\text{到底什么误差值得消除？}
+}
+$$<p>传统自适应有限元通常试图降低：</p>
+$$
+\|u-u_h\|
+$$<p>这样的全局误差，例如能量范数误差。</p>
+<p>但工程中我们通常并不真正关心整个场：</p>
+$$
+u(x)
+$$<p>每个地方都同等准确。</p>
+<p>我们真正关心的往往是一个 <strong>Quantity of Interest，QoI</strong>：</p>
+$$
+J(u),
+$$<p>例如：</p>
+<ul>
+<li>某个孔边最大应力；</li>
+<li>某个测点位移；</li>
+<li>出口平均流量；</li>
+<li>升力/阻力；</li>
+<li>某个时间的接触力；</li>
+<li>可靠性极限状态 \(g(u)\)。</li>
+</ul>
+<p>DWR 的核心思想就是：</p>
+$$
+\boxed{
+\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。}
+}
+$$<p>Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com"  title="An optimal control approach to a posteriori error estimation in finite element methods | Acta Numerica | Cambridge Core"
+     target="_blank" rel="noopener"
+    >剑桥大学出版社</a>)</p>
+<hr>
+<h2 id="1-为什么哪里有限元误差最大可能完全不是正确问题">1. 为什么“哪里有限元误差最大”可能完全不是正确问题？
+</h2><p>假设你模拟一个带孔板拉伸。</p>
+<p>你真正关心：</p>
+$$
+J(u)=\sigma_{xx}(x_{\rm hole}),
+$$<p>即孔边某点的应力。</p>
+<p>现在网格中有两个区域：</p>
+<h3 id="区域-a">区域 A
+</h3><p>离孔非常远，但局部离散误差很大。</p>
+<h3 id="区域-b">区域 B
+</h3><p>孔附近，局部误差只有 A 的一半。</p>
+<p>传统 residual estimator 可能认为：</p>
+$$
+\eta_A>\eta_B
+$$<p>于是优先细化 A。</p>
+<p>但问题是：</p>
+<p>区域 A 的误差也许几乎不会传播到：</p>
+$$
+\sigma_{xx}(x_{\rm hole}).
+$$<p>而区域 B 即使误差不算最大，却直接控制最终答案。</p>
+<p>所以真正应该比较的是：</p>
+$$
+\boxed{
+\text{local error magnitude}
+\times
+\text{QoI sensitivity}
+}
+$$<p>而不是：</p>
+$$
+\boxed{
+\text{local error magnitude}
+}
+$$<p>本身。</p>
+<p>这就是 DWR 里那个 <strong>weighted</strong> 的意义。</p>
+<hr>
+<h1 id="2-先把有限元问题写成一个残差问题">2. 先把有限元问题写成一个残差问题
+</h1><p>设连续问题：</p>
+$$
+A(u)(v)=F(v),
+$$<p>有限元解：</p>
+$$
+u_h.
+$$<p>定义 residual：</p>
+<h1 id="rhou_hv">$$
+\boxed{
+\rho(u_h)(v)
+</h1><p>F(v)-A(u_h)(v).
+}
+$$</p>
+<p>如果：</p>
+$$
+u_h=u,
+$$<p>那么：</p>
+$$
+\rho(u_h)=0.
+$$<p>所以 residual 告诉我们：</p>
+<blockquote>
+<p>当前有限元解在哪些地方没有严格满足原始 PDE。</p>
+</blockquote>
+<p>这和很多 a posteriori error estimator 一样。</p>
+<p>但 DWR 不直接把 residual 当成最终误差指标。</p>
+<p>它还需要回答：</p>
+$$
+\boxed{
+\text{某个 residual 对 }J(u)\text{ 到底有多重要？}
+}
+$$<p>于是引入 <strong>dual / adjoint problem</strong>。</p>
+<hr>
+<h1 id="3-dual-problem-到底在算什么">3. Dual problem 到底在算什么？
+</h1><p>对线性问题，假设：</p>
+$$
+Au=f.
+$$<p>我们关心：</p>
+$$
+J(u)=c^Tu.
+$$<p>有限元误差：</p>
+$$
+e=u-u_h.
+$$<p>目标误差：</p>
+$$
+J(u)-J(u_h)=c^Te.
+$$<p>现在定义 adjoint：</p>
+$$
+\boxed{
+A^Tz=c.
+}
+$$<p>于是：</p>
+<h1 id="cte">$$
+c^Te
+</h1><p>z^TAe.
+$$</p>
+<p>而：</p>
+$$
+Ae=f-Au_h=r.
+$$<p>因此：</p>
+<h1 id="ju-ju_h">$$
+\boxed{
+J(u)-J(u_h)
+</h1><p>z^Tr.
+}
+$$</p>
+<p>这就是 DWR 最核心的一条公式。</p>
+<p>可以拆成：</p>
+<h1 id="textqoi-error">$$
+\boxed{
+\text{QoI error}
+</h1><p>\text{residual}
+\times
+\text{adjoint sensitivity}
+}
+$$</p>
+<p>更准确地说，是 residual 在 dual solution 上的作用。</p>
+<hr>
+<h1 id="4-为什么-adjoint-可以理解成误差传播地图">4. 为什么 adjoint 可以理解成“误差传播地图”？
+</h1><p>考虑：</p>
+$$
+z=A^{-T}c.
+$$<p>它回答的是：</p>
+<blockquote>
+<p><strong>如果系统某个位置产生一点误差，这个误差最终会怎样影响 \(J\)？</strong></p>
+</blockquote>
+<p>所以：</p>
+$$
+z(x)
+$$<p>不是 primal solution 的另一个版本。</p>
+<p>它是一张：</p>
+$$
+\boxed{\text{QoI sensitivity field}}
+$$<p>例如你关心出口流量，那么：</p>
+$$
+z(x)
+$$<p>会告诉你：</p>
+<blockquote>
+<p>上游哪些局部 PDE 误差最容易最终改变出口流量？</p>
+</blockquote>
+<p>如果某个区域：</p>
+$$
+z\approx0,
+$$<p>即使：</p>
+$$
+|r|
+$$<p>很大，也可能：</p>
+$$
+r z\approx0.
+$$<p>于是没必要优先在那里细化。</p>
+<p>反过来某区域：</p>
+$$
+r
+$$<p>中等，但：</p>
+$$
+|z|\gg1,
+$$<p>其误差会强烈传播到 QoI。</p>
+<p>这就是 DWR 的真正物理意义。</p>
+<hr>
+<h1 id="5-这与普通-residual-based-adaptivity-有什么根本区别">5. 这与普通 residual-based adaptivity 有什么根本区别？
+</h1><p>普通 residual estimator 大概构造：</p>
+$$
+\eta_K
+\sim
+\|r_K\|.
+$$<p>然后：</p>
+$$
+\eta_K\uparrow
+\Rightarrow
+\text{refine element }K.
+$$<p>DWR 则近似：</p>
+$$
+\boxed{
+\eta_K
+\sim
+\rho_K(u_h)\,
+(z-z_h)
+}
+$$<p>或者实际实现中的某种局部化近似。</p>
+<p>其中：</p>
+<ul>
+<li>\(\rho_K\)：局部 primal residual；</li>
+<li>\(z-z_h\)：dual/adjoint approximation error。</li>
+</ul>
+<p>于是：</p>
+$$
+\boxed{
+\eta_K
+}
+$$<p>已经不是“这个元素错了多少”。</p>
+<p>它表示：</p>
+$$
+\boxed{
+\text{这个元素的离散误差对最终 QoI 贡献了多少。}
+}
+$$<p>deal.II 的经典 <code>step-14</code> 教程就是围绕这一结构实现 dual weighted residual estimator，并直接比较 DWR、全局细化和 Kelly residual estimator 等不同自适应策略。(<a class="link" href="https://dealii.org/9.4.1/doxygen/deal.II/step_14.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-14 tutorial program"
+     target="_blank" rel="noopener"
+    >deal.II</a>)</p>
+<hr>
+<h1 id="6-一个直观例子不要把网格细在最热闹的地方">6. 一个直观例子：不要把网格细在“最热闹”的地方
+</h1><p>假设二维导热：</p>
+$$
+-\nabla\cdot(k\nabla T)=q.
+$$<p>左边有一个复杂热源，导致：</p>
+$$
+\nabla T
+$$<p>非常大。</p>
+<p>但你真正关心：</p>
+<h1 id="jt">$$
+J(T)
+</h1><p>T(x_{\rm sensor}),
+$$</p>
+<p>而传感器在右下角。</p>
+<p>普通误差估计可能大量细化热源周围，因为那里：</p>
+$$
+|r_K|
+$$<p>大。</p>
+<p>DWR 的 dual problem 则从：</p>
+$$
+x_{\rm sensor}
+$$<p>向整个域传播敏感度。</p>
+<p>结果可能发现：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">热源附近：
+</span></span><span class="line"><span class="cl">residual 很大
+</span></span><span class="line"><span class="cl">adjoint sensitivity 很小
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">某条热传导路径：
+</span></span><span class="line"><span class="cl">residual 中等
+</span></span><span class="line"><span class="cl">adjoint sensitivity 很大
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>于是 DWR 会把网格优先细化到第二类区域。</p>
+<p>这就是：</p>
+$$
+\boxed{
+\text{goal-oriented adaptivity}
+}
+$$<p>真正比普通 adaptivity 高一层的地方。</p>
+<hr>
+<h1 id="7-dwr-为什么和伴随法天然是一回事">7. DWR 为什么和伴随法天然是一回事？
+</h1><p>如果你做过优化：</p>
+$$
+\min_\theta J(u(\theta)),
+$$<p>而：</p>
+$$
+R(u,\theta)=0,
+$$<p>你通常引入 adjoint：</p>
+<h1 id="lambda">$$
+\left(
+\frac{\partial R}{\partial u}
+\right)^T
+\lambda
+</h1><p>\frac{\partial J}{\partial u}.
+$$</p>
+<p>然后得到：</p>
+$$
+\frac{dJ}{d\theta}.
+$$<p>DWR 用的也是同一个数学结构。</p>
+<p>区别只在用途：</p>
+<h3 id="优化中的-adjoint">优化中的 adjoint
+</h3><p>回答：</p>
+$$
+\boxed{
+\text{参数变化会怎样改变 }J？
+}
+$$<h3 id="dwr-中的-adjoint">DWR 中的 adjoint
+</h3><p>回答：</p>
+$$
+\boxed{
+\text{局部离散误差会怎样改变 }J？
+}
+$$<p>所以：</p>
+$$
+\boxed{
+\text{adjoint optimization}
+\quad\text{和}\quad
+\text{goal-oriented error estimation}
+}
+$$<p>其实是同一套 duality machinery 的两个应用。</p>
+<p>这也是为什么 Becker–Rannacher 的经典框架直接从最优控制中的 duality 思想发展出来。(<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com"  title="An optimal control approach to a posteriori error estimation in finite element methods | Acta Numerica | Cambridge Core"
+     target="_blank" rel="noopener"
+    >剑桥大学出版社</a>)</p>
+<hr>
+<h1 id="8-一个很深的结论误差没有绝对重要性">8. 一个很深的结论：误差没有“绝对重要性”
+</h1><p>假设一个 FEM 解：</p>
+$$
+u_h
+$$<p>有同样的离散误差。</p>
+<p>但你选择不同 QoI：</p>
+$$
+J_1(u)=\text{左端位移},
+$$$$
+J_2(u)=\text{右端应力}.
+$$<p>你会得到两个不同 adjoint：</p>
+$$
+z_1,
+\qquad
+z_2.
+$$<p>于是：</p>
+$$
+\eta_K^{(1)}
+\neq
+\eta_K^{(2)}.
+$$<p>也就是说：</p>
+$$
+\boxed{
+\text{同一个有限元模型，对于不同工程目标，最优网格可能完全不同。}
+}
+$$<p>这句话非常重要。</p>
+<p>工程上经常存在一种隐含假设：</p>
+<blockquote>
+<p>“网格收敛了，所以所有输出都可信。”</p>
+</blockquote>
+<p>DWR 会强迫你把这句话改成：</p>
+<blockquote>
+<p><strong>这个网格对于哪个 quantity of interest 收敛了？</strong></p>
+</blockquote>
+<p>这是更严格、更工程化的提问。</p>
+<hr>
+<h1 id="9-为什么-dwr-中-dual-解通常要比-primal-解更丰富">9. 为什么 DWR 中 dual 解通常要比 primal 解“更丰富”？
+</h1><p>这里有一个实现陷阱。</p>
+<p>如果 primal：</p>
+$$
+u_h\in V_h
+$$<p>而 dual：</p>
+$$
+z_h\in V_h
+$$<p>使用完全相同的 Galerkin 空间，那么因为 Galerkin orthogonality：</p>
+$$
+\rho(u_h)(z_h)=0.
+$$<p>于是 estimator 可能直接失去信息。</p>
+<p>因此实际 DWR 通常需要：</p>
+$$
+\boxed{
+z_h
+\text{ 在更高阶或更细网格空间中计算}
+}
+$$<p>例如：</p>
+$$
+P_1\text{ primal}
+$$<p>配：</p>
+$$
+P_2\text{ dual}.
+$$<p>或者对 dual 做局部 reconstruction。</p>
+<p>这也是 DWR 比普通 residual estimator 更贵的原因之一：</p>
+$$
+\boxed{
+\text{除了 primal solve，
+还要额外解一个 adjoint problem。}
+}
+$$<p>近期和经典实践都反复强调，高质量 dual approximation 是 DWR 是否有效的关键。(<a class="link" href="https://arxiv.org/abs/1803.10643?utm_source=chatgpt.com"  title="Numerical study of goal-oriented error control for stabilized finite element methods"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<hr>
+<h1 id="10-那为什么还值得多解一次-adjoint">10. 那为什么还值得多解一次 adjoint？
+</h1><p>因为它可能大幅减少：</p>
+$$
+\boxed{\text{真正昂贵的 primal DOF}}
+$$<p>数量。</p>
+<p>假设普通 adaptivity 最终需要：</p>
+$$
+2\times10^6
+$$<p>个单元，才能让整个场普遍很准。</p>
+<p>但最终你只关心：</p>
+$$
+J(u).
+$$<p>Goal-oriented adaptivity 可能通过把 DOF 集中到真正影响 \(J\) 的区域，以远少于：</p>
+$$
+2\times10^6
+$$<p>的网格达到相同：</p>
+$$
+|J-J_h|.
+$$<p>所以付出一个 adjoint solve，换来的是：</p>
+$$
+\boxed{
+\text{更聪明的 DOF allocation}
+}
+$$<p>这和前几期许多方法背后的共同思想一致：</p>
+$$
+\boxed{
+\text{不要平均地给所有区域相同精度。}
+}
+$$<p>2024 年对非线性 \(p\)-Laplace 空间—时间 FEM 的工作仍在使用 DWR，就是因为工程目标往往是某个特定 functional，而不是整个解场的统一精度。(<a class="link" href="https://doi.org/10.1016/j.camwa.2024.05.017?utm_source=chatgpt.com"  title="Goal-oriented adaptive space-time finite element methods for regularized parabolic p-Laplace problems - ScienceDirect"
+     target="_blank" rel="noopener"
+    >数字对象标识符</a>)</p>
+<hr>
+<h1 id="11-它甚至可以控制求解器迭代误差">11. 它甚至可以控制“求解器迭代误差”
+</h1><p>这点很容易被忽视。</p>
+<p>假设 FEM 网格已经固定，但线性系统：</p>
+$$
+Ku=f
+$$<p>只用 CG 迭代到某个 tolerance。</p>
+<p>于是总误差包含：</p>
+$$
+\boxed{
+\text{discretization error}
++
+\text{algebraic solver error}.
+}
+$$<p>一般做法可能固定：</p>
+$$
+\|r_{\rm linear}\|<10^{-10}.
+$$<p>但这可能严重过度求解。</p>
+<p>如果最终 QoI 只要求：</p>
+$$
+10^{-3}
+$$<p>精度，那么线性系统没必要每一步都解到机器精度。</p>
+<p>已有 DWR 工作直接把 discretization error 与 iterative solver error 同时纳入目标导向误差控制，并据此自动平衡 multigrid、Gauss–Seidel、CG 的迭代精度与网格误差。(<a class="link" href="https://portal.fis.tum.de/de/publications/goal-oriented-error-control-of-the-iterative-solution-of-finite-e/?utm_source=chatgpt.com"  title="Goal-oriented error control of the iterative solution of finite element equations - Technische Universität München"
+     target="_blank" rel="noopener"
+    >Technical University of Munich</a>)</p>
+<p>这其实是一个非常高级的资源分配思想：</p>
+$$
+\boxed{
+\text{solver tolerance 也应该由最终 QoI 决定。}
+}
+$$<hr>
+<h1 id="12-对可靠性分析为什么特别有意思">12. 对可靠性分析为什么特别有意思？
+</h1><p>假设极限状态：</p>
+<h1 id="gx">$$
+g(X)
+</h1><h2 id="sigma_rm-allow">\sigma_{\rm allow}
+</h2><p>\sigma_{\max}(X).
+$$</p>
+<p>传统 FEM 网格收敛可能看：</p>
+$$
+\|u-u_h\|.
+$$<p>但可靠性真正关心的是：</p>
+$$
+\boxed{
+g(X)
+}
+$$<p>尤其：</p>
+$$
+g(X)\approx0
+$$<p>附近。</p>
+<p>那么最合理的有限元误差控制目标其实应该围绕：</p>
+$$
+J(u)=g(u)
+$$<p>或者：</p>
+$$
+J(u)=\sigma_{\max}.
+$$<p>这样 DWR 可以告诉你：</p>
+<blockquote>
+<p>哪些空间区域的 FEM 离散误差最可能改变“安全 / 失效”的判断？</p>
+</blockquote>
+<p>这比让整个结构统一达到：</p>
+$$
+1\%
+$$<p>位移误差更有任务针对性。</p>
+<p>甚至可以进一步思考：</p>
+$$
+\boxed{
+\text{可靠性采样 adaptive}
++
+\text{FEM mesh adaptive}
+}
+$$<p>两层同时存在。</p>
+<p>第一层决定：</p>
+$$
+\text{哪个随机样本值得算？}
+$$<p>第二层决定：</p>
+$$
+\text{这个随机样本内部，哪里值得细化？}
+$$<p>这是非常有潜力的多层资源分配结构。</p>
+<hr>
+<h1 id="13-这和代理模型的关系也很紧">13. 这和代理模型的关系也很紧
+</h1><p>假设你要训练代理：</p>
+$$
+\hat g(X).
+$$<p>高保真训练数据来自 FEM：</p>
+$$
+g_h(X).
+$$<p>但如果 FEM 自己带有：</p>
+$$
+\epsilon_{\rm FEM}(X),
+$$<p>那么代理其实在学习：</p>
+$$
+g(X)+\epsilon_{\rm FEM}(X).
+$$<p>很多 surrogate workflow 默认：</p>
+$$
+\boxed{
+\text{HF label = truth}
+}
+$$<p>但实际上：</p>
+$$
+\boxed{
+\text{HF simulation 也有数值误差。}
+}
+$$<p>如果 DWR 能提供：</p>
+$$
+|J(u)-J(u_h)|
+$$<p>的局部估计，就可能让 surrogate training 进一步获得：</p>
+$$
+\boxed{
+\text{label fidelity information}
+}
+$$<p>例如：</p>
+<ul>
+<li>FEM 误差大的样本重新细化；</li>
+<li>FEM 误差小的样本直接接受；</li>
+<li>training loss 按 label uncertainty 加权；</li>
+<li>multi-fidelity surrogate 把“网格精度”也视为 fidelity。</li>
+</ul>
+<p>这比单纯把 FEM 全部设成统一超细网格更经济。</p>
+<hr>
+<h1 id="14-一个很重要的限制qoi-选错了整个自适应过程也会跟着错">14. 一个很重要的限制：QoI 选错了，整个自适应过程也会跟着错
+</h1><p>DWR 是高度 goal-dependent 的。</p>
+<p>如果你定义：</p>
+$$
+J(u)=\text{tip displacement},
+$$<p>它会优化 tip displacement。</p>
+<p>但如果后来突然关心：</p>
+$$
+\sigma_{\max},
+$$<p>之前的网格未必适合。</p>
+<p>因此：</p>
+$$
+\boxed{
+\text{DWR 把工程目标正式写进数值方法，
+同时也让结果对目标定义更敏感。}
+}
+$$<p>现实任务经常同时有多个 QoI：</p>
+$$
+J_1,J_2,\ldots,J_m.
+$$<p>例如：</p>
+<ul>
+<li>位移；</li>
+<li>应力；</li>
+<li>温度；</li>
+<li>反力。</li>
+</ul>
+<p>这就产生 <strong>multi-goal error estimation</strong>。</p>
+<p>2024 年仍有工作研究如何将多个 goal functionals 放进同一 DWR/adaptive framework，而不是为每个输出单独做一次完全独立的 refinement。(<a class="link" href="https://onlinelibrary.wiley.com/doi/abs/10.1002/pamm.202400157?utm_source=chatgpt.com"  title="Locally different models in a checkerboard pattern with mesh adaptation and error control for multiple quantities of interest - Endtmayer - 2024 - Proceedings in Applied Mathematics and Mechanics - Wiley Online Library"
+     target="_blank" rel="noopener"
+    >Wiley Online Library</a>)</p>
+<hr>
+<h1 id="15-dwr-也不是严格保证误差上界的万能方法">15. DWR 也不是严格保证误差上界的万能方法
+</h1><p>这点必须讲清楚。</p>
+<p>经典 DWR 的优势是：</p>
+$$
+\boxed{
+\text{非常 sharp、goal-specific}
+}
+$$<p>但实际 estimator 往往依赖：</p>
+<ul>
+<li>dual approximation；</li>
+<li>higher-order reconstruction；</li>
+<li>neglected remainder terms；</li>
+<li>saturation assumptions。</li>
+</ul>
+<p>所以经典 DWR estimator 不应自动理解为：</p>
+$$
+\boxed{\text{严格数学上界}}
+$$<p>与前面讲过的某些 certified reduced-basis bound 不完全一样。</p>
+<p>后续工作一直在研究 DWR 的两侧估计、可靠性/效率以及 saturation assumption；例如 SIAM JSC 的两侧 a posteriori 分析明确讨论了这些条件以及 saturation assumption 可能失效的反例。(<a class="link" href="https://epubs.siam.org/doi/10.1137/18M1227275?utm_source=chatgpt.com"  title="Two-Side a Posteriori Error Estimates for the Dual-Weighted Residual Method | SIAM Journal on Scientific Computing"
+     target="_blank" rel="noopener"
+    >工业与应用数学学会</a>)</p>
+<p>因此要区分：</p>
+$$
+\boxed{
+\text{sharp estimator}
+}
+$$<p>和：</p>
+$$
+\boxed{
+\text{guaranteed upper bound}
+}
+$$<p>这两者不是同义词。</p>
+<hr>
+<h1 id="16-它最近仍然在往哪里发展">16. 它最近仍然在往哪里发展？
+</h1><p>DWR 并不是一个停留在 2001 年的老方法。</p>
+<p>2024 年已有工作把 goal-oriented space-time adaptivity 用到非线性 \(p\)-Laplace 问题，并直接通过 adjoint 解控制时空网格。(<a class="link" href="https://doi.org/10.1016/j.camwa.2024.05.017?utm_source=chatgpt.com"  title="Goal-oriented adaptive space-time finite element methods for regularized parabolic p-Laplace problems - ScienceDirect"
+     target="_blank" rel="noopener"
+    >数字对象标识符</a>)</p>
+<p>在 fracture 场景中，也有工作利用 DWR 对 phase-field fracture 做 space-time / temporal adaptivity，让网格和时间步围绕最终关注的 fracture quantity 调整，而不是统一细化。(<a class="link" href="https://www.scipedia.com/public/Kosin_et_al_2024a?utm_source=chatgpt.com"  title="Goal oriented error estimation for space-time adaptivity in phase-field fracture - Kosin et al 2024a - Scipedia"
+     target="_blank" rel="noopener"
+    >Scipedia</a>)</p>
+<p>更近期的 2026 年工作还在研究 least-squares FEM 中如何使用“物理 PDE adjoint”而不是 least-squares formulation 自身产生的 adjoint 来做 goal-oriented error estimation，说明“什么才是最有物理意义的 dual problem”仍然是活跃研究问题。(<a class="link" href="https://arxiv.org/abs/2607.23850?utm_source=chatgpt.com"  title="Goal-Oriented Error Estimation for Least-Squares Finite Element Methods via Physically Meaningful Adjoint PDEs"
+     target="_blank" rel="noopener"
+    >arXiv</a>)</p>
+<hr>
+<h1 id="17-对自研物理求解器最值得迁移的一点">17. 对自研物理求解器最值得迁移的一点
+</h1><p>DWR 最深刻的思想其实可以脱离 FEM：</p>
+$$
+\boxed{
+\text{误差的重要程度，应由它对最终任务的影响决定。}
+}
+$$<p>假设软体求解器里同时存在：</p>
+<ul>
+<li>contact residual；</li>
+<li>volume residual；</li>
+<li>bending residual；</li>
+<li>momentum error；</li>
+<li>\(J\) error。</li>
+</ul>
+<p>你可能会自然地按：</p>
+$$
+\max |r_i|
+$$<p>去决定哪个约束最该继续迭代。</p>
+<p>但如果最终目标是：</p>
+<h1 id="jx">$$
+J(x)
+</h1><p>\text{末端位置误差},
+$$</p>
+<p>那么真正有价值的问题是：</p>
+$$
+\boxed{
+\text{哪个 residual 对末端位置最敏感？}
+}
+$$<p>也就是说，理论上可以考虑：</p>
+$$
+\text{residual magnitude}
+\times
+\text{task sensitivity}.
+$$<p>这就是一种非常通用的：</p>
+$$
+\boxed{
+\text{goal-oriented solver budget allocation}
+}
+$$<p>思想。</p>
+<p>对于游戏物理甚至可以想象：</p>
+<ul>
+<li>离摄像机近；</li>
+<li>会影响 gameplay；</li>
+<li>会影响接触结果；</li>
+</ul>
+<p>的误差拥有更高 dual weight。</p>
+<p>这和传统“统一迭代 10 次”已经是完全不同的求解器设计层级。</p>
+<hr>
+<h2 id="一个最小可实践例子">一个最小可实践例子
+</h2><p>考虑 Poisson：</p>
+$$
+-\Delta u=f
+$$<p>目标量：</p>
+$$
+J(u)=u(x_0).
+$$<p>流程可以概括为：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">1. 解 primal FEM:
+</span></span><span class="line"><span class="cl">   A u_h = f
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">2. 定义 QoI:
+</span></span><span class="line"><span class="cl">   J(u) = u(x0)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">3. 解 adjoint:
+</span></span><span class="line"><span class="cl">   A^T z = J&#39;
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">4. 计算每个单元 residual:
+</span></span><span class="line"><span class="cl">   r_K
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">5. 用 adjoint 对 residual 加权:
+</span></span><span class="line"><span class="cl">   eta_K ~ r_K * z_error
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">6. 按 |eta_K| 排序
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">7. 只细化对 J 贡献最大的单元
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">8. 重复
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果把 refinement history 和普通 residual estimator 对比，你很可能看到两套完全不同的网格：</p>
+$$
+\boxed{
+\text{一个追求全场正确；
+一个追求最终答案正确。}
+}
+$$<p>这就是 DWR 最值得亲手验证的地方。</p>
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>DWR 最重要的公式可以记成：</p>
+$$
+\boxed{
+\text{QoI error}
+\approx
+\text{primal residual}
+\times
+\text{dual sensitivity}.
+}
+$$<p>但更值得留下的是它背后的观念：</p>
+$$
+\boxed{
+\text{“误差大”不等于“误差重要”。}
+}
+$$<p>在整个知识体系里，它正好卡在：</p>
+$$
+\text{FEM residual}
+$$$$
+\downarrow
+$$$$
+\boxed{\text{Adjoint / DWR}}
+$$$$
+\downarrow
+$$$$
+\text{Goal-oriented adaptivity}
+$$$$
+\downarrow
+$$$$
+\text{可靠性 / 优化 / UQ / surrogate}.
+$$<p>它让有限元从：</p>
+$$
+\boxed{
+\text{“把解场算准”}
+}
+$$<p>进一步变成：</p>
+$$
+\boxed{
+\text{“只把影响工程结论的那部分算准”。}
+}
+$$<p>对昂贵仿真来说，这个转变非常重要。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><ol>
+<li>
+<p><strong>Becker &amp; Rannacher, <em>An Optimal Control Approach to A Posteriori Error Estimation in Finite Element Methods</em>, Acta Numerica</strong>。DWR 的经典系统入口，重点看“global norm error → quantity-of-interest error”这一步为什么需要 duality。(<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com"  title="An optimal control approach to a posteriori error estimation in finite element methods | Acta Numerica | Cambridge Core"
+     target="_blank" rel="noopener"
+    >剑桥大学出版社</a>)
+<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+    >Cambridge 论文页</a></p>
+</li>
+<li>
+<p><strong>deal.II <code>step-14</code> — Dual Weighted Residual Error Estimation</strong>。非常推荐作为实现入口，完整展示 primal solver、dual functional、weighted residual、单元误差定位以及不同 refinement criterion 的比较。(<a class="link" href="https://dealii.org/9.4.1/doxygen/deal.II/step_14.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-14 tutorial program"
+     target="_blank" rel="noopener"
+    >deal.II</a>)
+<a class="link" href="https://dealii.org/9.4.1/doxygen/deal.II/step_14.html?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+    >deal.II step-14</a></p>
+</li>
+<li>
+<p><strong>Ladevèze et al., <em>An Introductory Review on A Posteriori Error Estimation in Finite Element Computations</em>, SIAM Review</strong>。如果想建立完整误差估计知识地图，这篇把 residual、equilibrated methods、global-norm estimation 与 goal-oriented estimation 放在同一框架中比较。(<a class="link" href="https://epubs.siam.org/doi/10.1137/21M1464841?utm_source=chatgpt.com"  title="An Introductory Review on A Posteriori Error Estimation in Finite Element Computations | SIAM Review"
+     target="_blank" rel="noopener"
+    >工业与应用数学学会</a>)</p>
+</li>
+<li>
+<p><strong>Endtmayer, Langer &amp; Wick, <em>Two-Side a Posteriori Error Estimates for the Dual-Weighted Residual Method</em>, SIAM JSC</strong>。适合理解 DWR estimator 何时可靠、何时高效，以及 saturation assumption 为什么不能被忽略。(<a class="link" href="https://epubs.siam.org/doi/10.1137/18M1227275?utm_source=chatgpt.com"  title="Two-Side a Posteriori Error Estimates for the Dual-Weighted Residual Method | SIAM Journal on Scientific Computing"
+     target="_blank" rel="noopener"
+    >工业与应用数学学会</a>)</p>
+</li>
+<li>
+<p><strong>Langer et al., <em>Goal-oriented adaptive space-time finite element methods for regularized parabolic p-Laplace problems</em>, 2024</strong>。近期实例，展示 DWR 如何从静态网格自适应扩展到 nonlinear space-time adaptivity。(<a class="link" href="https://doi.org/10.1016/j.camwa.2024.05.017?utm_source=chatgpt.com"  title="Goal-oriented adaptive space-time finite element methods for regularized parabolic p-Laplace problems - ScienceDirect"
+     target="_blank" rel="noopener"
+    >数字对象标识符</a>)</p>
+</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/">数值优化</a>
+        
+            <a href="/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/">可靠性</a>
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/13-neural-operator/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/05-mfmc/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Multifidelity Monte Carlo：代理模型不一定要“替代”高保真模型，它也可以只负责降方差</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/16-active-subspaces/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Active Subspaces：真正该降的维，可能不是“变量”，而是“变量的方向组合”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/15-anderson-acceleration/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/14-ipc-feasibility/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IPC：为什么“无穿透”可以被写成一个优化问题，而不是靠碰撞后修补</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

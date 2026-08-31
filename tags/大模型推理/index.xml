@@ -1,0 +1,841 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>大模型推理 on Assranai&#39;s 手账</title>
+        <link>https://assranai.github.io/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86/</link>
+        <description>Recent content in 大模型推理 on Assranai&#39;s 手账</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en-us</language>
+        <copyright>Assranai</copyright>
+        <lastBuildDate>Mon, 31 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”</title>
+        <link>https://assranai.github.io/cards/18-paged-attention/</link>
+        <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/18-paged-attention/</guid>
+        <description>&lt;h1 id=&#34;pagedattentionllm-推理的关键突破有时不是更快算-attention而是像操作系统一样管理显存&#34;&gt;PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：PagedAttention 与 KV Cache 虚拟内存化&lt;/strong&gt;
+&lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × GPU 系统&lt;/strong&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;PagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：&lt;/p&gt;
+$$
+\boxed{\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}
+$$&lt;p&gt;vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 &lt;strong&gt;20.4%–38.2%&lt;/strong&gt;；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 &lt;strong&gt;2–4× serving throughput&lt;/strong&gt;。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;更值得学的是它背后的思想：&lt;/p&gt;
+$$
+\boxed{\text{资源布局本身，也是算法的一部分。}}
+$$&lt;hr&gt;
+&lt;h2 id=&#34;1-为什么-llm-推理会突然变成内存管理问题&#34;&gt;1. 为什么 LLM 推理会突然变成“内存管理问题”？
+&lt;/h2&gt;&lt;p&gt;自回归模型生成第 \(t\) 个 token 时，需要：&lt;/p&gt;
+$$
+q_t
+$$&lt;p&gt;与之前所有 token 的：&lt;/p&gt;
+$$
+k_1,\ldots,k_t
+$$&lt;p&gt;计算 attention。&lt;/p&gt;
+&lt;p&gt;如果每生成一个 token 都重新计算过去所有 token 的 \(K,V\)，浪费极大。&lt;/p&gt;
+&lt;p&gt;所以推理系统保存：&lt;/p&gt;
+$$
+\boxed{\text{KV Cache}}
+$$&lt;p&gt;即每层过去所有 token 的：&lt;/p&gt;
+$$
+K,V.
+$$&lt;p&gt;下一步只计算新 token 的：&lt;/p&gt;
+$$
+K_t,V_t
+$$&lt;p&gt;再读取历史 cache。&lt;/p&gt;
+&lt;p&gt;因此 decode 阶段大致变成：&lt;/p&gt;
+$$
+\text{计算一个新 token}
++
+\boxed{\text{读取越来越大的历史 KV}}
+$$&lt;p&gt;而且生成过程严格自回归：&lt;/p&gt;
+$$
+x_1\rightarrow x_2\rightarrow\cdots
+$$&lt;p&gt;单请求的 GPU 并行度并不高。原始 vLLM 论文指出，这使 generation/decode 阶段高度 memory-bound，提高吞吐量的关键之一是同时 batch 更多请求。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;于是产生了一个链条：&lt;/p&gt;
+$$
+\boxed{
+\text{KV Cache 占用}
+\rightarrow
+\text{能容纳多少并发 sequence}
+\rightarrow
+\text{batch size}
+\rightarrow
+\text{GPU utilization}
+\rightarrow
+\text{吞吐量}
+}
+$$&lt;p&gt;所以浪费 10 GB 显存并不只是“浪费 10 GB”。&lt;/p&gt;
+&lt;p&gt;它可能意味着：&lt;/p&gt;
+$$
+\boxed{\text{少跑一大批并发请求。}}
+$$&lt;hr&gt;
+&lt;h1 id=&#34;2-kv-cache-到底有多大&#34;&gt;2. KV Cache 到底有多大？
+&lt;/h1&gt;&lt;p&gt;对于传统 multi-head/GQA Transformer，一个 token 的 KV Cache 大致为：&lt;/p&gt;
+&lt;h1 id=&#34;m_rm-token&#34;&gt;$$
+M_{\rm token}
+&lt;/h1&gt;&lt;p&gt;2
+\times L
+\times H_{\rm KV}
+\times d_{\rm head}
+\times b
+$$&lt;/p&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(2\)：Key + Value；&lt;/li&gt;
+&lt;li&gt;\(L\)：Transformer 层数；&lt;/li&gt;
+&lt;li&gt;\(H_{\rm KV}\)：KV heads；&lt;/li&gt;
+&lt;li&gt;\(d_{\rm head}\)：head dimension；&lt;/li&gt;
+&lt;li&gt;\(b\)：每个元素字节数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;举一个示意模型：&lt;/p&gt;
+$$
+L=32,\quad
+H_{\rm KV}=8,\quad
+d_{\rm head}=128,
+$$&lt;p&gt;BF16：&lt;/p&gt;
+$$
+b=2.
+$$&lt;p&gt;那么：&lt;/p&gt;
+&lt;h1 id=&#34;m_rm-token-1&#34;&gt;$$
+M_{\rm token}
+&lt;/h1&gt;&lt;h1 id=&#34;2times32times8times128times2&#34;&gt;2\times32\times8\times128\times2
+&lt;/h1&gt;&lt;p&gt;128\text{ KB/token}.
+$$&lt;/p&gt;
+&lt;p&gt;一个：&lt;/p&gt;
+$$
+8192
+$$&lt;p&gt;token sequence 就大约需要：&lt;/p&gt;
+$$
+\boxed{1\text{ GB KV Cache}}
+$$&lt;p&gt;这还只是一个请求。&lt;/p&gt;
+&lt;p&gt;如果同时服务：&lt;/p&gt;
+$$
+40
+$$&lt;p&gt;条长 sequence：&lt;/p&gt;
+$$
+\approx40\text{ GB}.
+$$&lt;p&gt;所以长上下文时代，KV Cache 很容易从“附属数据”变成 inference infrastructure 的核心资源。&lt;/p&gt;
+&lt;p&gt;vLLM 原论文举的历史例子更夸张：OPT-13B FP16 每 token KV 约 800 KB，因此长度 2048 的单个请求最大约需 1.6 GB KV Cache。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-真正麻烦的还不是大而是长度事先不知道&#34;&gt;3. 真正麻烦的还不是“大”，而是长度事先不知道
+&lt;/h1&gt;&lt;p&gt;假设用户请求：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Prompt：500 tokens
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;最大输出：2000 tokens
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;服务器不知道实际会生成：&lt;/p&gt;
+$$
+50？
+\quad500？
+\quad2000？
+$$&lt;p&gt;token。&lt;/p&gt;
+&lt;p&gt;旧式做法很自然：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;为安全起见，先给它分配能够容纳最大长度的连续 tensor。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;于是可能预留：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;| used | used | used | future future future future future |
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果请求 300 token 就结束：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;| actual KV |              wasted memory                |
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;与此同时，GPU 上还有很多不同长度请求：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;AAAAAAA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;BBBB
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;CCCCCCCCCCCC
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;DD
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;它们不断：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;生成 token；&lt;/li&gt;
+&lt;li&gt;增长；&lt;/li&gt;
+&lt;li&gt;完成；&lt;/li&gt;
+&lt;li&gt;释放。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这就是经典动态内存管理问题：&lt;/p&gt;
+$$
+\boxed{
+\text{internal fragmentation}
++
+\text{external fragmentation}
+}
+$$&lt;p&gt;vLLM 团队测得，当时一些连续分配方案中真正用于 token state 的 KV 空间比例最低只有约 20.4%。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;这时继续优化矩阵乘 kernel 已经无法解决根本问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-pagedattention-的核心其实来自操作系统&#34;&gt;4. PagedAttention 的核心其实来自操作系统
+&lt;/h1&gt;&lt;p&gt;操作系统几十年前遇到过几乎同样的问题。&lt;/p&gt;
+&lt;p&gt;一个进程认为自己拥有连续虚拟地址：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Page 0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Page 1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Page 2
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Page 3
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;但实际 RAM 可以放成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Physical frame 17 ← Page 0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Physical frame  3 ← Page 1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Physical frame 52 ← Page 2
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Physical frame  8 ← Page 3
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;通过：&lt;/p&gt;
+$$
+\boxed{\text{page table}}
+$$&lt;p&gt;建立：&lt;/p&gt;
+$$
+\text{logical page}
+\rightarrow
+\text{physical frame}.
+$$&lt;p&gt;PagedAttention 把这个思想迁移过来：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;OS&lt;/th&gt;
+					&lt;th&gt;LLM&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;process&lt;/td&gt;
+					&lt;td&gt;sequence/request&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;virtual page&lt;/td&gt;
+					&lt;td&gt;logical KV block&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;physical frame&lt;/td&gt;
+					&lt;td&gt;GPU KV block&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;page table&lt;/td&gt;
+					&lt;td&gt;block table&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;bytes&lt;/td&gt;
+					&lt;td&gt;token KV states&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;于是一个 sequence：&lt;/p&gt;
+$$
+[1,2,3,4,5,\ldots]
+$$&lt;p&gt;逻辑上连续，&lt;/p&gt;
+&lt;p&gt;但 KV 可以实际存成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;logical:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;B0 → B1 → B2 → B3
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;physical GPU memory:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;B2 | free | B0 | other | B3 | B1
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;attention kernel 根据 block table 去取。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;物理连续性不再是逻辑连续性的必要条件。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这就是 PagedAttention 最核心的突破。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-它并没有近似-attention&#34;&gt;5. 它并没有近似 Attention
+&lt;/h1&gt;&lt;p&gt;这是一个很重要的澄清。&lt;/p&gt;
+&lt;p&gt;正常 attention：&lt;/p&gt;
+&lt;h1 id=&#34;a_ij&#34;&gt;$$
+a_{ij}
+&lt;/h1&gt;&lt;p&gt;\operatorname{softmax}
+\left(
+\frac{q_i^Tk_j}{\sqrt d}
+\right).
+$$&lt;/p&gt;
+&lt;p&gt;PagedAttention 仍然读取这些：&lt;/p&gt;
+$$
+K,V
+$$&lt;p&gt;完成 attention。&lt;/p&gt;
+&lt;p&gt;变化的是：&lt;/p&gt;
+$$
+\boxed{\text{这些 }K,V\text{ 在物理显存中的布局}}
+$$&lt;p&gt;因此它本质上属于：&lt;/p&gt;
+$$
+\boxed{\text{memory virtualization}}
+$$&lt;p&gt;而不是：&lt;/p&gt;
+$$
+\text{sparse attention}
+$$&lt;p&gt;或：&lt;/p&gt;
+$$
+\text{approximate attention}.
+$$&lt;p&gt;vLLM 官方当前实现仍以固定 token 数的 cache block 为基本管理单元，其 cache 配置中明确包含 &lt;code&gt;block_size&lt;/code&gt;、KV Cache memory size、prefix caching、KV offloading 等参数。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/config/cache/&#34;  title=&#34;cache - vLLM&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么分页以后碎片突然变得容易控制&#34;&gt;6. 为什么分页以后碎片突然变得容易控制？
+&lt;/h1&gt;&lt;p&gt;假设 block size 为：&lt;/p&gt;
+$$
+B=16\text{ tokens}.
+$$&lt;p&gt;一个 100 token 请求需要：&lt;/p&gt;
+$$
+\left\lceil\frac{100}{16}\right\rceil=7
+$$&lt;p&gt;个 block。&lt;/p&gt;
+&lt;p&gt;真正浪费只发生在最后一个 block：&lt;/p&gt;
+$$
+112-100=12\text{ tokens}.
+$$&lt;p&gt;因此内部碎片上界从“可能预留整个最大 sequence”缩小到：&lt;/p&gt;
+$$
+\boxed{&lt;1\text{ block/request}}
+$$&lt;p&gt;同时所有 physical block 都同样大小：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[block][block][block][block][block]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;任何释放出来的 block 都可以供另一个 sequence 使用。&lt;/p&gt;
+&lt;p&gt;这基本消除了经典意义上的 external fragmentation。原论文正是通过固定大小 block、按需分配实现 near-zero KV Cache memory waste。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-更厉害的是page-还能共享&#34;&gt;7. 更厉害的是：page 还能共享
+&lt;/h1&gt;&lt;p&gt;假设用户要求：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;对同一个 prompt 生成 8 个候选答案。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;传统方式容易得到：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Prompt KV + Output A
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Prompt KV + Output B
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Prompt KV + Output C
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;...
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;prompt 的：&lt;/p&gt;
+$$
+K,V
+$$&lt;p&gt;被复制 8 份。&lt;/p&gt;
+&lt;p&gt;Paged memory 允许：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                 ┌→ Output A blocks
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Shared Prompt ───┼→ Output B blocks
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                 ├→ Output C blocks
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                 └→ Output D blocks
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;多个 logical sequences 指向相同 physical KV blocks。&lt;/p&gt;
+&lt;p&gt;只有发生分叉后才分配自己的 block。&lt;/p&gt;
+&lt;p&gt;这其实就是：&lt;/p&gt;
+$$
+\boxed{\text{Copy-on-Write}}
+$$&lt;p&gt;思想。&lt;/p&gt;
+&lt;p&gt;原论文在 beam search 场景中报告，block sharing 在其测试中最高可以节省约 55% 的 KV memory。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;这个能力后来也自然演化出了：&lt;/p&gt;
+$$
+\boxed{\text{Prefix Caching}}
+$$&lt;p&gt;如果不同请求拥有完全相同的 prefix，就可以复用已经计算好的 KV blocks。vLLM 官方实现使用 block tokens 与此前 prefix 来标识 cache block。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html&#34;  title=&#34;Implementation — vLLM&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-pagedattention-和-continuous-batching-为什么经常一起出现&#34;&gt;8. PagedAttention 和 Continuous Batching 为什么经常一起出现？
+&lt;/h1&gt;&lt;p&gt;这是理解 serving stack 的关键。&lt;/p&gt;
+&lt;p&gt;Continuous batching 做的是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;一个 request 完成，就立即把新 request 加入执行 batch。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;因此 batch 不再：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;等所有请求结束
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;→ 换下一批
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;而是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration 1:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;A B C D
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration 2:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;A B C D
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;C 完成
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration 3:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;A B E D
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这样 GPU 更容易持续吃满。&lt;/p&gt;
+&lt;p&gt;问题是：如果 E 进来时 GPU 没有一块足够大的&lt;strong&gt;连续 KV 空间&lt;/strong&gt;，调度器仍然无法放进去。&lt;/p&gt;
+&lt;p&gt;PagedAttention 提供：&lt;/p&gt;
+$$
+\boxed{\text{细粒度可组合显存}}
+$$&lt;p&gt;Continuous batching 提供：&lt;/p&gt;
+$$
+\boxed{\text{细粒度 request scheduling}}
+$$&lt;p&gt;二者结合后才真正形成：&lt;/p&gt;
+$$
+\boxed{
+\text{空出来一点资源}
+\Rightarrow
+\text{马上拿去服务另一个请求}
+}
+$$&lt;p&gt;vLLM 官方目前仍把 PagedAttention 和 continuous batching 同时列为其高吞吐 serving 的核心能力。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com&#34;  title=&#34;vLLM - vLLM&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-它和-flashattention-到底是什么关系&#34;&gt;9. 它和 FlashAttention 到底是什么关系？
+&lt;/h1&gt;&lt;p&gt;这两个名字很容易混在一起，但解决的是不同层的问题。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;FlashAttention&lt;/strong&gt; 问：&lt;/p&gt;
+$$
+\boxed{
+\text{一次 attention computation 怎样减少 HBM↔SRAM 数据搬运？}
+}
+$$&lt;p&gt;它通过 tiling、kernel fusion 等方式降低 GPU 内存层级间的 IO，是：&lt;/p&gt;
+$$
+\boxed{\text{kernel / algorithmic IO optimization}}
+$$&lt;p&gt;。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com&#34;  title=&#34;FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;PagedAttention&lt;/strong&gt; 问：&lt;/p&gt;
+$$
+\boxed{
+\text{几百个动态 sequence 的历史 KV 到底怎样放进 GPU memory？}
+}
+$$&lt;p&gt;它属于：&lt;/p&gt;
+$$
+\boxed{\text{serving memory management}}
+$$&lt;p&gt;所以可以简单记成：&lt;/p&gt;
+$$
+\boxed{
+\text{FlashAttention：一次 Attention 怎样算得更高效}
+}
+$$$$
+\boxed{
+\text{PagedAttention：大量请求的 KV 怎样活得更高效}
+}
+$$&lt;p&gt;现代系统完全可以同时使用两类优化；当前 vLLM 文档也明确列出了 FlashAttention/FlashInfer 等 optimized kernel 与其 KV Cache 管理能力。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.10.0/?utm_source=chatgpt.com&#34;  title=&#34;vLLM - vLLM&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-pagedattention-真正改变的是容量--吞吐的转换率&#34;&gt;10. PagedAttention 真正改变的是“容量 → 吞吐”的转换率
+&lt;/h1&gt;&lt;p&gt;假设 GPU 能给 KV Cache 留：&lt;/p&gt;
+$$
+40\text{ GB}.
+$$&lt;p&gt;方案 A 的有效利用率只有：&lt;/p&gt;
+$$
+40\%.
+$$&lt;p&gt;真正保存 token states：&lt;/p&gt;
+$$
+16\text{ GB}.
+$$&lt;p&gt;方案 B 达到：&lt;/p&gt;
+$$
+95\%.
+$$&lt;p&gt;真正使用：&lt;/p&gt;
+$$
+38\text{ GB}.
+$$&lt;p&gt;即使：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;GPU FLOPS 没变；&lt;/li&gt;
+&lt;li&gt;模型没变；&lt;/li&gt;
+&lt;li&gt;attention 数学没变；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;可同时驻留的请求数可能提高：&lt;/p&gt;
+&lt;p&gt;$$&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;2\times.
+$$&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;decode 又恰恰需要 batch 才能有效利用 GPU。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+$$
+\boxed{
+\text{memory utilization}
+\rightarrow
+\text{batch capacity}
+\rightarrow
+\text{compute utilization}
+}
+$$&lt;p&gt;形成乘法效应。&lt;/p&gt;
+&lt;p&gt;这解释了为什么一个“内存分配算法”能最终体现为明显的 tokens/s 提升。原始 vLLM 实验报告的 2–4× throughput 增益本质上正来自这种系统级连锁。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这个方法的代价是什么&#34;&gt;11. 这个方法的代价是什么？
+&lt;/h1&gt;&lt;p&gt;Paging 绝不是免费午餐。&lt;/p&gt;
+&lt;p&gt;连续 KV：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;base_ptr + offset
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;访问很简单。&lt;/p&gt;
+&lt;p&gt;paged KV 需要：&lt;/p&gt;
+$$
+\text{logical block}
+\rightarrow
+\text{block table}
+\rightarrow
+\text{physical block}.
+$$&lt;p&gt;这会增加：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;地址间接寻址；&lt;/li&gt;
+&lt;li&gt;metadata；&lt;/li&gt;
+&lt;li&gt;kernel 复杂度；&lt;/li&gt;
+&lt;li&gt;非连续内存访问；&lt;/li&gt;
+&lt;li&gt;block size 调优问题。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;block 太大：&lt;/p&gt;
+$$
+\Rightarrow
+\text{最后一页浪费增加}.
+$$&lt;p&gt;block 太小：&lt;/p&gt;
+$$
+\Rightarrow
+\text{block table、调度和 kernel overhead 增加}.
+$$&lt;p&gt;所以 PagedAttention 的真正贡献并不是“分页一定快”。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+$$
+\boxed{
+\text{用一点访问复杂度，
+换取大量更有价值的并发容量。}
+}
+$$&lt;p&gt;这是典型 systems trade-off。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-它也没有解决长上下文的所有问题&#34;&gt;12. 它也没有解决长上下文的所有问题
+&lt;/h1&gt;&lt;p&gt;PagedAttention 解决：&lt;/p&gt;
+$$
+\boxed{\text{KV Cache allocation efficiency}}
+$$&lt;p&gt;但如果上下文从：&lt;/p&gt;
+$$
+8K\rightarrow1M,
+$$&lt;p&gt;历史 KV 本身仍然巨大。&lt;/p&gt;
+&lt;p&gt;即使：&lt;/p&gt;
+$$
+100\%
+$$&lt;p&gt;利用显存，&lt;/p&gt;
+$$
+1M\text{ token KV}
+$$&lt;p&gt;还是 1M token KV。&lt;/p&gt;
+&lt;p&gt;而普通 attention 的计算量问题也不会因为 paging 自动消失。&lt;/p&gt;
+&lt;p&gt;因此后续方向包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;GQA/MQA：减少 KV heads；&lt;/li&gt;
+&lt;li&gt;FP8/低比特 KV Cache；&lt;/li&gt;
+&lt;li&gt;KV eviction/compression；&lt;/li&gt;
+&lt;li&gt;sliding-window/sparse attention；&lt;/li&gt;
+&lt;li&gt;prefix caching；&lt;/li&gt;
+&lt;li&gt;CPU/NVMe KV offloading；&lt;/li&gt;
+&lt;li&gt;disaggregated prefill/decode。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;当前 vLLM 稳定版配置已经显式支持 KV Cache dtype、memory bytes、prefix caching 和 KV offloading 等机制。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/config/cache/&#34;  title=&#34;cache - vLLM&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;所以 PagedAttention 更准确的位置是：&lt;/p&gt;
+$$
+\boxed{
+\text{KV Cache 系统架构的基础设施层}
+}
+$$&lt;p&gt;而不是长上下文问题的终点。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对-ai-agent-系统尤其有价值的启发&#34;&gt;13. 对 AI Agent 系统尤其有价值的启发
+&lt;/h1&gt;&lt;p&gt;Agent workload 往往不是简单：&lt;/p&gt;
+$$
+\text{prompt}\rightarrow\text{一次回答}.
+$$&lt;p&gt;而可能是：&lt;/p&gt;
+$$
+\text{system prompt}
++\text{长历史}
++\text{工具调用}
++\text{新 observation}
++\text{继续推理}.
+$$&lt;p&gt;于是大量请求可能共享：&lt;/p&gt;
+$$
+\boxed{\text{相同或部分相同的 prefix}}
+$$&lt;p&gt;例如同一 Agent 的：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;system instructions；&lt;/li&gt;
+&lt;li&gt;tool definitions；&lt;/li&gt;
+&lt;li&gt;repository context；&lt;/li&gt;
+&lt;li&gt;cached documents。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这时 KV Cache 开始具有一种很有意思的性质：&lt;/p&gt;
+$$
+\boxed{\text{它已经不只是 inference 临时内存，而是一种可复用计算状态。}}
+$$&lt;p&gt;一旦这样理解，问题自然会从：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;怎样运行一次模型？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;升级成：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;怎样管理、寻址、共享、淘汰一大批模型中间状态？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这越来越像：&lt;/p&gt;
+$$
+\text{数据库}
++
+\text{操作系统}
++
+\text{分布式缓存}
+$$&lt;p&gt;问题，而不只是深度学习问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-对物理引擎科学计算也有一个很强的迁移&#34;&gt;14. 对物理引擎/科学计算也有一个很强的迁移
+&lt;/h1&gt;&lt;p&gt;PagedAttention 最深层的思想其实与 Attention 无关：&lt;/p&gt;
+$$
+\boxed{
+\text{logical continuity 不需要 physical continuity。}
+}
+$$&lt;p&gt;这在大型 simulation system 中也很有价值。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;粒子池；&lt;/li&gt;
+&lt;li&gt;contact manifold；&lt;/li&gt;
+&lt;li&gt;sparse grid；&lt;/li&gt;
+&lt;li&gt;dynamic mesh；&lt;/li&gt;
+&lt;li&gt;ECS component storage；&lt;/li&gt;
+&lt;li&gt;GPU constraint batches。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果对象数量：&lt;/p&gt;
+$$
+N(t)
+$$&lt;p&gt;动态增长、删除、分裂，&lt;/p&gt;
+&lt;p&gt;强行要求：&lt;/p&gt;
+$$
+\boxed{\text{每个逻辑对象拥有连续可扩张物理数组}}
+$$&lt;p&gt;往往会制造：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;realloc；&lt;/li&gt;
+&lt;li&gt;memcpy；&lt;/li&gt;
+&lt;li&gt;fragmentation；&lt;/li&gt;
+&lt;li&gt;over-reservation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;PagedAttention 的思考方式是：&lt;/p&gt;
+$$
+\boxed{
+\text{逻辑数据结构}
+\quad\neq\quad
+\text{物理内存布局}
+}
+$$&lt;p&gt;中间加入：&lt;/p&gt;
+$$
+\boxed{\text{indirection layer}}
+$$&lt;p&gt;以后，调度器获得了巨大的自由度。&lt;/p&gt;
+&lt;p&gt;这是一种极其通用的高性能系统设计方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一个很实用的部署诊断思路&#34;&gt;一个很实用的部署诊断思路
+&lt;/h2&gt;&lt;p&gt;如果以后部署自己的 LLM/Agent 服务，不要只监控：&lt;/p&gt;
+$$
+\text{GPU utilization}.
+$$&lt;p&gt;至少应该同时看：&lt;/p&gt;
+$$
+\boxed{
+\text{KV cache utilization}
+}
+$$$$
+\boxed{
+\text{running / waiting requests}
+}
+$$$$
+\boxed{
+\text{tokens/s}
+}
+$$$$
+\boxed{
+\text{TTFT}
+}
+$$$$
+\boxed{
+\text{inter-token latency}
+}
+$$&lt;p&gt;如果出现：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;GPU compute utilization：不高
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;KV cache：接近满
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;waiting requests：很多
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;那么瓶颈很可能并不在：&lt;/p&gt;
+$$
+\text{更多 TFLOPS}
+$$&lt;p&gt;而在：&lt;/p&gt;
+$$
+\boxed{\text{serving memory capacity / scheduling}}
+$$&lt;p&gt;这一层。&lt;/p&gt;
+&lt;p&gt;这是做 AI 全栈工程时非常重要的性能诊断转变。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;PagedAttention 最值得记住的并不是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“把 KV Cache 分成 block。”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;更重要的是：&lt;/p&gt;
+$$
+\boxed{
+\text{LLM serving 的性能，不能只从神经网络计算图理解。}
+}
+$$&lt;p&gt;模型进入真实服务以后：&lt;/p&gt;
+$$
+\text{模型结构}
+$$&lt;p&gt;只是系统中的一层。&lt;/p&gt;
+&lt;p&gt;下面还有：&lt;/p&gt;
+$$
+\boxed{
+\text{GPU kernel}
++
+\text{memory allocator}
++
+\text{scheduler}
++
+\text{cache}
++
+\text{distributed runtime}.
+}
+$$&lt;p&gt;PagedAttention 特别漂亮的地方在于，它没有发明一个更聪明的 Transformer，而是把操作系统中已经成熟几十年的：&lt;/p&gt;
+$$
+\boxed{\text{virtual memory}}
+$$&lt;p&gt;重新映射到：&lt;/p&gt;
+$$
+\boxed{\text{KV Cache}}
+$$&lt;p&gt;上。&lt;/p&gt;
+&lt;p&gt;最后得到的启发非常普遍：&lt;/p&gt;
+$$
+\boxed{
+\text{当一种资源具有“大小动态变化、生命周期不确定、存在共享机会”的特点时，
+优先考虑把逻辑地址与物理存储解耦。}
+}
+$$&lt;p&gt;这是一个远远超出 LLM serving 的工程思想。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Kwon et al., &lt;em&gt;Efficient Memory Management for Large Language Model Serving with PagedAttention&lt;/em&gt;, SOSP 2023&lt;/strong&gt;。原始论文，也是今天最值得读的来源；重点建议看 §3 Memory Challenges、§4 PagedAttention/KV Cache Manager 和评估中的 memory waste。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文页面&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;vLLM 官方 PagedAttention / KV Cache 文档&lt;/strong&gt;。适合从概念进入现在的工程实现，官方 API 已经直接暴露 block size、KV Cache memory、cache dtype、prefix caching 和 offloading 等配置。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.16.0/api/vllm/v1/attention/ops/paged_attn/?utm_source=chatgpt.com&#34;  title=&#34;paged_attn - vLLM&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)
+&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM 官方文档&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;vLLM Automatic Prefix Caching Implementation&lt;/strong&gt;。很适合继续理解“paged memory → block sharing → prefix caching”这条演化路线，以及 block 如何通过 token/prefix 被唯一识别。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html&#34;  title=&#34;Implementation — vLLM&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Dao et al., &lt;em&gt;FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness&lt;/em&gt;, NeurIPS 2022&lt;/strong&gt;。建议与 PagedAttention 对照阅读：前者优化 attention kernel 的 HBM↔SRAM IO，后者优化 serving 时 KV Cache 的生命周期与物理布局。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com&#34;  title=&#34;FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果继续追近期 KV 系统方向，可以关注 &lt;strong&gt;KV Cache quantization、eviction、offloading、prefix caching 和 prefill/decode disaggregation&lt;/strong&gt;；当前 vLLM 已经把其中多项纳入生产 serving stack，这条线比单独研究某一个 CUDA kernel 更接近现代 LLM inference system 的全貌。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/?utm_source=chatgpt.com&#34;  title=&#34;vllm - vLLM&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>

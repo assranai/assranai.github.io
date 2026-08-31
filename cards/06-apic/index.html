@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：MPM × 流体/软体动力学 × 数值方法 × 物理引擎\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[ \\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}} \\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[ \\boxed{\\text{particle}\\leftrightarrow\\text{grid}} \\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[ \\boxed{\\text{Particles}} \\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[ \\boxed{\\text{Grid}} \\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[ \\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}. \\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[ \\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}} \\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[ \\boxed{\\text{particle}\\leftrightarrow\\text{grid}} \\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[ \\boxed{\\text{Particles}} \\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[ \\boxed{\\text{Grid}} \\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[ \\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}. \\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
 <title>APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/06-apic/'>
 
-<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”">
-<meta property='og:description' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：MPM × 流体/软体动力学 × 数值方法 × 物理引擎\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[ \\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}} \\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[ \\boxed{\\text{particle}\\leftrightarrow\\text{grid}} \\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[ \\boxed{\\text{Particles}} \\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[ \\boxed{\\text{Grid}} \\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[ \\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}. \\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
+<link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”">
+<meta property='og:description' content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[ \\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}} \\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[ \\boxed{\\text{particle}\\leftrightarrow\\text{grid}} \\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[ \\boxed{\\text{Particles}} \\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[ \\boxed{\\text{Grid}} \\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[ \\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}. \\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/06-apic/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
-<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='MPM' /><meta property='article:tag' content='流体' /><meta property='article:tag' content='软体动力学' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='物理引擎' /><meta property='article:published_time' content='2026-08-19T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-19T00:00:00&#43;00:00'/>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='计算力学' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='软体动力学' /><meta property='article:tag' content='流体' /><meta property='article:tag' content='数值方法' /><meta property='article:published_time' content='2026-08-19T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-19T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”">
-<meta name="twitter:description" content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：MPM × 流体/软体动力学 × 数值方法 × 物理引擎\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[ \\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}} \\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[ \\boxed{\\text{particle}\\leftrightarrow\\text{grid}} \\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[ \\boxed{\\text{Particles}} \\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[ \\boxed{\\text{Grid}} \\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[ \\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}. \\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
+<meta name="twitter:description" content="APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉” 主题：Affine Particle-In-Cell（APIC）与粒子—网格传递\n领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法\n推荐阅读时间：约 8 分钟\n今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：\n\\[ \\boxed{\\text{数值耗散不一定来自时间积分或材料模型，也可能来自状态表示之间的信息损失。}} \\]APIC 由 Jiang、Schroeder、Selle、Teran 和 Stomakhin 在 SIGGRAPH 2015 提出。作者给出的出发点非常明确：传统 PIC 稳定但耗散严重；FLIP 为减少耗散保留更多粒子信息，却更容易产生噪声和不稳定；APIC 希望在两者之间取得更好的结构性折中。\n这件事对做求解器尤其值得理解，因为 APIC 改的并非 constitutive model，也没有引入更高阶时间积分器。\n它只改变：\n\\[ \\boxed{\\text{particle}\\leftrightarrow\\text{grid}} \\]之间到底传递多少信息。\n1. 先理解 MPM/PIC 为什么需要“来回搬数据” MPM 一类方法有两套表示：\n\\[ \\boxed{\\text{Particles}} \\]负责携带材料：\n质量； 位置； 速度； 形变梯度 \\(F\\)； 应力； 材料参数； 而临时背景网格：\n\\[ \\boxed{\\text{Grid}} \\]负责：\n汇聚质量； 计算动量； 计算力； 处理接触； 求解运动。 一个典型时间步近似是：\n\\[ \\text{Particles} \\xrightarrow{\\mathrm{P2G}} \\text{Grid} \\xrightarrow{\\text{physics}} \\text{Grid} \\xrightarrow{\\mathrm{G2P}} \\text{Particles}. \\]这正是 hybrid Lagrangian/Eulerian 方法的基本结构：粒子便于追踪材料输运和大拓扑变化，Eulerian 背景网格适合计算机械力和碰撞。\n">
     </head>
     <body class="
     article-page
@@ -427,7 +427,7 @@
     
     <h1 id="apic粒子法里的数值耗散很多时候来自信息在表示转换时被丢掉">APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”
 </h1><p><strong>主题：Affine Particle-In-Cell（APIC）与粒子—网格传递</strong><br>
-<strong>领域：MPM × 流体/软体动力学 × 数值方法 × 物理引擎</strong><br>
+<strong>领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法</strong><br>
 <strong>推荐阅读时间：约 8 分钟</strong></p>
 <p>今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：</p>
 \[
@@ -1077,15 +1077,15 @@ v_i
     
     <section class="article-tags">
         
-            <a href="/tags/mpm/">MPM</a>
+            <a href="/tags/%E8%AE%A1%E7%AE%97%E5%8A%9B%E5%AD%A6/">计算力学</a>
         
-            <a href="/tags/%E6%B5%81%E4%BD%93/">流体</a>
+            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
         
             <a href="/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/">软体动力学</a>
         
-            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+            <a href="/tags/%E6%B5%81%E4%BD%93/">流体</a>
         
-            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
         
     </section>
 
@@ -1143,6 +1143,67 @@ v_i
     
 
     
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/12-imex/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/04-variational-integrators/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Variational Integrators：时间积分器也可以“从力学原理里推出来”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/11-hourglass-modes/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Hourglass Modes：有限元里最危险的一类“假柔软”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/03-projective-dynamics/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Projective Dynamics：把“PBD 的投影”变成真正的能量求解</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
 
      
     

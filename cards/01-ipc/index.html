@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="IPC：把“碰撞处理”改写成一个优化问题 主题：Incremental Potential Contact（IPC，增量势接触）\n领域：有限元 × 非线性动力学 × 碰撞 × 物理引擎\n推荐阅读时间：约 8 分钟\n今天选 IPC，是因为它背后有一个很值得迁移的思想：当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。\nIPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。\n这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。\n1. IPC 在整个知识体系里的位置 先看传统软体模拟的一条典型流水线：\n\\[ \\text{弹性内力} \\rightarrow \\text{时间积分} \\rightarrow \\text{碰撞检测} \\rightarrow \\text{穿透修正} \\rightarrow \\text{速度修正} \\]这里存在一个结构性问题。\n弹性求解器可能得到一个它认为合理的位置 \\(x\\)，碰撞模块随后说：\n这个位置非法，改掉。\n于是碰撞模块把位置投影到另一个位置 \\(x'\\)。\n但 \\(x'\\) 并不一定满足原来的弹性能量最小化问题。\n下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：\n接触抖动； 大量 constraint fighting； 四面体压扁； 接触附近异常刚化； 能量注入； 极端情况下元素反转。 IPC 的关键改变是：\n接触本身也是能量。\n于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="IPC：把“碰撞处理”改写成一个优化问题 主题：Incremental Potential Contact（IPC，增量势接触）\n领域：有限元 × 物理引擎 × 接触力学 × 非线性动力学\n推荐阅读时间：约 8 分钟\n今天选 IPC，是因为它背后有一个很值得迁移的思想：当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。\nIPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。\n这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。\n1. IPC 在整个知识体系里的位置 先看传统软体模拟的一条典型流水线：\n\\[ \\text{弹性内力} \\rightarrow \\text{时间积分} \\rightarrow \\text{碰撞检测} \\rightarrow \\text{穿透修正} \\rightarrow \\text{速度修正} \\]这里存在一个结构性问题。\n弹性求解器可能得到一个它认为合理的位置 \\(x\\)，碰撞模块随后说：\n这个位置非法，改掉。\n于是碰撞模块把位置投影到另一个位置 \\(x'\\)。\n但 \\(x'\\) 并不一定满足原来的弹性能量最小化问题。\n下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：\n接触抖动； 大量 constraint fighting； 四面体压扁； 接触附近异常刚化； 能量注入； 极端情况下元素反转。 IPC 的关键改变是：\n接触本身也是能量。\n于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。\n">
 <title>IPC：把“碰撞处理”改写成一个优化问题</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/01-ipc/'>
 
-<link rel="stylesheet" href="/scss/style.min.6ba8b9ea95cedbd14d34969a3a28210289d3a74cba725c37699a1455f78e7135.css"><meta property='og:title' content="IPC：把“碰撞处理”改写成一个优化问题">
-<meta property='og:description' content="IPC：把“碰撞处理”改写成一个优化问题 主题：Incremental Potential Contact（IPC，增量势接触）\n领域：有限元 × 非线性动力学 × 碰撞 × 物理引擎\n推荐阅读时间：约 8 分钟\n今天选 IPC，是因为它背后有一个很值得迁移的思想：当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。\nIPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。\n这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。\n1. IPC 在整个知识体系里的位置 先看传统软体模拟的一条典型流水线：\n\\[ \\text{弹性内力} \\rightarrow \\text{时间积分} \\rightarrow \\text{碰撞检测} \\rightarrow \\text{穿透修正} \\rightarrow \\text{速度修正} \\]这里存在一个结构性问题。\n弹性求解器可能得到一个它认为合理的位置 \\(x\\)，碰撞模块随后说：\n这个位置非法，改掉。\n于是碰撞模块把位置投影到另一个位置 \\(x'\\)。\n但 \\(x'\\) 并不一定满足原来的弹性能量最小化问题。\n下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：\n接触抖动； 大量 constraint fighting； 四面体压扁； 接触附近异常刚化； 能量注入； 极端情况下元素反转。 IPC 的关键改变是：\n接触本身也是能量。\n于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。\n">
+<link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="IPC：把“碰撞处理”改写成一个优化问题">
+<meta property='og:description' content="IPC：把“碰撞处理”改写成一个优化问题 主题：Incremental Potential Contact（IPC，增量势接触）\n领域：有限元 × 物理引擎 × 接触力学 × 非线性动力学\n推荐阅读时间：约 8 分钟\n今天选 IPC，是因为它背后有一个很值得迁移的思想：当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。\nIPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。\n这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。\n1. IPC 在整个知识体系里的位置 先看传统软体模拟的一条典型流水线：\n\\[ \\text{弹性内力} \\rightarrow \\text{时间积分} \\rightarrow \\text{碰撞检测} \\rightarrow \\text{穿透修正} \\rightarrow \\text{速度修正} \\]这里存在一个结构性问题。\n弹性求解器可能得到一个它认为合理的位置 \\(x\\)，碰撞模块随后说：\n这个位置非法，改掉。\n于是碰撞模块把位置投影到另一个位置 \\(x'\\)。\n但 \\(x'\\) 并不一定满足原来的弹性能量最小化问题。\n下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：\n接触抖动； 大量 constraint fighting； 四面体压扁； 接触附近异常刚化； 能量注入； 极端情况下元素反转。 IPC 的关键改变是：\n接触本身也是能量。\n于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/01-ipc/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
-<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='非线性动力学' /><meta property='article:tag' content='碰撞' /><meta property='article:tag' content='物理引擎' /><meta property='article:published_time' content='2026-08-14T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-14T00:00:00&#43;00:00'/>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='接触力学' /><meta property='article:tag' content='非线性动力学' /><meta property='article:published_time' content='2026-08-14T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-14T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="IPC：把“碰撞处理”改写成一个优化问题">
-<meta name="twitter:description" content="IPC：把“碰撞处理”改写成一个优化问题 主题：Incremental Potential Contact（IPC，增量势接触）\n领域：有限元 × 非线性动力学 × 碰撞 × 物理引擎\n推荐阅读时间：约 8 分钟\n今天选 IPC，是因为它背后有一个很值得迁移的思想：当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。\nIPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。\n这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。\n1. IPC 在整个知识体系里的位置 先看传统软体模拟的一条典型流水线：\n\\[ \\text{弹性内力} \\rightarrow \\text{时间积分} \\rightarrow \\text{碰撞检测} \\rightarrow \\text{穿透修正} \\rightarrow \\text{速度修正} \\]这里存在一个结构性问题。\n弹性求解器可能得到一个它认为合理的位置 \\(x\\)，碰撞模块随后说：\n这个位置非法，改掉。\n于是碰撞模块把位置投影到另一个位置 \\(x'\\)。\n但 \\(x'\\) 并不一定满足原来的弹性能量最小化问题。\n下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：\n接触抖动； 大量 constraint fighting； 四面体压扁； 接触附近异常刚化； 能量注入； 极端情况下元素反转。 IPC 的关键改变是：\n接触本身也是能量。\n于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。\n">
+<meta name="twitter:description" content="IPC：把“碰撞处理”改写成一个优化问题 主题：Incremental Potential Contact（IPC，增量势接触）\n领域：有限元 × 物理引擎 × 接触力学 × 非线性动力学\n推荐阅读时间：约 8 分钟\n今天选 IPC，是因为它背后有一个很值得迁移的思想：当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。\nIPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。\n这与你近期接触的软体求解器问题尤其相关，因为 IPC 给出了一条和 PBD/XPBD 很不同的路线。\n1. IPC 在整个知识体系里的位置 先看传统软体模拟的一条典型流水线：\n\\[ \\text{弹性内力} \\rightarrow \\text{时间积分} \\rightarrow \\text{碰撞检测} \\rightarrow \\text{穿透修正} \\rightarrow \\text{速度修正} \\]这里存在一个结构性问题。\n弹性求解器可能得到一个它认为合理的位置 \\(x\\)，碰撞模块随后说：\n这个位置非法，改掉。\n于是碰撞模块把位置投影到另一个位置 \\(x'\\)。\n但 \\(x'\\) 并不一定满足原来的弹性能量最小化问题。\n下一步弹性约束又试图恢复材料形状，碰撞约束再次阻止它，于是容易出现：\n接触抖动； 大量 constraint fighting； 四面体压扁； 接触附近异常刚化； 能量注入； 极端情况下元素反转。 IPC 的关键改变是：\n接触本身也是能量。\n于是系统从“动力学求解 + 碰撞修正”变成一个统一优化问题。\n">
     </head>
     <body class="
     article-page
@@ -421,7 +421,7 @@
     
     <h1 id="ipc把碰撞处理改写成一个优化问题">IPC：把“碰撞处理”改写成一个优化问题
 </h1><p><strong>主题：Incremental Potential Contact（IPC，增量势接触）</strong><br>
-<strong>领域：有限元 × 非线性动力学 × 碰撞 × 物理引擎</strong><br>
+<strong>领域：有限元 × 物理引擎 × 接触力学 × 非线性动力学</strong><br>
 <strong>推荐阅读时间：约 8 分钟</strong></p>
 <p>今天选 IPC，是因为它背后有一个很值得迁移的思想：<strong>当碰撞、材料变形和时间积分彼此打架时，与其不断增加碰撞修正、投影、clamp 和事后补丁，可以尝试把它们统一写进同一个变分问题。</strong></p>
 <p>IPC 由 Minchen Li 等人在 SIGGRAPH 2020 系统提出，用于大变形非线性弹性动力学中的接触问题。论文报告了最高约 230 万四面体、单步约 49.8 万接触的测试，并强调在极端压缩和大变形下保持无相交、无反转的可行轨迹。</p>
@@ -995,11 +995,11 @@ J>0
         
             <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
         
-            <a href="/tags/%E9%9D%9E%E7%BA%BF%E6%80%A7%E5%8A%A8%E5%8A%9B%E5%AD%A6/">非线性动力学</a>
-        
-            <a href="/tags/%E7%A2%B0%E6%92%9E/">碰撞</a>
-        
             <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+        
+            <a href="/tags/%E6%8E%A5%E8%A7%A6%E5%8A%9B%E5%AD%A6/">接触力学</a>
+        
+            <a href="/tags/%E9%9D%9E%E7%BA%BF%E6%80%A7%E5%8A%A8%E5%8A%9B%E5%AD%A6/">非线性动力学</a>
         
     </section>
 
@@ -1065,12 +1065,64 @@ J>0
             
                 
 <article class="">
+    <a href="/cards/14-ipc-feasibility/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IPC：为什么“无穿透”可以被写成一个优化问题，而不是靠碰撞后修补</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/12-imex/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/10-complementarity/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Complementarity：为什么刚体接触本质上是一个“二选一”问题</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
     <a href="/cards/04-variational-integrators/">
         
         
 
         <div class="article-details">
             <h2 class="article-title">Variational Integrators：时间积分器也可以“从力学原理里推出来”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/03-projective-dynamics/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Projective Dynamics：把“PBD 的投影”变成真正的能量求解</h2>
         </div>
     </a>
 </article>
