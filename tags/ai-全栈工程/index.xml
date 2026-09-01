@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Mon, 31 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Tue, 01 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</title>
         <link>https://assranai.github.io/cards/13-neural-operator/</link>
         <pubDate>Wed, 26 Aug 2026 00:00:00 +0000</pubDate>
@@ -931,6 +931,513 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;如果继续追近期 KV 系统方向，可以关注 &lt;strong&gt;KV Cache quantization、eviction、offloading、prefix caching 和 prefill/decode disaggregation&lt;/strong&gt;；当前 vLLM 已经把其中多项纳入生产 serving stack，这条线比单独研究某一个 CUDA kernel 更接近现代 LLM inference system 的全貌。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/?utm_source=chatgpt.com&#34;  title=&#34;vllm - vLLM&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        <item>
+        <title>Conformal Prediction：代理模型真正缺的，往往不是“置信区间”，而是“覆盖率保证”</title>
+        <link>https://assranai.github.io/cards/19-conformal-prediction/</link>
+        <pubDate>Tue, 01 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/19-conformal-prediction/</guid>
+        <description>&lt;h1 id=&#34;conformal-prediction代理模型真正缺的往往不是置信区间而是覆盖率保证&#34;&gt;Conformal Prediction：代理模型真正缺的，往往不是“置信区间”，而是“覆盖率保证”
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Conformal Prediction（保形预测）&lt;/strong&gt;
+&lt;strong&gt;领域：代理模型 × 可靠性 × 不确定性量化 × AI 全栈工程&lt;/strong&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 Conformal Prediction，因为它正好切中一个代理模型里很容易被忽略的问题：&lt;/p&gt;
+$$\boxed{ \text{模型给出的“不确定性”，到底有没有被校准？} }$$&lt;p&gt;Kriging 会给你：&lt;/p&gt;
+$$\mu(x),\qquad \sigma(x)$$&lt;p&gt;神经网络也可以通过 ensemble、Bayesian approximation、quantile regression 等方式给出 uncertainty。&lt;/p&gt;
+&lt;p&gt;但这些量通常依赖：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Gaussian process 假设；&lt;/li&gt;
+&lt;li&gt;kernel 是否合适；&lt;/li&gt;
+&lt;li&gt;噪声模型；&lt;/li&gt;
+&lt;li&gt;posterior approximation；&lt;/li&gt;
+&lt;li&gt;网络校准程度。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+$$\mu(x)\pm1.96\sigma(x)$$&lt;p&gt;写成“95%区间”，并不自动意味着未来真实输出确实有 95% 落在里面。&lt;/p&gt;
+&lt;p&gt;Conformal Prediction 解决的是另一个层面的问题：&lt;/p&gt;
+$$\boxed{ \text{给定一个任意黑盒预测模型， 再用一批 calibration data， 把它包装成具有有限样本覆盖率保证的预测区间。} }$$&lt;p&gt;在标准 exchangeability 假设下，它不要求知道真实数据分布，也不要求底层模型正确。Lei 等的经典 JASA 工作明确证明，conformal inference 可以套在任意 regression estimator 外层，同时获得 finite-sample marginal coverage。(&lt;a class=&#34;link&#34; href=&#34;https://econpapers.repec.org/RePEc%3Ataf%3Ajnlasa%3Av%3A113%3Ay%3A2018%3Ai%3A523%3Ap%3A1094-1111?utm_source=chatgpt.com&#34;  title=&#34;EconPapers: Distribution-Free Predictive Inference for Regression&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;EconPapers&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看普通代理模型究竟缺了什么&#34;&gt;1. 先看普通代理模型究竟缺了什么
+&lt;/h2&gt;&lt;p&gt;假设 Kriging 给你：&lt;/p&gt;
+$$\hat y(x)=100.$$&lt;p&gt;同时预测标准差：&lt;/p&gt;
+$$\sigma(x)=5.$$&lt;p&gt;于是写：&lt;/p&gt;
+$$[90.2,\ 109.8]$$&lt;p&gt;作为所谓 95% prediction interval。&lt;/p&gt;
+&lt;p&gt;问题在于这个“95%”来自模型内部假设。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;kernel 选错；&lt;/li&gt;
+&lt;li&gt;响应非平稳；&lt;/li&gt;
+&lt;li&gt;hyperparameter 估计不准；&lt;/li&gt;
+&lt;li&gt;数据有异方差；&lt;/li&gt;
+&lt;li&gt;surrogate misspecified；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么真实 coverage 可能只有：&lt;/p&gt;
+$$82\%.$$&lt;p&gt;也可能：&lt;/p&gt;
+$$99\%.$$&lt;p&gt;所以这里其实有两个不同问题：&lt;/p&gt;
+$$\boxed{ \text{uncertainty estimation} }$$&lt;p&gt;和：&lt;/p&gt;
+$$\boxed{ \text{uncertainty calibration} }$$&lt;p&gt;Conformal prediction 主要处理第二个。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-最简单的-split-conformal-几乎简单得不像一个高级方法&#34;&gt;2. 最简单的 Split Conformal 几乎简单得不像一个高级方法
+&lt;/h1&gt;&lt;p&gt;先把数据分成：&lt;/p&gt;
+$$D_{\rm train}$$&lt;p&gt;和：&lt;/p&gt;
+$$D_{\rm cal}.$$&lt;p&gt;第一步，用训练集随便训练一个模型：&lt;/p&gt;
+$$\hat f(x).$$&lt;p&gt;它可以是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Kriging；&lt;/li&gt;
+&lt;li&gt;Random Forest；&lt;/li&gt;
+&lt;li&gt;Neural Network；&lt;/li&gt;
+&lt;li&gt;Neural Operator；&lt;/li&gt;
+&lt;li&gt;Reduced model；&lt;/li&gt;
+&lt;li&gt;任意 deterministic surrogate。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;然后对 calibration set：&lt;/p&gt;
+$$(x_i,y_i)$$&lt;p&gt;计算 residual：&lt;/p&gt;
+$$\boxed{ s_i= |y_i-\hat f(x_i)| }$$&lt;p&gt;这些：&lt;/p&gt;
+$$s_i$$&lt;p&gt;叫 &lt;strong&gt;nonconformity scores&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;意思非常直白：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;真实标签到底偏离模型预测多远？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;然后排序：&lt;/p&gt;
+$$s_{(1)} \le s_{(2)} \le \cdots \le s_{(n)}.$$&lt;p&gt;如果希望覆盖率：&lt;/p&gt;
+$$1-\alpha=0.95,$$&lt;p&gt;取一个经过有限样本修正的：&lt;/p&gt;
+$$95\%$$&lt;p&gt;分位数：&lt;/p&gt;
+$$q.$$&lt;p&gt;对新的：&lt;/p&gt;
+$$x^*$$&lt;p&gt;直接输出：&lt;/p&gt;
+$$\boxed{ C(x^*) = [ \hat f(x^*)-q,\, \hat f(x^*)+q ] }$$&lt;p&gt;就结束了。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-为什么这么简单居然能有理论保证&#34;&gt;3. 为什么这么简单居然能有理论保证？
+&lt;/h1&gt;&lt;p&gt;关键不在：&lt;/p&gt;
+$$\hat f$$&lt;p&gt;多么正确。&lt;/p&gt;
+&lt;p&gt;关键在：&lt;/p&gt;
+$$\boxed{\text{exchangeability}}$$&lt;p&gt;如果 calibration examples 和新的 test point 是 exchangeable，例如都是独立同分布采样，那么新样本 residual：&lt;/p&gt;
+$$s_{n+1}$$&lt;p&gt;在：&lt;/p&gt;
+$$s_1,\ldots,s_n,s_{n+1}$$&lt;p&gt;中的 rank 是均匀的。&lt;/p&gt;
+&lt;p&gt;所以新 residual 大于 calibration residual 的 95% quantile 的概率最多约：&lt;/p&gt;
+$$5\%.$$&lt;p&gt;因此：&lt;/p&gt;
+$$\boxed{ P\left( Y_{\rm new}\in C(X_{\rm new}) \right) \ge1-\alpha. }$$&lt;p&gt;而且这是：&lt;/p&gt;
+$$\boxed{\text{finite-sample}}$$&lt;p&gt;结果。&lt;/p&gt;
+&lt;p&gt;不是：&lt;/p&gt;
+$$n\rightarrow\infty$$&lt;p&gt;之后才成立。&lt;/p&gt;
+&lt;p&gt;这正是 conformal prediction 最吸引人的地方之一。Angelopoulos 和 Bates 的 2023 教程把这种“distribution-free、finite-sample、model-agnostic guarantee”作为 conformal prediction 的核心特性。(&lt;a class=&#34;link&#34; href=&#34;https://mlanthology.org/ftml/2023/angelopoulos2023ftml-conformal/?utm_source=chatgpt.com&#34;  title=&#34;Conformal Prediction: A Gentle Introduction | ML Anthology&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;ML Anthology&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-注意它没有证明模型是对的&#34;&gt;4. 注意：它没有证明模型“是对的”
+&lt;/h1&gt;&lt;p&gt;这一点非常重要。&lt;/p&gt;
+&lt;p&gt;假设你的 surrogate 烂得惊人：&lt;/p&gt;
+$$R^2=0.1.$$&lt;p&gt;Conformal prediction 仍然可以做到：&lt;/p&gt;
+$$95\%\text{ coverage}.$$&lt;p&gt;怎么做到？&lt;/p&gt;
+&lt;p&gt;区间会变成：&lt;/p&gt;
+$$[-500,\,+700].$$&lt;p&gt;它很可靠，但毫无用处。&lt;/p&gt;
+&lt;p&gt;因此 conformal prediction 同时涉及两个完全不同的指标：&lt;/p&gt;
+&lt;h3 id=&#34;validity&#34;&gt;Validity
+&lt;/h3&gt;$$\boxed{ P(Y\in C(X))\ge1-\alpha }$$&lt;p&gt;区间是否具有正确 coverage。&lt;/p&gt;
+&lt;h3 id=&#34;efficiency&#34;&gt;Efficiency
+&lt;/h3&gt;$$\boxed{ |C(X)| }$$&lt;p&gt;区间是否足够窄。&lt;/p&gt;
+&lt;p&gt;这就是理解 conformal prediction 很关键的一点：&lt;/p&gt;
+$$\boxed{ \text{Conformal calibration 不创造预测能力， 只把已有预测能力转换成可验证的覆盖率。} }$$&lt;p&gt;底层 surrogate 越好，最终区间一般越窄。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-一个有限元代理模型例子&#34;&gt;5. 一个有限元代理模型例子
+&lt;/h1&gt;&lt;p&gt;假设输入：&lt;/p&gt;
+$$X= (E,\mu,\text{gap},F)$$&lt;p&gt;输出：&lt;/p&gt;
+$$Y=\sigma_{\max}.$$&lt;p&gt;你训练一个 Kriging：&lt;/p&gt;
+$$\hat\sigma(X).$$&lt;p&gt;然后保留：&lt;/p&gt;
+$$100$$&lt;p&gt;个额外 FEM 样本做 calibration。&lt;/p&gt;
+&lt;p&gt;得到绝对误差：&lt;/p&gt;
+$$s_i= |\sigma_i-\hat\sigma_i|.$$&lt;p&gt;假设：&lt;/p&gt;
+$$95\%\text{ conformal quantile}=8.4\text{ MPa}.$$&lt;p&gt;那么任意新输入：&lt;/p&gt;
+$$X^*$$&lt;p&gt;如果 surrogate 给：&lt;/p&gt;
+$$\hat\sigma=312\text{ MPa},$$&lt;p&gt;conformal interval：&lt;/p&gt;
+$$\boxed{ [303.6,\ 320.4]\text{ MPa} }$$&lt;p&gt;如果材料允许应力：&lt;/p&gt;
+$$\sigma_{\rm allow}=330\text{ MPa},$$&lt;p&gt;那么整个区间都在安全侧：&lt;/p&gt;
+$$320.4&lt;330.$$&lt;p&gt;这时你有比：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“Kriging \(R^2=0.98\)”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;强得多的局部决策依据。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-但这里马上暴露一个问题所有输入区间一样宽&#34;&gt;6. 但这里马上暴露一个问题：所有输入区间一样宽
+&lt;/h1&gt;&lt;p&gt;最简单 split conformal 使用：&lt;/p&gt;
+$$s_i=|y_i-\hat f_i|.$$&lt;p&gt;所以最终所有点都是：&lt;/p&gt;
+$$\hat f(x)\pm q.$$&lt;p&gt;但真实问题往往：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;区域 A：模型误差约 1 MPa
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;区域 B：模型误差约 20 MPa
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;统一：&lt;/p&gt;
+$$\pm20$$&lt;p&gt;显然浪费。&lt;/p&gt;
+&lt;p&gt;这就是为什么 plain conformal 可能很保守。&lt;/p&gt;
+&lt;p&gt;它有：&lt;/p&gt;
+$$\boxed{\text{marginal coverage}}$$&lt;p&gt;但不一定具有好的：&lt;/p&gt;
+$$\boxed{\text{local adaptivity}}$$&lt;hr&gt;
+&lt;h1 id=&#34;7-conformalized-quantile-regression-为什么很重要&#34;&gt;7. Conformalized Quantile Regression 为什么很重要？
+&lt;/h1&gt;&lt;p&gt;Quantile regression 直接学习：&lt;/p&gt;
+$$\hat q_{\alpha/2}(x)$$&lt;p&gt;和：&lt;/p&gt;
+$$\hat q_{1-\alpha/2}(x).$$&lt;p&gt;所以模型本身先给出一个异方差区间：&lt;/p&gt;
+$$[ \hat q_{\rm low}(x), \hat q_{\rm high}(x) ].$$&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;简单区域：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[99, 101]
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;复杂区域：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[80, 120]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;然后 conformal 不再看普通 absolute residual，而定义：&lt;/p&gt;
+$$s_i = \max \left[ \hat q_{\rm low}(x_i)-y_i,\, y_i-\hat q_{\rm high}(x_i) \right].$$&lt;p&gt;再用 calibration quantile：&lt;/p&gt;
+$$q$$&lt;p&gt;修正：&lt;/p&gt;
+$$\boxed{ [ \hat q_{\rm low}(x)-q,\, \hat q_{\rm high}(x)+q ] }$$&lt;p&gt;于是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;quantile regression 负责学习哪里难；&lt;/li&gt;
+&lt;li&gt;conformal calibration 负责保证 coverage。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这就是 &lt;strong&gt;Conformalized Quantile Regression（CQR）&lt;/strong&gt;。Romano、Patterson 与 Candès 在 NeurIPS 2019 的工作中专门针对传统 conformal 区间缺乏 heteroscedastic adaptivity 的问题提出这一方法，并在保持有限样本 coverage 的同时获得更短、更自适应的区间。(&lt;a class=&#34;link&#34; href=&#34;https://proceedings.neurips.cc/paper_files/paper/2019/hash/5103c3584b063c431bd1268e9b5e76fb-Abstract.html?utm_source=chatgpt.com&#34;  title=&#34;Conformalized Quantile Regression&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;NeurIPS 会议记录&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-这和-kriging-variance-有一个很有意思的组合方式&#34;&gt;8. 这和 Kriging variance 有一个很有意思的组合方式
+&lt;/h1&gt;&lt;p&gt;对于 Kriging：&lt;/p&gt;
+$$\mu(x),\sigma(x)$$&lt;p&gt;本来已经提供 local uncertainty。&lt;/p&gt;
+&lt;p&gt;于是可以定义 normalized score：&lt;/p&gt;
+$$\boxed{ s_i= \frac{|y_i-\mu(x_i)|} {\sigma(x_i)} }$$&lt;p&gt;然后 calibration 得到：&lt;/p&gt;
+$$q.$$&lt;p&gt;最终：&lt;/p&gt;
+$$\boxed{ [ \mu(x)-q\sigma(x), \, \mu(x)+q\sigma(x) ] }$$&lt;p&gt;这件事非常有意思。&lt;/p&gt;
+&lt;p&gt;原来的：&lt;/p&gt;
+$$1.96\sigma$$&lt;p&gt;依赖 GP assumptions。&lt;/p&gt;
+&lt;p&gt;Conformal calibration 则用数据告诉你：&lt;/p&gt;
+$$\boxed{ \text{在实际预测误差下， 到底应该乘 }1.3、2.1\text{ 还是 }3.7？ }$$&lt;p&gt;所以它可以理解成：&lt;/p&gt;
+$$\boxed{ \text{把 model-based uncertainty 变成 empirically calibrated uncertainty} }$$&lt;p&gt;这对 surrogate modeling 很有迁移价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-但必须特别警惕一个词marginal-coverage&#34;&gt;9. 但必须特别警惕一个词：marginal coverage
+&lt;/h1&gt;&lt;p&gt;Conformal guarantee 通常是：&lt;/p&gt;
+$$P \left( Y\in C(X) \right) \ge0.95.$$&lt;p&gt;这个概率同时对：&lt;/p&gt;
+$$X,Y$$&lt;p&gt;取平均。&lt;/p&gt;
+&lt;p&gt;它&lt;strong&gt;并不自动保证&lt;/strong&gt;：&lt;/p&gt;
+$$P \left( Y\in C(X)\mid X=x \right) \ge0.95$$&lt;p&gt;对每一个：&lt;/p&gt;
+$$x$$&lt;p&gt;都成立。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;普通区域：99% coverage
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;危险区域：70% coverage
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;总体仍可能：&lt;/p&gt;
+$$95\%.$$&lt;p&gt;如果危险区域占比很低尤其如此。&lt;/p&gt;
+&lt;p&gt;这对可靠性分析非常关键。&lt;/p&gt;
+&lt;p&gt;因为可靠性恰恰可能只关心：&lt;/p&gt;
+$$\boxed{ \text{概率空间里非常小的一块区域} }$$&lt;p&gt;因此：&lt;/p&gt;
+$$\boxed{ \text{marginal calibration} \neq \text{failure-boundary calibration} }$$&lt;p&gt;这几乎是把 conformal prediction 用于可靠性时最重要的警告。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-它为什么不能直接解决--失效概率问题&#34;&gt;10. 它为什么不能直接解决 \(10^{-6}\) 失效概率问题？
+&lt;/h1&gt;&lt;p&gt;假设你的 calibration set：&lt;/p&gt;
+$$n=1000.$$&lt;p&gt;真正失效区域概率：&lt;/p&gt;
+$$10^{-6}.$$&lt;p&gt;那么 calibration dataset 很可能一个失效附近样本都没有。&lt;/p&gt;
+&lt;p&gt;Conformal prediction 无法凭空知道：&lt;/p&gt;
+$$\boxed{ \text{这个从未见过的尾部区域， 模型误差究竟有多大。} }$$&lt;p&gt;所以如果你直接用全局 calibration：&lt;/p&gt;
+$$95\%\text{ coverage}$$&lt;p&gt;去证明：&lt;/p&gt;
+$$10^{-6}\text{ reliability},$$&lt;p&gt;逻辑上是不够的。&lt;/p&gt;
+&lt;p&gt;这和前几期讲过的 Subset Simulation、AK-MCS 又接上了：&lt;/p&gt;
+$$\boxed{ \text{可靠性不仅需要 calibration， 还需要 failure-relevant sampling。} }$$&lt;p&gt;真正有吸引力的组合会是：&lt;/p&gt;
+$$\text{adaptive reliability sampling} + \text{local/conformal calibration}.$$&lt;hr&gt;
+&lt;h1 id=&#34;11-它与-certified-reduced-basis-有什么本质区别&#34;&gt;11. 它与 Certified Reduced Basis 有什么本质区别？
+&lt;/h1&gt;&lt;p&gt;前几期讲过 Certified RB：&lt;/p&gt;
+$$\|u_h-u_N\| \le \Delta_N.$$&lt;p&gt;这个 bound 来自：&lt;/p&gt;
+$$\boxed{ \text{PDE residual + stability theory} }$$&lt;p&gt;Conformal interval 来自：&lt;/p&gt;
+$$\boxed{ \text{exchangeability + empirical calibration residuals} }$$&lt;p&gt;所以：&lt;/p&gt;
+&lt;h3 id=&#34;certified-rb&#34;&gt;Certified RB
+&lt;/h3&gt;&lt;p&gt;偏向：&lt;/p&gt;
+$$\boxed{\text{physics/numerics-based certification}}$$&lt;h3 id=&#34;conformal-prediction&#34;&gt;Conformal Prediction
+&lt;/h3&gt;&lt;p&gt;偏向：&lt;/p&gt;
+$$\boxed{\text{data/statistics-based calibration}}$$&lt;p&gt;RB 对模型结构要求很强，却可以提供具有数值分析意义的误差 bound。&lt;/p&gt;
+&lt;p&gt;Conformal 对底层模型几乎没有要求，但保证主要是：&lt;/p&gt;
+$$\boxed{\text{frequentist coverage}}$$&lt;p&gt;而非单次 deterministic error bound。&lt;/p&gt;
+&lt;p&gt;这两个概念不能混在一起。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-和-bayesian-uncertainty-的关系也值得分清&#34;&gt;12. 和 Bayesian uncertainty 的关系也值得分清
+&lt;/h1&gt;&lt;p&gt;Bayesian / GP 的区间回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;在我的概率模型、prior、likelihood 等假设成立时，参数/函数的不确定性是什么？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Conformal 回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;如果 calibration/test samples 具有相应 exchangeability，那么长期来看，我的区间覆盖真实结果的频率是多少？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+$$\boxed{ \text{Bayesian uncertainty} }$$&lt;p&gt;更偏向模型内部概率语义；&lt;/p&gt;
+&lt;p&gt;而：&lt;/p&gt;
+$$\boxed{ \text{Conformal coverage} }$$&lt;p&gt;更偏向 repeated-sampling guarantee。&lt;/p&gt;
+&lt;p&gt;一个非常有价值的组合是：&lt;/p&gt;
+$$\boxed{ \text{Bayesian model 提供高质量 uncertainty ranking} + \text{Conformal 做 calibration} }$$&lt;p&gt;二者并不冲突。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-真正的软肋distribution-shift&#34;&gt;13. 真正的软肋：distribution shift
+&lt;/h1&gt;&lt;p&gt;Conformal prediction 最经典的保证依赖：&lt;/p&gt;
+$$\boxed{\text{exchangeability}}$$&lt;p&gt;也就是说 calibration 和未来 test distribution 要匹配。&lt;/p&gt;
+&lt;p&gt;如果训练/标定阶段：&lt;/p&gt;
+$$X\sim p_{\rm train}(x)$$&lt;p&gt;但部署后：&lt;/p&gt;
+$$X\sim p_{\rm test}(x),$$&lt;p&gt;且：&lt;/p&gt;
+$$p_{\rm train}\neq p_{\rm test},$$&lt;p&gt;coverage 可能失效。&lt;/p&gt;
+&lt;p&gt;这是工程应用中非常现实的问题。&lt;/p&gt;
+&lt;p&gt;例如 FEM surrogate 在训练时参数范围：&lt;/p&gt;
+$$\mu\in[0.1,0.3]$$&lt;p&gt;后来实际工况集中在：&lt;/p&gt;
+$$\mu\in[0.27,0.35].$$&lt;p&gt;这已经是 covariate shift。&lt;/p&gt;
+&lt;p&gt;Tibshirani、Barber、Candès 和 Ramdas 在 NeurIPS 2019 进一步发展了 &lt;strong&gt;weighted conformal prediction&lt;/strong&gt;，在训练和测试 covariate distribution 不同、且 density ratio 可知或可估的条件下恢复分布无关的 prediction interval guarantee。(&lt;a class=&#34;link&#34; href=&#34;https://proceedings.neurips.cc/paper_files/paper/2019/hash/8fb21ee7a2207526da55a679f0332de2-Abstract.html?utm_source=chatgpt.com&#34;  title=&#34;Conformal Prediction Under Covariate Shift&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;NeurIPS 会议记录&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;因此在工程部署中：&lt;/p&gt;
+$$\boxed{ \text{先检查数据分布有没有漂移， 再谈 conformal coverage。} }$$&lt;hr&gt;
+&lt;h1 id=&#34;14-对代理模型研究一个非常值得迁移的评价方式&#34;&gt;14. 对代理模型研究，一个非常值得迁移的评价方式
+&lt;/h1&gt;&lt;p&gt;现在很多 surrogate 论文主要报告：&lt;/p&gt;
+$$R^2,$$$$RMSE,$$$$MAE.$$&lt;p&gt;这些都是：&lt;/p&gt;
+$$\boxed{\text{point prediction quality}}$$&lt;p&gt;指标。&lt;/p&gt;
+&lt;p&gt;如果模型将参与自动决策，更成熟的评价应该增加：&lt;/p&gt;
+&lt;h3 id=&#34;empirical-coverage&#34;&gt;Empirical Coverage
+&lt;/h3&gt;$$\frac1N \sum_i I[y_i\in C(x_i)]$$&lt;p&gt;是否接近目标：&lt;/p&gt;
+$$95\%.$$&lt;h3 id=&#34;interval-width&#34;&gt;Interval Width
+&lt;/h3&gt;$$\frac1N \sum_i |C(x_i)|$$&lt;p&gt;是否足够窄。&lt;/p&gt;
+&lt;p&gt;于是代理模型评价变成二维：&lt;/p&gt;
+$$\boxed{ \text{Validity} \quad+\quad \text{Efficiency} }$$&lt;p&gt;比如：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;模型&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;Coverage&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;平均区间宽度&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;A&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;95.2%&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;18.2&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;B&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;95.0%&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;9.7&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;C&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;87.0%&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;7.5&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;如果目标 coverage 是 95%，那么：&lt;/p&gt;
+$$C$$&lt;p&gt;虽然区间最窄，却不合格。&lt;/p&gt;
+&lt;p&gt;A 与 B 中：&lt;/p&gt;
+$$B$$&lt;p&gt;更有价值。&lt;/p&gt;
+&lt;p&gt;这比单独比较：&lt;/p&gt;
+$$R^2=0.985 \quad vs\quad 0.991$$&lt;p&gt;对工程决策更有意义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15-一个很强的可靠性应用思路三态分类而不是硬判安全失效&#34;&gt;15. 一个很强的可靠性应用思路：三态分类，而不是硬判安全/失效
+&lt;/h1&gt;&lt;p&gt;设极限状态：&lt;/p&gt;
+$$g(x)&gt;0 \Rightarrow \text{safe}$$$$g(x)\le0 \Rightarrow \text{failure}.$$&lt;p&gt;Conformal surrogate 给：&lt;/p&gt;
+$$[L(x),U(x)].$$&lt;p&gt;于是可以定义：&lt;/p&gt;
+$$\boxed{ L(x)&gt;0 \Rightarrow \text{certified-like safe} }$$$$\boxed{ U(x)&lt;0 \Rightarrow \text{certified-like failure} }$$&lt;p&gt;而：&lt;/p&gt;
+$$\boxed{ L(x)\le0\le U(x) \Rightarrow \text{uncertain} }$$&lt;p&gt;第三类样本才调用 HF。&lt;/p&gt;
+&lt;p&gt;这会自然形成：&lt;/p&gt;
+$$\text{surrogate} \rightarrow \text{conformal uncertainty} \rightarrow \text{HF fallback}.$$&lt;p&gt;要强调：这里的“certified-like”仍然是统计覆盖意义，不等于数学严格的逐点认证。&lt;/p&gt;
+&lt;p&gt;但作为工程工作流，它比：&lt;/p&gt;
+$$\hat g(x)&gt;0 \Rightarrow safe$$&lt;p&gt;成熟很多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-这其实还能反过来驱动-active-learning&#34;&gt;16. 这其实还能反过来驱动 Active Learning
+&lt;/h1&gt;&lt;p&gt;假设一个 candidate 的 conformal interval：&lt;/p&gt;
+$$[-0.1,\ 12]$$&lt;p&gt;跨越：&lt;/p&gt;
+$$g=0.$$&lt;p&gt;另一个：&lt;/p&gt;
+$$[20,\ 35].$$&lt;p&gt;如果最终目标是可靠性，显然前者更值得高保真计算。&lt;/p&gt;
+&lt;p&gt;所以 acquisition 可以围绕：&lt;/p&gt;
+$$\boxed{ 0\in C(x) }$$&lt;p&gt;展开。&lt;/p&gt;
+&lt;p&gt;进一步根据：&lt;/p&gt;
+$$\text{interval width}$$&lt;p&gt;或：&lt;/p&gt;
+$$\operatorname{dist}(C(x),0)$$&lt;p&gt;排序。&lt;/p&gt;
+&lt;p&gt;于是形成：&lt;/p&gt;
+$$\boxed{ \text{Conformal Active Learning for reliability} }$$&lt;p&gt;的自然结构：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;9
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;训练 surrogate
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;conformal calibration
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;寻找区间跨越 g=0 的点
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;调用 HF
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;重新训练/校准
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这和 AK-MCS 的：&lt;/p&gt;
+$$U(x) = \frac{|\mu(x)|}{\sigma(x)}$$&lt;p&gt;思路非常接近。&lt;/p&gt;
+&lt;p&gt;但区别是：&lt;/p&gt;
+$$\sigma(x)$$&lt;p&gt;主要来自 GP 内部假设，&lt;/p&gt;
+&lt;p&gt;而 conformal interval 的尺度经过 empirical calibration。&lt;/p&gt;
+&lt;p&gt;这是很值得研究的区别。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-为什么它对-ai-agent--ai-全栈工程也有价值&#34;&gt;17. 为什么它对 AI Agent / AI 全栈工程也有价值？
+&lt;/h1&gt;&lt;p&gt;AI 系统越来越常出现：&lt;/p&gt;
+$$\boxed{ \text{模型输出} \rightarrow \text{自动决策} }$$&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;分类结果是否自动执行；&lt;/li&gt;
+&lt;li&gt;LLM judge 是否通过；&lt;/li&gt;
+&lt;li&gt;CV 检测是否触发控制；&lt;/li&gt;
+&lt;li&gt;surrogate 是否跳过 HF simulation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;真正需要的不只是一个 score：&lt;/p&gt;
+$$0.93.$$&lt;p&gt;而是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;这个 score 是否经过校准，能否对应实际错误率？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Conformal 方法可以把：&lt;/p&gt;
+$$\text{prediction scores}$$&lt;p&gt;转化为：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;prediction sets；&lt;/li&gt;
+&lt;li&gt;abstention；&lt;/li&gt;
+&lt;li&gt;risk-controlled decisions。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;截至 2026 年 8 月，MAPIE 仍在积极开发 conformal/risk-control 工具；其最新 PyPI 发布信息明确提到 LLM-as-Judge、图像分割、exchangeability tests 和 adaptive conformal prediction 等应用。(&lt;a class=&#34;link&#34; href=&#34;https://pypi.org/project/MAPIE/?utm_source=chatgpt.com&#34;  title=&#34;MAPIE · PyPI&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;PyPI&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;这说明 conformal prediction 已经从统计方法逐渐进入：&lt;/p&gt;
+$$\boxed{\text{production uncertainty layer}}$$&lt;p&gt;这一位置。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-对缺失变量导致代理精度骤降也有一个有意思的启发&#34;&gt;18. 对“缺失变量导致代理精度骤降”也有一个有意思的启发
+&lt;/h1&gt;&lt;p&gt;假设一个关键输入缺失以后：&lt;/p&gt;
+$$R^2: 0.96\rightarrow0.4.$$&lt;p&gt;普通 surrogate 只会：&lt;/p&gt;
+$$\boxed{\text{预测变差}}$$&lt;p&gt;更危险的是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;它可能仍然给出很自信的预测。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Conformal calibration 提供了一种额外检测机制：&lt;/p&gt;
+&lt;p&gt;如果缺失信息使模型预测误差分布变宽：&lt;/p&gt;
+$$s_i\uparrow,$$&lt;p&gt;那么 conformal interval 会自动：&lt;/p&gt;
+$$\boxed{\text{变宽}}$$&lt;p&gt;至少在 calibration distribution 与部署条件匹配的前提下。&lt;/p&gt;
+&lt;p&gt;这意味着一个更成熟的 surrogate system 不仅输出：&lt;/p&gt;
+$$\hat y$$&lt;p&gt;还应该输出：&lt;/p&gt;
+$$\boxed{ \text{在当前信息完整度下，这个预测到底能缩到多窄。} }$$&lt;p&gt;这和 masked/missing-input surrogate 是一个很值得结合的方向。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一个非常容易实现的最小实验&#34;&gt;一个非常容易实现的最小实验
+&lt;/h2&gt;&lt;p&gt;如果已经有一个 Kriging：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;train:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    fit surrogate on D_train
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;calibration:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    for (x_i, y_i) in D_cal:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        score_i = abs(y_i - model(x_i))
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    q = corrected 95% quantile(score)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;predict:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    y_hat = model(x_new)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    interval =
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        [y_hat - q,
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;         y_hat + q]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;然后在独立 test set 检查：&lt;/p&gt;
+$$\boxed{ \text{Coverage} = \frac{\#\{y_i\in C(x_i)\}}{N}. }$$&lt;p&gt;我尤其建议做三组比较：&lt;/p&gt;
+$$\text{Kriging native }1.96\sigma,$$$$\text{plain split conformal},$$$$\text{normalized conformal using }\sigma(x).$$&lt;p&gt;看三个指标：&lt;/p&gt;
+$$\boxed{ \text{Coverage} }$$$$\boxed{ \text{Average Width} }$$$$\boxed{ \text{Failure-boundary Coverage} }$$&lt;p&gt;第三个尤其重要：&lt;/p&gt;
+&lt;p&gt;只统计：&lt;/p&gt;
+$$|g(x)|&lt;\epsilon$$&lt;p&gt;附近。&lt;/p&gt;
+&lt;p&gt;这很可能会直接暴露：&lt;/p&gt;
+$$\boxed{ \text{全局 95% coverage 并不代表极限状态附近也是 95%。} }$$&lt;p&gt;这正是可靠性研究真正值得继续深入的地方。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Conformal Prediction 最值得记住的不是某个 quantile 公式。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+$$\boxed{ \text{“模型认为自己有多不确定” 和 “这个不确定性在现实中是否覆盖真实误差” 是两个不同的问题。} }$$&lt;p&gt;所以一个更完整的代理模型体系应该区分：&lt;/p&gt;
+$$\text{point prediction}$$$$\downarrow$$$$\text{model uncertainty}$$$$\downarrow$$$$\boxed{\text{empirical calibration}}$$$$\downarrow$$$$\text{decision / reliability}.$$&lt;p&gt;Conformal Prediction 正好卡在：&lt;/p&gt;
+$$\boxed{ \text{预测模型} \quad\longrightarrow\quad \text{可信决策} }$$&lt;p&gt;之间。&lt;/p&gt;
+&lt;p&gt;而对可靠性问题，最值得进一步追的并不是“给 Kriging 套一个 conformal interval”这么简单，而是：&lt;/p&gt;
+$$\boxed{ \text{怎样让 calibration 本身聚焦于极限状态和稀有事件区域？} }$$&lt;p&gt;因为真正困难的始终不是平均意义上的预测误差，而是：&lt;/p&gt;
+$$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还能知道自己可能错了。} }$$&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Angelopoulos &amp;amp; Bates, &lt;em&gt;Conformal Prediction: A Gentle Introduction&lt;/em&gt;, Foundations and Trends in Machine Learning, 2023&lt;/strong&gt;。目前最好的系统入门之一，包含 finite-sample guarantee、regression/classification、distribution shift、time series、abstention 及 Python 示例。(&lt;a class=&#34;link&#34; href=&#34;https://mlanthology.org/ftml/2023/angelopoulos2023ftml-conformal/?utm_source=chatgpt.com&#34;  title=&#34;Conformal Prediction: A Gentle Introduction | ML Anthology&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;ML Anthology&lt;/a&gt;)
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2107.07511?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文与教程&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Lei et al., &lt;em&gt;Distribution-Free Predictive Inference for Regression&lt;/em&gt;, JASA, 2018&lt;/strong&gt;。理解 full conformal、split conformal、jackknife 以及“任意 regression estimator + finite-sample marginal coverage”的经典来源。(&lt;a class=&#34;link&#34; href=&#34;https://econpapers.repec.org/RePEc%3Ataf%3Ajnlasa%3Av%3A113%3Ay%3A2018%3Ai%3A523%3Ap%3A1094-1111?utm_source=chatgpt.com&#34;  title=&#34;EconPapers: Distribution-Free Predictive Inference for Regression&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;EconPapers&lt;/a&gt;)&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Romano, Patterson &amp;amp; Candès, &lt;em&gt;Conformalized Quantile Regression&lt;/em&gt;, NeurIPS 2019&lt;/strong&gt;。非常值得代理模型研究者看：解决 plain conformal 区间不能很好适应 heteroscedasticity 的问题。(&lt;a class=&#34;link&#34; href=&#34;https://proceedings.neurips.cc/paper_files/paper/2019/hash/5103c3584b063c431bd1268e9b5e76fb-Abstract.html?utm_source=chatgpt.com&#34;  title=&#34;Conformalized Quantile Regression&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;NeurIPS 会议记录&lt;/a&gt;)
+&lt;a class=&#34;link&#34; href=&#34;https://proceedings.neurips.cc/paper/2019/hash/5103c3584b063c431bd1268e9b5e76fb-Abstract.html?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;NeurIPS 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Tibshirani et al., &lt;em&gt;Conformal Prediction Under Covariate Shift&lt;/em&gt;, NeurIPS 2019&lt;/strong&gt;。如果要真正部署代理模型，这篇尤其重要：它说明经典 exchangeability 被破坏以后怎么办，并提出 weighted conformal。(&lt;a class=&#34;link&#34; href=&#34;https://proceedings.neurips.cc/paper_files/paper/2019/hash/8fb21ee7a2207526da55a679f0332de2-Abstract.html?utm_source=chatgpt.com&#34;  title=&#34;Conformal Prediction Under Covariate Shift&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;NeurIPS 会议记录&lt;/a&gt;)
+&lt;a class=&#34;link&#34; href=&#34;https://proceedings.neurips.cc/paper/2019/hash/8fb21ee7a2207526da55a679f0332de2-Abstract.html?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;NeurIPS 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;MAPIE&lt;/strong&gt;。一个成熟的 Python conformal-prediction/risk-control 工具库；截至 2026 年 8 月仍有更新，适合直接在现有 sklearn/ML workflow 上试验 calibration、prediction intervals 和 risk control。(&lt;a class=&#34;link&#34; href=&#34;https://pypi.org/project/MAPIE/?utm_source=chatgpt.com&#34;  title=&#34;MAPIE · PyPI&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;PyPI&lt;/a&gt;)&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 </description>
