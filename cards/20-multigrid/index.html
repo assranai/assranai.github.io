@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉 主题：Multigrid（多重网格）与误差频谱分解 领域：有限元 × 数值方法 × 物理引擎 × 高性能计算 推荐阅读时间：约 8–10 分钟\n今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：\n$$\\boxed{ \\text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$答案通常不是“迭代器坏了”，而是：\n它擅长消灭高频误差，却不擅长消灭低频误差。\nMultigrid 的核心策略因此非常漂亮：\n$$\\boxed{ \\text{细网格负责消高频误差，粗网格负责消低频误差。} }$$Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。(应用数学学会)\n1. 先看一个非常典型的现象 设要求解：\n$$Au=f.$$当前近似：\n$$u^{(k)}$$与真解：\n$$u^*$$之间的误差：\n$$e^{(k)} = u^*-u^{(k)}.$$假设用 Weighted Jacobi：\n$$u^{(k+1)} = u^{(k)} + \\omega D^{-1} (f-Au^{(k)}).$$误差满足：\n$$e^{(k+1)} = \\left(I-\\omega D^{-1}A\\right)e^{(k)}.$$如果把误差写成 Fourier modes：\n$$e_j = \\sin(k\\pi x_j),$$不同波数：\n">
+<title>Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/20-multigrid/'>
+
+<link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉">
+<meta property='og:description' content="Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉 主题：Multigrid（多重网格）与误差频谱分解 领域：有限元 × 数值方法 × 物理引擎 × 高性能计算 推荐阅读时间：约 8–10 分钟\n今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：\n$$\\boxed{ \\text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$答案通常不是“迭代器坏了”，而是：\n它擅长消灭高频误差，却不擅长消灭低频误差。\nMultigrid 的核心策略因此非常漂亮：\n$$\\boxed{ \\text{细网格负责消高频误差，粗网格负责消低频误差。} }$$Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。(应用数学学会)\n1. 先看一个非常典型的现象 设要求解：\n$$Au=f.$$当前近似：\n$$u^{(k)}$$与真解：\n$$u^*$$之间的误差：\n$$e^{(k)} = u^*-u^{(k)}.$$假设用 Weighted Jacobi：\n$$u^{(k+1)} = u^{(k)} + \\omega D^{-1} (f-Au^{(k)}).$$误差满足：\n$$e^{(k+1)} = \\left(I-\\omega D^{-1}A\\right)e^{(k)}.$$如果把误差写成 Fourier modes：\n$$e_j = \\sin(k\\pi x_j),$$不同波数：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/20-multigrid/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='高性能计算' /><meta property='article:published_time' content='2026-09-02T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-02T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉">
+<meta name="twitter:description" content="Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉 主题：Multigrid（多重网格）与误差频谱分解 领域：有限元 × 数值方法 × 物理引擎 × 高性能计算 推荐阅读时间：约 8–10 分钟\n今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：\n$$\\boxed{ \\text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$答案通常不是“迭代器坏了”，而是：\n它擅长消灭高频误差，却不擅长消灭低频误差。\nMultigrid 的核心策略因此非常漂亮：\n$$\\boxed{ \\text{细网格负责消高频误差，粗网格负责消低频误差。} }$$Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。(应用数学学会)\n1. 先看一个非常典型的现象 设要求解：\n$$Au=f.$$当前近似：\n$$u^{(k)}$$与真解：\n$$u^*$$之间的误差：\n$$e^{(k)} = u^*-u^{(k)}.$$假设用 Weighted Jacobi：\n$$u^{(k+1)} = u^{(k)} + \\omega D^{-1} (f-Au^{(k)}).$$误差满足：\n$$e^{(k+1)} = \\left(I-\\omega D^{-1}A\\right)e^{(k)}.$$如果把误差写成 Fourier modes：\n$$e_j = \\sin(k\\pi x_j),$$不同波数：\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先看一个非常典型的现象">1. 先看一个非常典型的现象</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#geometric-multigridgmg">Geometric Multigrid（GMG）</a></li>
+        <li><a href="#algebraic-multigridamg">Algebraic Multigrid（AMG）</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#高频误差">高频误差</a></li>
+        <li><a href="#低频误差">低频误差</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/20-multigrid/">Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-02T00:00:00Z'>Sep 02, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 5 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="multigrid为什么低频误差应该交给粗网格而不是逼细网格慢慢磨掉">Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉
+</h1><p><strong>主题：Multigrid（多重网格）与误差频谱分解</strong>
+<strong>领域：有限元 × 数值方法 × 物理引擎 × 高性能计算</strong>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：</p>
+$$\boxed{ \text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$<p>答案通常不是“迭代器坏了”，而是：</p>
+<blockquote>
+<p><strong>它擅长消灭高频误差，却不擅长消灭低频误差。</strong></p>
+</blockquote>
+<p>Multigrid 的核心策略因此非常漂亮：</p>
+$$\boxed{ \text{细网格负责消高频误差，粗网格负责消低频误差。} }$$<p>Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。(<a class="link" href="https://epubs.siam.org/doi/10.1137/1.9780898719505.ch3?utm_source=chatgpt.com"  title="A Multigrid Tutorial, Second Edition | 3. Elements of Multigrid"
+     target="_blank" rel="noopener"
+    >应用数学学会</a>)</p>
+<hr>
+<h2 id="1-先看一个非常典型的现象">1. 先看一个非常典型的现象
+</h2><p>设要求解：</p>
+$$Au=f.$$<p>当前近似：</p>
+$$u^{(k)}$$<p>与真解：</p>
+$$u^*$$<p>之间的误差：</p>
+$$e^{(k)} = u^*-u^{(k)}.$$<p>假设用 Weighted Jacobi：</p>
+$$u^{(k+1)} = u^{(k)} + \omega D^{-1} (f-Au^{(k)}).$$<p>误差满足：</p>
+$$e^{(k+1)} = \left(I-\omega D^{-1}A\right)e^{(k)}.$$<p>如果把误差写成 Fourier modes：</p>
+$$e_j = \sin(k\pi x_j),$$<p>不同波数：</p>
+$$k$$<p>的衰减速度完全不同。</p>
+<p>对于 Poisson 一类问题，Jacobi/Gauss–Seidel 通常能迅速削弱：</p>
+$$\boxed{\text{高波数 / 高频误差}}$$<p>却会留下：</p>
+$$\boxed{\text{低波数 / 平滑误差}}$$<p>慢慢收敛。</p>
+<p>所以你常会看到：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">iteration 0:  锯齿状误差很多
+</span></span><span class="line"><span class="cl">iteration 5:  锯齿几乎没了
+</span></span><span class="line"><span class="cl">iteration 50:  还剩一个平滑的大鼓包
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>残差最初下降得很快，随后进入长尾。</p>
+<p>这正是经典 multigrid 理论所谓 relaxation 的 <strong>smoothing property</strong>。(<a class="link" href="https://epubs.siam.org/doi/10.1137/1.9780898719505.ch3?utm_source=chatgpt.com"  title="A Multigrid Tutorial, Second Edition | 3. Elements of Multigrid"
+     target="_blank" rel="noopener"
+    >应用数学学会</a>)</p>
+<hr>
+<h1 id="2-为什么低频误差这么难消">2. 为什么低频误差这么难消？
+</h1><p>考虑一个非常平滑的误差：</p>
+$$e(x)=\sin(\pi x).$$<p>在很细的网格上：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">· · · · · · · · · · · · · · ·
+</span></span><span class="line"><span class="cl">        ______
+</span></span><span class="line"><span class="cl">      /        \
+</span></span><span class="line"><span class="cl">_____/          \_____
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>相邻节点之间差别很小。</p>
+<p>Jacobi 或 Gauss–Seidel 本质上不断根据邻居做局部修正。</p>
+<p>对于这种长波误差，局部看起来几乎已经“很平滑”：</p>
+$$e_{i-1}\approx e_i\approx e_{i+1}.$$<p>所以局部 relaxation 很难判断：</p>
+<blockquote>
+<p>整个区域其实一起偏高了。</p>
+</blockquote>
+<p>这是一个尺度问题。</p>
+<hr>
+<h1 id="3-multigrid-最关键的洞察低频是相对于网格而言的">3. Multigrid 最关键的洞察：低频是相对于网格而言的
+</h1><p>把细网格：</p>
+$$h$$<p>换成粗网格：</p>
+$$2h.$$<p>原来细网格上的长波误差：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">fine:
+</span></span><span class="line"><span class="cl">~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>在粗网格眼里会变成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">coarse:
+</span></span><span class="line"><span class="cl">^   v   ^   v
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>也就是说：</p>
+$$\boxed{ \text{细网格上的低频误差， 在粗网格上会变成相对高频误差。} }$$<p>而高频误差正是 relaxation 擅长消掉的。</p>
+<p>这就是 Multigrid 最值得记住的一句话。</p>
+<p>它没有发明一个更强的迭代器。</p>
+<p>它改变了：</p>
+$$\boxed{\text{误差被观察的尺度}}$$<hr>
+<h1 id="4-两层-multigrid-到底做了什么">4. 两层 Multigrid 到底做了什么？
+</h1><p>设 fine-grid equation：</p>
+$$A_hu_h=f_h.$$<p>当前近似：</p>
+$$u_h.$$<p>第一步，先在细网格做几次 smoothing：</p>
+$$u_h \leftarrow S_h(u_h).$$<p>高频误差迅速下降。</p>
+<p>然后计算 residual：</p>
+$$r_h = f_h-A_hu_h.$$<p>注意：</p>
+$$Ae=r,$$<p>所以 residual 实际编码了当前 error。</p>
+<p>接下来把 residual 限制到粗网格：</p>
+$$\boxed{ r_{2h} = Rr_h }$$<p>然后在粗网格解：</p>
+$$A_{2h}e_{2h}=r_{2h}.$$<p>这里求的不是完整解，而是：</p>
+$$\boxed{\text{fine-grid error 的粗尺度修正}}$$<p>再 prolongate 回去：</p>
+$$e_h = Pe_{2h}.$$<p>更新：</p>
+$$u_h \leftarrow u_h+Pe_{2h}.$$<p>最后再做几次 post-smoothing。</p>
+<p>流程就是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">fine smooth
+</span></span><span class="line"><span class="cl">    ↓
+</span></span><span class="line"><span class="cl">compute residual
+</span></span><span class="line"><span class="cl">    ↓
+</span></span><span class="line"><span class="cl">restrict to coarse
+</span></span><span class="line"><span class="cl">    ↓
+</span></span><span class="line"><span class="cl">solve error equation
+</span></span><span class="line"><span class="cl">    ↓
+</span></span><span class="line"><span class="cl">prolongate correction
+</span></span><span class="line"><span class="cl">    ↓
+</span></span><span class="line"><span class="cl">fine smooth
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这就是一个基本的 <strong>two-grid correction scheme</strong>。</p>
+<hr>
+<h1 id="5-为什么要解误差方程而不是重新解原方程">5. 为什么要解“误差方程”，而不是重新解原方程？
+</h1><p>这是一个非常漂亮的结构。</p>
+<p>因为：</p>
+$$Au=f$$<p>而：</p>
+$$A\tilde u$$<p>是当前近似。</p>
+<p>于是：</p>
+$$A(u-\tilde u) = f-A\tilde u.$$<p>即：</p>
+$$\boxed{ Ae=r. }$$<p>所以 residual：</p>
+$$r$$<p>本质上告诉你：</p>
+<blockquote>
+<p>当前解还欠缺什么。</p>
+</blockquote>
+<p>粗网格不是重新完成全部物理计算，而是在估计：</p>
+$$\boxed{\text{当前剩余误差的低频部分}}$$<p>然后把 correction：</p>
+$$e$$<p>加回去。</p>
+<p>这和 Newton correction：</p>
+$$J\Delta x=-F$$<p>在思维上非常相似：</p>
+<blockquote>
+<p>不重新构造答案，而是解“当前错了多少”。</p>
+</blockquote>
+<hr>
+<h1 id="6-为什么还需要一层又一层粗网格">6. 为什么还需要一层又一层粗网格？
+</h1><p>因为在：</p>
+$$2h$$<p>网格上，仍然存在低频误差。</p>
+<p>所以继续：</p>
+$$h \rightarrow 2h \rightarrow 4h \rightarrow 8h \rightarrow\cdots$$<p>直到最粗层只有很少自由度，可以：</p>
+$$\boxed{\text{直接解}}$$<p>于是形成经典 V-cycle：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">fine
+</span></span><span class="line"><span class="cl"> ↓ smooth
+</span></span><span class="line"><span class="cl"> ↓ restrict
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"> medium
+</span></span><span class="line"><span class="cl">  ↓ smooth
+</span></span><span class="line"><span class="cl">  ↓ restrict
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">   coarse
+</span></span><span class="line"><span class="cl">   direct solve
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">  ↑ prolong
+</span></span><span class="line"><span class="cl">  ↑ smooth
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"> ↑ prolong
+</span></span><span class="line"><span class="cl"> ↑ smooth
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">fine
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>因此：</p>
+$$\boxed{ \text{不同空间尺度的误差， 由不同网格层负责。} }$$<p>这其实是一种非常明确的“频带分工”。</p>
+<hr>
+<h1 id="7-为什么理论上-multigrid-可以接近-">7. 为什么理论上 Multigrid 可以接近 \(O(N)\)？
+</h1><p>假设 finest grid 有：</p>
+$$N$$<p>个未知量。</p>
+<p>三维均匀 coarsening 后：</p>
+$$N,\quad \frac{N}{8},\quad \frac{N}{64},\ldots$$<p>所有层加起来：</p>
+$$N \left( 1+\frac18+\frac1{64}+\cdots \right) = \frac87N.$$<p>如果每层只做固定次数：</p>
+<ul>
+<li>smoothing；</li>
+<li>restriction；</li>
+<li>prolongation；</li>
+</ul>
+<p>那么一次 V-cycle 工作量：</p>
+$$\boxed{O(N)}.$$<p>如果 convergence factor 又近似与：</p>
+$$N$$<p>无关，那么达到固定精度只需要常数个 V-cycle。</p>
+<p>最终：</p>
+$$\boxed{\text{solve complexity}\approx O(N)}$$<p>这就是 Multigrid 在 PDE 世界里如此重要的原因。</p>
+<p>相比之下，单纯 CG 的 iteration count 会随着条件数：</p>
+$$\kappa(A)$$<p>恶化；对于细网格椭圆问题：</p>
+$$\kappa(A) \sim h^{-2}.$$<p>网格越细：</p>
+$$\text{迭代越来越难}.$$<p>Multigrid 的目标正是让：</p>
+$$\boxed{\text{收敛速度基本摆脱 }h}$$<p>的控制。</p>
+<hr>
+<h1 id="8-multigrid-与-cg-是竞争关系吗">8. Multigrid 与 CG 是竞争关系吗？
+</h1><p>通常不是。</p>
+<p>实际系统经常使用：</p>
+$$\boxed{ \text{CG} + \text{Multigrid preconditioner}. }$$<p>也就是说，Multigrid 不直接承担所有求解，而是提供：</p>
+$$M^{-1}\approx A^{-1}.$$<p>然后：</p>
+$$M^{-1}Au=M^{-1}f.$$<p>如果 preconditioner 足够好：</p>
+$$\kappa(M^{-1}A)$$<p>会大幅降低。</p>
+<p>于是 CG 只需要很少 iteration。</p>
+<p>现代 FEM 中常见组合：</p>
+$$\boxed{ \text{Krylov outer solver} + \text{Multigrid inner preconditioner}. }$$<p>这比“选 CG 还是 Multigrid”更准确。</p>
+<hr>
+<h1 id="9-geometric-multigrid-与-algebraic-multigrid-差在哪里">9. Geometric Multigrid 与 Algebraic Multigrid 差在哪里？
+</h1><p>这是工程上最重要的分叉之一。</p>
+<h3 id="geometric-multigridgmg">Geometric Multigrid（GMG）
+</h3><p>你明确知道：</p>
+$$\text{fine mesh} \rightarrow \text{coarse mesh}.$$<p>例如：</p>
+$$128^3 \rightarrow 64^3 \rightarrow 32^3.$$<p>Restriction / prolongation 来自有限元空间之间的几何关系。</p>
+<p>优点：</p>
+<ul>
+<li>层级物理含义明确；</li>
+<li>可以非常高效；</li>
+<li>特别适合 structured / hierarchical mesh。</li>
+</ul>
+<p>缺点：</p>
+<ul>
+<li>代码需要显式维护 mesh hierarchy；</li>
+<li>复杂几何和自适应网格实现更麻烦。</li>
+</ul>
+<h3 id="algebraic-multigridamg">Algebraic Multigrid（AMG）
+</h3><p>只给：</p>
+$$A.$$<p>算法根据矩阵中的强耦合关系自动构造 coarse variables 和 prolongation。</p>
+<p>所以：</p>
+$$\boxed{ \text{AMG 不需要知道原始几何} }$$<p>这使它非常适合：</p>
+<ul>
+<li>unstructured FEM；</li>
+<li>黑盒线性系统；</li>
+<li>工业 solver。</li>
+</ul>
+<p>deal.II 官方 step-50 就直接比较了 AMG 与几何 Multigrid：AMG 配置容易得多，而 matrix-free GMG 在其测试问题上能获得显著更好的性能。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_50.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-50 tutorial program"
+     target="_blank" rel="noopener"
+    >deal.II</a>)</p>
+<p>NVIDIA 也提供 GPU 加速 AMG 库 <strong>AMGX</strong>，面向 implicit unstructured simulations 和单/多 GPU 分布式求解。(<a class="link" href="https://github.com/NVIDIA/AMGX?utm_source=chatgpt.com"  title="GitHub - NVIDIA/AMGX: Distributed multigrid linear solver library on GPU · GitHub"
+     target="_blank" rel="noopener"
+    >GitHub</a>)</p>
+<hr>
+<h1 id="10-为什么-multigrid-与-matrix-free-是一对非常重要的组合">10. 为什么 Multigrid 与 Matrix-Free 是一对非常重要的组合？
+</h1><p>现代 CPU/GPU 上，稀疏矩阵乘：</p>
+$$y=Ax$$<p>经常不是 FLOPs 不够，而是：</p>
+$$\boxed{\text{内存带宽不够}}$$<p>因为 sparse matrix 需要不断从主存读取：</p>
+<ul>
+<li>matrix values；</li>
+<li>column indices；</li>
+<li>vectors。</li>
+</ul>
+<p>deal.II 官方 matrix-free 教程明确指出，在现代处理器上，主内存访问往往成为 PDE solver 的瓶颈；matrix-free 方法避免显式存储矩阵，从单元算子直接执行 \(Av\)，从而减少 memory transfer。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_37.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-37 tutorial program"
+     target="_blank" rel="noopener"
+    >deal.II</a>)</p>
+<p>于是现代高阶 FEM 一个非常强的组合是：</p>
+$$\boxed{ \text{Matrix-free operator} + \text{Multigrid} + \text{Krylov} }$$<p>可以理解成：</p>
+<ul>
+<li>matrix-free：每次算子应用便宜；</li>
+<li>multigrid：iteration count 少；</li>
+<li>Krylov：提高鲁棒性。</li>
+</ul>
+<p>deal.II 的 step-37 展示的正是这一结构，并报告了大规模并行中高达数百亿甚至数千亿自由度级别的 matrix-free multigrid 计算案例。(<a class="link" href="https://dealii.org/9.0.0/doxygen/deal.II/step_37.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-37 tutorial program"
+     target="_blank" rel="noopener"
+    >deal.II</a>)</p>
+<hr>
+<h1 id="11-multigrid-真正深刻的地方它在解不同尺度的错误">11. Multigrid 真正深刻的地方：它在解“不同尺度的错误”
+</h1><p>很多 iterative solver 的思想是：</p>
+$$\boxed{\text{找到更好的搜索方向}}$$<p>例如：</p>
+<ul>
+<li>CG；</li>
+<li>GMRES；</li>
+<li>Anderson；</li>
+<li>Newton。</li>
+</ul>
+<p>Multigrid 则多加入了一个维度：</p>
+$$\boxed{\text{尺度}}$$<p>它问：</p>
+<blockquote>
+<p>当前误差属于哪个空间尺度？</p>
+</blockquote>
+<p>所以可以这样理解：</p>
+$$\boxed{ \text{Smoother：处理局部振荡误差} }$$$$\boxed{ \text{Coarse solve：处理全局协调误差} }$$<p>这是为什么 Multigrid 不只是“多跑几个网格”。</p>
+<p>它本质上是一种：</p>
+$$\boxed{\text{error-space decomposition}}$$<p>方法。</p>
+<hr>
+<h1 id="12-为什么简单-jacobi-在-multigrid-里反而突然变得有价值">12. 为什么简单 Jacobi 在 Multigrid 里反而突然变得有价值？
+</h1><p>单独使用 Jacobi：</p>
+$$\boxed{\text{慢}}$$<p>所以看起来很落后。</p>
+<p>但 Multigrid 根本不要求 smoother 把问题解完。</p>
+<p>它只要求：</p>
+$$\boxed{\text{迅速消掉高频误差}}$$<p>而 weighted Jacobi 在这件事上恰恰很擅长。</p>
+<p>所以：</p>
+$$\boxed{ \text{一个“差的完整求解器”， 可能是一个非常好的局部组件。} }$$<p>这是 Multigrid 特别值得迁移的工程思想。</p>
+<p>算法组件不需要：</p>
+$$\text{什么都擅长}.$$<p>只要：</p>
+$$\boxed{\text{在明确分工里做好一件事}}$$<p>就够了。</p>
+<hr>
+<h1 id="13-对软体求解器这个思想几乎可以直接迁移">13. 对软体求解器，这个思想几乎可以直接迁移
+</h1><p>想象一个大软体。</p>
+<p>局部 tet 形状误差：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">+-+-+-+-+-+-+
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>属于高频。</p>
+<p>而整个物体逐渐向一侧弯曲：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">~~~~~~~~~~~~~
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>属于低频。</p>
+<p>如果只使用局部 Gauss–Seidel / Jacobi constraint projection：</p>
+$$\boxed{\text{局部错误修得很快}}$$<p>但整个物体的 global deformation correction 可能传播得非常慢。</p>
+<p>例如一根有：</p>
+$$1000$$<p>段的长杆。</p>
+<p>如果末端受到约束变化，local iterative solver 要靠：</p>
+$$\text{neighbor}\rightarrow\text{neighbor}\rightarrow\text{neighbor}$$<p>把信息逐渐传播到另一端。</p>
+<p>需要很多 iteration。</p>
+<p>Multigrid 的思想则是：</p>
+$$\boxed{ \text{在粗层直接表示“整根杆一起怎么变”。} }$$<p>于是 global correction 可以一步跨越大量 fine DOFs。</p>
+<p>这就是为什么多层结构对：</p>
+<ul>
+<li>cloth；</li>
+<li>deformable bodies；</li>
+<li>constraint systems；</li>
+</ul>
+<p>都有天然吸引力。</p>
+<hr>
+<h1 id="14-它和-projective-dynamics-也有直接联系">14. 它和 Projective Dynamics 也有直接联系
+</h1><p>PD global step 经常要求解：</p>
+$$Ax=b.$$<p>对于大规模网格：</p>
+$$A$$<p>虽然固定，但线性求解仍可能占主要成本。</p>
+<p>如果网格规模增大：</p>
+$$10^4 \rightarrow 10^6$$<p>直接 factorization：</p>
+<ul>
+<li>内存越来越大；</li>
+<li>preprocessing 很重；</li>
+<li>GPU 适应性不好。</li>
+</ul>
+<p>那么：</p>
+$$\boxed{ \text{Multigrid-preconditioned iterative global solve} }$$<p>就是非常自然的路线。</p>
+<p>更深一点，PD/local-global 本身也有尺度传播问题。</p>
+<p>因此 multi-resolution deformation solver、hierarchical PBD、multilevel PD 等方法背后的直觉，都和 Multigrid 有很强亲缘性：</p>
+$$\boxed{ \text{global low-frequency modes 应该在低维 coarse representation 上处理。} }$$<hr>
+<h1 id="15-为什么-amg-对真实弹性问题比-poisson-难">15. 为什么 AMG 对真实弹性问题比 Poisson 难？
+</h1><p>Poisson 很友好，因为其平滑误差通常就是：</p>
+$$\boxed{\text{几何上的平滑函数}}$$<p>但三维弹性：</p>
+$$Ku=f$$<p>有一个特别重要的近零空间：</p>
+$$\boxed{\text{rigid-body modes}}$$<p>即：</p>
+<ul>
+<li>3 个平移；</li>
+<li>3 个旋转。</li>
+</ul>
+<p>一个好的 AMG coarse space 必须能很好地表示这些模式。</p>
+<p>否则：</p>
+$$\boxed{ \text{真正难收敛的低能量模式没有进入 coarse level} }$$<p>Multigrid 就会失效。</p>
+<p>这揭示了更一般的原则：</p>
+$$\boxed{ \text{coarse space 最重要的任务， 不是“节点变少”，而是保留难以由 smoother 消掉的模式。} }$$<p>这句话非常关键。</p>
+<hr>
+<h1 id="16-这甚至可以用来理解-reduced-basis">16. 这甚至可以用来理解 Reduced Basis
+</h1><p>Multigrid coarse space：</p>
+$$V_H$$<p>保存的是：</p>
+$$\boxed{\text{低频 / 难收敛误差模式}}$$<p>Reduced Basis：</p>
+$$V_r$$<p>保存的是：</p>
+$$\boxed{\text{参数变化下重要的 solution modes}}$$<p>POD：</p>
+$$V_{\rm POD}$$<p>保存的是：</p>
+$$\boxed{\text{数据中最有能量的 modes}}$$<p>Active Subspaces 保存的是：</p>
+$$\boxed{\text{输入空间最敏感方向}}$$<p>你会发现这些方法其实都在做：</p>
+$$\boxed{ \text{找到真正需要昂贵处理的低维结构。} }$$<p>区别只是“重要”的定义不同。</p>
+<hr>
+<h1 id="17-multigrid-失败时通常不是层数不够">17. Multigrid 失败时通常不是“层数不够”
+</h1><p>这是工程上很重要的一点。</p>
+<p>如果 Multigrid 收敛很差，常见原因可能是：</p>
+<ul>
+<li>smoother 不适合当前 operator；</li>
+<li>coarse space 没保留 near-null modes；</li>
+<li>restriction/prolongation 设计差；</li>
+<li>coefficient jump 太强；</li>
+<li>anisotropy；</li>
+<li>contact / active set 导致 operator 急剧变化；</li>
+<li>coarse operator 不够准确。</li>
+</ul>
+<p>所以 Multigrid 的三个核心组件必须彼此匹配：</p>
+$$\boxed{ \text{smoother} + \text{transfer operators} + \text{coarse operator}. }$$<p>单纯增加：</p>
+$$\text{more levels}$$<p>并不能自动修复结构错误。</p>
+<hr>
+<h1 id="18-一个很值得做的求解器诊断观察误差频谱而不只是-residual-norm">18. 一个很值得做的求解器诊断：观察误差频谱，而不只是 residual norm
+</h1><p>如果你有一个 Poisson/FEM benchmark，可以分别初始化：</p>
+<h3 id="高频误差">高频误差
+</h3>$$e_i=(-1)^i$$<h3 id="低频误差">低频误差
+</h3>$$e_i=\sin(\pi x_i).$$<p>然后只跑：</p>
+$$10$$<p>轮 Jacobi/Gauss–Seidel。</p>
+<p>你很可能看到：</p>
+$$\|e_{\rm high}\| \downarrow\downarrow\downarrow$$<p>而：</p>
+$$\|e_{\rm low}\|$$<p>下降很慢。</p>
+<p>再把低频误差 restrict 到 coarse grid。</p>
+<p>它在 coarse grid 上就不再那么“低频”。</p>
+<p>这个实验非常简单，却能直接建立 Multigrid 的核心直觉。</p>
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Multigrid 最值得记住的并不是 V-cycle 的代码结构，而是：</p>
+$$\boxed{ \text{一个误差难不难消除，取决于你在哪个尺度上看它。} }$$<p>在细网格上：</p>
+$$\text{长波误差}$$<p>非常顽固。</p>
+<p>到了粗网格：</p>
+$$\boxed{\text{它就变成了容易处理的误差。}}$$<p>因此 Multigrid 在整个知识体系中的位置可以理解成：</p>
+$$\text{local relaxation}$$$$\downarrow$$$$\boxed{\text{multiscale error decomposition}}$$$$\downarrow$$$$\text{near-linear-complexity PDE solve}.$$<p>它给物理求解器最值得迁移的启发则是：</p>
+$$\boxed{ \text{不要期待一种迭代过程同时高效处理所有尺度的错误。} }$$<p>更成熟的做法是明确分工：</p>
+$$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理全局误差。} }$$<p>这也是从“能解一个有限元系统”走向“大规模高性能求解器”非常关键的一步。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><ol>
+<li>
+<p><strong>Briggs, Henson &amp; McCormick, <em>A Multigrid Tutorial</em>, 2nd ed., SIAM</strong>。最推荐的入门资料。尤其值得看 Basic Iterative Methods 与 Elements of Multigrid 两章，把 smoothing、Fourier modes 和 coarse-grid correction 串起来。(<a class="link" href="https://epubs.siam.org/doi/abs/10.1137/1.9780898719505.fm?utm_source=chatgpt.com"  title="A Multigrid Tutorial, Second Edition | Front Matter"
+     target="_blank" rel="noopener"
+    >应用数学学会</a>)
+<a class="link" href="https://epubs.siam.org/doi/book/10.1137/1.9780898719505?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+    >SIAM 图书页</a></p>
+</li>
+<li>
+<p><strong>deal.II <code>step-37</code>：Matrix-Free Multigrid</strong>。非常好的现代 FEM 工程实现入口，重点看为什么当前处理器上的瓶颈经常是 memory bandwidth，以及 matrix-free 如何与 multigrid 组合。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_37.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-37 tutorial program"
+     target="_blank" rel="noopener"
+    >deal.II</a>)
+<a class="link" href="https://dealii.org/current/doxygen/deal.II/step_37.html?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+    >deal.II step-37</a></p>
+</li>
+<li>
+<p><strong>deal.II <code>step-50</code>：GMG vs AMG</strong>。适合理解 geometric multigrid、algebraic multigrid、matrix-free GMG 在大型并行 FEM 中的真实工程差异。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_50.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-50 tutorial program"
+     target="_blank" rel="noopener"
+    >deal.II</a>)
+<a class="link" href="https://www.dealii.org/current/doxygen/deal.II/step_50.html?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+    >deal.II step-50</a></p>
+</li>
+<li>
+<p><strong>NVIDIA AMGX</strong>。GPU 上的工业级 algebraic multigrid solver library，支持分布式、多 GPU、block systems 与灵活 smoother/preconditioner 组合，很适合观察 AMG 怎样变成 HPC 基础设施。(<a class="link" href="https://github.com/NVIDIA/AMGX?utm_source=chatgpt.com"  title="GitHub - NVIDIA/AMGX: Distributed multigrid linear solver library on GPU · GitHub"
+     target="_blank" rel="noopener"
+    >GitHub</a>)
+<a class="link" href="https://github.com/NVIDIA/AMGX?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+    >AMGX GitHub</a></p>
+</li>
+<li>
+<p>如果继续深入，下一步非常值得研究 <strong>near-null-space-aware AMG、multigrid for elasticity、matrix-free \(p\)-multigrid 和 nonlinear multigrid/FAS</strong>。这时你会发现 Multigrid 的真正核心逐渐从“粗网格”转向一个更一般的问题：<strong>怎样构造能够表示难收敛模式的 coarse space。</strong></p>
+</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+        
+            <a href="/tags/%E9%AB%98%E6%80%A7%E8%83%BD%E8%AE%A1%E7%AE%97/">高性能计算</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/12-imex/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/04-variational-integrators/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Variational Integrators：时间积分器也可以“从力学原理里推出来”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/17-dual-weighted-residual/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/14-ipc-feasibility/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IPC：为什么“无穿透”可以被写成一个优化问题，而不是靠碰撞后修补</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/13-neural-operator/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

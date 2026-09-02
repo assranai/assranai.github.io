@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Thu, 27 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Wed, 02 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>IPC：把“碰撞处理”改写成一个优化问题</title>
         <link>https://assranai.github.io/cards/01-ipc/</link>
         <pubDate>Fri, 14 Aug 2026 00:00:00 +0000</pubDate>
@@ -2068,6 +2068,507 @@
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;IPC Toolkit v1.5.0 Release Notes, 2026-02-05&lt;/strong&gt;。如果想跟进这套技术今天仍在怎么发展，可以看最新工具链加入的 Geometric Contact Potential、Offset Geometric Contact 和并行 LBVH broad phase。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        <item>
+        <title>Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉</title>
+        <link>https://assranai.github.io/cards/20-multigrid/</link>
+        <pubDate>Wed, 02 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/20-multigrid/</guid>
+        <description>&lt;h1 id=&#34;multigrid为什么低频误差应该交给粗网格而不是逼细网格慢慢磨掉&#34;&gt;Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Multigrid（多重网格）与误差频谱分解&lt;/strong&gt;
+&lt;strong&gt;领域：有限元 × 数值方法 × 物理引擎 × 高性能计算&lt;/strong&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：&lt;/p&gt;
+$$\boxed{ \text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$&lt;p&gt;答案通常不是“迭代器坏了”，而是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;它擅长消灭高频误差，却不擅长消灭低频误差。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Multigrid 的核心策略因此非常漂亮：&lt;/p&gt;
+$$\boxed{ \text{细网格负责消高频误差，粗网格负责消低频误差。} }$$&lt;p&gt;Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。(&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/1.9780898719505.ch3?utm_source=chatgpt.com&#34;  title=&#34;A Multigrid Tutorial, Second Edition | 3. Elements of Multigrid&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;应用数学学会&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看一个非常典型的现象&#34;&gt;1. 先看一个非常典型的现象
+&lt;/h2&gt;&lt;p&gt;设要求解：&lt;/p&gt;
+$$Au=f.$$&lt;p&gt;当前近似：&lt;/p&gt;
+$$u^{(k)}$$&lt;p&gt;与真解：&lt;/p&gt;
+$$u^*$$&lt;p&gt;之间的误差：&lt;/p&gt;
+$$e^{(k)} = u^*-u^{(k)}.$$&lt;p&gt;假设用 Weighted Jacobi：&lt;/p&gt;
+$$u^{(k+1)} = u^{(k)} + \omega D^{-1} (f-Au^{(k)}).$$&lt;p&gt;误差满足：&lt;/p&gt;
+$$e^{(k+1)} = \left(I-\omega D^{-1}A\right)e^{(k)}.$$&lt;p&gt;如果把误差写成 Fourier modes：&lt;/p&gt;
+$$e_j = \sin(k\pi x_j),$$&lt;p&gt;不同波数：&lt;/p&gt;
+$$k$$&lt;p&gt;的衰减速度完全不同。&lt;/p&gt;
+&lt;p&gt;对于 Poisson 一类问题，Jacobi/Gauss–Seidel 通常能迅速削弱：&lt;/p&gt;
+$$\boxed{\text{高波数 / 高频误差}}$$&lt;p&gt;却会留下：&lt;/p&gt;
+$$\boxed{\text{低波数 / 平滑误差}}$$&lt;p&gt;慢慢收敛。&lt;/p&gt;
+&lt;p&gt;所以你常会看到：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration 0:  锯齿状误差很多
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration 5:  锯齿几乎没了
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration 50:  还剩一个平滑的大鼓包
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;残差最初下降得很快，随后进入长尾。&lt;/p&gt;
+&lt;p&gt;这正是经典 multigrid 理论所谓 relaxation 的 &lt;strong&gt;smoothing property&lt;/strong&gt;。(&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/1.9780898719505.ch3?utm_source=chatgpt.com&#34;  title=&#34;A Multigrid Tutorial, Second Edition | 3. Elements of Multigrid&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;应用数学学会&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-为什么低频误差这么难消&#34;&gt;2. 为什么低频误差这么难消？
+&lt;/h1&gt;&lt;p&gt;考虑一个非常平滑的误差：&lt;/p&gt;
+$$e(x)=\sin(\pi x).$$&lt;p&gt;在很细的网格上：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;· · · · · · · · · · · · · · ·
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ______
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      /        \
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;_____/          \_____
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;相邻节点之间差别很小。&lt;/p&gt;
+&lt;p&gt;Jacobi 或 Gauss–Seidel 本质上不断根据邻居做局部修正。&lt;/p&gt;
+&lt;p&gt;对于这种长波误差，局部看起来几乎已经“很平滑”：&lt;/p&gt;
+$$e_{i-1}\approx e_i\approx e_{i+1}.$$&lt;p&gt;所以局部 relaxation 很难判断：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;整个区域其实一起偏高了。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这是一个尺度问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-multigrid-最关键的洞察低频是相对于网格而言的&#34;&gt;3. Multigrid 最关键的洞察：低频是相对于网格而言的
+&lt;/h1&gt;&lt;p&gt;把细网格：&lt;/p&gt;
+$$h$$&lt;p&gt;换成粗网格：&lt;/p&gt;
+$$2h.$$&lt;p&gt;原来细网格上的长波误差：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在粗网格眼里会变成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;coarse:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;^   v   ^   v
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;也就是说：&lt;/p&gt;
+$$\boxed{ \text{细网格上的低频误差， 在粗网格上会变成相对高频误差。} }$$&lt;p&gt;而高频误差正是 relaxation 擅长消掉的。&lt;/p&gt;
+&lt;p&gt;这就是 Multigrid 最值得记住的一句话。&lt;/p&gt;
+&lt;p&gt;它没有发明一个更强的迭代器。&lt;/p&gt;
+&lt;p&gt;它改变了：&lt;/p&gt;
+$$\boxed{\text{误差被观察的尺度}}$$&lt;hr&gt;
+&lt;h1 id=&#34;4-两层-multigrid-到底做了什么&#34;&gt;4. 两层 Multigrid 到底做了什么？
+&lt;/h1&gt;&lt;p&gt;设 fine-grid equation：&lt;/p&gt;
+$$A_hu_h=f_h.$$&lt;p&gt;当前近似：&lt;/p&gt;
+$$u_h.$$&lt;p&gt;第一步，先在细网格做几次 smoothing：&lt;/p&gt;
+$$u_h \leftarrow S_h(u_h).$$&lt;p&gt;高频误差迅速下降。&lt;/p&gt;
+&lt;p&gt;然后计算 residual：&lt;/p&gt;
+$$r_h = f_h-A_hu_h.$$&lt;p&gt;注意：&lt;/p&gt;
+$$Ae=r,$$&lt;p&gt;所以 residual 实际编码了当前 error。&lt;/p&gt;
+&lt;p&gt;接下来把 residual 限制到粗网格：&lt;/p&gt;
+$$\boxed{ r_{2h} = Rr_h }$$&lt;p&gt;然后在粗网格解：&lt;/p&gt;
+$$A_{2h}e_{2h}=r_{2h}.$$&lt;p&gt;这里求的不是完整解，而是：&lt;/p&gt;
+$$\boxed{\text{fine-grid error 的粗尺度修正}}$$&lt;p&gt;再 prolongate 回去：&lt;/p&gt;
+$$e_h = Pe_{2h}.$$&lt;p&gt;更新：&lt;/p&gt;
+$$u_h \leftarrow u_h+Pe_{2h}.$$&lt;p&gt;最后再做几次 post-smoothing。&lt;/p&gt;
+&lt;p&gt;流程就是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine smooth
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute residual
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;restrict to coarse
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve error equation
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;prolongate correction
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine smooth
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这就是一个基本的 &lt;strong&gt;two-grid correction scheme&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么要解误差方程而不是重新解原方程&#34;&gt;5. 为什么要解“误差方程”，而不是重新解原方程？
+&lt;/h1&gt;&lt;p&gt;这是一个非常漂亮的结构。&lt;/p&gt;
+&lt;p&gt;因为：&lt;/p&gt;
+$$Au=f$$&lt;p&gt;而：&lt;/p&gt;
+$$A\tilde u$$&lt;p&gt;是当前近似。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+$$A(u-\tilde u) = f-A\tilde u.$$&lt;p&gt;即：&lt;/p&gt;
+$$\boxed{ Ae=r. }$$&lt;p&gt;所以 residual：&lt;/p&gt;
+$$r$$&lt;p&gt;本质上告诉你：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;当前解还欠缺什么。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;粗网格不是重新完成全部物理计算，而是在估计：&lt;/p&gt;
+$$\boxed{\text{当前剩余误差的低频部分}}$$&lt;p&gt;然后把 correction：&lt;/p&gt;
+$$e$$&lt;p&gt;加回去。&lt;/p&gt;
+&lt;p&gt;这和 Newton correction：&lt;/p&gt;
+$$J\Delta x=-F$$&lt;p&gt;在思维上非常相似：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;不重新构造答案，而是解“当前错了多少”。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么还需要一层又一层粗网格&#34;&gt;6. 为什么还需要一层又一层粗网格？
+&lt;/h1&gt;&lt;p&gt;因为在：&lt;/p&gt;
+$$2h$$&lt;p&gt;网格上，仍然存在低频误差。&lt;/p&gt;
+&lt;p&gt;所以继续：&lt;/p&gt;
+$$h \rightarrow 2h \rightarrow 4h \rightarrow 8h \rightarrow\cdots$$&lt;p&gt;直到最粗层只有很少自由度，可以：&lt;/p&gt;
+$$\boxed{\text{直接解}}$$&lt;p&gt;于是形成经典 V-cycle：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ↓ smooth
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ↓ restrict
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; medium
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↓ smooth
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↓ restrict
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;   coarse
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;   direct solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↑ prolong
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↑ smooth
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ↑ prolong
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ↑ smooth
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此：&lt;/p&gt;
+$$\boxed{ \text{不同空间尺度的误差， 由不同网格层负责。} }$$&lt;p&gt;这其实是一种非常明确的“频带分工”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么理论上-multigrid-可以接近-&#34;&gt;7. 为什么理论上 Multigrid 可以接近 \(O(N)\)？
+&lt;/h1&gt;&lt;p&gt;假设 finest grid 有：&lt;/p&gt;
+$$N$$&lt;p&gt;个未知量。&lt;/p&gt;
+&lt;p&gt;三维均匀 coarsening 后：&lt;/p&gt;
+$$N,\quad \frac{N}{8},\quad \frac{N}{64},\ldots$$&lt;p&gt;所有层加起来：&lt;/p&gt;
+$$N \left( 1+\frac18+\frac1{64}+\cdots \right) = \frac87N.$$&lt;p&gt;如果每层只做固定次数：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;smoothing；&lt;/li&gt;
+&lt;li&gt;restriction；&lt;/li&gt;
+&lt;li&gt;prolongation；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么一次 V-cycle 工作量：&lt;/p&gt;
+$$\boxed{O(N)}.$$&lt;p&gt;如果 convergence factor 又近似与：&lt;/p&gt;
+$$N$$&lt;p&gt;无关，那么达到固定精度只需要常数个 V-cycle。&lt;/p&gt;
+&lt;p&gt;最终：&lt;/p&gt;
+$$\boxed{\text{solve complexity}\approx O(N)}$$&lt;p&gt;这就是 Multigrid 在 PDE 世界里如此重要的原因。&lt;/p&gt;
+&lt;p&gt;相比之下，单纯 CG 的 iteration count 会随着条件数：&lt;/p&gt;
+$$\kappa(A)$$&lt;p&gt;恶化；对于细网格椭圆问题：&lt;/p&gt;
+$$\kappa(A) \sim h^{-2}.$$&lt;p&gt;网格越细：&lt;/p&gt;
+$$\text{迭代越来越难}.$$&lt;p&gt;Multigrid 的目标正是让：&lt;/p&gt;
+$$\boxed{\text{收敛速度基本摆脱 }h}$$&lt;p&gt;的控制。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-multigrid-与-cg-是竞争关系吗&#34;&gt;8. Multigrid 与 CG 是竞争关系吗？
+&lt;/h1&gt;&lt;p&gt;通常不是。&lt;/p&gt;
+&lt;p&gt;实际系统经常使用：&lt;/p&gt;
+$$\boxed{ \text{CG} + \text{Multigrid preconditioner}. }$$&lt;p&gt;也就是说，Multigrid 不直接承担所有求解，而是提供：&lt;/p&gt;
+$$M^{-1}\approx A^{-1}.$$&lt;p&gt;然后：&lt;/p&gt;
+$$M^{-1}Au=M^{-1}f.$$&lt;p&gt;如果 preconditioner 足够好：&lt;/p&gt;
+$$\kappa(M^{-1}A)$$&lt;p&gt;会大幅降低。&lt;/p&gt;
+&lt;p&gt;于是 CG 只需要很少 iteration。&lt;/p&gt;
+&lt;p&gt;现代 FEM 中常见组合：&lt;/p&gt;
+$$\boxed{ \text{Krylov outer solver} + \text{Multigrid inner preconditioner}. }$$&lt;p&gt;这比“选 CG 还是 Multigrid”更准确。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-geometric-multigrid-与-algebraic-multigrid-差在哪里&#34;&gt;9. Geometric Multigrid 与 Algebraic Multigrid 差在哪里？
+&lt;/h1&gt;&lt;p&gt;这是工程上最重要的分叉之一。&lt;/p&gt;
+&lt;h3 id=&#34;geometric-multigridgmg&#34;&gt;Geometric Multigrid（GMG）
+&lt;/h3&gt;&lt;p&gt;你明确知道：&lt;/p&gt;
+$$\text{fine mesh} \rightarrow \text{coarse mesh}.$$&lt;p&gt;例如：&lt;/p&gt;
+$$128^3 \rightarrow 64^3 \rightarrow 32^3.$$&lt;p&gt;Restriction / prolongation 来自有限元空间之间的几何关系。&lt;/p&gt;
+&lt;p&gt;优点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;层级物理含义明确；&lt;/li&gt;
+&lt;li&gt;可以非常高效；&lt;/li&gt;
+&lt;li&gt;特别适合 structured / hierarchical mesh。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;缺点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;代码需要显式维护 mesh hierarchy；&lt;/li&gt;
+&lt;li&gt;复杂几何和自适应网格实现更麻烦。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;algebraic-multigridamg&#34;&gt;Algebraic Multigrid（AMG）
+&lt;/h3&gt;&lt;p&gt;只给：&lt;/p&gt;
+$$A.$$&lt;p&gt;算法根据矩阵中的强耦合关系自动构造 coarse variables 和 prolongation。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+$$\boxed{ \text{AMG 不需要知道原始几何} }$$&lt;p&gt;这使它非常适合：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;unstructured FEM；&lt;/li&gt;
+&lt;li&gt;黑盒线性系统；&lt;/li&gt;
+&lt;li&gt;工业 solver。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;deal.II 官方 step-50 就直接比较了 AMG 与几何 Multigrid：AMG 配置容易得多，而 matrix-free GMG 在其测试问题上能获得显著更好的性能。(&lt;a class=&#34;link&#34; href=&#34;https://dealii.org/9.5.0/doxygen/deal.II/step_50.html?utm_source=chatgpt.com&#34;  title=&#34;The deal.II Library: The step-50 tutorial program&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;deal.II&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;NVIDIA 也提供 GPU 加速 AMG 库 &lt;strong&gt;AMGX&lt;/strong&gt;，面向 implicit unstructured simulations 和单/多 GPU 分布式求解。(&lt;a class=&#34;link&#34; href=&#34;https://github.com/NVIDIA/AMGX?utm_source=chatgpt.com&#34;  title=&#34;GitHub - NVIDIA/AMGX: Distributed multigrid linear solver library on GPU · GitHub&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;GitHub&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-为什么-multigrid-与-matrix-free-是一对非常重要的组合&#34;&gt;10. 为什么 Multigrid 与 Matrix-Free 是一对非常重要的组合？
+&lt;/h1&gt;&lt;p&gt;现代 CPU/GPU 上，稀疏矩阵乘：&lt;/p&gt;
+$$y=Ax$$&lt;p&gt;经常不是 FLOPs 不够，而是：&lt;/p&gt;
+$$\boxed{\text{内存带宽不够}}$$&lt;p&gt;因为 sparse matrix 需要不断从主存读取：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;matrix values；&lt;/li&gt;
+&lt;li&gt;column indices；&lt;/li&gt;
+&lt;li&gt;vectors。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;deal.II 官方 matrix-free 教程明确指出，在现代处理器上，主内存访问往往成为 PDE solver 的瓶颈；matrix-free 方法避免显式存储矩阵，从单元算子直接执行 \(Av\)，从而减少 memory transfer。(&lt;a class=&#34;link&#34; href=&#34;https://dealii.org/9.5.0/doxygen/deal.II/step_37.html?utm_source=chatgpt.com&#34;  title=&#34;The deal.II Library: The step-37 tutorial program&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;deal.II&lt;/a&gt;)&lt;/p&gt;
+&lt;p&gt;于是现代高阶 FEM 一个非常强的组合是：&lt;/p&gt;
+$$\boxed{ \text{Matrix-free operator} + \text{Multigrid} + \text{Krylov} }$$&lt;p&gt;可以理解成：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;matrix-free：每次算子应用便宜；&lt;/li&gt;
+&lt;li&gt;multigrid：iteration count 少；&lt;/li&gt;
+&lt;li&gt;Krylov：提高鲁棒性。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;deal.II 的 step-37 展示的正是这一结构，并报告了大规模并行中高达数百亿甚至数千亿自由度级别的 matrix-free multigrid 计算案例。(&lt;a class=&#34;link&#34; href=&#34;https://dealii.org/9.0.0/doxygen/deal.II/step_37.html?utm_source=chatgpt.com&#34;  title=&#34;The deal.II Library: The step-37 tutorial program&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;deal.II&lt;/a&gt;)&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-multigrid-真正深刻的地方它在解不同尺度的错误&#34;&gt;11. Multigrid 真正深刻的地方：它在解“不同尺度的错误”
+&lt;/h1&gt;&lt;p&gt;很多 iterative solver 的思想是：&lt;/p&gt;
+$$\boxed{\text{找到更好的搜索方向}}$$&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;CG；&lt;/li&gt;
+&lt;li&gt;GMRES；&lt;/li&gt;
+&lt;li&gt;Anderson；&lt;/li&gt;
+&lt;li&gt;Newton。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Multigrid 则多加入了一个维度：&lt;/p&gt;
+$$\boxed{\text{尺度}}$$&lt;p&gt;它问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;当前误差属于哪个空间尺度？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;所以可以这样理解：&lt;/p&gt;
+$$\boxed{ \text{Smoother：处理局部振荡误差} }$$$$\boxed{ \text{Coarse solve：处理全局协调误差} }$$&lt;p&gt;这是为什么 Multigrid 不只是“多跑几个网格”。&lt;/p&gt;
+&lt;p&gt;它本质上是一种：&lt;/p&gt;
+$$\boxed{\text{error-space decomposition}}$$&lt;p&gt;方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-为什么简单-jacobi-在-multigrid-里反而突然变得有价值&#34;&gt;12. 为什么简单 Jacobi 在 Multigrid 里反而突然变得有价值？
+&lt;/h1&gt;&lt;p&gt;单独使用 Jacobi：&lt;/p&gt;
+$$\boxed{\text{慢}}$$&lt;p&gt;所以看起来很落后。&lt;/p&gt;
+&lt;p&gt;但 Multigrid 根本不要求 smoother 把问题解完。&lt;/p&gt;
+&lt;p&gt;它只要求：&lt;/p&gt;
+$$\boxed{\text{迅速消掉高频误差}}$$&lt;p&gt;而 weighted Jacobi 在这件事上恰恰很擅长。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+$$\boxed{ \text{一个“差的完整求解器”， 可能是一个非常好的局部组件。} }$$&lt;p&gt;这是 Multigrid 特别值得迁移的工程思想。&lt;/p&gt;
+&lt;p&gt;算法组件不需要：&lt;/p&gt;
+$$\text{什么都擅长}.$$&lt;p&gt;只要：&lt;/p&gt;
+$$\boxed{\text{在明确分工里做好一件事}}$$&lt;p&gt;就够了。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对软体求解器这个思想几乎可以直接迁移&#34;&gt;13. 对软体求解器，这个思想几乎可以直接迁移
+&lt;/h1&gt;&lt;p&gt;想象一个大软体。&lt;/p&gt;
+&lt;p&gt;局部 tet 形状误差：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+-+-+-+-+-+-+
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;属于高频。&lt;/p&gt;
+&lt;p&gt;而整个物体逐渐向一侧弯曲：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;~~~~~~~~~~~~~
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;属于低频。&lt;/p&gt;
+&lt;p&gt;如果只使用局部 Gauss–Seidel / Jacobi constraint projection：&lt;/p&gt;
+$$\boxed{\text{局部错误修得很快}}$$&lt;p&gt;但整个物体的 global deformation correction 可能传播得非常慢。&lt;/p&gt;
+&lt;p&gt;例如一根有：&lt;/p&gt;
+$$1000$$&lt;p&gt;段的长杆。&lt;/p&gt;
+&lt;p&gt;如果末端受到约束变化，local iterative solver 要靠：&lt;/p&gt;
+$$\text{neighbor}\rightarrow\text{neighbor}\rightarrow\text{neighbor}$$&lt;p&gt;把信息逐渐传播到另一端。&lt;/p&gt;
+&lt;p&gt;需要很多 iteration。&lt;/p&gt;
+&lt;p&gt;Multigrid 的思想则是：&lt;/p&gt;
+$$\boxed{ \text{在粗层直接表示“整根杆一起怎么变”。} }$$&lt;p&gt;于是 global correction 可以一步跨越大量 fine DOFs。&lt;/p&gt;
+&lt;p&gt;这就是为什么多层结构对：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;cloth；&lt;/li&gt;
+&lt;li&gt;deformable bodies；&lt;/li&gt;
+&lt;li&gt;constraint systems；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;都有天然吸引力。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-它和-projective-dynamics-也有直接联系&#34;&gt;14. 它和 Projective Dynamics 也有直接联系
+&lt;/h1&gt;&lt;p&gt;PD global step 经常要求解：&lt;/p&gt;
+$$Ax=b.$$&lt;p&gt;对于大规模网格：&lt;/p&gt;
+$$A$$&lt;p&gt;虽然固定，但线性求解仍可能占主要成本。&lt;/p&gt;
+&lt;p&gt;如果网格规模增大：&lt;/p&gt;
+$$10^4 \rightarrow 10^6$$&lt;p&gt;直接 factorization：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;内存越来越大；&lt;/li&gt;
+&lt;li&gt;preprocessing 很重；&lt;/li&gt;
+&lt;li&gt;GPU 适应性不好。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+$$\boxed{ \text{Multigrid-preconditioned iterative global solve} }$$&lt;p&gt;就是非常自然的路线。&lt;/p&gt;
+&lt;p&gt;更深一点，PD/local-global 本身也有尺度传播问题。&lt;/p&gt;
+&lt;p&gt;因此 multi-resolution deformation solver、hierarchical PBD、multilevel PD 等方法背后的直觉，都和 Multigrid 有很强亲缘性：&lt;/p&gt;
+$$\boxed{ \text{global low-frequency modes 应该在低维 coarse representation 上处理。} }$$&lt;hr&gt;
+&lt;h1 id=&#34;15-为什么-amg-对真实弹性问题比-poisson-难&#34;&gt;15. 为什么 AMG 对真实弹性问题比 Poisson 难？
+&lt;/h1&gt;&lt;p&gt;Poisson 很友好，因为其平滑误差通常就是：&lt;/p&gt;
+$$\boxed{\text{几何上的平滑函数}}$$&lt;p&gt;但三维弹性：&lt;/p&gt;
+$$Ku=f$$&lt;p&gt;有一个特别重要的近零空间：&lt;/p&gt;
+$$\boxed{\text{rigid-body modes}}$$&lt;p&gt;即：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;3 个平移；&lt;/li&gt;
+&lt;li&gt;3 个旋转。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;一个好的 AMG coarse space 必须能很好地表示这些模式。&lt;/p&gt;
+&lt;p&gt;否则：&lt;/p&gt;
+$$\boxed{ \text{真正难收敛的低能量模式没有进入 coarse level} }$$&lt;p&gt;Multigrid 就会失效。&lt;/p&gt;
+&lt;p&gt;这揭示了更一般的原则：&lt;/p&gt;
+$$\boxed{ \text{coarse space 最重要的任务， 不是“节点变少”，而是保留难以由 smoother 消掉的模式。} }$$&lt;p&gt;这句话非常关键。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-这甚至可以用来理解-reduced-basis&#34;&gt;16. 这甚至可以用来理解 Reduced Basis
+&lt;/h1&gt;&lt;p&gt;Multigrid coarse space：&lt;/p&gt;
+$$V_H$$&lt;p&gt;保存的是：&lt;/p&gt;
+$$\boxed{\text{低频 / 难收敛误差模式}}$$&lt;p&gt;Reduced Basis：&lt;/p&gt;
+$$V_r$$&lt;p&gt;保存的是：&lt;/p&gt;
+$$\boxed{\text{参数变化下重要的 solution modes}}$$&lt;p&gt;POD：&lt;/p&gt;
+$$V_{\rm POD}$$&lt;p&gt;保存的是：&lt;/p&gt;
+$$\boxed{\text{数据中最有能量的 modes}}$$&lt;p&gt;Active Subspaces 保存的是：&lt;/p&gt;
+$$\boxed{\text{输入空间最敏感方向}}$$&lt;p&gt;你会发现这些方法其实都在做：&lt;/p&gt;
+$$\boxed{ \text{找到真正需要昂贵处理的低维结构。} }$$&lt;p&gt;区别只是“重要”的定义不同。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-multigrid-失败时通常不是层数不够&#34;&gt;17. Multigrid 失败时通常不是“层数不够”
+&lt;/h1&gt;&lt;p&gt;这是工程上很重要的一点。&lt;/p&gt;
+&lt;p&gt;如果 Multigrid 收敛很差，常见原因可能是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;smoother 不适合当前 operator；&lt;/li&gt;
+&lt;li&gt;coarse space 没保留 near-null modes；&lt;/li&gt;
+&lt;li&gt;restriction/prolongation 设计差；&lt;/li&gt;
+&lt;li&gt;coefficient jump 太强；&lt;/li&gt;
+&lt;li&gt;anisotropy；&lt;/li&gt;
+&lt;li&gt;contact / active set 导致 operator 急剧变化；&lt;/li&gt;
+&lt;li&gt;coarse operator 不够准确。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以 Multigrid 的三个核心组件必须彼此匹配：&lt;/p&gt;
+$$\boxed{ \text{smoother} + \text{transfer operators} + \text{coarse operator}. }$$&lt;p&gt;单纯增加：&lt;/p&gt;
+$$\text{more levels}$$&lt;p&gt;并不能自动修复结构错误。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-一个很值得做的求解器诊断观察误差频谱而不只是-residual-norm&#34;&gt;18. 一个很值得做的求解器诊断：观察误差频谱，而不只是 residual norm
+&lt;/h1&gt;&lt;p&gt;如果你有一个 Poisson/FEM benchmark，可以分别初始化：&lt;/p&gt;
+&lt;h3 id=&#34;高频误差&#34;&gt;高频误差
+&lt;/h3&gt;$$e_i=(-1)^i$$&lt;h3 id=&#34;低频误差&#34;&gt;低频误差
+&lt;/h3&gt;$$e_i=\sin(\pi x_i).$$&lt;p&gt;然后只跑：&lt;/p&gt;
+$$10$$&lt;p&gt;轮 Jacobi/Gauss–Seidel。&lt;/p&gt;
+&lt;p&gt;你很可能看到：&lt;/p&gt;
+$$\|e_{\rm high}\| \downarrow\downarrow\downarrow$$&lt;p&gt;而：&lt;/p&gt;
+$$\|e_{\rm low}\|$$&lt;p&gt;下降很慢。&lt;/p&gt;
+&lt;p&gt;再把低频误差 restrict 到 coarse grid。&lt;/p&gt;
+&lt;p&gt;它在 coarse grid 上就不再那么“低频”。&lt;/p&gt;
+&lt;p&gt;这个实验非常简单，却能直接建立 Multigrid 的核心直觉。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Multigrid 最值得记住的并不是 V-cycle 的代码结构，而是：&lt;/p&gt;
+$$\boxed{ \text{一个误差难不难消除，取决于你在哪个尺度上看它。} }$$&lt;p&gt;在细网格上：&lt;/p&gt;
+$$\text{长波误差}$$&lt;p&gt;非常顽固。&lt;/p&gt;
+&lt;p&gt;到了粗网格：&lt;/p&gt;
+$$\boxed{\text{它就变成了容易处理的误差。}}$$&lt;p&gt;因此 Multigrid 在整个知识体系中的位置可以理解成：&lt;/p&gt;
+$$\text{local relaxation}$$$$\downarrow$$$$\boxed{\text{multiscale error decomposition}}$$$$\downarrow$$$$\text{near-linear-complexity PDE solve}.$$&lt;p&gt;它给物理求解器最值得迁移的启发则是：&lt;/p&gt;
+$$\boxed{ \text{不要期待一种迭代过程同时高效处理所有尺度的错误。} }$$&lt;p&gt;更成熟的做法是明确分工：&lt;/p&gt;
+$$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理全局误差。} }$$&lt;p&gt;这也是从“能解一个有限元系统”走向“大规模高性能求解器”非常关键的一步。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Briggs, Henson &amp;amp; McCormick, &lt;em&gt;A Multigrid Tutorial&lt;/em&gt;, 2nd ed., SIAM&lt;/strong&gt;。最推荐的入门资料。尤其值得看 Basic Iterative Methods 与 Elements of Multigrid 两章，把 smoothing、Fourier modes 和 coarse-grid correction 串起来。(&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/abs/10.1137/1.9780898719505.fm?utm_source=chatgpt.com&#34;  title=&#34;A Multigrid Tutorial, Second Edition | Front Matter&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;应用数学学会&lt;/a&gt;)
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/book/10.1137/1.9780898719505?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 图书页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;deal.II &lt;code&gt;step-37&lt;/code&gt;：Matrix-Free Multigrid&lt;/strong&gt;。非常好的现代 FEM 工程实现入口，重点看为什么当前处理器上的瓶颈经常是 memory bandwidth，以及 matrix-free 如何与 multigrid 组合。(&lt;a class=&#34;link&#34; href=&#34;https://dealii.org/9.5.0/doxygen/deal.II/step_37.html?utm_source=chatgpt.com&#34;  title=&#34;The deal.II Library: The step-37 tutorial program&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;deal.II&lt;/a&gt;)
+&lt;a class=&#34;link&#34; href=&#34;https://dealii.org/current/doxygen/deal.II/step_37.html?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;deal.II step-37&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;deal.II &lt;code&gt;step-50&lt;/code&gt;：GMG vs AMG&lt;/strong&gt;。适合理解 geometric multigrid、algebraic multigrid、matrix-free GMG 在大型并行 FEM 中的真实工程差异。(&lt;a class=&#34;link&#34; href=&#34;https://dealii.org/9.5.0/doxygen/deal.II/step_50.html?utm_source=chatgpt.com&#34;  title=&#34;The deal.II Library: The step-50 tutorial program&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;deal.II&lt;/a&gt;)
+&lt;a class=&#34;link&#34; href=&#34;https://www.dealii.org/current/doxygen/deal.II/step_50.html?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;deal.II step-50&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;NVIDIA AMGX&lt;/strong&gt;。GPU 上的工业级 algebraic multigrid solver library，支持分布式、多 GPU、block systems 与灵活 smoother/preconditioner 组合，很适合观察 AMG 怎样变成 HPC 基础设施。(&lt;a class=&#34;link&#34; href=&#34;https://github.com/NVIDIA/AMGX?utm_source=chatgpt.com&#34;  title=&#34;GitHub - NVIDIA/AMGX: Distributed multigrid linear solver library on GPU · GitHub&#34;
+     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;GitHub&lt;/a&gt;)
+&lt;a class=&#34;link&#34; href=&#34;https://github.com/NVIDIA/AMGX?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;AMGX GitHub&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果继续深入，下一步非常值得研究 &lt;strong&gt;near-null-space-aware AMG、multigrid for elasticity、matrix-free \(p\)-multigrid 和 nonlinear multigrid/FAS&lt;/strong&gt;。这时你会发现 Multigrid 的真正核心逐渐从“粗网格”转向一个更一般的问题：&lt;strong&gt;怎样构造能够表示难收敛模式的 coarse space。&lt;/strong&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 </description>
