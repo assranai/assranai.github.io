@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Wed, 02 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Fri, 04 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>IPC：把“碰撞处理”改写成一个优化问题</title>
         <link>https://assranai.github.io/cards/01-ipc/</link>
         <pubDate>Fri, 14 Aug 2026 00:00:00 +0000</pubDate>
@@ -16300,6 +16300,992 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;如果继续深入，下一步非常值得研究 &lt;strong&gt;near-null-space-aware AMG、multigrid for elasticity、matrix-free \(p\)-multigrid 和 nonlinear multigrid/FAS&lt;/strong&gt;。这时你会发现 Multigrid 的真正核心逐渐从“粗网格”转向一个更一般的问题：&lt;strong&gt;怎样构造能够表示难收敛模式的 coarse space。&lt;/strong&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        <item>
+        <title>FAS：非线性问题的“粗网格”不该只修正误差，而应该直接解一个粗尺度的完整非线性状态</title>
+        <link>https://assranai.github.io/cards/21-fas/</link>
+        <pubDate>Thu, 03 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/21-fas/</guid>
+        <description>&lt;h1 id=&#34;fas非线性问题的粗网格不该只修正误差而应该直接解一个粗尺度的完整非线性状态&#34;&gt;FAS：非线性问题的“粗网格”不该只修正误差，而应该直接解一个粗尺度的完整非线性状态
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Full Approximation Scheme（FAS，全近似格式）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 数值方法 × 软体动力学 × 接触力学&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;上一期 Multigrid 的核心是：&lt;/p&gt;
+\[\boxed{ \text{细网格消高频误差，粗网格消低频误差} }\]&lt;p&gt;但那套最经典的推导针对的是线性问题：&lt;/p&gt;
+\[Au=f.\]&lt;p&gt;真正进入软体、超弹性、塑性、接触以后，我们面对的是：&lt;/p&gt;
+\[\boxed{ F_h(u_h)=f_h }\]&lt;p&gt;其中 \(F_h\) 是非线性算子。&lt;/p&gt;
+&lt;p&gt;这时一个关键问题出现了：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;粗网格到底应该解“误差”，还是应该解“解本身”？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;FAS 给出的答案是：&lt;/p&gt;
+\[\boxed{ \text{在非线性问题里，粗层应当求一个完整的 coarse approximation。} }\]&lt;p&gt;这也是它名字里 &lt;strong&gt;Full Approximation&lt;/strong&gt; 的真正含义。&lt;/p&gt;
+&lt;p&gt;Achi Brandt 在 1970 年代建立了现代 multigrid/FAS 框架；其 1977 年经典论文已经明确讨论了利用多层网格以近线性复杂度求解包括非线性在内的边值问题。今天 PETSc 的 &lt;code&gt;SNESFAS&lt;/code&gt; 仍然直接实现这一 nonlinear multigrid 体系。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-为什么线性-multigrid-的误差方程到了非线性里不再自然&#34;&gt;1. 为什么线性 multigrid 的“误差方程”到了非线性里不再自然？
+&lt;/h2&gt;&lt;p&gt;线性问题：&lt;/p&gt;
+\[Au=f.\]&lt;p&gt;当前近似：&lt;/p&gt;
+\[\tilde u.\]&lt;p&gt;定义误差：&lt;/p&gt;
+\[e=u-\tilde u.\]&lt;p&gt;因为线性性：&lt;/p&gt;
+\[A(u-\tilde u) = Au-A\tilde u,\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ Ae=f-A\tilde u=r. }\]&lt;p&gt;于是 coarse grid 很自然地解：&lt;/p&gt;
+\[A_H e_H=r_H.\]&lt;p&gt;然后：&lt;/p&gt;
+\[u_h \leftarrow u_h+Pe_H.\]&lt;p&gt;整个 coarse level 只负责计算：&lt;/p&gt;
+\[\boxed{\text{correction}}\]&lt;p&gt;这就是上一期讲的 coarse-grid correction。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;2-非线性时这条等式坏掉了&#34;&gt;2. 非线性时，这条等式坏掉了
+&lt;/h2&gt;&lt;p&gt;现在：&lt;/p&gt;
+\[F(u)=f.\]&lt;p&gt;当前近似：&lt;/p&gt;
+\[\tilde u.\]&lt;p&gt;你仍然想写：&lt;/p&gt;
+\[u=\tilde u+e.\]&lt;p&gt;但：&lt;/p&gt;
+\[F(\tilde u+e) \neq F(\tilde u)+F(e).\]&lt;p&gt;所以不能得到：&lt;/p&gt;
+\[F(e)=f-F(\tilde u).\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \text{非线性算子不能把“当前状态”和“误差”拆开。} }\]&lt;p&gt;这看起来只是一个代数小问题，实际却决定了 nonlinear multigrid 的 formulation。&lt;/p&gt;
+&lt;p&gt;FAS 正是为这个问题设计的。Brandt–Livne 的多重网格专著把 FAS 作为解决 nonlinear problems 的标准多层框架之一。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-fas-的关键粗网格解的是-不是&#34;&gt;3. FAS 的关键：粗网格解的是 \(u_H\)，不是 \(e_H\)
+&lt;/h1&gt;&lt;p&gt;假设 fine-grid equation：&lt;/p&gt;
+\[F_h(u_h)=f_h.\]&lt;p&gt;当前 fine approximation：&lt;/p&gt;
+\[\tilde u_h.\]&lt;p&gt;先计算 residual：&lt;/p&gt;
+\[r_h = f_h-F_h(\tilde u_h).\]&lt;p&gt;然后把当前解限制到 coarse grid：&lt;/p&gt;
+\[\tilde u_H=I_h^H\tilde u_h.\]&lt;p&gt;FAS 不让 coarse grid 解：&lt;/p&gt;
+\[F_H(e_H)=r_H.\]&lt;p&gt;而是构造一个新的 coarse equation：&lt;/p&gt;
+\[\boxed{ F_H(u_H) = F_H(\tilde u_H) + Rr_h. }\]&lt;p&gt;等价地写：&lt;/p&gt;
+\[F_H(u_H) = f_H+\tau_H.\]&lt;p&gt;其中：&lt;/p&gt;
+\[\boxed{ \tau_H = F_H(I_h^H\tilde u_h) - R F_h(\tilde u_h) }\]&lt;p&gt;就是著名的：&lt;/p&gt;
+\[\boxed{\tau\text{-correction}}\]&lt;p&gt;或：&lt;/p&gt;
+\[\boxed{\text{FAS coarse-grid defect correction}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;PETSc 当前文档对 FAS 的描述非常直接：粗层求解的是 coarse versions of the nonlinear problem，并通过扰动粗问题，使 fine-grid projected solution 在粗层上产生零修正。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4--correction-到底在修什么&#34;&gt;4. \(\tau\)-correction 到底在修什么？
+&lt;/h1&gt;&lt;p&gt;这是 FAS 最值得理解的一点。&lt;/p&gt;
+&lt;p&gt;假设你只是简单地把 fine-grid 方程换成 coarse-grid 方程：&lt;/p&gt;
+\[F_H(u_H)=f_H.\]&lt;p&gt;那么 coarse operator：&lt;/p&gt;
+\[F_H\]&lt;p&gt;并不等于：&lt;/p&gt;
+\[F_h\]&lt;p&gt;的完美缩小版。&lt;/p&gt;
+&lt;p&gt;因为：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;discretization 不同；&lt;/li&gt;
+&lt;li&gt;网格分辨率不同；&lt;/li&gt;
+&lt;li&gt;非线性 constitutive response 不同；&lt;/li&gt;
+&lt;li&gt;几何表示不同。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;于是即使：&lt;/p&gt;
+\[\tilde u_h\]&lt;p&gt;已经是真正 fine-grid solution，&lt;/p&gt;
+&lt;p&gt;直接限制：&lt;/p&gt;
+\[I_h^H\tilde u_h\]&lt;p&gt;通常也不会精确满足 naïve coarse equation：&lt;/p&gt;
+\[F_H(I_h^H\tilde u_h) \neq f_H.\]&lt;p&gt;这就很危险：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;fine grid 已经对了，coarse grid 却会告诉你“还应该修一点”。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;FAS 的 \(\tau\)-correction 就是消除这种假修正。&lt;/p&gt;
+&lt;p&gt;它要求一个非常重要的 &lt;strong&gt;fixed-point consistency&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[F_h(u_h)=f_h,\]&lt;p&gt;那么把它限制到 coarse grid 后：&lt;/p&gt;
+\[u_H=I_h^H u_h\]&lt;p&gt;应该恰好满足 FAS coarse equation。&lt;/p&gt;
+&lt;p&gt;于是 coarse correction：&lt;/p&gt;
+\[u_H-I_h^Hu_h\]&lt;p&gt;为零。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \tau\text{ 的作用，是让 coarse physics 与当前 fine physics 保持一致。} }\]&lt;p&gt;这比“修正离散误差”更准确。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-一个很直观的非线性弹簧例子&#34;&gt;5. 一个很直观的非线性弹簧例子
+&lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
+\[F(u)=ku+\beta u^3.\]&lt;p&gt;目标：&lt;/p&gt;
+\[ku+\beta u^3=f.\]&lt;p&gt;假设 fine model 的非线性参数和 coarse approximation 不完全一致：&lt;/p&gt;
+\[F_h(u)=k_hu+\beta_hu^3,\]\[F_H(u)=k_Hu+\beta_Hu^3.\]&lt;p&gt;如果直接把 fine 状态：&lt;/p&gt;
+\[\tilde u_h\]&lt;p&gt;投到 coarse grid，再解：&lt;/p&gt;
+\[F_H(u_H)=f_H,\]&lt;p&gt;coarse solver 会尝试把状态拉向：&lt;/p&gt;
+\[F_H\]&lt;p&gt;自己的平衡点。&lt;/p&gt;
+&lt;p&gt;但这个平衡点未必与 fine problem 一致。&lt;/p&gt;
+&lt;p&gt;FAS 额外加入：&lt;/p&gt;
+\[\tau_H = F_H(\tilde u_H) - RF_h(\tilde u_h),\]&lt;p&gt;于是 coarse problem 变成：&lt;/p&gt;
+\[F_H(u_H) = Rf_h+\tau_H.\]&lt;p&gt;这样 coarse level 的任务就变成：&lt;/p&gt;
+\[\boxed{ \text{用粗模型描述当前 fine residual 所对应的大尺度非线性修正} }\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\text{假装 coarse model 就是真实问题。}\]&lt;hr&gt;
+&lt;h1 id=&#34;6-fas-v-cycle-实际上长什么样&#34;&gt;6. FAS V-cycle 实际上长什么样？
+&lt;/h1&gt;&lt;p&gt;压缩以后：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;21
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;22
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;function FAS(level h, u_h, f_h):
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    pre-smooth:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        nonlinear_relax(F_h(u_h)=f_h)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    residual:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        r_h = f_h - F_h(u_h)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    restrict current state:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        u_H0 = I_h^H u_h
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    build coarse RHS:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        f_H = F_H(u_H0) + R r_h
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    recursively solve:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        u_H = FAS(H, u_H0, f_H)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    coarse correction:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        u_h += P (u_H - u_H0)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    post-smooth:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        nonlinear_relax(F_h(u_h)=f_h)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;注意 coarse correction：&lt;/p&gt;
+\[\boxed{ P(u_H-u_H^0) }\]&lt;p&gt;这里真正插值回来的是 coarse solution 的&lt;strong&gt;变化量&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;但 coarse level 内部存储和求解的是：&lt;/p&gt;
+\[\boxed{u_H}\]&lt;p&gt;完整近似。&lt;/p&gt;
+&lt;p&gt;这就是 FAS 与 linear correction scheme 最大的结构区别。&lt;/p&gt;
+&lt;p&gt;PETSc 的 FAS 实现今天仍保留 V/W cycle、pre/post smoothers、multiplicative/additive/full 等多种结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么这对超弹性问题很有意义&#34;&gt;7. 为什么这对超弹性问题很有意义？
+&lt;/h1&gt;&lt;p&gt;考虑 quasi-static hyperelasticity：&lt;/p&gt;
+\[R(u) = f_{\rm int}(u)-f_{\rm ext} = 0.\]&lt;p&gt;例如 Neo-Hookean：&lt;/p&gt;
+\[\Psi(F) = \frac{\mu}{2}(I_1-3) - \mu\ln J + \frac{\lambda}{2}(\ln J)^2.\]&lt;p&gt;于是：&lt;/p&gt;
+\[f_{\rm int}(u) = \nabla_u \int\Psi(F(u))\,dV.\]&lt;p&gt;这个方程显然是强非线性的。&lt;/p&gt;
+&lt;p&gt;传统 Newton：&lt;/p&gt;
+\[K(u_k)\Delta u=-R(u_k)\]&lt;p&gt;每轮：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;线性化；&lt;/li&gt;
+&lt;li&gt;解一个大 tangent system；&lt;/li&gt;
+&lt;li&gt;更新。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;而 FAS 的思路更接近：&lt;/p&gt;
+\[\boxed{ \text{直接让多层网格共同处理 nonlinear state} }\]&lt;p&gt;粗层可以直接修正：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;大尺度整体弯曲；&lt;/li&gt;
+&lt;li&gt;全局拉伸；&lt;/li&gt;
+&lt;li&gt;大区域体积响应；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;fine layer 再处理：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;局部材料非线性；&lt;/li&gt;
+&lt;li&gt;几何细节；&lt;/li&gt;
+&lt;li&gt;高频误差。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以它不是：&lt;/p&gt;
+\[\text{Newton + linear multigrid}\]&lt;p&gt;的简单改名。&lt;/p&gt;
+&lt;p&gt;它属于：&lt;/p&gt;
+\[\boxed{\text{nonlinear multilevel solve}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-它和-newtonmultigrid-到底有什么区别&#34;&gt;8. 它和 Newton–Multigrid 到底有什么区别？
+&lt;/h1&gt;&lt;p&gt;这是最值得分清楚的相邻概念。&lt;/p&gt;
+&lt;h3 id=&#34;newtonkrylovmultigrid&#34;&gt;Newton–Krylov–Multigrid
+&lt;/h3&gt;&lt;p&gt;先在当前状态：&lt;/p&gt;
+\[u_k\]&lt;p&gt;线性化：&lt;/p&gt;
+\[J(u_k)\Delta u=-R(u_k).\]&lt;p&gt;然后 multigrid 只负责求这个线性系统：&lt;/p&gt;
+\[\boxed{ J\Delta u=-R. }\]&lt;p&gt;所以结构是：&lt;/p&gt;
+\[\text{nonlinear outer Newton}\]\[\downarrow\]\[\text{linear multigrid inner solve}.\]&lt;h3 id=&#34;fas&#34;&gt;FAS
+&lt;/h3&gt;&lt;p&gt;每一个 grid level 都拥有：&lt;/p&gt;
+\[\boxed{\text{自己的 nonlinear problem}}\]&lt;p&gt;所以 nonlinear correction 本身跨尺度传播。&lt;/p&gt;
+&lt;p&gt;可以粗略记：&lt;/p&gt;
+\[\boxed{ \text{Newton-MG：先线性化，再多层求解} }\]\[\boxed{ \text{FAS：非线性本身就是多层的} }\]&lt;p&gt;两者都非常有价值。&lt;/p&gt;
+&lt;p&gt;对很多成熟 FEM，Newton + geometric/AMG tangent preconditioner 往往更容易实现；例如有限应变超弹性的 matrix-free geometric multigrid 工作，就是在 tangent operator 上使用 multigrid。&lt;/p&gt;
+&lt;p&gt;FAS 则在强非线性、非线性平滑器有效、粗层非线性 operator 可以合理构造时更具吸引力。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-fas-真正困难的地方其实不是-v-cycle而是-coarse-nonlinear-operator&#34;&gt;9. FAS 真正困难的地方其实不是 V-cycle，而是 coarse nonlinear operator
+&lt;/h1&gt;&lt;p&gt;线性问题可以自然做：&lt;/p&gt;
+\[A_H = R A_h P\]&lt;p&gt;即 Galerkin coarse operator。&lt;/p&gt;
+&lt;p&gt;非线性时：&lt;/p&gt;
+\[F_H\]&lt;p&gt;怎么定义就复杂得多。&lt;/p&gt;
+&lt;p&gt;你希望 coarse model：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;足够便宜；&lt;/li&gt;
+&lt;li&gt;能代表低频 nonlinear modes；&lt;/li&gt;
+&lt;li&gt;与 fine operator 一致；&lt;/li&gt;
+&lt;li&gt;不会产生错误物理平衡点。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;真实非结构网格里尤其困难。&lt;/p&gt;
+&lt;p&gt;近期 nonlinear multigrid 研究仍然重点关注这个问题。例如基于 AMGe coarse spaces 的 nonlinear FAS 工作强调：此前在一般非结构网格上，FAS 的难点之一就是 coarse nonlinear operators 不够稳定和准确；改进 coarse space 后，才能恢复更可靠的多层性能。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{FAS 成败很大程度由 coarse model quality 决定。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;10-这与代理模型有一个很有意思的联系&#34;&gt;10. 这与代理模型有一个很有意思的联系
+&lt;/h1&gt;&lt;p&gt;通常 surrogate 被理解成：&lt;/p&gt;
+\[x\rightarrow y.\]&lt;p&gt;但 FAS 中 coarse nonlinear model 实际上也是一种：&lt;/p&gt;
+\[\boxed{\text{低成本、低分辨率物理代理}}\]&lt;p&gt;区别是：&lt;/p&gt;
+&lt;p&gt;它不是替代 fine model 输出最终答案。&lt;/p&gt;
+&lt;p&gt;它的任务是：&lt;/p&gt;
+\[\boxed{ \text{预测 fine problem 当前缺失的低频非线性修正。} }\]&lt;p&gt;这是一种非常不同的 surrogate philosophy：&lt;/p&gt;
+\[\text{surrogate for outputs}\]&lt;p&gt;vs.&lt;/p&gt;
+\[\boxed{ \text{surrogate for solver corrections} }\]&lt;p&gt;后一种思路很值得迁移到 learned solver。&lt;/p&gt;
+&lt;p&gt;比如：&lt;/p&gt;
+\[\text{NN}\]&lt;p&gt;不必预测最终 FEM state，&lt;/p&gt;
+&lt;p&gt;它可以只预测：&lt;/p&gt;
+\[\boxed{ \text{coarse/global correction} }\]&lt;p&gt;再让 fine physics solver 消除局部误差。&lt;/p&gt;
+&lt;p&gt;这通常比“AI 直接替代求解器”更加可控。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么-fas-可能特别适合局部迭代传播很慢的软体求解器&#34;&gt;11. 为什么 FAS 可能特别适合“局部迭代传播很慢”的软体求解器？
+&lt;/h1&gt;&lt;p&gt;假设一个 XPBD/Jacobi 软体长条：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[1]-[2]-[3]-...-[1000]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;端点突然移动。&lt;/p&gt;
+&lt;p&gt;局部 constraint projection 的信息传播是：&lt;/p&gt;
+\[1\rightarrow2\rightarrow3\rightarrow\cdots\]&lt;p&gt;因此全局形变修正要经过很多 iteration 才能传遍整个物体。&lt;/p&gt;
+&lt;p&gt;上一期 Multigrid 已经说明：&lt;/p&gt;
+\[\boxed{ \text{这是低频误差传播问题。} }\]&lt;p&gt;但如果 constraint 本身是强非线性：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;volume constraints；&lt;/li&gt;
+&lt;li&gt;nonlinear strain；&lt;/li&gt;
+&lt;li&gt;contact active set；&lt;/li&gt;
+&lt;li&gt;large rotation；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;简单在线性 correction space 做 coarse solve 可能不够。&lt;/p&gt;
+&lt;p&gt;FAS 给出的更自然思路是：&lt;/p&gt;
+\[\boxed{ \text{粗层软体本身也做 nonlinear constraint solve} }\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine tet mesh:    100k vertices
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓ restrict state
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;coarse mesh:      10k vertices
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;nonlinear XPBD/elastic solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓ prolong correction
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine mesh
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;粗层不是只求：&lt;/p&gt;
+\[\Delta x\]&lt;p&gt;的一个线性 approximation，&lt;/p&gt;
+&lt;p&gt;而是直接找到：&lt;/p&gt;
+\[\boxed{ \text{整体姿态在 coarse physics 下应该往哪里走。} }\]&lt;p&gt;这就是 nonlinear multilevel soft-body solver 的核心直觉。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-但接触会让事情更麻烦&#34;&gt;12. 但接触会让事情更麻烦
+&lt;/h1&gt;&lt;p&gt;假设 fine mesh 上有一个小凸起：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;──────▲──────
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      ground
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;coarse mesh 可能直接把它抹掉：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;coarse:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;─────────────
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;那么 fine level 有 contact：&lt;/p&gt;
+\[C_f(x)\ge0,\]&lt;p&gt;coarse level 却根本不知道这个 contact。&lt;/p&gt;
+&lt;p&gt;于是 coarse correction 可能把物体推向：&lt;/p&gt;
+\[\boxed{\text{fine level 不可行的方向}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以 contact-aware nonlinear multigrid 很难。&lt;/p&gt;
+&lt;p&gt;它要求 coarse hierarchy 不只是：&lt;/p&gt;
+\[\text{geometry hierarchy}\]&lt;p&gt;还要考虑：&lt;/p&gt;
+\[\boxed{ \text{constraint / active-set hierarchy} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;实际上，FAS 早就被扩展到 complementarity / variational inequality 问题。经典 PFAS 工作把 FAS 用于 free-boundary / complementarity problem；而 2024 年 SIAM JSC 的 FAS constraint-decomposition 方法进一步针对 nonlinear variational inequalities，并报告近似 mesh-independent convergence 与 optimal full-multigrid complexity。&lt;/p&gt;
+&lt;p&gt;这说明：&lt;/p&gt;
+\[\boxed{ \text{FAS + inequality/contact} }\]&lt;p&gt;并不是纯理论想象，而是一条仍在发展的路线。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这里其实和-ipc-又连起来了&#34;&gt;13. 这里其实和 IPC 又连起来了
+&lt;/h1&gt;&lt;p&gt;IPC 每个时间步求：&lt;/p&gt;
+\[\min_x E(x)+B_{\rm contact}(x).\]&lt;p&gt;随着网格越来越细：&lt;/p&gt;
+\[x\in\mathbb R^{3N}\]&lt;p&gt;非线性优化规模越来越大。&lt;/p&gt;
+&lt;p&gt;如果有 nonlinear multilevel hierarchy：&lt;/p&gt;
+\[x_h \leftrightarrow x_H,\]&lt;p&gt;理论上 coarse level 可以解决：&lt;/p&gt;
+\[\boxed{ \text{大尺度 elastic/contact configuration} }\]&lt;p&gt;fine level 再处理：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;局部 barrier；&lt;/li&gt;
+&lt;li&gt;细几何接触；&lt;/li&gt;
+&lt;li&gt;高频 deformation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但关键难点就在：&lt;/p&gt;
+\[\boxed{ \text{如何让 coarse contact problem 与 fine contact feasible set 一致？} }\]&lt;p&gt;这实际上比“给 IPC 加 AMG”深很多。&lt;/p&gt;
+&lt;p&gt;它涉及：&lt;/p&gt;
+\[\text{nonlinear coarse energy} + \text{constraint coarsening} + \text{feasibility}.\]&lt;p&gt;从研究角度看，这类问题的含金量明显高于单纯继续调 iteration count。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-fas-和普通-coarse-to-fine-initialization-也不是一回事&#34;&gt;14. FAS 和普通 coarse-to-fine initialization 也不是一回事
+&lt;/h1&gt;&lt;p&gt;很多图形学方法会做：&lt;/p&gt;
+\[\text{先粗网格解} \rightarrow \text{插值到细网格} \rightarrow \text{再细网格解}.\]&lt;p&gt;这只发生一次。&lt;/p&gt;
+&lt;p&gt;叫：&lt;/p&gt;
+\[\boxed{\text{nested iteration}}\]&lt;p&gt;或者 coarse-to-fine initialization。&lt;/p&gt;
+&lt;p&gt;FAS 则在每个 nonlinear solve 中反复：&lt;/p&gt;
+\[h \downarrow H \uparrow h.\]&lt;p&gt;coarse state 不断根据 fine residual 被修改。&lt;/p&gt;
+&lt;p&gt;所以它形成：&lt;/p&gt;
+\[\boxed{\text{双向持续反馈}}\]&lt;p&gt;而不只是：&lt;/p&gt;
+\[\text{coarse initialization}.\]&lt;p&gt;PETSc 当前甚至把 &lt;code&gt;full&lt;/code&gt; FAS、multiplicative FAS、additive FAS 等不同循环方式显式区分。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15--correction-还有一个更深的意义它可以测量粗模型到底错了什么&#34;&gt;15. \(\tau\)-correction 还有一个更深的意义：它可以测量“粗模型到底错了什么”
+&lt;/h1&gt;&lt;p&gt;回忆：&lt;/p&gt;
+\[\tau_H = F_H(I_h^H u_h) - R F_h(u_h).\]&lt;p&gt;如果：&lt;/p&gt;
+\[\tau_H\approx0,\]&lt;p&gt;说明：&lt;/p&gt;
+\[F_H\]&lt;p&gt;对当前状态而言很好地代表了 fine operator。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[\|\tau_H\|\gg0,\]&lt;p&gt;说明 coarse physics 与 fine physics 差异明显。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \tau }\]&lt;p&gt;不仅是算法补偿项，&lt;/p&gt;
+&lt;p&gt;还可以理解成：&lt;/p&gt;
+\[\boxed{ \text{跨尺度模型失配量} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这其实与 multilevel UQ / multifidelity 的 discrepancy 很像：&lt;/p&gt;
+\[f_H-f_L.\]&lt;p&gt;只是这里 discrepancy 发生在：&lt;/p&gt;
+\[\boxed{\text{nonlinear operator space}}\]&lt;p&gt;而不是最终 scalar response。&lt;/p&gt;
+&lt;p&gt;这个视角非常值得保留。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它对多保真代理模型有一个很强的迁移启发&#34;&gt;16. 它对多保真代理模型有一个很强的迁移启发
+&lt;/h1&gt;&lt;p&gt;传统 multifidelity ：&lt;/p&gt;
+\[y_H(x) = \rho y_L(x)+\delta(x).\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{ \text{高保真} = \text{低保真} + \text{discrepancy}. }\]&lt;p&gt;FAS：&lt;/p&gt;
+\[\boxed{ \text{fine nonlinear problem} = \text{coarse nonlinear problem} + \tau\text{-correction}. }\]&lt;p&gt;两者结构非常相似。&lt;/p&gt;
+&lt;p&gt;区别在于 FAS 中：&lt;/p&gt;
+\[\tau\]&lt;p&gt;不是通过统计拟合学习出来，&lt;/p&gt;
+&lt;p&gt;而是从当前 fine residual 和 coarse operator 一致性直接构造。&lt;/p&gt;
+&lt;p&gt;所以 FAS 提供一个很有价值的概念：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;低保真模型最重要的不一定是绝对准确，而是它的失配是否可以被结构化地修正。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这对于代理建模也非常重要。&lt;/p&gt;
+&lt;p&gt;一个粗模型：&lt;/p&gt;
+\[R^2=0.7\]&lt;p&gt;未必没价值。&lt;/p&gt;
+&lt;p&gt;如果其 discrepancy：&lt;/p&gt;
+\[\delta(x)\]&lt;p&gt;非常平滑、低维、容易学习，&lt;/p&gt;
+&lt;p&gt;它仍然可能是很优秀的低保真模型。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-一个非常值得自研的最小实验&#34;&gt;17. 一个非常值得自研的最小实验
+&lt;/h1&gt;&lt;p&gt;如果已有一个 nonlinear spring/cloth/soft-body solver，不需要直接上三维大 tet。&lt;/p&gt;
+&lt;p&gt;可以从 1D nonlinear Poisson 开始：&lt;/p&gt;
+\[-\frac{d}{dx} \left[ (1+u^2)\frac{du}{dx} \right] = f.\]&lt;p&gt;离散得到：&lt;/p&gt;
+\[F_h(u_h)=f_h.\]&lt;p&gt;建立：&lt;/p&gt;
+\[N=1025\]&lt;p&gt;的 fine grid，&lt;/p&gt;
+&lt;p&gt;以及：&lt;/p&gt;
+\[513,\ 257,\ 129,\dots\]&lt;p&gt;coarse grids。&lt;/p&gt;
+&lt;p&gt;比较三种方法：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;单层 nonlinear Gauss–Seidel；&lt;/li&gt;
+&lt;li&gt;Newton + linear multigrid；&lt;/li&gt;
+&lt;li&gt;FAS V-cycle。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;记录：&lt;/p&gt;
+\[\|F_h(u_k)-f_h\|.\]&lt;p&gt;最重要的实验不是哪个最快，而是观察：&lt;/p&gt;
+\[\boxed{ \text{网格从 }N=10^3\rightarrow10^5 \text{ 后，iteration count 是否增长。} }\]&lt;p&gt;如果 FAS hierarchy 设计良好，它追求的是：&lt;/p&gt;
+\[\boxed{\text{近似 mesh-independent nonlinear convergence}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这才是 nonlinear multigrid 真正的价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-对大型游戏物理最值得迁移的一层&#34;&gt;18. 对大型游戏物理最值得迁移的一层
+&lt;/h1&gt;&lt;p&gt;很多实时 solver 的典型架构是：&lt;/p&gt;
+\[\boxed{ \text{大量便宜局部迭代} }\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;constraint projection；&lt;/li&gt;
+&lt;li&gt;Jacobi；&lt;/li&gt;
+&lt;li&gt;Gauss–Seidel；&lt;/li&gt;
+&lt;li&gt;local contacts。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这种方法最大优势是：&lt;/p&gt;
+\[\text{简单、GPU友好、随时可以停}.\]&lt;p&gt;最大弱点是：&lt;/p&gt;
+\[\boxed{\text{全球信息传播慢。}}\]&lt;p&gt;FAS 提醒我们，未来更成熟的实时 solver 不一定要走：&lt;/p&gt;
+\[\text{完全 Newton 化}\]&lt;p&gt;这条路。&lt;/p&gt;
+&lt;p&gt;还有另一条非常有吸引力的路线：&lt;/p&gt;
+\[\boxed{ \text{cheap local nonlinear solver} + \text{coarse nonlinear correction} }\]&lt;p&gt;即：&lt;/p&gt;
+\[\text{保留局部求解器的并行性}\]&lt;p&gt;同时：&lt;/p&gt;
+\[\text{增加低频 global communication path}.\]&lt;p&gt;这正是 hierarchical physics solver 很值得研究的方向。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;FAS 最值得记住的并不是：&lt;/p&gt;
+\[\tau_H = F_H(I_h^Hu_h)-RF_h(u_h).\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \text{非线性问题中的粗层，不能只被理解成“低分辨率误差修正器”；它本身应该承载一个完整的粗尺度非线性状态。} }\]&lt;p&gt;因此可以把线性 Multigrid 与 FAS 的区别压缩成：&lt;/p&gt;
+\[\boxed{ \text{Linear MG：coarse grid solves the error} }\]\[\boxed{ \text{FAS：coarse grid solves the solution} }\]&lt;p&gt;而 \(\tau\)-correction 负责保证：&lt;/p&gt;
+\[\boxed{ \text{粗层看到的物理，与 fine level 当前看到的物理相容。} }\]&lt;p&gt;它在整个知识体系中的位置大约是：&lt;/p&gt;
+\[\text{Multigrid}\]\[\downarrow\]\[\boxed{\text{FAS / Nonlinear Multigrid}}\]\[\downarrow\]\[\text{Nonlinear FEM / contact / constrained optimization}\]\[\downarrow\]\[\text{multilevel physics solver}.\]&lt;p&gt;如果以后要做真正大规模软体求解器，我会把这类方法视为比“单纯增加 XPBD iteration”更值得长期掌握的一层，因为它针对的正是大型局部迭代器最根本的瓶颈：&lt;/p&gt;
+\[\boxed{\text{低频、全局、强非线性修正如何快速传播。}}\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Achi Brandt, &lt;em&gt;Multi-Level Adaptive Solutions to Boundary-Value Problems&lt;/em&gt;, Mathematics of Computation, 1977&lt;/strong&gt;。现代 multigrid/FAS 的奠基论文之一；已经讨论了多层方法对 possibly nonlinear systems 的近线性复杂度求解。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Brandt &amp;amp; Livne, &lt;em&gt;Multigrid Techniques: 1984 Guide with Applications to Fluid Dynamics&lt;/em&gt;，Chapter 8: Full Approximation Scheme and Applications&lt;/strong&gt;。如果想专门理解 FAS、\(\tau\)-correction 和多层程序结构，这是很直接的经典来源。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/1.9781611970753.ch8&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 章节页面&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;PETSc &lt;code&gt;SNESFAS&lt;/code&gt; 官方文档&lt;/strong&gt;。非常推荐直接看一个成熟 HPC 库今天怎样暴露 nonlinear multigrid：层数、V/W-cycle、additive/multiplicative/full FAS、pre/post nonlinear smoothers 和 coarse solve 都能直接配置。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://petsc.org/main/manualpages/SNESFAS/SNESFAS/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;PETSc SNESFAS&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Christensen, Vassilevski &amp;amp; Villa, &lt;em&gt;Nonlinear multigrid solvers exploiting AMGe coarse spaces with approximation properties&lt;/em&gt;&lt;/strong&gt;。适合继续追现代 nonlinear AMG/FAS：真正困难的是怎样在一般非结构有限元网格上构造高质量 coarse nonlinear operators。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Farrell 等, &lt;em&gt;A Full Approximation Scheme Multilevel Method for Nonlinear Variational Inequalities&lt;/em&gt;, SIAM JSC, 2024&lt;/strong&gt;。如果想把 FAS 与 contact/complementarity 联系起来，这篇尤其值得看；它把 FAS 扩展到 nonlinear variational inequalities，并提供可复现实验代码。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        <item>
+        <title>Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传</title>
+        <link>https://assranai.github.io/cards/22-implicit-differentiation/</link>
+        <pubDate>Fri, 04 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/22-implicit-differentiation/</guid>
+        <description>&lt;h1 id=&#34;implicit-differentiation让求解器结果可微而不是把整个求解过程一层层反传&#34;&gt;Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Implicit Differentiation（隐式微分）用于物理求解器与优化层&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 科学机器学习 × AI 全栈工程 × 数值优化&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选隐式微分，因为它处在一个很关键的位置：&lt;/p&gt;
+\[\boxed{ \text{数值求解器} \longrightarrow \text{可微模块} }\]&lt;p&gt;传统自动微分通常要求你把程序执行过程全部展开：&lt;/p&gt;
+\[x_0\to x_1\to x_2\to\cdots\to x_K.\]&lt;p&gt;然后从：&lt;/p&gt;
+\[x_K\]&lt;p&gt;一路反向传播。&lt;/p&gt;
+&lt;p&gt;但如果：&lt;/p&gt;
+\[x_K\]&lt;p&gt;其实是某个方程的收敛解：&lt;/p&gt;
+\[F(x^*,\theta)=0,\]&lt;p&gt;那么有一个更聪明的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;为什么要关心求解器“怎么走到答案”，而不能直接对“答案满足的方程”求导？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这就是 implicit differentiation。&lt;/p&gt;
+&lt;p&gt;Blondel 等人的经典工作把这一思想做成模块化框架：用户只要给出最优性条件或 root equation，就可以在不展开整个迭代器的情况下计算解对参数的导数；JAX/JAXopt 今天都直接支持这一工作流。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-最简单的例子你其实不需要对-newton-的每一步求导&#34;&gt;1. 最简单的例子：你其实不需要对 Newton 的每一步求导
+&lt;/h2&gt;&lt;p&gt;设：&lt;/p&gt;
+\[x^*(\theta)\]&lt;p&gt;由：&lt;/p&gt;
+\[F(x,\theta)=0\]&lt;p&gt;隐式定义。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[F(x,\theta) = x^3+\theta x-1.\]&lt;p&gt;对不同：&lt;/p&gt;
+\[\theta\]&lt;p&gt;你可能用 Newton：&lt;/p&gt;
+\[x_{k+1} = x_k - \frac{F(x_k,\theta)} {\partial F/\partial x}\]&lt;p&gt;迭代 20 次求：&lt;/p&gt;
+\[x^*.\]&lt;p&gt;如果要计算：&lt;/p&gt;
+\[\frac{dx^*}{d\theta},\]&lt;p&gt;最直接的 AD 方法是把 20 次 Newton 全部展开，再反传。&lt;/p&gt;
+&lt;p&gt;但其实在收敛点：&lt;/p&gt;
+\[F(x^*,\theta)=0.\]&lt;p&gt;直接对：&lt;/p&gt;
+\[\theta\]&lt;p&gt;求导：&lt;/p&gt;
+\[\frac{\partial F}{\partial x} \frac{dx^*}{d\theta} + \frac{\partial F}{\partial\theta} = 0.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \frac{dx^*}{d\theta} = - \left( \frac{\partial F}{\partial x} \right)^{-1} \frac{\partial F}{\partial\theta} }\]&lt;p&gt;完事。&lt;/p&gt;
+&lt;p&gt;你完全不需要知道：&lt;/p&gt;
+\[x_1,x_2,\ldots,x_{19}\]&lt;p&gt;发生了什么。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-这件事真正厉害在哪里&#34;&gt;2. 这件事真正厉害在哪里？
+&lt;/h1&gt;&lt;p&gt;关键是：&lt;/p&gt;
+\[\boxed{ \text{求解轨迹} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \text{求解结果的数学定义} }\]&lt;p&gt;被分离开了。&lt;/p&gt;
+&lt;p&gt;Forward solve 可以用：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Newton；&lt;/li&gt;
+&lt;li&gt;BFGS；&lt;/li&gt;
+&lt;li&gt;multigrid；&lt;/li&gt;
+&lt;li&gt;Gauss–Seidel；&lt;/li&gt;
+&lt;li&gt;direct solve；&lt;/li&gt;
+&lt;li&gt;domain decomposition；&lt;/li&gt;
+&lt;li&gt;GPU black-box solver。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Backward gradient 却统一来自：&lt;/p&gt;
+\[\boxed{ F(x^*,\theta)=0. }\]&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{Differentiation is attached to the problem, not to the algorithm.} }\]&lt;p&gt;这就是它比普通“把 solver 展开反传”更深的一层。&lt;/p&gt;
+&lt;p&gt;Blondel 等将这一点称为 modular implicit differentiation：solver 和 optimality mapping 可以彼此解耦，因此可以继续使用已有高性能求解器，而不用为了自动微分重写一遍算法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-放到有限元里它立刻变得非常有用&#34;&gt;3. 放到有限元里，它立刻变得非常有用
+&lt;/h1&gt;&lt;p&gt;设非线性有限元平衡方程：&lt;/p&gt;
+\[R(u,\theta)=0.\]&lt;p&gt;其中：&lt;/p&gt;
+\[u\]&lt;p&gt;是几十万甚至几百万个自由度，&lt;/p&gt;
+&lt;p&gt;而：&lt;/p&gt;
+\[\theta\]&lt;p&gt;可能是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Young 模量；&lt;/li&gt;
+&lt;li&gt;摩擦系数；&lt;/li&gt;
+&lt;li&gt;材料参数；&lt;/li&gt;
+&lt;li&gt;几何参数；&lt;/li&gt;
+&lt;li&gt;载荷；&lt;/li&gt;
+&lt;li&gt;边界条件。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;你关心某个输出：&lt;/p&gt;
+\[J(u,\theta).\]&lt;p&gt;想求：&lt;/p&gt;
+\[\frac{dJ}{d\theta}.\]&lt;p&gt;直接展开 Newton：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;assemble
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve Δu
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;update
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;assemble
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve Δu
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;update
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;...
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;然后反向传播，会需要保存大量中间状态。&lt;/p&gt;
+&lt;p&gt;Implicit differentiation 则直接从：&lt;/p&gt;
+\[R(u^*,\theta)=0\]&lt;p&gt;出发。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-推导一次你会发现它其实就是-adjoint&#34;&gt;4. 推导一次，你会发现它其实就是 adjoint
+&lt;/h1&gt;&lt;p&gt;对：&lt;/p&gt;
+\[R(u,\theta)=0\]&lt;p&gt;求导：&lt;/p&gt;
+\[R_u \frac{du}{d\theta} + R_\theta = 0.\]&lt;p&gt;所以：&lt;/p&gt;
+\[\frac{du}{d\theta} = - R_u^{-1}R_\theta.\]&lt;p&gt;然后：&lt;/p&gt;
+\[\frac{dJ}{d\theta} = J_\theta + J_u \frac{du}{d\theta}.\]&lt;p&gt;代进去：&lt;/p&gt;
+\[\frac{dJ}{d\theta} = J_\theta - J_uR_u^{-1}R_\theta.\]&lt;p&gt;现在定义 adjoint：&lt;/p&gt;
+\[\boxed{ R_u^T\lambda = J_u^T }\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \frac{dJ}{d\theta} = J_\theta - \lambda^T R_\theta. }\]&lt;p&gt;这就是最标准的 adjoint sensitivity formula。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Implicit differentiation} }\]&lt;p&gt;在 PDE/FEM 世界里并不是一个凭空冒出来的 ML 新概念。&lt;/p&gt;
+&lt;p&gt;它和：&lt;/p&gt;
+\[\boxed{ \text{adjoint method} }\]&lt;p&gt;本质上是同一套数学结构。&lt;/p&gt;
+&lt;p&gt;不同的是，现代 differentiable programming 把这套结构变成了可组合的软件原语。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么它特别适合参数很多输出少的问题&#34;&gt;5. 为什么它特别适合“参数很多、输出少”的问题？
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[\theta\in\mathbb R^{10000}\]&lt;p&gt;代表：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;材料场；&lt;/li&gt;
+&lt;li&gt;几何设计变量；&lt;/li&gt;
+&lt;li&gt;控制参数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;输出只有：&lt;/p&gt;
+\[J\in\mathbb R.\]&lt;p&gt;如果直接计算：&lt;/p&gt;
+\[\frac{du}{d\theta},\]&lt;p&gt;你可能需要处理巨大的：&lt;/p&gt;
+\[N_u\times N_\theta\]&lt;p&gt;Jacobian。&lt;/p&gt;
+&lt;p&gt;但 adjoint/implicit differentiation 只需要解一次：&lt;/p&gt;
+\[R_u^T\lambda=J_u^T.\]&lt;p&gt;然后所有参数梯度：&lt;/p&gt;
+\[\frac{dJ}{d\theta_i}\]&lt;p&gt;都可以通过：&lt;/p&gt;
+\[-\lambda^TR_{\theta_i}\]&lt;p&gt;获得。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{gradient cost 对参数数量并不线性增长。} }\]&lt;p&gt;这就是为什么它特别适合：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;topology optimization；&lt;/li&gt;
+&lt;li&gt;parameter identification；&lt;/li&gt;
+&lt;li&gt;inverse FEM；&lt;/li&gt;
+&lt;li&gt;design optimization；&lt;/li&gt;
+&lt;li&gt;differentiable physics。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-unrolling-和-implicit-differentiation-的真正区别&#34;&gt;6. Unrolling 和 implicit differentiation 的真正区别
+&lt;/h1&gt;&lt;p&gt;假设 fixed-point solver：&lt;/p&gt;
+\[x_{k+1}=G(x_k,\theta)\]&lt;p&gt;迭代：&lt;/p&gt;
+\[K=1000\]&lt;p&gt;次。&lt;/p&gt;
+&lt;h3 id=&#34;unrolled-autodiff&#34;&gt;Unrolled autodiff
+&lt;/h3&gt;&lt;p&gt;保存：&lt;/p&gt;
+\[x_1,x_2,\ldots,x_{1000}\]&lt;p&gt;然后 chain rule：&lt;/p&gt;
+\[\frac{\partial x_{1000}} {\partial x_{999}} \cdots \frac{\partial x_1} {\partial\theta}.\]&lt;p&gt;特点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;梯度对应“运行了 K 次的算法”；&lt;/li&gt;
+&lt;li&gt;memory：&lt;/li&gt;
+&lt;/ul&gt;
+\[O(KN)\]&lt;p&gt;或需要 checkpointing；&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;K 很大时反传很贵；&lt;/li&gt;
+&lt;li&gt;可能产生 exploding/vanishing gradient。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;implicit-differentiation&#34;&gt;Implicit differentiation
+&lt;/h3&gt;&lt;p&gt;假设最终：&lt;/p&gt;
+\[x^*=G(x^*,\theta).\]&lt;p&gt;定义：&lt;/p&gt;
+\[F(x,\theta) = x-G(x,\theta)=0.\]&lt;p&gt;只对这个方程求导。&lt;/p&gt;
+&lt;p&gt;特点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;不需要保存整个 trajectory；&lt;/li&gt;
+&lt;li&gt;backward 通常变成一个线性 solve；&lt;/li&gt;
+&lt;li&gt;gradient 对应收敛 fixed point。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;JAXopt 官方文档明确把这两种方式并列：solver 可以选择 implicit differentiation，或者对 unrolled iterations 自动微分。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-这里有一个非常重要的微妙点两者求的梯度其实可能不同&#34;&gt;7. 这里有一个非常重要的微妙点：两者求的“梯度”其实可能不同
+&lt;/h1&gt;&lt;p&gt;假设 solver 并没有完全收敛。&lt;/p&gt;
+&lt;p&gt;运行：&lt;/p&gt;
+\[K=10\]&lt;p&gt;次得到：&lt;/p&gt;
+\[x_{10}.\]&lt;p&gt;Unrolling 给你的是：&lt;/p&gt;
+\[\boxed{ \frac{dx_{10}}{d\theta} }\]&lt;p&gt;即：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;这个具体十步算法的输出怎么变。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Implicit differentiation 假设：&lt;/p&gt;
+\[F(x^*,\theta)=0\]&lt;p&gt;成立，给的是：&lt;/p&gt;
+\[\boxed{ \frac{dx^*}{d\theta} }\]&lt;p&gt;即：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;真正收敛解怎么变。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[x_{10}\approx x^*\]&lt;p&gt;两者很接近。&lt;/p&gt;
+&lt;p&gt;如果 solver residual：&lt;/p&gt;
+\[\|F(x_{10},\theta)\|\]&lt;p&gt;还很大，它们可能明显不同。&lt;/p&gt;
+&lt;p&gt;因此 implicit differentiation 暗含一个非常重要的工程条件：&lt;/p&gt;
+\[\boxed{ \text{forward solution 应该足够接近真正的 root/optimum。} }\]&lt;p&gt;这也解释了 JAX &lt;code&gt;custom_root&lt;/code&gt; 的接口为什么明确假设 forward solver 返回一个满足：&lt;/p&gt;
+\[f(\text{solution})=0\]&lt;p&gt;的解。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-backward-pass-为什么又变成了一个线性系统&#34;&gt;8. Backward pass 为什么又变成了一个线性系统？
+&lt;/h1&gt;&lt;p&gt;回忆：&lt;/p&gt;
+\[R_u^T\lambda = J_u^T.\]&lt;p&gt;所以 differentiable solver 的 backward pass 本身就是：&lt;/p&gt;
+\[\boxed{ \text{一个 linear solve} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这件事非常漂亮。&lt;/p&gt;
+&lt;p&gt;Forward 可能是：&lt;/p&gt;
+\[\boxed{ \text{nonlinear solve} }\]&lt;p&gt;Backward 则通常是：&lt;/p&gt;
+\[\boxed{ \text{linearized adjoint solve} }\]&lt;p&gt;而：&lt;/p&gt;
+\[R_u\]&lt;p&gt;通常正是 forward Newton 里已经出现过的 tangent/Jacobian：&lt;/p&gt;
+\[K_{\rm tangent}.\]&lt;p&gt;因此可以复用：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;sparse matrix；&lt;/li&gt;
+&lt;li&gt;preconditioner；&lt;/li&gt;
+&lt;li&gt;multigrid hierarchy；&lt;/li&gt;
+&lt;li&gt;factorization；&lt;/li&gt;
+&lt;li&gt;matrix-free JVP。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这也是为什么“可微物理引擎”真正做好以后，往往和传统数值求解器技术高度重合。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-它和前面讲过的-multigrid-可以直接组合&#34;&gt;9. 它和前面讲过的 Multigrid 可以直接组合
+&lt;/h1&gt;&lt;p&gt;如果：&lt;/p&gt;
+\[R_u^T\lambda=b\]&lt;p&gt;有：&lt;/p&gt;
+\[10^7\]&lt;p&gt;自由度，&lt;/p&gt;
+&lt;p&gt;implicit differentiation 并没有让这个系统凭空变小。&lt;/p&gt;
+&lt;p&gt;你仍然需要高效解：&lt;/p&gt;
+\[\lambda.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{Implicit Differentiation} + \text{Krylov} + \text{Multigrid} }\]&lt;p&gt;是非常自然的组合。&lt;/p&gt;
+&lt;p&gt;也就是说：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;implicit differentiation 决定“该解哪个 backward equation”；&lt;/li&gt;
+&lt;li&gt;multigrid 决定“这个方程怎样高效解”。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这就是为什么学习 differentiable physics 不能脱离：&lt;/p&gt;
+\[\boxed{\text{传统数值线性代数}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-如果-forward-是优化问题呢&#34;&gt;10. 如果 forward 是优化问题呢？
+&lt;/h1&gt;&lt;p&gt;设：&lt;/p&gt;
+\[x^*(\theta) = \arg\min_x f(x,\theta).\]&lt;p&gt;一阶最优条件：&lt;/p&gt;
+\[\nabla_x f(x^*,\theta)=0.\]&lt;p&gt;于是把：&lt;/p&gt;
+\[F(x,\theta) = \nabla_x f(x,\theta)\]&lt;p&gt;代进 implicit differentiation：&lt;/p&gt;
+\[\nabla^2_{xx} f \frac{dx^*}{d\theta} + \nabla^2_{x\theta}f = 0.\]&lt;p&gt;得到：&lt;/p&gt;
+\[\boxed{ \frac{dx^*}{d\theta} = - \left( \nabla^2_{xx}f \right)^{-1} \nabla^2_{x\theta}f. }\]&lt;p&gt;所以 differentiable optimization layer 的 backward，本质上由：&lt;/p&gt;
+\[\boxed{\text{Hessian / KKT system}}\]&lt;p&gt;控制。&lt;/p&gt;
+&lt;p&gt;这正是现代 optimization layer、bilevel optimization 和 meta-learning 中 implicit differentiation 的基础。Blondel 等的框架正是以 optimality mapping 为统一接口。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这和把求解器当神经网络层有什么本质区别&#34;&gt;11. 这和“把求解器当神经网络层”有什么本质区别？
+&lt;/h1&gt;&lt;p&gt;普通 NN layer：&lt;/p&gt;
+\[y=f_\theta(x)\]&lt;p&gt;forward 是显式函数。&lt;/p&gt;
+&lt;p&gt;Implicit layer：&lt;/p&gt;
+\[\boxed{ y \text{ 被定义为某个方程的解} }\]&lt;p&gt;例如：&lt;/p&gt;
+\[F(y,x,\theta)=0.\]&lt;p&gt;所以 layer 本身可能内部运行：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;optimization；&lt;/li&gt;
+&lt;li&gt;PDE solve；&lt;/li&gt;
+&lt;li&gt;equilibrium solve；&lt;/li&gt;
+&lt;li&gt;fixed point；&lt;/li&gt;
+&lt;li&gt;contact solve。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;从网络外面看：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;input
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;physics solver
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solution
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;loss
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;而 backward：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;loss gradient
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;implicit adjoint solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;parameter gradient
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这意味着：&lt;/p&gt;
+\[\boxed{ \text{AI 系统可以把成熟数值求解器直接作为一个可微模块使用。} }\]&lt;p&gt;这比“用神经网络近似求解器”是完全不同的一条路线。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-接触为什么是-implicit-differentiation-的地狱级问题&#34;&gt;12. 接触为什么是 implicit differentiation 的地狱级问题？
+&lt;/h1&gt;&lt;p&gt;到目前为止，我们隐含假设：&lt;/p&gt;
+\[F\]&lt;p&gt;足够光滑。&lt;/p&gt;
+&lt;p&gt;但接触存在：&lt;/p&gt;
+\[\text{separated} \leftrightarrow \text{contact}\]&lt;p&gt;以及：&lt;/p&gt;
+\[\text{stick} \leftrightarrow \text{slip}.\]&lt;p&gt;也就是说 active set 会变化。&lt;/p&gt;
+&lt;p&gt;接触动力学经常包含：&lt;/p&gt;
+\[\max,\quad \min,\quad \text{complementarity},\]&lt;p&gt;因此 solution map：&lt;/p&gt;
+\[x^*(\theta)\]&lt;p&gt;可能：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;不连续；&lt;/li&gt;
+&lt;li&gt;不可微；&lt;/li&gt;
+&lt;li&gt;只有分段导数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这意味着：&lt;/p&gt;
+\[\boxed{ \text{“solver 能稳定 forward” 并不意味着 “gradient 也有用”。} }\]&lt;p&gt;这是 differentiable physics 中非常深的工程问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-nimble-和-dojo-为什么值得看&#34;&gt;13. Nimble 和 Dojo 为什么值得看？
+&lt;/h1&gt;&lt;p&gt;它们提供了两种非常好的现实例子。&lt;/p&gt;
+&lt;h3 id=&#34;nimble&#34;&gt;Nimble
+&lt;/h3&gt;&lt;p&gt;Nimble 使用 hard contact LCP，并针对 LCP solution 的稀疏结构推导分析梯度。论文报告单时间步 Jacobian 相比有限差分最高约 &lt;strong&gt;87× 单核加速&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;这说明：&lt;/p&gt;
+\[\boxed{ \text{明确利用 solver 数学结构， 可以比黑盒 finite difference 高效得多。} }\]&lt;h3 id=&#34;dojo&#34;&gt;Dojo
+&lt;/h3&gt;&lt;p&gt;Dojo 把刚体接触写成带摩擦锥的 nonlinear complementarity problem，用 primal-dual interior-point method 求解，再通过 implicit function theorem 对一个平滑化后的中间问题求导。&lt;/p&gt;
+&lt;p&gt;这里最值得注意的是：&lt;/p&gt;
+\[\boxed{ \text{他们甚至把“gradient smoothness”和“forward contact accuracy”做成了一个可调权衡。} }\]&lt;p&gt;这说明 differentiable physics 的目标并不总是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“梯度必须严格等于硬接触的数学导数。”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;实际优化更关心：&lt;/p&gt;
+\[\boxed{ \text{gradient 是否足够稳定、连续、对优化有用。} }\]&lt;p&gt;这是一个很重要的设计思想。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-为什么碰撞时正确梯度会如此难&#34;&gt;14. 为什么碰撞时“正确梯度”会如此难？
+&lt;/h1&gt;&lt;p&gt;假设小球撞墙。&lt;/p&gt;
+&lt;p&gt;碰撞时间：&lt;/p&gt;
+\[t_{\rm hit}\]&lt;p&gt;本身依赖参数：&lt;/p&gt;
+\[\theta.\]&lt;p&gt;如果你忽略：&lt;/p&gt;
+\[\frac{dt_{\rm hit}}{d\theta},\]&lt;p&gt;只对碰撞前后状态直接求导，就可能得到错误梯度。&lt;/p&gt;
+&lt;p&gt;这和普通离散状态更新很不一样：&lt;/p&gt;
+\[x_{n+1}=f(x_n)\]&lt;p&gt;里时间步边界是固定的。&lt;/p&gt;
+&lt;p&gt;碰撞实际发生在：&lt;/p&gt;
+\[t_n&lt;t_{\rm hit}&lt;t_{n+1}.\]&lt;p&gt;所以事件时间本身是状态的一部分。&lt;/p&gt;
+&lt;p&gt;2023 年针对 differentiable physics contact gradient 的研究明确指出，当接触法向或碰撞时间随状态变化时，已有 differentiable simulator 可能产生错误梯度；其改进方案直接利用 CCD 与 time-of-impact 信息修正梯度。&lt;/p&gt;
+&lt;p&gt;这再次说明：&lt;/p&gt;
+\[\boxed{ \text{几何事件的微分} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \text{动力学方程的微分} }\]&lt;p&gt;必须同时正确。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15-对软体-fem一个特别实用的应用参数识别&#34;&gt;15. 对软体 FEM，一个特别实用的应用：参数识别
+&lt;/h1&gt;&lt;p&gt;假设有实验测得：&lt;/p&gt;
+\[u_{\rm obs}.\]&lt;p&gt;你希望识别：&lt;/p&gt;
+\[\theta= (E,\nu,\mu_{\rm friction}).\]&lt;p&gt;定义：&lt;/p&gt;
+\[J(\theta) = \frac12 \|u^*(\theta)-u_{\rm obs}\|^2.\]&lt;p&gt;其中：&lt;/p&gt;
+\[u^*(\theta)\]&lt;p&gt;必须通过 nonlinear FEM solve：&lt;/p&gt;
+\[R(u,\theta)=0\]&lt;p&gt;才能得到。&lt;/p&gt;
+&lt;p&gt;传统方法：&lt;/p&gt;
+&lt;h3 id=&#34;finite-difference&#34;&gt;Finite difference
+&lt;/h3&gt;&lt;p&gt;若 20 个参数：&lt;/p&gt;
+\[\frac{\partial J}{\partial\theta_i} \approx \frac{ J(\theta+\epsilon e_i)-J(\theta) }{\epsilon}.\]&lt;p&gt;一次 gradient：&lt;/p&gt;
+\[\approx21\]&lt;p&gt;次完整 FEM solve。&lt;/p&gt;
+&lt;h3 id=&#34;implicit-adjoint&#34;&gt;Implicit adjoint
+&lt;/h3&gt;&lt;p&gt;1 次 forward FEM：&lt;/p&gt;
+\[R(u,\theta)=0.\]&lt;p&gt;1 次 adjoint solve：&lt;/p&gt;
+\[R_u^T\lambda=J_u^T.\]&lt;p&gt;然后一次性得到：&lt;/p&gt;
+\[\nabla_\theta J.\]&lt;p&gt;当：&lt;/p&gt;
+\[N_\theta\]&lt;p&gt;很大时，差距会极其明显。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-这和代理模型形成了一个很有意思的竞争互补关系&#34;&gt;16. 这和代理模型形成了一个很有意思的竞争/互补关系
+&lt;/h1&gt;&lt;p&gt;假设你的目标是优化：&lt;/p&gt;
+\[\min_\theta J(\theta).\]&lt;p&gt;一种路线：&lt;/p&gt;
+\[\text{FEM samples} \rightarrow \text{Kriging} \rightarrow \text{optimize surrogate}.\]&lt;p&gt;另一种：&lt;/p&gt;
+\[\boxed{ \text{differentiable FEM} \rightarrow \nabla_\theta J \rightarrow \text{gradient optimization}. }\]&lt;p&gt;前者适合：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;black-box；&lt;/li&gt;
+&lt;li&gt;变量不多；&lt;/li&gt;
+&lt;li&gt;仿真不可微；&lt;/li&gt;
+&lt;li&gt;需要全局近似。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;后者适合：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;高维参数；&lt;/li&gt;
+&lt;li&gt;solver 可访问；&lt;/li&gt;
+&lt;li&gt;局部优化；&lt;/li&gt;
+&lt;li&gt;inverse problem。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;更成熟的方案还可以组合：&lt;/p&gt;
+\[\boxed{ \text{gradient-enhanced surrogate} }\]&lt;p&gt;即每次 HF solve 不只输出：&lt;/p&gt;
+\[J(\theta),\]&lt;p&gt;还输出：&lt;/p&gt;
+\[\nabla_\theta J.\]&lt;p&gt;那么一个昂贵样本携带的信息量会大很多。&lt;/p&gt;
+&lt;p&gt;这是 implicit differentiation 对 surrogate modeling 一个非常直接的迁移价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-它和可靠性分析也有一条很值得关注的连接&#34;&gt;17. 它和可靠性分析也有一条很值得关注的连接
+&lt;/h1&gt;&lt;p&gt;极限状态：&lt;/p&gt;
+\[g(\theta).\]&lt;p&gt;如果 differentiable FEM 可以提供：&lt;/p&gt;
+\[\nabla_\theta g,\]&lt;p&gt;那么很多可靠性工具都会变得更强：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;FORM/SORM；&lt;/li&gt;
+&lt;li&gt;active subspace；&lt;/li&gt;
+&lt;li&gt;gradient-enhanced Kriging；&lt;/li&gt;
+&lt;li&gt;design-point search；&lt;/li&gt;
+&lt;li&gt;sensitivity analysis。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;例如 FORM 本来就需要：&lt;/p&gt;
+\[\nabla g.\]&lt;p&gt;如果这个梯度来自几十个 finite difference FEM runs，成本很高。&lt;/p&gt;
+&lt;p&gt;Adjoint/implicit differentiation 可以把高维 gradient 压缩为：&lt;/p&gt;
+\[\boxed{ \text{一次 forward + 一次 adjoint} }\]&lt;p&gt;量级。&lt;/p&gt;
+&lt;p&gt;这意味着：&lt;/p&gt;
+\[\boxed{ \text{可微有限元} + \text{可靠性} }\]&lt;p&gt;其实是一个非常自然、但还没有被工程上充分利用的组合。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-一个非常容易误解的点隐式微分并不等于免费梯度&#34;&gt;18. 一个非常容易误解的点：隐式微分并不等于“免费梯度”
+&lt;/h1&gt;&lt;p&gt;Backward 仍需要求：&lt;/p&gt;
+\[R_u^T\lambda=b.\]&lt;p&gt;如果：&lt;/p&gt;
+\[R_u\]&lt;p&gt;条件数很差：&lt;/p&gt;
+\[\kappa(R_u)\gg1,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\lambda\]&lt;p&gt;也会难算。&lt;/p&gt;
+&lt;p&gt;更严重的是：&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[R_u\]&lt;p&gt;接近奇异：&lt;/p&gt;
+\[\sigma_{\min}(R_u)\rightarrow0,\]&lt;p&gt;那么：&lt;/p&gt;
+\[R_u^{-1}\]&lt;p&gt;会很大。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \frac{du}{d\theta} }\]&lt;p&gt;本身可能爆炸。&lt;/p&gt;
+&lt;p&gt;这不一定是数值 bug。&lt;/p&gt;
+&lt;p&gt;它可能意味着：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;系统真的接近 bifurcation / instability / mechanism / loss of stiffness。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;所以 implicit differentiation 还会暴露：&lt;/p&gt;
+\[\boxed{\text{物理系统的 conditioning}}\]&lt;p&gt;这和前面 Certified RB 中：&lt;/p&gt;
+\[1/\alpha\]&lt;p&gt;放大 residual error 的逻辑非常相似。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;19-2026-年一个值得注意的发展二阶隐式微分开始进入-fem&#34;&gt;19. 2026 年一个值得注意的发展：二阶隐式微分开始进入 FEM
+&lt;/h1&gt;&lt;p&gt;传统 differentiable physics 大量使用：&lt;/p&gt;
+\[\nabla_\theta J.\]&lt;p&gt;但如果要做真正 Newton-type inverse optimization，还希望得到：&lt;/p&gt;
+\[H = \nabla_\theta^2J.\]&lt;p&gt;显式构造 Hessian 太贵。&lt;/p&gt;
+&lt;p&gt;2026 年 &lt;em&gt;Computer Physics Communications&lt;/em&gt; 已发表一项针对有限元可微物理的 &lt;strong&gt;implicit Hessian-vector product&lt;/strong&gt; 工作：利用 JVP/VJP 等自动微分原语计算二阶隐式导数，并在 2D/3D、线性/非线性 PDE 反问题上测试；作者报告在非线性反问题中，利用精确 Hessian-vector product 的 Newton-CG 可以加速优化收敛。&lt;/p&gt;
+&lt;p&gt;这说明：&lt;/p&gt;
+\[\boxed{ \text{differentiable physics 正在从“一阶梯度可用” 进一步进入“二阶数值优化可用”。} }\]&lt;p&gt;这条线值得长期关注。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;20-对自研求解器最值得迁移的工程架构&#34;&gt;20. 对自研求解器最值得迁移的工程架构
+&lt;/h1&gt;&lt;p&gt;如果以后希望 Rust/物理 solver 具备 differentiability，我反而不建议一开始把整个代码全部 AD 化。&lt;/p&gt;
+&lt;p&gt;更可控的路线是把 solver API 设计成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;forward:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    solve F(x, theta) = 0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    return x
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;backward:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    given dL/dx
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    solve:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        (dF/dx)^T lambda = dL/dx
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    return:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        dL/dtheta =
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        -lambda^T dF/dtheta
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;也就是说，明确暴露：&lt;/p&gt;
+\[\boxed{ F, \quad J_xv, \quad J_x^Tv, \quad J_\theta v }\]&lt;p&gt;这些算子。&lt;/p&gt;
+&lt;p&gt;这样底层 forward solver 仍然可以：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;自由优化；&lt;/li&gt;
+&lt;li&gt;matrix-free；&lt;/li&gt;
+&lt;li&gt;GPU；&lt;/li&gt;
+&lt;li&gt;multigrid；&lt;/li&gt;
+&lt;li&gt;自定义 sparse kernels。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;而 differentiability 成为一个：&lt;/p&gt;
+\[\boxed{\text{solver-level interface}}\]&lt;p&gt;，而不是把每行代码绑死在某个 autodiff framework 里。&lt;/p&gt;
+&lt;p&gt;这是一种很强的工程抽象。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一个最小可实践实验&#34;&gt;一个最小可实践实验
+&lt;/h2&gt;&lt;p&gt;可以做一个非常简单的非线性弹簧系统：&lt;/p&gt;
+\[R(x,k) = kx+\beta x^3-f = 0.\]&lt;p&gt;目标：&lt;/p&gt;
+\[J(k) = \frac12(x(k)-x_{\rm target})^2.\]&lt;p&gt;然后比较三种 gradient：&lt;/p&gt;
+&lt;h3 id=&#34;finite-difference-1&#34;&gt;Finite Difference
+&lt;/h3&gt;\[\frac{ J(k+\epsilon)-J(k-\epsilon) }{2\epsilon}.\]&lt;h3 id=&#34;unrolled-newton-ad&#34;&gt;Unrolled Newton AD
+&lt;/h3&gt;&lt;p&gt;对 20 次 Newton 全展开。&lt;/p&gt;
+&lt;h3 id=&#34;implicit&#34;&gt;Implicit
+&lt;/h3&gt;\[R_x = k+3\beta x^2,\]\[R_k=x.\]&lt;p&gt;所以：&lt;/p&gt;
+\[\frac{dx}{dk} = - \frac{x} {k+3\beta x^2}.\]&lt;p&gt;再：&lt;/p&gt;
+\[\frac{dJ}{dk} = (x-x_{\rm target}) \frac{dx}{dk}.\]&lt;p&gt;然后故意只做：&lt;/p&gt;
+\[2,\ 5,\ 20\]&lt;p&gt;次 Newton。&lt;/p&gt;
+&lt;p&gt;你会非常直观地看到：&lt;/p&gt;
+\[\boxed{ \text{solver 没收敛时， unrolled gradient 与 implicit gradient 开始分叉。} }\]&lt;p&gt;这个实验能一次理解 implicit differentiation 80% 的核心。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Implicit Differentiation 最重要的不是：&lt;/p&gt;
+\[\frac{dx^*}{d\theta} = -F_x^{-1}F_\theta.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{如果一个输出是“某个方程的解”， 它的导数应该优先从这个方程本身推导， 而不一定从产生这个解的全部迭代过程推导。} }\]&lt;p&gt;它在整个知识体系中的位置大概是：&lt;/p&gt;
+\[\text{Numerical Solver}\]\[\downarrow\]\[\boxed{\text{Implicit / Adjoint Differentiation}}\]\[\downarrow\]\[\text{Differentiable Physics}\]\[\downarrow\]\[\text{Inverse Problems / Optimization / Learning}.\]&lt;p&gt;而对于物理引擎和有限元开发，它最强的启发是：&lt;/p&gt;
+\[\boxed{ \text{“可微”不应该只是自动微分框架附着在代码外面， 而可以成为求解器本身的一项数学接口。} }\]&lt;p&gt;一旦这样设计，FEM、优化、可靠性、代理模型和 AI 就真正开始共享同一套计算基础设施。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Blondel et al., &lt;em&gt;Efficient and Modular Implicit Differentiation&lt;/em&gt;, NeurIPS 2022 / arXiv 2021&lt;/strong&gt;。最推荐作为现代入口，核心看“optimality mapping + implicit function theorem + autodiff”如何把隐式微分做成通用软件接口。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2105.15183&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文页面&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;JAX &lt;code&gt;jax.lax.custom_root&lt;/code&gt; 与 JAXopt Implicit Differentiation 文档&lt;/strong&gt;。如果想真正实现，这是最直接的工程资料；JAX 明确通过 implicit function theorem 给 root solver 定义梯度，JAXopt 则提供 &lt;code&gt;custom_root&lt;/code&gt;、&lt;code&gt;custom_fixed_point&lt;/code&gt;、JVP/VJP 等接口。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://docs.jax.dev/en/latest/_autosummary/jax.lax.custom_root.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;JAX custom_root&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Werling et al., &lt;em&gt;Fast and Feature-Complete Differentiable Physics for Articulated Rigid Bodies with Contact&lt;/em&gt;, 2021&lt;/strong&gt;。适合看 implicit/analytic differentiation 如何真正落到 hard-contact LCP，并理解为什么 contact gradient 比普通 smooth dynamics 难得多。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2103.16021&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文页面&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Howell et al., &lt;em&gt;Dojo: A Differentiable Physics Engine for Robotics&lt;/em&gt;&lt;/strong&gt;。很适合观察另一种 contact-differentiation 路线：nonlinear complementarity + interior-point + implicit differentiation，并显式权衡硬接触精度与 gradient smoothness。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2203.00806&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Dojo 论文页面&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Xue, &lt;em&gt;Implicit differentiation with second-order derivatives and benchmarks in finite-element-based differentiable physics&lt;/em&gt;, Computer Physics Communications, 2026&lt;/strong&gt;。这是很值得追的新进展：从一阶 adjoint 继续走到 implicit Hessian-vector product 和 Newton-CG PDE 反问题优化。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2505.12646&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文预印本&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 </description>

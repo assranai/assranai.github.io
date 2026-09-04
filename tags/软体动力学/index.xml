@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Tue, 25 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 03 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Projective Dynamics：把“PBD 的投影”变成真正的能量求解</title>
         <link>https://assranai.github.io/cards/03-projective-dynamics/</link>
         <pubDate>Sun, 16 Aug 2026 00:00:00 +0000</pubDate>
@@ -1214,6 +1214,461 @@
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Drake &lt;code&gt;SemiExplicitEulerIntegrator&lt;/code&gt; 官方文档&lt;/strong&gt;。适合专门澄清游戏物理常说的 semi-implicit/symplectic Euler 与一般 IMEX 的区别。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        <item>
+        <title>FAS：非线性问题的“粗网格”不该只修正误差，而应该直接解一个粗尺度的完整非线性状态</title>
+        <link>https://assranai.github.io/cards/21-fas/</link>
+        <pubDate>Thu, 03 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/21-fas/</guid>
+        <description>&lt;h1 id=&#34;fas非线性问题的粗网格不该只修正误差而应该直接解一个粗尺度的完整非线性状态&#34;&gt;FAS：非线性问题的“粗网格”不该只修正误差，而应该直接解一个粗尺度的完整非线性状态
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Full Approximation Scheme（FAS，全近似格式）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 数值方法 × 软体动力学 × 接触力学&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;上一期 Multigrid 的核心是：&lt;/p&gt;
+\[\boxed{ \text{细网格消高频误差，粗网格消低频误差} }\]&lt;p&gt;但那套最经典的推导针对的是线性问题：&lt;/p&gt;
+\[Au=f.\]&lt;p&gt;真正进入软体、超弹性、塑性、接触以后，我们面对的是：&lt;/p&gt;
+\[\boxed{ F_h(u_h)=f_h }\]&lt;p&gt;其中 \(F_h\) 是非线性算子。&lt;/p&gt;
+&lt;p&gt;这时一个关键问题出现了：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;粗网格到底应该解“误差”，还是应该解“解本身”？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;FAS 给出的答案是：&lt;/p&gt;
+\[\boxed{ \text{在非线性问题里，粗层应当求一个完整的 coarse approximation。} }\]&lt;p&gt;这也是它名字里 &lt;strong&gt;Full Approximation&lt;/strong&gt; 的真正含义。&lt;/p&gt;
+&lt;p&gt;Achi Brandt 在 1970 年代建立了现代 multigrid/FAS 框架；其 1977 年经典论文已经明确讨论了利用多层网格以近线性复杂度求解包括非线性在内的边值问题。今天 PETSc 的 &lt;code&gt;SNESFAS&lt;/code&gt; 仍然直接实现这一 nonlinear multigrid 体系。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-为什么线性-multigrid-的误差方程到了非线性里不再自然&#34;&gt;1. 为什么线性 multigrid 的“误差方程”到了非线性里不再自然？
+&lt;/h2&gt;&lt;p&gt;线性问题：&lt;/p&gt;
+\[Au=f.\]&lt;p&gt;当前近似：&lt;/p&gt;
+\[\tilde u.\]&lt;p&gt;定义误差：&lt;/p&gt;
+\[e=u-\tilde u.\]&lt;p&gt;因为线性性：&lt;/p&gt;
+\[A(u-\tilde u) = Au-A\tilde u,\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ Ae=f-A\tilde u=r. }\]&lt;p&gt;于是 coarse grid 很自然地解：&lt;/p&gt;
+\[A_H e_H=r_H.\]&lt;p&gt;然后：&lt;/p&gt;
+\[u_h \leftarrow u_h+Pe_H.\]&lt;p&gt;整个 coarse level 只负责计算：&lt;/p&gt;
+\[\boxed{\text{correction}}\]&lt;p&gt;这就是上一期讲的 coarse-grid correction。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;2-非线性时这条等式坏掉了&#34;&gt;2. 非线性时，这条等式坏掉了
+&lt;/h2&gt;&lt;p&gt;现在：&lt;/p&gt;
+\[F(u)=f.\]&lt;p&gt;当前近似：&lt;/p&gt;
+\[\tilde u.\]&lt;p&gt;你仍然想写：&lt;/p&gt;
+\[u=\tilde u+e.\]&lt;p&gt;但：&lt;/p&gt;
+\[F(\tilde u+e) \neq F(\tilde u)+F(e).\]&lt;p&gt;所以不能得到：&lt;/p&gt;
+\[F(e)=f-F(\tilde u).\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \text{非线性算子不能把“当前状态”和“误差”拆开。} }\]&lt;p&gt;这看起来只是一个代数小问题，实际却决定了 nonlinear multigrid 的 formulation。&lt;/p&gt;
+&lt;p&gt;FAS 正是为这个问题设计的。Brandt–Livne 的多重网格专著把 FAS 作为解决 nonlinear problems 的标准多层框架之一。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-fas-的关键粗网格解的是-不是&#34;&gt;3. FAS 的关键：粗网格解的是 \(u_H\)，不是 \(e_H\)
+&lt;/h1&gt;&lt;p&gt;假设 fine-grid equation：&lt;/p&gt;
+\[F_h(u_h)=f_h.\]&lt;p&gt;当前 fine approximation：&lt;/p&gt;
+\[\tilde u_h.\]&lt;p&gt;先计算 residual：&lt;/p&gt;
+\[r_h = f_h-F_h(\tilde u_h).\]&lt;p&gt;然后把当前解限制到 coarse grid：&lt;/p&gt;
+\[\tilde u_H=I_h^H\tilde u_h.\]&lt;p&gt;FAS 不让 coarse grid 解：&lt;/p&gt;
+\[F_H(e_H)=r_H.\]&lt;p&gt;而是构造一个新的 coarse equation：&lt;/p&gt;
+\[\boxed{ F_H(u_H) = F_H(\tilde u_H) + Rr_h. }\]&lt;p&gt;等价地写：&lt;/p&gt;
+\[F_H(u_H) = f_H+\tau_H.\]&lt;p&gt;其中：&lt;/p&gt;
+\[\boxed{ \tau_H = F_H(I_h^H\tilde u_h) - R F_h(\tilde u_h) }\]&lt;p&gt;就是著名的：&lt;/p&gt;
+\[\boxed{\tau\text{-correction}}\]&lt;p&gt;或：&lt;/p&gt;
+\[\boxed{\text{FAS coarse-grid defect correction}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;PETSc 当前文档对 FAS 的描述非常直接：粗层求解的是 coarse versions of the nonlinear problem，并通过扰动粗问题，使 fine-grid projected solution 在粗层上产生零修正。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4--correction-到底在修什么&#34;&gt;4. \(\tau\)-correction 到底在修什么？
+&lt;/h1&gt;&lt;p&gt;这是 FAS 最值得理解的一点。&lt;/p&gt;
+&lt;p&gt;假设你只是简单地把 fine-grid 方程换成 coarse-grid 方程：&lt;/p&gt;
+\[F_H(u_H)=f_H.\]&lt;p&gt;那么 coarse operator：&lt;/p&gt;
+\[F_H\]&lt;p&gt;并不等于：&lt;/p&gt;
+\[F_h\]&lt;p&gt;的完美缩小版。&lt;/p&gt;
+&lt;p&gt;因为：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;discretization 不同；&lt;/li&gt;
+&lt;li&gt;网格分辨率不同；&lt;/li&gt;
+&lt;li&gt;非线性 constitutive response 不同；&lt;/li&gt;
+&lt;li&gt;几何表示不同。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;于是即使：&lt;/p&gt;
+\[\tilde u_h\]&lt;p&gt;已经是真正 fine-grid solution，&lt;/p&gt;
+&lt;p&gt;直接限制：&lt;/p&gt;
+\[I_h^H\tilde u_h\]&lt;p&gt;通常也不会精确满足 naïve coarse equation：&lt;/p&gt;
+\[F_H(I_h^H\tilde u_h) \neq f_H.\]&lt;p&gt;这就很危险：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;fine grid 已经对了，coarse grid 却会告诉你“还应该修一点”。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;FAS 的 \(\tau\)-correction 就是消除这种假修正。&lt;/p&gt;
+&lt;p&gt;它要求一个非常重要的 &lt;strong&gt;fixed-point consistency&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[F_h(u_h)=f_h,\]&lt;p&gt;那么把它限制到 coarse grid 后：&lt;/p&gt;
+\[u_H=I_h^H u_h\]&lt;p&gt;应该恰好满足 FAS coarse equation。&lt;/p&gt;
+&lt;p&gt;于是 coarse correction：&lt;/p&gt;
+\[u_H-I_h^Hu_h\]&lt;p&gt;为零。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \tau\text{ 的作用，是让 coarse physics 与当前 fine physics 保持一致。} }\]&lt;p&gt;这比“修正离散误差”更准确。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-一个很直观的非线性弹簧例子&#34;&gt;5. 一个很直观的非线性弹簧例子
+&lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
+\[F(u)=ku+\beta u^3.\]&lt;p&gt;目标：&lt;/p&gt;
+\[ku+\beta u^3=f.\]&lt;p&gt;假设 fine model 的非线性参数和 coarse approximation 不完全一致：&lt;/p&gt;
+\[F_h(u)=k_hu+\beta_hu^3,\]\[F_H(u)=k_Hu+\beta_Hu^3.\]&lt;p&gt;如果直接把 fine 状态：&lt;/p&gt;
+\[\tilde u_h\]&lt;p&gt;投到 coarse grid，再解：&lt;/p&gt;
+\[F_H(u_H)=f_H,\]&lt;p&gt;coarse solver 会尝试把状态拉向：&lt;/p&gt;
+\[F_H\]&lt;p&gt;自己的平衡点。&lt;/p&gt;
+&lt;p&gt;但这个平衡点未必与 fine problem 一致。&lt;/p&gt;
+&lt;p&gt;FAS 额外加入：&lt;/p&gt;
+\[\tau_H = F_H(\tilde u_H) - RF_h(\tilde u_h),\]&lt;p&gt;于是 coarse problem 变成：&lt;/p&gt;
+\[F_H(u_H) = Rf_h+\tau_H.\]&lt;p&gt;这样 coarse level 的任务就变成：&lt;/p&gt;
+\[\boxed{ \text{用粗模型描述当前 fine residual 所对应的大尺度非线性修正} }\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\text{假装 coarse model 就是真实问题。}\]&lt;hr&gt;
+&lt;h1 id=&#34;6-fas-v-cycle-实际上长什么样&#34;&gt;6. FAS V-cycle 实际上长什么样？
+&lt;/h1&gt;&lt;p&gt;压缩以后：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;21
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;22
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;function FAS(level h, u_h, f_h):
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    pre-smooth:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        nonlinear_relax(F_h(u_h)=f_h)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    residual:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        r_h = f_h - F_h(u_h)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    restrict current state:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        u_H0 = I_h^H u_h
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    build coarse RHS:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        f_H = F_H(u_H0) + R r_h
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    recursively solve:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        u_H = FAS(H, u_H0, f_H)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    coarse correction:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        u_h += P (u_H - u_H0)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    post-smooth:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        nonlinear_relax(F_h(u_h)=f_h)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;注意 coarse correction：&lt;/p&gt;
+\[\boxed{ P(u_H-u_H^0) }\]&lt;p&gt;这里真正插值回来的是 coarse solution 的&lt;strong&gt;变化量&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;但 coarse level 内部存储和求解的是：&lt;/p&gt;
+\[\boxed{u_H}\]&lt;p&gt;完整近似。&lt;/p&gt;
+&lt;p&gt;这就是 FAS 与 linear correction scheme 最大的结构区别。&lt;/p&gt;
+&lt;p&gt;PETSc 的 FAS 实现今天仍保留 V/W cycle、pre/post smoothers、multiplicative/additive/full 等多种结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么这对超弹性问题很有意义&#34;&gt;7. 为什么这对超弹性问题很有意义？
+&lt;/h1&gt;&lt;p&gt;考虑 quasi-static hyperelasticity：&lt;/p&gt;
+\[R(u) = f_{\rm int}(u)-f_{\rm ext} = 0.\]&lt;p&gt;例如 Neo-Hookean：&lt;/p&gt;
+\[\Psi(F) = \frac{\mu}{2}(I_1-3) - \mu\ln J + \frac{\lambda}{2}(\ln J)^2.\]&lt;p&gt;于是：&lt;/p&gt;
+\[f_{\rm int}(u) = \nabla_u \int\Psi(F(u))\,dV.\]&lt;p&gt;这个方程显然是强非线性的。&lt;/p&gt;
+&lt;p&gt;传统 Newton：&lt;/p&gt;
+\[K(u_k)\Delta u=-R(u_k)\]&lt;p&gt;每轮：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;线性化；&lt;/li&gt;
+&lt;li&gt;解一个大 tangent system；&lt;/li&gt;
+&lt;li&gt;更新。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;而 FAS 的思路更接近：&lt;/p&gt;
+\[\boxed{ \text{直接让多层网格共同处理 nonlinear state} }\]&lt;p&gt;粗层可以直接修正：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;大尺度整体弯曲；&lt;/li&gt;
+&lt;li&gt;全局拉伸；&lt;/li&gt;
+&lt;li&gt;大区域体积响应；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;fine layer 再处理：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;局部材料非线性；&lt;/li&gt;
+&lt;li&gt;几何细节；&lt;/li&gt;
+&lt;li&gt;高频误差。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以它不是：&lt;/p&gt;
+\[\text{Newton + linear multigrid}\]&lt;p&gt;的简单改名。&lt;/p&gt;
+&lt;p&gt;它属于：&lt;/p&gt;
+\[\boxed{\text{nonlinear multilevel solve}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-它和-newtonmultigrid-到底有什么区别&#34;&gt;8. 它和 Newton–Multigrid 到底有什么区别？
+&lt;/h1&gt;&lt;p&gt;这是最值得分清楚的相邻概念。&lt;/p&gt;
+&lt;h3 id=&#34;newtonkrylovmultigrid&#34;&gt;Newton–Krylov–Multigrid
+&lt;/h3&gt;&lt;p&gt;先在当前状态：&lt;/p&gt;
+\[u_k\]&lt;p&gt;线性化：&lt;/p&gt;
+\[J(u_k)\Delta u=-R(u_k).\]&lt;p&gt;然后 multigrid 只负责求这个线性系统：&lt;/p&gt;
+\[\boxed{ J\Delta u=-R. }\]&lt;p&gt;所以结构是：&lt;/p&gt;
+\[\text{nonlinear outer Newton}\]\[\downarrow\]\[\text{linear multigrid inner solve}.\]&lt;h3 id=&#34;fas&#34;&gt;FAS
+&lt;/h3&gt;&lt;p&gt;每一个 grid level 都拥有：&lt;/p&gt;
+\[\boxed{\text{自己的 nonlinear problem}}\]&lt;p&gt;所以 nonlinear correction 本身跨尺度传播。&lt;/p&gt;
+&lt;p&gt;可以粗略记：&lt;/p&gt;
+\[\boxed{ \text{Newton-MG：先线性化，再多层求解} }\]\[\boxed{ \text{FAS：非线性本身就是多层的} }\]&lt;p&gt;两者都非常有价值。&lt;/p&gt;
+&lt;p&gt;对很多成熟 FEM，Newton + geometric/AMG tangent preconditioner 往往更容易实现；例如有限应变超弹性的 matrix-free geometric multigrid 工作，就是在 tangent operator 上使用 multigrid。&lt;/p&gt;
+&lt;p&gt;FAS 则在强非线性、非线性平滑器有效、粗层非线性 operator 可以合理构造时更具吸引力。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-fas-真正困难的地方其实不是-v-cycle而是-coarse-nonlinear-operator&#34;&gt;9. FAS 真正困难的地方其实不是 V-cycle，而是 coarse nonlinear operator
+&lt;/h1&gt;&lt;p&gt;线性问题可以自然做：&lt;/p&gt;
+\[A_H = R A_h P\]&lt;p&gt;即 Galerkin coarse operator。&lt;/p&gt;
+&lt;p&gt;非线性时：&lt;/p&gt;
+\[F_H\]&lt;p&gt;怎么定义就复杂得多。&lt;/p&gt;
+&lt;p&gt;你希望 coarse model：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;足够便宜；&lt;/li&gt;
+&lt;li&gt;能代表低频 nonlinear modes；&lt;/li&gt;
+&lt;li&gt;与 fine operator 一致；&lt;/li&gt;
+&lt;li&gt;不会产生错误物理平衡点。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;真实非结构网格里尤其困难。&lt;/p&gt;
+&lt;p&gt;近期 nonlinear multigrid 研究仍然重点关注这个问题。例如基于 AMGe coarse spaces 的 nonlinear FAS 工作强调：此前在一般非结构网格上，FAS 的难点之一就是 coarse nonlinear operators 不够稳定和准确；改进 coarse space 后，才能恢复更可靠的多层性能。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{FAS 成败很大程度由 coarse model quality 决定。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;10-这与代理模型有一个很有意思的联系&#34;&gt;10. 这与代理模型有一个很有意思的联系
+&lt;/h1&gt;&lt;p&gt;通常 surrogate 被理解成：&lt;/p&gt;
+\[x\rightarrow y.\]&lt;p&gt;但 FAS 中 coarse nonlinear model 实际上也是一种：&lt;/p&gt;
+\[\boxed{\text{低成本、低分辨率物理代理}}\]&lt;p&gt;区别是：&lt;/p&gt;
+&lt;p&gt;它不是替代 fine model 输出最终答案。&lt;/p&gt;
+&lt;p&gt;它的任务是：&lt;/p&gt;
+\[\boxed{ \text{预测 fine problem 当前缺失的低频非线性修正。} }\]&lt;p&gt;这是一种非常不同的 surrogate philosophy：&lt;/p&gt;
+\[\text{surrogate for outputs}\]&lt;p&gt;vs.&lt;/p&gt;
+\[\boxed{ \text{surrogate for solver corrections} }\]&lt;p&gt;后一种思路很值得迁移到 learned solver。&lt;/p&gt;
+&lt;p&gt;比如：&lt;/p&gt;
+\[\text{NN}\]&lt;p&gt;不必预测最终 FEM state，&lt;/p&gt;
+&lt;p&gt;它可以只预测：&lt;/p&gt;
+\[\boxed{ \text{coarse/global correction} }\]&lt;p&gt;再让 fine physics solver 消除局部误差。&lt;/p&gt;
+&lt;p&gt;这通常比“AI 直接替代求解器”更加可控。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么-fas-可能特别适合局部迭代传播很慢的软体求解器&#34;&gt;11. 为什么 FAS 可能特别适合“局部迭代传播很慢”的软体求解器？
+&lt;/h1&gt;&lt;p&gt;假设一个 XPBD/Jacobi 软体长条：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[1]-[2]-[3]-...-[1000]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;端点突然移动。&lt;/p&gt;
+&lt;p&gt;局部 constraint projection 的信息传播是：&lt;/p&gt;
+\[1\rightarrow2\rightarrow3\rightarrow\cdots\]&lt;p&gt;因此全局形变修正要经过很多 iteration 才能传遍整个物体。&lt;/p&gt;
+&lt;p&gt;上一期 Multigrid 已经说明：&lt;/p&gt;
+\[\boxed{ \text{这是低频误差传播问题。} }\]&lt;p&gt;但如果 constraint 本身是强非线性：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;volume constraints；&lt;/li&gt;
+&lt;li&gt;nonlinear strain；&lt;/li&gt;
+&lt;li&gt;contact active set；&lt;/li&gt;
+&lt;li&gt;large rotation；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;简单在线性 correction space 做 coarse solve 可能不够。&lt;/p&gt;
+&lt;p&gt;FAS 给出的更自然思路是：&lt;/p&gt;
+\[\boxed{ \text{粗层软体本身也做 nonlinear constraint solve} }\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine tet mesh:    100k vertices
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓ restrict state
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;coarse mesh:      10k vertices
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;nonlinear XPBD/elastic solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓ prolong correction
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine mesh
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;粗层不是只求：&lt;/p&gt;
+\[\Delta x\]&lt;p&gt;的一个线性 approximation，&lt;/p&gt;
+&lt;p&gt;而是直接找到：&lt;/p&gt;
+\[\boxed{ \text{整体姿态在 coarse physics 下应该往哪里走。} }\]&lt;p&gt;这就是 nonlinear multilevel soft-body solver 的核心直觉。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-但接触会让事情更麻烦&#34;&gt;12. 但接触会让事情更麻烦
+&lt;/h1&gt;&lt;p&gt;假设 fine mesh 上有一个小凸起：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fine:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;──────▲──────
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      ground
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;coarse mesh 可能直接把它抹掉：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;coarse:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;─────────────
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;那么 fine level 有 contact：&lt;/p&gt;
+\[C_f(x)\ge0,\]&lt;p&gt;coarse level 却根本不知道这个 contact。&lt;/p&gt;
+&lt;p&gt;于是 coarse correction 可能把物体推向：&lt;/p&gt;
+\[\boxed{\text{fine level 不可行的方向}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以 contact-aware nonlinear multigrid 很难。&lt;/p&gt;
+&lt;p&gt;它要求 coarse hierarchy 不只是：&lt;/p&gt;
+\[\text{geometry hierarchy}\]&lt;p&gt;还要考虑：&lt;/p&gt;
+\[\boxed{ \text{constraint / active-set hierarchy} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;实际上，FAS 早就被扩展到 complementarity / variational inequality 问题。经典 PFAS 工作把 FAS 用于 free-boundary / complementarity problem；而 2024 年 SIAM JSC 的 FAS constraint-decomposition 方法进一步针对 nonlinear variational inequalities，并报告近似 mesh-independent convergence 与 optimal full-multigrid complexity。&lt;/p&gt;
+&lt;p&gt;这说明：&lt;/p&gt;
+\[\boxed{ \text{FAS + inequality/contact} }\]&lt;p&gt;并不是纯理论想象，而是一条仍在发展的路线。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这里其实和-ipc-又连起来了&#34;&gt;13. 这里其实和 IPC 又连起来了
+&lt;/h1&gt;&lt;p&gt;IPC 每个时间步求：&lt;/p&gt;
+\[\min_x E(x)+B_{\rm contact}(x).\]&lt;p&gt;随着网格越来越细：&lt;/p&gt;
+\[x\in\mathbb R^{3N}\]&lt;p&gt;非线性优化规模越来越大。&lt;/p&gt;
+&lt;p&gt;如果有 nonlinear multilevel hierarchy：&lt;/p&gt;
+\[x_h \leftrightarrow x_H,\]&lt;p&gt;理论上 coarse level 可以解决：&lt;/p&gt;
+\[\boxed{ \text{大尺度 elastic/contact configuration} }\]&lt;p&gt;fine level 再处理：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;局部 barrier；&lt;/li&gt;
+&lt;li&gt;细几何接触；&lt;/li&gt;
+&lt;li&gt;高频 deformation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但关键难点就在：&lt;/p&gt;
+\[\boxed{ \text{如何让 coarse contact problem 与 fine contact feasible set 一致？} }\]&lt;p&gt;这实际上比“给 IPC 加 AMG”深很多。&lt;/p&gt;
+&lt;p&gt;它涉及：&lt;/p&gt;
+\[\text{nonlinear coarse energy} + \text{constraint coarsening} + \text{feasibility}.\]&lt;p&gt;从研究角度看，这类问题的含金量明显高于单纯继续调 iteration count。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-fas-和普通-coarse-to-fine-initialization-也不是一回事&#34;&gt;14. FAS 和普通 coarse-to-fine initialization 也不是一回事
+&lt;/h1&gt;&lt;p&gt;很多图形学方法会做：&lt;/p&gt;
+\[\text{先粗网格解} \rightarrow \text{插值到细网格} \rightarrow \text{再细网格解}.\]&lt;p&gt;这只发生一次。&lt;/p&gt;
+&lt;p&gt;叫：&lt;/p&gt;
+\[\boxed{\text{nested iteration}}\]&lt;p&gt;或者 coarse-to-fine initialization。&lt;/p&gt;
+&lt;p&gt;FAS 则在每个 nonlinear solve 中反复：&lt;/p&gt;
+\[h \downarrow H \uparrow h.\]&lt;p&gt;coarse state 不断根据 fine residual 被修改。&lt;/p&gt;
+&lt;p&gt;所以它形成：&lt;/p&gt;
+\[\boxed{\text{双向持续反馈}}\]&lt;p&gt;而不只是：&lt;/p&gt;
+\[\text{coarse initialization}.\]&lt;p&gt;PETSc 当前甚至把 &lt;code&gt;full&lt;/code&gt; FAS、multiplicative FAS、additive FAS 等不同循环方式显式区分。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15--correction-还有一个更深的意义它可以测量粗模型到底错了什么&#34;&gt;15. \(\tau\)-correction 还有一个更深的意义：它可以测量“粗模型到底错了什么”
+&lt;/h1&gt;&lt;p&gt;回忆：&lt;/p&gt;
+\[\tau_H = F_H(I_h^H u_h) - R F_h(u_h).\]&lt;p&gt;如果：&lt;/p&gt;
+\[\tau_H\approx0,\]&lt;p&gt;说明：&lt;/p&gt;
+\[F_H\]&lt;p&gt;对当前状态而言很好地代表了 fine operator。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[\|\tau_H\|\gg0,\]&lt;p&gt;说明 coarse physics 与 fine physics 差异明显。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \tau }\]&lt;p&gt;不仅是算法补偿项，&lt;/p&gt;
+&lt;p&gt;还可以理解成：&lt;/p&gt;
+\[\boxed{ \text{跨尺度模型失配量} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这其实与 multilevel UQ / multifidelity 的 discrepancy 很像：&lt;/p&gt;
+\[f_H-f_L.\]&lt;p&gt;只是这里 discrepancy 发生在：&lt;/p&gt;
+\[\boxed{\text{nonlinear operator space}}\]&lt;p&gt;而不是最终 scalar response。&lt;/p&gt;
+&lt;p&gt;这个视角非常值得保留。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它对多保真代理模型有一个很强的迁移启发&#34;&gt;16. 它对多保真代理模型有一个很强的迁移启发
+&lt;/h1&gt;&lt;p&gt;传统 multifidelity ：&lt;/p&gt;
+\[y_H(x) = \rho y_L(x)+\delta(x).\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{ \text{高保真} = \text{低保真} + \text{discrepancy}. }\]&lt;p&gt;FAS：&lt;/p&gt;
+\[\boxed{ \text{fine nonlinear problem} = \text{coarse nonlinear problem} + \tau\text{-correction}. }\]&lt;p&gt;两者结构非常相似。&lt;/p&gt;
+&lt;p&gt;区别在于 FAS 中：&lt;/p&gt;
+\[\tau\]&lt;p&gt;不是通过统计拟合学习出来，&lt;/p&gt;
+&lt;p&gt;而是从当前 fine residual 和 coarse operator 一致性直接构造。&lt;/p&gt;
+&lt;p&gt;所以 FAS 提供一个很有价值的概念：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;低保真模型最重要的不一定是绝对准确，而是它的失配是否可以被结构化地修正。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这对于代理建模也非常重要。&lt;/p&gt;
+&lt;p&gt;一个粗模型：&lt;/p&gt;
+\[R^2=0.7\]&lt;p&gt;未必没价值。&lt;/p&gt;
+&lt;p&gt;如果其 discrepancy：&lt;/p&gt;
+\[\delta(x)\]&lt;p&gt;非常平滑、低维、容易学习，&lt;/p&gt;
+&lt;p&gt;它仍然可能是很优秀的低保真模型。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-一个非常值得自研的最小实验&#34;&gt;17. 一个非常值得自研的最小实验
+&lt;/h1&gt;&lt;p&gt;如果已有一个 nonlinear spring/cloth/soft-body solver，不需要直接上三维大 tet。&lt;/p&gt;
+&lt;p&gt;可以从 1D nonlinear Poisson 开始：&lt;/p&gt;
+\[-\frac{d}{dx} \left[ (1+u^2)\frac{du}{dx} \right] = f.\]&lt;p&gt;离散得到：&lt;/p&gt;
+\[F_h(u_h)=f_h.\]&lt;p&gt;建立：&lt;/p&gt;
+\[N=1025\]&lt;p&gt;的 fine grid，&lt;/p&gt;
+&lt;p&gt;以及：&lt;/p&gt;
+\[513,\ 257,\ 129,\dots\]&lt;p&gt;coarse grids。&lt;/p&gt;
+&lt;p&gt;比较三种方法：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;单层 nonlinear Gauss–Seidel；&lt;/li&gt;
+&lt;li&gt;Newton + linear multigrid；&lt;/li&gt;
+&lt;li&gt;FAS V-cycle。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;记录：&lt;/p&gt;
+\[\|F_h(u_k)-f_h\|.\]&lt;p&gt;最重要的实验不是哪个最快，而是观察：&lt;/p&gt;
+\[\boxed{ \text{网格从 }N=10^3\rightarrow10^5 \text{ 后，iteration count 是否增长。} }\]&lt;p&gt;如果 FAS hierarchy 设计良好，它追求的是：&lt;/p&gt;
+\[\boxed{\text{近似 mesh-independent nonlinear convergence}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这才是 nonlinear multigrid 真正的价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-对大型游戏物理最值得迁移的一层&#34;&gt;18. 对大型游戏物理最值得迁移的一层
+&lt;/h1&gt;&lt;p&gt;很多实时 solver 的典型架构是：&lt;/p&gt;
+\[\boxed{ \text{大量便宜局部迭代} }\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;constraint projection；&lt;/li&gt;
+&lt;li&gt;Jacobi；&lt;/li&gt;
+&lt;li&gt;Gauss–Seidel；&lt;/li&gt;
+&lt;li&gt;local contacts。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这种方法最大优势是：&lt;/p&gt;
+\[\text{简单、GPU友好、随时可以停}.\]&lt;p&gt;最大弱点是：&lt;/p&gt;
+\[\boxed{\text{全球信息传播慢。}}\]&lt;p&gt;FAS 提醒我们，未来更成熟的实时 solver 不一定要走：&lt;/p&gt;
+\[\text{完全 Newton 化}\]&lt;p&gt;这条路。&lt;/p&gt;
+&lt;p&gt;还有另一条非常有吸引力的路线：&lt;/p&gt;
+\[\boxed{ \text{cheap local nonlinear solver} + \text{coarse nonlinear correction} }\]&lt;p&gt;即：&lt;/p&gt;
+\[\text{保留局部求解器的并行性}\]&lt;p&gt;同时：&lt;/p&gt;
+\[\text{增加低频 global communication path}.\]&lt;p&gt;这正是 hierarchical physics solver 很值得研究的方向。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;FAS 最值得记住的并不是：&lt;/p&gt;
+\[\tau_H = F_H(I_h^Hu_h)-RF_h(u_h).\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \text{非线性问题中的粗层，不能只被理解成“低分辨率误差修正器”；它本身应该承载一个完整的粗尺度非线性状态。} }\]&lt;p&gt;因此可以把线性 Multigrid 与 FAS 的区别压缩成：&lt;/p&gt;
+\[\boxed{ \text{Linear MG：coarse grid solves the error} }\]\[\boxed{ \text{FAS：coarse grid solves the solution} }\]&lt;p&gt;而 \(\tau\)-correction 负责保证：&lt;/p&gt;
+\[\boxed{ \text{粗层看到的物理，与 fine level 当前看到的物理相容。} }\]&lt;p&gt;它在整个知识体系中的位置大约是：&lt;/p&gt;
+\[\text{Multigrid}\]\[\downarrow\]\[\boxed{\text{FAS / Nonlinear Multigrid}}\]\[\downarrow\]\[\text{Nonlinear FEM / contact / constrained optimization}\]\[\downarrow\]\[\text{multilevel physics solver}.\]&lt;p&gt;如果以后要做真正大规模软体求解器，我会把这类方法视为比“单纯增加 XPBD iteration”更值得长期掌握的一层，因为它针对的正是大型局部迭代器最根本的瓶颈：&lt;/p&gt;
+\[\boxed{\text{低频、全局、强非线性修正如何快速传播。}}\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Achi Brandt, &lt;em&gt;Multi-Level Adaptive Solutions to Boundary-Value Problems&lt;/em&gt;, Mathematics of Computation, 1977&lt;/strong&gt;。现代 multigrid/FAS 的奠基论文之一；已经讨论了多层方法对 possibly nonlinear systems 的近线性复杂度求解。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Brandt &amp;amp; Livne, &lt;em&gt;Multigrid Techniques: 1984 Guide with Applications to Fluid Dynamics&lt;/em&gt;，Chapter 8: Full Approximation Scheme and Applications&lt;/strong&gt;。如果想专门理解 FAS、\(\tau\)-correction 和多层程序结构，这是很直接的经典来源。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/1.9781611970753.ch8&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 章节页面&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;PETSc &lt;code&gt;SNESFAS&lt;/code&gt; 官方文档&lt;/strong&gt;。非常推荐直接看一个成熟 HPC 库今天怎样暴露 nonlinear multigrid：层数、V/W-cycle、additive/multiplicative/full FAS、pre/post nonlinear smoothers 和 coarse solve 都能直接配置。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://petsc.org/main/manualpages/SNESFAS/SNESFAS/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;PETSc SNESFAS&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Christensen, Vassilevski &amp;amp; Villa, &lt;em&gt;Nonlinear multigrid solvers exploiting AMGe coarse spaces with approximation properties&lt;/em&gt;&lt;/strong&gt;。适合继续追现代 nonlinear AMG/FAS：真正困难的是怎样在一般非结构有限元网格上构造高质量 coarse nonlinear operators。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Farrell 等, &lt;em&gt;A Full Approximation Scheme Multilevel Method for Nonlinear Variational Inequalities&lt;/em&gt;, SIAM JSC, 2024&lt;/strong&gt;。如果想把 FAS 与 contact/complementarity 联系起来，这篇尤其值得看；它把 FAS 扩展到 nonlinear variational inequalities，并提供可复现实验代码。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 </description>

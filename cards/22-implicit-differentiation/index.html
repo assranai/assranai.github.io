@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传 主题：Implicit Differentiation（隐式微分）用于物理求解器与优化层\n领域：有限元 × 科学机器学习 × AI 全栈工程 × 数值优化\n推荐阅读时间：约 8–10 分钟\n今天选隐式微分，因为它处在一个很关键的位置：\n\\[\\boxed{ \\text{数值求解器} \\longrightarrow \\text{可微模块} }\\]传统自动微分通常要求你把程序执行过程全部展开：\n\\[x_0\\to x_1\\to x_2\\to\\cdots\\to x_K.\\]然后从：\n\\[x_K\\]一路反向传播。\n但如果：\n\\[x_K\\]其实是某个方程的收敛解：\n\\[F(x^*,\\theta)=0,\\]那么有一个更聪明的问题：\n为什么要关心求解器“怎么走到答案”，而不能直接对“答案满足的方程”求导？\n这就是 implicit differentiation。\nBlondel 等人的经典工作把这一思想做成模块化框架：用户只要给出最优性条件或 root equation，就可以在不展开整个迭代器的情况下计算解对参数的导数；JAX/JAXopt 今天都直接支持这一工作流。\n1. 最简单的例子：你其实不需要对 Newton 的每一步求导 设：\n\\[x^*(\\theta)\\]由：\n\\[F(x,\\theta)=0\\]隐式定义。\n例如：\n\\[F(x,\\theta) = x^3+\\theta x-1.\\]对不同：\n\\[\\theta\\]你可能用 Newton：\n\\[x_{k+1} = x_k - \\frac{F(x_k,\\theta)} {\\partial F/\\partial x}\\]迭代 20 次求：\n\\[x^*.\\]如果要计算：\n\\[\\frac{dx^*}{d\\theta},\\]最直接的 AD 方法是把 20 次 Newton 全部展开，再反传。\n">
+<title>Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/22-implicit-differentiation/'>
+
+<link rel="stylesheet" href="/scss/style.min.c0f005ed434b05a3b4b73bd415b58e88989ab470d57bcaf6911d21299a6eba07.css"><meta property='og:title' content="Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传">
+<meta property='og:description' content="Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传 主题：Implicit Differentiation（隐式微分）用于物理求解器与优化层\n领域：有限元 × 科学机器学习 × AI 全栈工程 × 数值优化\n推荐阅读时间：约 8–10 分钟\n今天选隐式微分，因为它处在一个很关键的位置：\n\\[\\boxed{ \\text{数值求解器} \\longrightarrow \\text{可微模块} }\\]传统自动微分通常要求你把程序执行过程全部展开：\n\\[x_0\\to x_1\\to x_2\\to\\cdots\\to x_K.\\]然后从：\n\\[x_K\\]一路反向传播。\n但如果：\n\\[x_K\\]其实是某个方程的收敛解：\n\\[F(x^*,\\theta)=0,\\]那么有一个更聪明的问题：\n为什么要关心求解器“怎么走到答案”，而不能直接对“答案满足的方程”求导？\n这就是 implicit differentiation。\nBlondel 等人的经典工作把这一思想做成模块化框架：用户只要给出最优性条件或 root equation，就可以在不展开整个迭代器的情况下计算解对参数的导数；JAX/JAXopt 今天都直接支持这一工作流。\n1. 最简单的例子：你其实不需要对 Newton 的每一步求导 设：\n\\[x^*(\\theta)\\]由：\n\\[F(x,\\theta)=0\\]隐式定义。\n例如：\n\\[F(x,\\theta) = x^3+\\theta x-1.\\]对不同：\n\\[\\theta\\]你可能用 Newton：\n\\[x_{k+1} = x_k - \\frac{F(x_k,\\theta)} {\\partial F/\\partial x}\\]迭代 20 次求：\n\\[x^*.\\]如果要计算：\n\\[\\frac{dx^*}{d\\theta},\\]最直接的 AD 方法是把 20 次 Newton 全部展开，再反传。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/22-implicit-differentiation/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='科学机器学习' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:tag' content='数值优化' /><meta property='article:published_time' content='2026-09-04T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-04T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传">
+<meta name="twitter:description" content="Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传 主题：Implicit Differentiation（隐式微分）用于物理求解器与优化层\n领域：有限元 × 科学机器学习 × AI 全栈工程 × 数值优化\n推荐阅读时间：约 8–10 分钟\n今天选隐式微分，因为它处在一个很关键的位置：\n\\[\\boxed{ \\text{数值求解器} \\longrightarrow \\text{可微模块} }\\]传统自动微分通常要求你把程序执行过程全部展开：\n\\[x_0\\to x_1\\to x_2\\to\\cdots\\to x_K.\\]然后从：\n\\[x_K\\]一路反向传播。\n但如果：\n\\[x_K\\]其实是某个方程的收敛解：\n\\[F(x^*,\\theta)=0,\\]那么有一个更聪明的问题：\n为什么要关心求解器“怎么走到答案”，而不能直接对“答案满足的方程”求导？\n这就是 implicit differentiation。\nBlondel 等人的经典工作把这一思想做成模块化框架：用户只要给出最优性条件或 root equation，就可以在不展开整个迭代器的情况下计算解对参数的导数；JAX/JAXopt 今天都直接支持这一工作流。\n1. 最简单的例子：你其实不需要对 Newton 的每一步求导 设：\n\\[x^*(\\theta)\\]由：\n\\[F(x,\\theta)=0\\]隐式定义。\n例如：\n\\[F(x,\\theta) = x^3+\\theta x-1.\\]对不同：\n\\[\\theta\\]你可能用 Newton：\n\\[x_{k+1} = x_k - \\frac{F(x_k,\\theta)} {\\partial F/\\partial x}\\]迭代 20 次求：\n\\[x^*.\\]如果要计算：\n\\[\\frac{dx^*}{d\\theta},\\]最直接的 AD 方法是把 20 次 Newton 全部展开，再反传。\n">
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-最简单的例子你其实不需要对-newton-的每一步求导">1. 最简单的例子：你其实不需要对 Newton 的每一步求导</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#unrolled-autodiff">Unrolled autodiff</a></li>
+        <li><a href="#implicit-differentiation">Implicit differentiation</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#nimble">Nimble</a></li>
+        <li><a href="#dojo">Dojo</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#finite-difference">Finite difference</a></li>
+        <li><a href="#implicit-adjoint">Implicit adjoint</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li><a href="#一个最小可实践实验">一个最小可实践实验</a>
+      <ol>
+        <li><a href="#finite-difference-1">Finite Difference</a></li>
+        <li><a href="#unrolled-newton-ad">Unrolled Newton AD</a></li>
+        <li><a href="#implicit">Implicit</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/22-implicit-differentiation/">Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-04T00:00:00Z'>Sep 04, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 4 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="implicit-differentiation让求解器结果可微而不是把整个求解过程一层层反传">Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传
+</h1><p><strong>主题：Implicit Differentiation（隐式微分）用于物理求解器与优化层</strong><br>
+<strong>领域：有限元 × 科学机器学习 × AI 全栈工程 × 数值优化</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天选隐式微分，因为它处在一个很关键的位置：</p>
+\[\boxed{ \text{数值求解器} \longrightarrow \text{可微模块} }\]<p>传统自动微分通常要求你把程序执行过程全部展开：</p>
+\[x_0\to x_1\to x_2\to\cdots\to x_K.\]<p>然后从：</p>
+\[x_K\]<p>一路反向传播。</p>
+<p>但如果：</p>
+\[x_K\]<p>其实是某个方程的收敛解：</p>
+\[F(x^*,\theta)=0,\]<p>那么有一个更聪明的问题：</p>
+<blockquote>
+<p><strong>为什么要关心求解器“怎么走到答案”，而不能直接对“答案满足的方程”求导？</strong></p>
+</blockquote>
+<p>这就是 implicit differentiation。</p>
+<p>Blondel 等人的经典工作把这一思想做成模块化框架：用户只要给出最优性条件或 root equation，就可以在不展开整个迭代器的情况下计算解对参数的导数；JAX/JAXopt 今天都直接支持这一工作流。</p>
+<hr>
+<h2 id="1-最简单的例子你其实不需要对-newton-的每一步求导">1. 最简单的例子：你其实不需要对 Newton 的每一步求导
+</h2><p>设：</p>
+\[x^*(\theta)\]<p>由：</p>
+\[F(x,\theta)=0\]<p>隐式定义。</p>
+<p>例如：</p>
+\[F(x,\theta) = x^3+\theta x-1.\]<p>对不同：</p>
+\[\theta\]<p>你可能用 Newton：</p>
+\[x_{k+1} = x_k - \frac{F(x_k,\theta)} {\partial F/\partial x}\]<p>迭代 20 次求：</p>
+\[x^*.\]<p>如果要计算：</p>
+\[\frac{dx^*}{d\theta},\]<p>最直接的 AD 方法是把 20 次 Newton 全部展开，再反传。</p>
+<p>但其实在收敛点：</p>
+\[F(x^*,\theta)=0.\]<p>直接对：</p>
+\[\theta\]<p>求导：</p>
+\[\frac{\partial F}{\partial x} \frac{dx^*}{d\theta} + \frac{\partial F}{\partial\theta} = 0.\]<p>于是：</p>
+\[\boxed{ \frac{dx^*}{d\theta} = - \left( \frac{\partial F}{\partial x} \right)^{-1} \frac{\partial F}{\partial\theta} }\]<p>完事。</p>
+<p>你完全不需要知道：</p>
+\[x_1,x_2,\ldots,x_{19}\]<p>发生了什么。</p>
+<hr>
+<h1 id="2-这件事真正厉害在哪里">2. 这件事真正厉害在哪里？
+</h1><p>关键是：</p>
+\[\boxed{ \text{求解轨迹} }\]<p>和：</p>
+\[\boxed{ \text{求解结果的数学定义} }\]<p>被分离开了。</p>
+<p>Forward solve 可以用：</p>
+<ul>
+<li>Newton；</li>
+<li>BFGS；</li>
+<li>multigrid；</li>
+<li>Gauss–Seidel；</li>
+<li>direct solve；</li>
+<li>domain decomposition；</li>
+<li>GPU black-box solver。</li>
+</ul>
+<p>Backward gradient 却统一来自：</p>
+\[\boxed{ F(x^*,\theta)=0. }\]<p>因此：</p>
+\[\boxed{ \text{Differentiation is attached to the problem, not to the algorithm.} }\]<p>这就是它比普通“把 solver 展开反传”更深的一层。</p>
+<p>Blondel 等将这一点称为 modular implicit differentiation：solver 和 optimality mapping 可以彼此解耦，因此可以继续使用已有高性能求解器，而不用为了自动微分重写一遍算法。</p>
+<hr>
+<h1 id="3-放到有限元里它立刻变得非常有用">3. 放到有限元里，它立刻变得非常有用
+</h1><p>设非线性有限元平衡方程：</p>
+\[R(u,\theta)=0.\]<p>其中：</p>
+\[u\]<p>是几十万甚至几百万个自由度，</p>
+<p>而：</p>
+\[\theta\]<p>可能是：</p>
+<ul>
+<li>Young 模量；</li>
+<li>摩擦系数；</li>
+<li>材料参数；</li>
+<li>几何参数；</li>
+<li>载荷；</li>
+<li>边界条件。</li>
+</ul>
+<p>你关心某个输出：</p>
+\[J(u,\theta).\]<p>想求：</p>
+\[\frac{dJ}{d\theta}.\]<p>直接展开 Newton：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">assemble
+</span></span><span class="line"><span class="cl">solve Δu
+</span></span><span class="line"><span class="cl">update
+</span></span><span class="line"><span class="cl">assemble
+</span></span><span class="line"><span class="cl">solve Δu
+</span></span><span class="line"><span class="cl">update
+</span></span><span class="line"><span class="cl">...
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>然后反向传播，会需要保存大量中间状态。</p>
+<p>Implicit differentiation 则直接从：</p>
+\[R(u^*,\theta)=0\]<p>出发。</p>
+<hr>
+<h1 id="4-推导一次你会发现它其实就是-adjoint">4. 推导一次，你会发现它其实就是 adjoint
+</h1><p>对：</p>
+\[R(u,\theta)=0\]<p>求导：</p>
+\[R_u \frac{du}{d\theta} + R_\theta = 0.\]<p>所以：</p>
+\[\frac{du}{d\theta} = - R_u^{-1}R_\theta.\]<p>然后：</p>
+\[\frac{dJ}{d\theta} = J_\theta + J_u \frac{du}{d\theta}.\]<p>代进去：</p>
+\[\frac{dJ}{d\theta} = J_\theta - J_uR_u^{-1}R_\theta.\]<p>现在定义 adjoint：</p>
+\[\boxed{ R_u^T\lambda = J_u^T }\]<p>于是：</p>
+\[\boxed{ \frac{dJ}{d\theta} = J_\theta - \lambda^T R_\theta. }\]<p>这就是最标准的 adjoint sensitivity formula。</p>
+<p>所以：</p>
+\[\boxed{ \text{Implicit differentiation} }\]<p>在 PDE/FEM 世界里并不是一个凭空冒出来的 ML 新概念。</p>
+<p>它和：</p>
+\[\boxed{ \text{adjoint method} }\]<p>本质上是同一套数学结构。</p>
+<p>不同的是，现代 differentiable programming 把这套结构变成了可组合的软件原语。</p>
+<hr>
+<h1 id="5-为什么它特别适合参数很多输出少的问题">5. 为什么它特别适合“参数很多、输出少”的问题？
+</h1><p>假设：</p>
+\[\theta\in\mathbb R^{10000}\]<p>代表：</p>
+<ul>
+<li>材料场；</li>
+<li>几何设计变量；</li>
+<li>控制参数。</li>
+</ul>
+<p>输出只有：</p>
+\[J\in\mathbb R.\]<p>如果直接计算：</p>
+\[\frac{du}{d\theta},\]<p>你可能需要处理巨大的：</p>
+\[N_u\times N_\theta\]<p>Jacobian。</p>
+<p>但 adjoint/implicit differentiation 只需要解一次：</p>
+\[R_u^T\lambda=J_u^T.\]<p>然后所有参数梯度：</p>
+\[\frac{dJ}{d\theta_i}\]<p>都可以通过：</p>
+\[-\lambda^TR_{\theta_i}\]<p>获得。</p>
+<p>因此：</p>
+\[\boxed{ \text{gradient cost 对参数数量并不线性增长。} }\]<p>这就是为什么它特别适合：</p>
+<ul>
+<li>topology optimization；</li>
+<li>parameter identification；</li>
+<li>inverse FEM；</li>
+<li>design optimization；</li>
+<li>differentiable physics。</li>
+</ul>
+<hr>
+<h1 id="6-unrolling-和-implicit-differentiation-的真正区别">6. Unrolling 和 implicit differentiation 的真正区别
+</h1><p>假设 fixed-point solver：</p>
+\[x_{k+1}=G(x_k,\theta)\]<p>迭代：</p>
+\[K=1000\]<p>次。</p>
+<h3 id="unrolled-autodiff">Unrolled autodiff
+</h3><p>保存：</p>
+\[x_1,x_2,\ldots,x_{1000}\]<p>然后 chain rule：</p>
+\[\frac{\partial x_{1000}} {\partial x_{999}} \cdots \frac{\partial x_1} {\partial\theta}.\]<p>特点：</p>
+<ul>
+<li>梯度对应“运行了 K 次的算法”；</li>
+<li>memory：</li>
+</ul>
+\[O(KN)\]<p>或需要 checkpointing；</p>
+<ul>
+<li>K 很大时反传很贵；</li>
+<li>可能产生 exploding/vanishing gradient。</li>
+</ul>
+<h3 id="implicit-differentiation">Implicit differentiation
+</h3><p>假设最终：</p>
+\[x^*=G(x^*,\theta).\]<p>定义：</p>
+\[F(x,\theta) = x-G(x,\theta)=0.\]<p>只对这个方程求导。</p>
+<p>特点：</p>
+<ul>
+<li>不需要保存整个 trajectory；</li>
+<li>backward 通常变成一个线性 solve；</li>
+<li>gradient 对应收敛 fixed point。</li>
+</ul>
+<p>JAXopt 官方文档明确把这两种方式并列：solver 可以选择 implicit differentiation，或者对 unrolled iterations 自动微分。</p>
+<hr>
+<h1 id="7-这里有一个非常重要的微妙点两者求的梯度其实可能不同">7. 这里有一个非常重要的微妙点：两者求的“梯度”其实可能不同
+</h1><p>假设 solver 并没有完全收敛。</p>
+<p>运行：</p>
+\[K=10\]<p>次得到：</p>
+\[x_{10}.\]<p>Unrolling 给你的是：</p>
+\[\boxed{ \frac{dx_{10}}{d\theta} }\]<p>即：</p>
+<blockquote>
+<p>这个具体十步算法的输出怎么变。</p>
+</blockquote>
+<p>Implicit differentiation 假设：</p>
+\[F(x^*,\theta)=0\]<p>成立，给的是：</p>
+\[\boxed{ \frac{dx^*}{d\theta} }\]<p>即：</p>
+<blockquote>
+<p>真正收敛解怎么变。</p>
+</blockquote>
+<p>如果：</p>
+\[x_{10}\approx x^*\]<p>两者很接近。</p>
+<p>如果 solver residual：</p>
+\[\|F(x_{10},\theta)\|\]<p>还很大，它们可能明显不同。</p>
+<p>因此 implicit differentiation 暗含一个非常重要的工程条件：</p>
+\[\boxed{ \text{forward solution 应该足够接近真正的 root/optimum。} }\]<p>这也解释了 JAX <code>custom_root</code> 的接口为什么明确假设 forward solver 返回一个满足：</p>
+\[f(\text{solution})=0\]<p>的解。</p>
+<hr>
+<h1 id="8-backward-pass-为什么又变成了一个线性系统">8. Backward pass 为什么又变成了一个线性系统？
+</h1><p>回忆：</p>
+\[R_u^T\lambda = J_u^T.\]<p>所以 differentiable solver 的 backward pass 本身就是：</p>
+\[\boxed{ \text{一个 linear solve} }\]<p>。</p>
+<p>这件事非常漂亮。</p>
+<p>Forward 可能是：</p>
+\[\boxed{ \text{nonlinear solve} }\]<p>Backward 则通常是：</p>
+\[\boxed{ \text{linearized adjoint solve} }\]<p>而：</p>
+\[R_u\]<p>通常正是 forward Newton 里已经出现过的 tangent/Jacobian：</p>
+\[K_{\rm tangent}.\]<p>因此可以复用：</p>
+<ul>
+<li>sparse matrix；</li>
+<li>preconditioner；</li>
+<li>multigrid hierarchy；</li>
+<li>factorization；</li>
+<li>matrix-free JVP。</li>
+</ul>
+<p>这也是为什么“可微物理引擎”真正做好以后，往往和传统数值求解器技术高度重合。</p>
+<hr>
+<h1 id="9-它和前面讲过的-multigrid-可以直接组合">9. 它和前面讲过的 Multigrid 可以直接组合
+</h1><p>如果：</p>
+\[R_u^T\lambda=b\]<p>有：</p>
+\[10^7\]<p>自由度，</p>
+<p>implicit differentiation 并没有让这个系统凭空变小。</p>
+<p>你仍然需要高效解：</p>
+\[\lambda.\]<p>于是：</p>
+\[\boxed{ \text{Implicit Differentiation} + \text{Krylov} + \text{Multigrid} }\]<p>是非常自然的组合。</p>
+<p>也就是说：</p>
+<ul>
+<li>implicit differentiation 决定“该解哪个 backward equation”；</li>
+<li>multigrid 决定“这个方程怎样高效解”。</li>
+</ul>
+<p>这就是为什么学习 differentiable physics 不能脱离：</p>
+\[\boxed{\text{传统数值线性代数}}\]<p>。</p>
+<hr>
+<h1 id="10-如果-forward-是优化问题呢">10. 如果 forward 是优化问题呢？
+</h1><p>设：</p>
+\[x^*(\theta) = \arg\min_x f(x,\theta).\]<p>一阶最优条件：</p>
+\[\nabla_x f(x^*,\theta)=0.\]<p>于是把：</p>
+\[F(x,\theta) = \nabla_x f(x,\theta)\]<p>代进 implicit differentiation：</p>
+\[\nabla^2_{xx} f \frac{dx^*}{d\theta} + \nabla^2_{x\theta}f = 0.\]<p>得到：</p>
+\[\boxed{ \frac{dx^*}{d\theta} = - \left( \nabla^2_{xx}f \right)^{-1} \nabla^2_{x\theta}f. }\]<p>所以 differentiable optimization layer 的 backward，本质上由：</p>
+\[\boxed{\text{Hessian / KKT system}}\]<p>控制。</p>
+<p>这正是现代 optimization layer、bilevel optimization 和 meta-learning 中 implicit differentiation 的基础。Blondel 等的框架正是以 optimality mapping 为统一接口。</p>
+<hr>
+<h1 id="11-这和把求解器当神经网络层有什么本质区别">11. 这和“把求解器当神经网络层”有什么本质区别？
+</h1><p>普通 NN layer：</p>
+\[y=f_\theta(x)\]<p>forward 是显式函数。</p>
+<p>Implicit layer：</p>
+\[\boxed{ y \text{ 被定义为某个方程的解} }\]<p>例如：</p>
+\[F(y,x,\theta)=0.\]<p>所以 layer 本身可能内部运行：</p>
+<ul>
+<li>optimization；</li>
+<li>PDE solve；</li>
+<li>equilibrium solve；</li>
+<li>fixed point；</li>
+<li>contact solve。</li>
+</ul>
+<p>从网络外面看：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">input
+</span></span><span class="line"><span class="cl">  ↓
+</span></span><span class="line"><span class="cl">physics solver
+</span></span><span class="line"><span class="cl">  ↓
+</span></span><span class="line"><span class="cl">solution
+</span></span><span class="line"><span class="cl">  ↓
+</span></span><span class="line"><span class="cl">loss
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>而 backward：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">loss gradient
+</span></span><span class="line"><span class="cl">  ↓
+</span></span><span class="line"><span class="cl">implicit adjoint solve
+</span></span><span class="line"><span class="cl">  ↓
+</span></span><span class="line"><span class="cl">parameter gradient
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这意味着：</p>
+\[\boxed{ \text{AI 系统可以把成熟数值求解器直接作为一个可微模块使用。} }\]<p>这比“用神经网络近似求解器”是完全不同的一条路线。</p>
+<hr>
+<h1 id="12-接触为什么是-implicit-differentiation-的地狱级问题">12. 接触为什么是 implicit differentiation 的地狱级问题？
+</h1><p>到目前为止，我们隐含假设：</p>
+\[F\]<p>足够光滑。</p>
+<p>但接触存在：</p>
+\[\text{separated} \leftrightarrow \text{contact}\]<p>以及：</p>
+\[\text{stick} \leftrightarrow \text{slip}.\]<p>也就是说 active set 会变化。</p>
+<p>接触动力学经常包含：</p>
+\[\max,\quad \min,\quad \text{complementarity},\]<p>因此 solution map：</p>
+\[x^*(\theta)\]<p>可能：</p>
+<ul>
+<li>不连续；</li>
+<li>不可微；</li>
+<li>只有分段导数。</li>
+</ul>
+<p>这意味着：</p>
+\[\boxed{ \text{“solver 能稳定 forward” 并不意味着 “gradient 也有用”。} }\]<p>这是 differentiable physics 中非常深的工程问题。</p>
+<hr>
+<h1 id="13-nimble-和-dojo-为什么值得看">13. Nimble 和 Dojo 为什么值得看？
+</h1><p>它们提供了两种非常好的现实例子。</p>
+<h3 id="nimble">Nimble
+</h3><p>Nimble 使用 hard contact LCP，并针对 LCP solution 的稀疏结构推导分析梯度。论文报告单时间步 Jacobian 相比有限差分最高约 <strong>87× 单核加速</strong>。</p>
+<p>这说明：</p>
+\[\boxed{ \text{明确利用 solver 数学结构， 可以比黑盒 finite difference 高效得多。} }\]<h3 id="dojo">Dojo
+</h3><p>Dojo 把刚体接触写成带摩擦锥的 nonlinear complementarity problem，用 primal-dual interior-point method 求解，再通过 implicit function theorem 对一个平滑化后的中间问题求导。</p>
+<p>这里最值得注意的是：</p>
+\[\boxed{ \text{他们甚至把“gradient smoothness”和“forward contact accuracy”做成了一个可调权衡。} }\]<p>这说明 differentiable physics 的目标并不总是：</p>
+<blockquote>
+<p>“梯度必须严格等于硬接触的数学导数。”</p>
+</blockquote>
+<p>实际优化更关心：</p>
+\[\boxed{ \text{gradient 是否足够稳定、连续、对优化有用。} }\]<p>这是一个很重要的设计思想。</p>
+<hr>
+<h1 id="14-为什么碰撞时正确梯度会如此难">14. 为什么碰撞时“正确梯度”会如此难？
+</h1><p>假设小球撞墙。</p>
+<p>碰撞时间：</p>
+\[t_{\rm hit}\]<p>本身依赖参数：</p>
+\[\theta.\]<p>如果你忽略：</p>
+\[\frac{dt_{\rm hit}}{d\theta},\]<p>只对碰撞前后状态直接求导，就可能得到错误梯度。</p>
+<p>这和普通离散状态更新很不一样：</p>
+\[x_{n+1}=f(x_n)\]<p>里时间步边界是固定的。</p>
+<p>碰撞实际发生在：</p>
+\[t_n<t_{\rm hit}<t_{n+1}.\]<p>所以事件时间本身是状态的一部分。</p>
+<p>2023 年针对 differentiable physics contact gradient 的研究明确指出，当接触法向或碰撞时间随状态变化时，已有 differentiable simulator 可能产生错误梯度；其改进方案直接利用 CCD 与 time-of-impact 信息修正梯度。</p>
+<p>这再次说明：</p>
+\[\boxed{ \text{几何事件的微分} }\]<p>和：</p>
+\[\boxed{ \text{动力学方程的微分} }\]<p>必须同时正确。</p>
+<hr>
+<h1 id="15-对软体-fem一个特别实用的应用参数识别">15. 对软体 FEM，一个特别实用的应用：参数识别
+</h1><p>假设有实验测得：</p>
+\[u_{\rm obs}.\]<p>你希望识别：</p>
+\[\theta= (E,\nu,\mu_{\rm friction}).\]<p>定义：</p>
+\[J(\theta) = \frac12 \|u^*(\theta)-u_{\rm obs}\|^2.\]<p>其中：</p>
+\[u^*(\theta)\]<p>必须通过 nonlinear FEM solve：</p>
+\[R(u,\theta)=0\]<p>才能得到。</p>
+<p>传统方法：</p>
+<h3 id="finite-difference">Finite difference
+</h3><p>若 20 个参数：</p>
+\[\frac{\partial J}{\partial\theta_i} \approx \frac{ J(\theta+\epsilon e_i)-J(\theta) }{\epsilon}.\]<p>一次 gradient：</p>
+\[\approx21\]<p>次完整 FEM solve。</p>
+<h3 id="implicit-adjoint">Implicit adjoint
+</h3><p>1 次 forward FEM：</p>
+\[R(u,\theta)=0.\]<p>1 次 adjoint solve：</p>
+\[R_u^T\lambda=J_u^T.\]<p>然后一次性得到：</p>
+\[\nabla_\theta J.\]<p>当：</p>
+\[N_\theta\]<p>很大时，差距会极其明显。</p>
+<hr>
+<h1 id="16-这和代理模型形成了一个很有意思的竞争互补关系">16. 这和代理模型形成了一个很有意思的竞争/互补关系
+</h1><p>假设你的目标是优化：</p>
+\[\min_\theta J(\theta).\]<p>一种路线：</p>
+\[\text{FEM samples} \rightarrow \text{Kriging} \rightarrow \text{optimize surrogate}.\]<p>另一种：</p>
+\[\boxed{ \text{differentiable FEM} \rightarrow \nabla_\theta J \rightarrow \text{gradient optimization}. }\]<p>前者适合：</p>
+<ul>
+<li>black-box；</li>
+<li>变量不多；</li>
+<li>仿真不可微；</li>
+<li>需要全局近似。</li>
+</ul>
+<p>后者适合：</p>
+<ul>
+<li>高维参数；</li>
+<li>solver 可访问；</li>
+<li>局部优化；</li>
+<li>inverse problem。</li>
+</ul>
+<p>更成熟的方案还可以组合：</p>
+\[\boxed{ \text{gradient-enhanced surrogate} }\]<p>即每次 HF solve 不只输出：</p>
+\[J(\theta),\]<p>还输出：</p>
+\[\nabla_\theta J.\]<p>那么一个昂贵样本携带的信息量会大很多。</p>
+<p>这是 implicit differentiation 对 surrogate modeling 一个非常直接的迁移价值。</p>
+<hr>
+<h1 id="17-它和可靠性分析也有一条很值得关注的连接">17. 它和可靠性分析也有一条很值得关注的连接
+</h1><p>极限状态：</p>
+\[g(\theta).\]<p>如果 differentiable FEM 可以提供：</p>
+\[\nabla_\theta g,\]<p>那么很多可靠性工具都会变得更强：</p>
+<ul>
+<li>FORM/SORM；</li>
+<li>active subspace；</li>
+<li>gradient-enhanced Kriging；</li>
+<li>design-point search；</li>
+<li>sensitivity analysis。</li>
+</ul>
+<p>例如 FORM 本来就需要：</p>
+\[\nabla g.\]<p>如果这个梯度来自几十个 finite difference FEM runs，成本很高。</p>
+<p>Adjoint/implicit differentiation 可以把高维 gradient 压缩为：</p>
+\[\boxed{ \text{一次 forward + 一次 adjoint} }\]<p>量级。</p>
+<p>这意味着：</p>
+\[\boxed{ \text{可微有限元} + \text{可靠性} }\]<p>其实是一个非常自然、但还没有被工程上充分利用的组合。</p>
+<hr>
+<h1 id="18-一个非常容易误解的点隐式微分并不等于免费梯度">18. 一个非常容易误解的点：隐式微分并不等于“免费梯度”
+</h1><p>Backward 仍需要求：</p>
+\[R_u^T\lambda=b.\]<p>如果：</p>
+\[R_u\]<p>条件数很差：</p>
+\[\kappa(R_u)\gg1,\]<p>那么：</p>
+\[\lambda\]<p>也会难算。</p>
+<p>更严重的是：</p>
+<p>如果：</p>
+\[R_u\]<p>接近奇异：</p>
+\[\sigma_{\min}(R_u)\rightarrow0,\]<p>那么：</p>
+\[R_u^{-1}\]<p>会很大。</p>
+<p>于是：</p>
+\[\boxed{ \frac{du}{d\theta} }\]<p>本身可能爆炸。</p>
+<p>这不一定是数值 bug。</p>
+<p>它可能意味着：</p>
+<blockquote>
+<p>系统真的接近 bifurcation / instability / mechanism / loss of stiffness。</p>
+</blockquote>
+<p>所以 implicit differentiation 还会暴露：</p>
+\[\boxed{\text{物理系统的 conditioning}}\]<p>这和前面 Certified RB 中：</p>
+\[1/\alpha\]<p>放大 residual error 的逻辑非常相似。</p>
+<hr>
+<h1 id="19-2026-年一个值得注意的发展二阶隐式微分开始进入-fem">19. 2026 年一个值得注意的发展：二阶隐式微分开始进入 FEM
+</h1><p>传统 differentiable physics 大量使用：</p>
+\[\nabla_\theta J.\]<p>但如果要做真正 Newton-type inverse optimization，还希望得到：</p>
+\[H = \nabla_\theta^2J.\]<p>显式构造 Hessian 太贵。</p>
+<p>2026 年 <em>Computer Physics Communications</em> 已发表一项针对有限元可微物理的 <strong>implicit Hessian-vector product</strong> 工作：利用 JVP/VJP 等自动微分原语计算二阶隐式导数，并在 2D/3D、线性/非线性 PDE 反问题上测试；作者报告在非线性反问题中，利用精确 Hessian-vector product 的 Newton-CG 可以加速优化收敛。</p>
+<p>这说明：</p>
+\[\boxed{ \text{differentiable physics 正在从“一阶梯度可用” 进一步进入“二阶数值优化可用”。} }\]<p>这条线值得长期关注。</p>
+<hr>
+<h1 id="20-对自研求解器最值得迁移的工程架构">20. 对自研求解器最值得迁移的工程架构
+</h1><p>如果以后希望 Rust/物理 solver 具备 differentiability，我反而不建议一开始把整个代码全部 AD 化。</p>
+<p>更可控的路线是把 solver API 设计成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">forward:
+</span></span><span class="line"><span class="cl">    solve F(x, theta) = 0
+</span></span><span class="line"><span class="cl">    return x
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">backward:
+</span></span><span class="line"><span class="cl">    given dL/dx
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    solve:
+</span></span><span class="line"><span class="cl">        (dF/dx)^T lambda = dL/dx
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    return:
+</span></span><span class="line"><span class="cl">        dL/dtheta =
+</span></span><span class="line"><span class="cl">        -lambda^T dF/dtheta
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>也就是说，明确暴露：</p>
+\[\boxed{ F, \quad J_xv, \quad J_x^Tv, \quad J_\theta v }\]<p>这些算子。</p>
+<p>这样底层 forward solver 仍然可以：</p>
+<ul>
+<li>自由优化；</li>
+<li>matrix-free；</li>
+<li>GPU；</li>
+<li>multigrid；</li>
+<li>自定义 sparse kernels。</li>
+</ul>
+<p>而 differentiability 成为一个：</p>
+\[\boxed{\text{solver-level interface}}\]<p>，而不是把每行代码绑死在某个 autodiff framework 里。</p>
+<p>这是一种很强的工程抽象。</p>
+<hr>
+<h2 id="一个最小可实践实验">一个最小可实践实验
+</h2><p>可以做一个非常简单的非线性弹簧系统：</p>
+\[R(x,k) = kx+\beta x^3-f = 0.\]<p>目标：</p>
+\[J(k) = \frac12(x(k)-x_{\rm target})^2.\]<p>然后比较三种 gradient：</p>
+<h3 id="finite-difference-1">Finite Difference
+</h3>\[\frac{ J(k+\epsilon)-J(k-\epsilon) }{2\epsilon}.\]<h3 id="unrolled-newton-ad">Unrolled Newton AD
+</h3><p>对 20 次 Newton 全展开。</p>
+<h3 id="implicit">Implicit
+</h3>\[R_x = k+3\beta x^2,\]\[R_k=x.\]<p>所以：</p>
+\[\frac{dx}{dk} = - \frac{x} {k+3\beta x^2}.\]<p>再：</p>
+\[\frac{dJ}{dk} = (x-x_{\rm target}) \frac{dx}{dk}.\]<p>然后故意只做：</p>
+\[2,\ 5,\ 20\]<p>次 Newton。</p>
+<p>你会非常直观地看到：</p>
+\[\boxed{ \text{solver 没收敛时， unrolled gradient 与 implicit gradient 开始分叉。} }\]<p>这个实验能一次理解 implicit differentiation 80% 的核心。</p>
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Implicit Differentiation 最重要的不是：</p>
+\[\frac{dx^*}{d\theta} = -F_x^{-1}F_\theta.\]<p>真正值得记住的是：</p>
+\[\boxed{ \text{如果一个输出是“某个方程的解”， 它的导数应该优先从这个方程本身推导， 而不一定从产生这个解的全部迭代过程推导。} }\]<p>它在整个知识体系中的位置大概是：</p>
+\[\text{Numerical Solver}\]\[\downarrow\]\[\boxed{\text{Implicit / Adjoint Differentiation}}\]\[\downarrow\]\[\text{Differentiable Physics}\]\[\downarrow\]\[\text{Inverse Problems / Optimization / Learning}.\]<p>而对于物理引擎和有限元开发，它最强的启发是：</p>
+\[\boxed{ \text{“可微”不应该只是自动微分框架附着在代码外面， 而可以成为求解器本身的一项数学接口。} }\]<p>一旦这样设计，FEM、优化、可靠性、代理模型和 AI 就真正开始共享同一套计算基础设施。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><ol>
+<li>
+<p><strong>Blondel et al., <em>Efficient and Modular Implicit Differentiation</em>, NeurIPS 2022 / arXiv 2021</strong>。最推荐作为现代入口，核心看“optimality mapping + implicit function theorem + autodiff”如何把隐式微分做成通用软件接口。<br>
+<a class="link" href="https://arxiv.org/abs/2105.15183"  target="_blank" rel="noopener"
+    >论文页面</a></p>
+</li>
+<li>
+<p><strong>JAX <code>jax.lax.custom_root</code> 与 JAXopt Implicit Differentiation 文档</strong>。如果想真正实现，这是最直接的工程资料；JAX 明确通过 implicit function theorem 给 root solver 定义梯度，JAXopt 则提供 <code>custom_root</code>、<code>custom_fixed_point</code>、JVP/VJP 等接口。<br>
+<a class="link" href="https://docs.jax.dev/en/latest/_autosummary/jax.lax.custom_root.html"  target="_blank" rel="noopener"
+    >JAX custom_root</a></p>
+</li>
+<li>
+<p><strong>Werling et al., <em>Fast and Feature-Complete Differentiable Physics for Articulated Rigid Bodies with Contact</em>, 2021</strong>。适合看 implicit/analytic differentiation 如何真正落到 hard-contact LCP，并理解为什么 contact gradient 比普通 smooth dynamics 难得多。<br>
+<a class="link" href="https://arxiv.org/abs/2103.16021"  target="_blank" rel="noopener"
+    >论文页面</a></p>
+</li>
+<li>
+<p><strong>Howell et al., <em>Dojo: A Differentiable Physics Engine for Robotics</em></strong>。很适合观察另一种 contact-differentiation 路线：nonlinear complementarity + interior-point + implicit differentiation，并显式权衡硬接触精度与 gradient smoothness。<br>
+<a class="link" href="https://arxiv.org/abs/2203.00806"  target="_blank" rel="noopener"
+    >Dojo 论文页面</a></p>
+</li>
+<li>
+<p><strong>Xue, <em>Implicit differentiation with second-order derivatives and benchmarks in finite-element-based differentiable physics</em>, Computer Physics Communications, 2026</strong>。这是很值得追的新进展：从一阶 adjoint 继续走到 implicit Hessian-vector product 和 Newton-CG PDE 反问题优化。<br>
+<a class="link" href="https://arxiv.org/abs/2505.12646"  target="_blank" rel="noopener"
+    >论文预印本</a></p>
+</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+            <a href="/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/">AI 全栈工程</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/">数值优化</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/13-neural-operator/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/17-dual-weighted-residual/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/15-anderson-acceleration/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/14-ipc-feasibility/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IPC：为什么“无穿透”可以被写成一个优化问题，而不是靠碰撞后修补</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
