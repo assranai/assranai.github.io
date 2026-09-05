@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定 主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计） 领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型 推荐阅读时间：约 8–10 分钟\n今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：\n$$\\boxed{ \\text{到底什么误差值得消除？} }$$传统自适应有限元通常试图降低：\n$$\\|u-u_h\\|$$这样的全局误差，例如能量范数误差。\n但工程中我们通常并不真正关心整个场：\n$$u(x)$$每个地方都同等准确。\n我们真正关心的往往是一个 Quantity of Interest，QoI：\n$$J(u),$$例如：\n某个孔边最大应力； 某个测点位移； 出口平均流量； 升力/阻力； 某个时间的接触力； 可靠性极限状态 \\(g(u)\\)。 DWR 的核心思想就是：\n$$\\boxed{ \\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} }$$Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(剑桥大学出版社)\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定 主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计） 领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型 推荐阅读时间：约 8–10 分钟\n今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：\n$$\\boxed{ \\text{到底什么误差值得消除？} }$$传统自适应有限元通常试图降低：\n$$\\|u-u_h\\|$$这样的全局误差，例如能量范数误差。\n但工程中我们通常并不真正关心整个场：\n$$u(x)$$每个地方都同等准确。\n我们真正关心的往往是一个 Quantity of Interest，QoI：\n$$J(u),$$例如：\n某个孔边最大应力； 某个测点位移； 出口平均流量； 升力/阻力； 某个时间的接触力； 可靠性极限状态 \\(g(u)\\)。 DWR 的核心思想就是：\n$$\\boxed{ \\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} }$$Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。([剑桥大学出版社][1])\n1. 为什么“哪里有限元误差最大”可能完全不是正确问题？ 假设你模拟一个带孔板拉伸。\n你真正关心：\n$$J(u)=\\sigma_{xx}(x_{\\rm hole}),$$即孔边某点的应力。\n现在网格中有两个区域：\n区域 A 离孔非常远，但局部离散误差很大。\n区域 B 孔附近，局部误差只有 A 的一半。\n传统 residual estimator 可能认为：\n">
 <title>Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/17-dual-weighted-residual/'>
 
 <link rel="stylesheet" href="/scss/style.min.7e4e9e9609924813bb4d5178ce0a9722b7f6817022825cf89a4c85d83f1765c6.css"><meta property='og:title' content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定">
-<meta property='og:description' content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定 主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计） 领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型 推荐阅读时间：约 8–10 分钟\n今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：\n$$\\boxed{ \\text{到底什么误差值得消除？} }$$传统自适应有限元通常试图降低：\n$$\\|u-u_h\\|$$这样的全局误差，例如能量范数误差。\n但工程中我们通常并不真正关心整个场：\n$$u(x)$$每个地方都同等准确。\n我们真正关心的往往是一个 Quantity of Interest，QoI：\n$$J(u),$$例如：\n某个孔边最大应力； 某个测点位移； 出口平均流量； 升力/阻力； 某个时间的接触力； 可靠性极限状态 \\(g(u)\\)。 DWR 的核心思想就是：\n$$\\boxed{ \\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} }$$Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(剑桥大学出版社)\n">
+<meta property='og:description' content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定 主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计） 领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型 推荐阅读时间：约 8–10 分钟\n今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：\n$$\\boxed{ \\text{到底什么误差值得消除？} }$$传统自适应有限元通常试图降低：\n$$\\|u-u_h\\|$$这样的全局误差，例如能量范数误差。\n但工程中我们通常并不真正关心整个场：\n$$u(x)$$每个地方都同等准确。\n我们真正关心的往往是一个 Quantity of Interest，QoI：\n$$J(u),$$例如：\n某个孔边最大应力； 某个测点位移； 出口平均流量； 升力/阻力； 某个时间的接触力； 可靠性极限状态 \\(g(u)\\)。 DWR 的核心思想就是：\n$$\\boxed{ \\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} }$$Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。([剑桥大学出版社][1])\n1. 为什么“哪里有限元误差最大”可能完全不是正确问题？ 假设你模拟一个带孔板拉伸。\n你真正关心：\n$$J(u)=\\sigma_{xx}(x_{\\rm hole}),$$即孔边某点的应力。\n现在网格中有两个区域：\n区域 A 离孔非常远，但局部离散误差很大。\n区域 B 孔附近，局部误差只有 A 的一半。\n传统 residual estimator 可能认为：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/17-dual-weighted-residual/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='数值优化' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='代理模型' /><meta property='article:published_time' content='2026-08-30T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-30T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定">
-<meta name="twitter:description" content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定 主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计） 领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型 推荐阅读时间：约 8–10 分钟\n今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：\n$$\\boxed{ \\text{到底什么误差值得消除？} }$$传统自适应有限元通常试图降低：\n$$\\|u-u_h\\|$$这样的全局误差，例如能量范数误差。\n但工程中我们通常并不真正关心整个场：\n$$u(x)$$每个地方都同等准确。\n我们真正关心的往往是一个 Quantity of Interest，QoI：\n$$J(u),$$例如：\n某个孔边最大应力； 某个测点位移； 出口平均流量； 升力/阻力； 某个时间的接触力； 可靠性极限状态 \\(g(u)\\)。 DWR 的核心思想就是：\n$$\\boxed{ \\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} }$$Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(剑桥大学出版社)\n">
+<meta name="twitter:description" content="Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定 主题：Goal-Oriented Error Estimation / Dual-Weighted Residual（DWR，目标导向误差估计） 领域：有限元 × 数值方法 × 数值优化 × 可靠性 × 代理模型 推荐阅读时间：约 8–10 分钟\n今天选 DWR，因为它回答了有限元中一个比“网格够不够细”更成熟的问题：\n$$\\boxed{ \\text{到底什么误差值得消除？} }$$传统自适应有限元通常试图降低：\n$$\\|u-u_h\\|$$这样的全局误差，例如能量范数误差。\n但工程中我们通常并不真正关心整个场：\n$$u(x)$$每个地方都同等准确。\n我们真正关心的往往是一个 Quantity of Interest，QoI：\n$$J(u),$$例如：\n某个孔边最大应力； 某个测点位移； 出口平均流量； 升力/阻力； 某个时间的接触力； 可靠性极限状态 \\(g(u)\\)。 DWR 的核心思想就是：\n$$\\boxed{ \\text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} }$$Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。([剑桥大学出版社][1])\n1. 为什么“哪里有限元误差最大”可能完全不是正确问题？ 假设你模拟一个带孔板拉伸。\n你真正关心：\n$$J(u)=\\sigma_{xx}(x_{\\rm hole}),$$即孔边某点的应力。\n现在网格中有两个区域：\n区域 A 离孔非常远，但局部离散误差很大。\n区域 B 孔附近，局部误差只有 A 的一半。\n传统 residual estimator 可能认为：\n">
     </head>
     <body class="
     article-page">
@@ -341,6 +341,14 @@
   </ol>
 
   <ol>
+    <li><a href="#hahahugoshortcode71s0hbhb">HAHAHUGOSHORTCODE71s0HBHB</a></li>
+  </ol>
+
+  <ol>
+    <li><a href="#hahahugoshortcode71s1hbhb">HAHAHUGOSHORTCODE71s1HBHB</a></li>
+  </ol>
+
+  <ol>
     <li><a href="#一个最小可实践例子">一个最小可实践例子</a></li>
   </ol>
 
@@ -441,9 +449,7 @@ $$J(u),$$<p>例如：</p>
 <li>可靠性极限状态 \(g(u)\)。</li>
 </ul>
 <p>DWR 的核心思想就是：</p>
-$$\boxed{ \text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} }$$<p>Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。(<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com"  title="An optimal control approach to a posteriori error estimation in finite element methods | Acta Numerica | Cambridge Core"
-     target="_blank" rel="noopener"
-    >剑桥大学出版社</a>)</p>
+$$\boxed{ \text{用“这个局部误差对最终 QoI 有多大影响”来加权残差。} }$$<p>Becker 与 Rannacher 的经典综述正是从这一点出发：传统全局误差范数不能充分反映工程真正关心的物理量，而 duality 可以把局部误差源与目标量敏感度联系起来。([剑桥大学出版社][1])</p>
 <hr>
 <h2 id="1-为什么哪里有限元误差最大可能完全不是正确问题">1. 为什么“哪里有限元误差最大”可能完全不是正确问题？
 </h2><p>假设你模拟一个带孔板拉伸。</p>
@@ -528,9 +534,7 @@ $$\boxed{ \eta_K \sim \rho_K(u_h)\, (z-z_h) }$$<p>或者实际实现中的某种
 <p>于是：</p>
 $$\boxed{ \eta_K }$$<p>已经不是“这个元素错了多少”。</p>
 <p>它表示：</p>
-$$\boxed{ \text{这个元素的离散误差对最终 QoI 贡献了多少。} }$$<p>deal.II 的经典 <code>step-14</code> 教程就是围绕这一结构实现 dual weighted residual estimator，并直接比较 DWR、全局细化和 Kelly residual estimator 等不同自适应策略。(<a class="link" href="https://dealii.org/9.4.1/doxygen/deal.II/step_14.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-14 tutorial program"
-     target="_blank" rel="noopener"
-    >deal.II</a>)</p>
+$$\boxed{ \text{这个元素的离散误差对最终 QoI 贡献了多少。} }$$<p>deal.II 的经典 <code>step-14</code> 教程就是围绕这一结构实现 dual weighted residual estimator，并直接比较 DWR、全局细化和 Kelly residual estimator 等不同自适应策略。([deal.II][2])</p>
 <hr>
 <h1 id="6-一个直观例子不要把网格细在最热闹的地方">6. 一个直观例子：不要把网格细在“最热闹”的地方
 </h1><p>假设二维导热：</p>
@@ -580,9 +584,7 @@ $$\boxed{ \text{参数变化会怎样改变 }J？ }$$<h3 id="dwr-中的-adjoint"
 </h3><p>回答：</p>
 $$\boxed{ \text{局部离散误差会怎样改变 }J？ }$$<p>所以：</p>
 $$\boxed{ \text{adjoint optimization} \quad\text{和}\quad \text{goal-oriented error estimation} }$$<p>其实是同一套 duality machinery 的两个应用。</p>
-<p>这也是为什么 Becker–Rannacher 的经典框架直接从最优控制中的 duality 思想发展出来。(<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com"  title="An optimal control approach to a posteriori error estimation in finite element methods | Acta Numerica | Cambridge Core"
-     target="_blank" rel="noopener"
-    >剑桥大学出版社</a>)</p>
+<p>这也是为什么 Becker–Rannacher 的经典框架直接从最优控制中的 duality 思想发展出来。([剑桥大学出版社][1])</p>
 <hr>
 <h1 id="8-一个很深的结论误差没有绝对重要性">8. 一个很深的结论：误差没有“绝对重要性”
 </h1><p>假设一个 FEM 解：</p>
@@ -613,9 +615,7 @@ $$\boxed{ z_h \text{ 在更高阶或更细网格空间中计算} }$$<p>例如：
 $$P_1\text{ primal}$$<p>配：</p>
 $$P_2\text{ dual}.$$<p>或者对 dual 做局部 reconstruction。</p>
 <p>这也是 DWR 比普通 residual estimator 更贵的原因之一：</p>
-$$\boxed{ \text{除了 primal solve， 还要额外解一个 adjoint problem。} }$$<p>近期和经典实践都反复强调，高质量 dual approximation 是 DWR 是否有效的关键。(<a class="link" href="https://arxiv.org/abs/1803.10643?utm_source=chatgpt.com"  title="Numerical study of goal-oriented error control for stabilized finite element methods"
-     target="_blank" rel="noopener"
-    >arXiv</a>)</p>
+$$\boxed{ \text{除了 primal solve， 还要额外解一个 adjoint problem。} }$$<p>近期和经典实践都反复强调，高质量 dual approximation 是 DWR 是否有效的关键。([arXiv][3])</p>
 <hr>
 <h1 id="10-那为什么还值得多解一次-adjoint">10. 那为什么还值得多解一次 adjoint？
 </h1><p>因为它可能大幅减少：</p>
@@ -627,12 +627,13 @@ $$J(u).$$<p>Goal-oriented adaptivity 可能通过把 DOF 集中到真正影响 \
 $$2\times10^6$$<p>的网格达到相同：</p>
 $$|J-J_h|.$$<p>所以付出一个 adjoint solve，换来的是：</p>
 $$\boxed{ \text{更聪明的 DOF allocation} }$$<p>这和前几期许多方法背后的共同思想一致：</p>
-$$\boxed{ \text{不要平均地给所有区域相同精度。} }$$<p>2024 年对非线性 \(p\)-Laplace 空间—时间 FEM 的工作仍在使用 DWR，就是因为工程目标往往是某个特定 functional，而不是整个解场的统一精度。(<a class="link" href="https://doi.org/10.1016/j.camwa.2024.05.017?utm_source=chatgpt.com"  title="Goal-oriented adaptive space-time finite element methods for regularized parabolic p-Laplace problems - ScienceDirect"
-     target="_blank" rel="noopener"
-    >数字对象标识符</a>)</p>
+$$\boxed{ \text{不要平均地给所有区域相同精度。} }$$<p>2024 年对非线性 \(p\)-Laplace 空间—时间 FEM 的工作仍在使用 DWR，就是因为工程目标往往是某个特定 functional，而不是整个解场的统一精度。([数字对象标识符][4])</p>
 <hr>
 <h1 id="11-它甚至可以控制求解器迭代误差">11. 它甚至可以控制“求解器迭代误差”
-</h1><p>这点很容易被忽视。</p>
+</h1><h2 id="hahahugoshortcode71s0hbhb"><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这点很容易被忽视。</p>
 <p>假设 FEM 网格已经固定，但线性系统：</p>
 $$Ku=f$$<p>只用 CG 迭代到某个 tolerance。</p>
 <p>于是总误差包含：</p>
@@ -640,12 +641,13 @@ $$\boxed{ \text{discretization error} + \text{algebraic solver error}. }$$<p>一
 $$\|r_{\rm linear}\|<10^{-10}.$$<p>但这可能严重过度求解。</p>
 <p>如果最终 QoI 只要求：</p>
 $$10^{-3}$$<p>精度，那么线性系统没必要每一步都解到机器精度。</p>
-<p>已有 DWR 工作直接把 discretization error 与 iterative solver error 同时纳入目标导向误差控制，并据此自动平衡 multigrid、Gauss–Seidel、CG 的迭代精度与网格误差。(<a class="link" href="https://portal.fis.tum.de/de/publications/goal-oriented-error-control-of-the-iterative-solution-of-finite-e/?utm_source=chatgpt.com"  title="Goal-oriented error control of the iterative solution of finite element equations - Technische Universität München"
-     target="_blank" rel="noopener"
-    >Technical University of Munich</a>)</p>
+<p>已有 DWR 工作直接把 discretization error 与 iterative solver error 同时纳入目标导向误差控制，并据此自动平衡 multigrid、Gauss–Seidel、CG 的迭代精度与网格误差。([Technical University of Munich][5])</p>
 <p>这其实是一个非常高级的资源分配思想：</p>
-$$\boxed{ \text{solver tolerance 也应该由最终 QoI 决定。} }$$<hr>
-<h1 id="12-对可靠性分析为什么特别有意思">12. 对可靠性分析为什么特别有意思？
+$$\boxed{ \text{solver tolerance 也应该由最终 QoI 决定。} }$$
+  </div>
+</details>
+
+</h2><h1 id="12-对可靠性分析为什么特别有意思">12. 对可靠性分析为什么特别有意思？
 </h1><p>假设极限状态：</p>
 $$g(X) = \sigma_{\rm allow} - \sigma_{\max}(X).$$<p>传统 FEM 网格收敛可能看：</p>
 $$\|u-u_h\|.$$<p>但可靠性真正关心的是：</p>
@@ -699,9 +701,7 @@ $$J_1,J_2,\ldots,J_m.$$<p>例如：</p>
 <li>反力。</li>
 </ul>
 <p>这就产生 <strong>multi-goal error estimation</strong>。</p>
-<p>2024 年仍有工作研究如何将多个 goal functionals 放进同一 DWR/adaptive framework，而不是为每个输出单独做一次完全独立的 refinement。(<a class="link" href="https://onlinelibrary.wiley.com/doi/abs/10.1002/pamm.202400157?utm_source=chatgpt.com"  title="Locally different models in a checkerboard pattern with mesh adaptation and error control for multiple quantities of interest - Endtmayer - 2024 - Proceedings in Applied Mathematics and Mechanics - Wiley Online Library"
-     target="_blank" rel="noopener"
-    >Wiley Online Library</a>)</p>
+<p>2024 年仍有工作研究如何将多个 goal functionals 放进同一 DWR/adaptive framework，而不是为每个输出单独做一次完全独立的 refinement。([Wiley Online Library][6])</p>
 <hr>
 <h1 id="15-dwr-也不是严格保证误差上界的万能方法">15. DWR 也不是严格保证误差上界的万能方法
 </h1><p>这点必须讲清楚。</p>
@@ -715,26 +715,24 @@ $$\boxed{ \text{非常 sharp、goal-specific} }$$<p>但实际 estimator 往往�
 </ul>
 <p>所以经典 DWR estimator 不应自动理解为：</p>
 $$\boxed{\text{严格数学上界}}$$<p>与前面讲过的某些 certified reduced-basis bound 不完全一样。</p>
-<p>后续工作一直在研究 DWR 的两侧估计、可靠性/效率以及 saturation assumption；例如 SIAM JSC 的两侧 a posteriori 分析明确讨论了这些条件以及 saturation assumption 可能失效的反例。(<a class="link" href="https://epubs.siam.org/doi/10.1137/18M1227275?utm_source=chatgpt.com"  title="Two-Side a Posteriori Error Estimates for the Dual-Weighted Residual Method | SIAM Journal on Scientific Computing"
-     target="_blank" rel="noopener"
-    >工业与应用数学学会</a>)</p>
+<p>后续工作一直在研究 DWR 的两侧估计、可靠性/效率以及 saturation assumption；例如 SIAM JSC 的两侧 a posteriori 分析明确讨论了这些条件以及 saturation assumption 可能失效的反例。([工业与应用数学学会][7])</p>
 <p>因此要区分：</p>
 $$\boxed{ \text{sharp estimator} }$$<p>和：</p>
 $$\boxed{ \text{guaranteed upper bound} }$$<p>这两者不是同义词。</p>
 <hr>
 <h1 id="16-它最近仍然在往哪里发展">16. 它最近仍然在往哪里发展？
-</h1><p>DWR 并不是一个停留在 2001 年的老方法。</p>
-<p>2024 年已有工作把 goal-oriented space-time adaptivity 用到非线性 \(p\)-Laplace 问题，并直接通过 adjoint 解控制时空网格。(<a class="link" href="https://doi.org/10.1016/j.camwa.2024.05.017?utm_source=chatgpt.com"  title="Goal-oriented adaptive space-time finite element methods for regularized parabolic p-Laplace problems - ScienceDirect"
-     target="_blank" rel="noopener"
-    >数字对象标识符</a>)</p>
-<p>在 fracture 场景中，也有工作利用 DWR 对 phase-field fracture 做 space-time / temporal adaptivity，让网格和时间步围绕最终关注的 fracture quantity 调整，而不是统一细化。(<a class="link" href="https://www.scipedia.com/public/Kosin_et_al_2024a?utm_source=chatgpt.com"  title="Goal oriented error estimation for space-time adaptivity in phase-field fracture - Kosin et al 2024a - Scipedia"
-     target="_blank" rel="noopener"
-    >Scipedia</a>)</p>
-<p>更近期的 2026 年工作还在研究 least-squares FEM 中如何使用“物理 PDE adjoint”而不是 least-squares formulation 自身产生的 adjoint 来做 goal-oriented error estimation，说明“什么才是最有物理意义的 dual problem”仍然是活跃研究问题。(<a class="link" href="https://arxiv.org/abs/2607.23850?utm_source=chatgpt.com"  title="Goal-Oriented Error Estimation for Least-Squares Finite Element Methods via Physically Meaningful Adjoint PDEs"
-     target="_blank" rel="noopener"
-    >arXiv</a>)</p>
-<hr>
-<h1 id="17-对自研物理求解器最值得迁移的一点">17. 对自研物理求解器最值得迁移的一点
+</h1><h2 id="hahahugoshortcode71s1hbhb"><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p>DWR 并不是一个停留在 2001 年的老方法。</p>
+<p>2024 年已有工作把 goal-oriented space-time adaptivity 用到非线性 \(p\)-Laplace 问题，并直接通过 adjoint 解控制时空网格。([数字对象标识符][4])</p>
+<p>在 fracture 场景中，也有工作利用 DWR 对 phase-field fracture 做 space-time / temporal adaptivity，让网格和时间步围绕最终关注的 fracture quantity 调整，而不是统一细化。([Scipedia][8])</p>
+<p>更近期的 2026 年工作还在研究 least-squares FEM 中如何使用“物理 PDE adjoint”而不是 least-squares formulation 自身产生的 adjoint 来做 goal-oriented error estimation，说明“什么才是最有物理意义的 dual problem”仍然是活跃研究问题。([arXiv][9])</p>
+
+  </div>
+</details>
+
+</h2><h1 id="17-对自研物理求解器最值得迁移的一点">17. 对自研物理求解器最值得迁移的一点
 </h1><p>DWR 最深刻的思想其实可以脱离 FEM：</p>
 $$\boxed{ \text{误差的重要程度，应由它对最终任务的影响决定。} }$$<p>假设软体求解器里同时存在：</p>
 <ul>
@@ -821,7 +819,10 @@ $$\text{FEM residual}$$$$\downarrow$$$$\boxed{\text{Adjoint / DWR}}$$$$\downarro
 $$\boxed{ \text{“把解场算准”} }$$<p>进一步变成：</p>
 $$\boxed{ \text{“只把影响工程结论的那部分算准”。} }$$<p>对昂贵仿真来说，这个转变非常重要。</p>
 <h3 id="拓展阅读">拓展阅读
-</h3><ol>
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
 <li>
 <p><strong>Becker &amp; Rannacher, <em>An Optimal Control Approach to A Posteriori Error Estimation in Finite Element Methods</em>, Acta Numerica</strong>。DWR 的经典系统入口，重点看“global norm error → quantity-of-interest error”这一步为什么需要 duality。(<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19?utm_source=chatgpt.com"  title="An optimal control approach to a posteriori error estimation in finite element methods | Acta Numerica | Cambridge Core"
      target="_blank" rel="noopener"
@@ -852,6 +853,10 @@ $$\boxed{ \text{“只把影响工程结论的那部分算准”。} }$$<p>对�
     >数字对象标识符</a>)</p>
 </li>
 </ol>
+
+  </div>
+</details>
+
 
 </section>
 
