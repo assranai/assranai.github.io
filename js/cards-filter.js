@@ -24,6 +24,7 @@
             });
 
             item.style.display = show ? '' : 'none';
+            item.setAttribute('data-fmatch', show ? '1' : '0');
             if (show) {
                 visible++;
             }
@@ -32,6 +33,7 @@
         if (empty) {
             empty.hidden = visible !== 0;
         }
+        document.dispatchEvent(new CustomEvent('cards:update'));
     }
 
     chips.forEach(function (chip) {
