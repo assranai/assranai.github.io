@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Thu, 03 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Mon, 07 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Projective Dynamics：把“PBD 的投影”变成真正的能量求解</title>
         <link>https://assranai.github.io/cards/03-projective-dynamics/</link>
         <pubDate>Sun, 16 Aug 2026 00:00:00 +0000</pubDate>
@@ -1847,6 +1847,539 @@
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Farrell 等, &lt;em&gt;A Full Approximation Scheme Multilevel Method for Nonlinear Variational Inequalities&lt;/em&gt;, SIAM JSC, 2024&lt;/strong&gt;。如果想把 FAS 与 contact/complementarity 联系起来，这篇尤其值得看；它把 FAS 扩展到 nonlinear variational inequalities，并提供可复现实验代码。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</title>
+        <link>https://assranai.github.io/cards/25-hyper-reduction/</link>
+        <pubDate>Mon, 07 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/25-hyper-reduction/</guid>
+        <description>&lt;h1 id=&#34;hyper-reduction状态维数降到几十并不意味着非线性有限元真的变快&#34;&gt;Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 数值方法 × 代理模型 × 软体动力学&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：&lt;/p&gt;
+\[\boxed{ \text{“自由度少了”与“计算成本少了”不是同一件事。} }\]&lt;p&gt;假设原始有限元有：&lt;/p&gt;
+\[N=10^6\]&lt;p&gt;个自由度。&lt;/p&gt;
+&lt;p&gt;通过 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt;/&lt;span class=&#34;term-anchor&#34; data-term=&#34;reduced-basis&#34; tabindex=&#34;0&#34;&gt;Reduced Basis&lt;/span&gt; 得到：&lt;/p&gt;
+\[u\approx Vq, \qquad V\in\mathbb R^{N\times r}, \quad r=50.\]&lt;p&gt;看起来问题已经从：&lt;/p&gt;
+\[10^6\]&lt;p&gt;维降到了：&lt;/p&gt;
+\[50\]&lt;p&gt;维。&lt;/p&gt;
+&lt;p&gt;但如果系统含有非线性内力：&lt;/p&gt;
+\[f_{\rm int}(u),\]&lt;p&gt;每一步仍然必须先在完整网格上计算：&lt;/p&gt;
+\[f_{\rm int}(Vq)\in\mathbb R^N,\]&lt;p&gt;然后才投影：&lt;/p&gt;
+\[V^T f_{\rm int}(Vq).\]&lt;p&gt;于是你虽然只求 50 个未知量，却可能依然遍历：&lt;/p&gt;
+\[\boxed{\text{全部百万个自由度 / 全部有限元单元。}}\]&lt;p&gt;这就是 projection-based nonlinear ROM 的经典瓶颈。DEIM 正是为此提出：让非线性项只在少数经过挑选的位置上求值；ECSW 则进一步从有限元虚功/能量结构出发，只计算少量具有权重的代表单元。&lt;/p&gt;
+&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{Model reduction 降的是状态空间； Hyper-reduction 降的是算子求值成本。} }\]&lt;hr&gt;
+&lt;h2 id=&#34;1-为什么线性-rom-很容易真正做到快非线性-rom-却不行&#34;&gt;1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？
+&lt;/h2&gt;&lt;p&gt;先看线性有限元：&lt;/p&gt;
+\[M\ddot u+Ku=f.\]&lt;p&gt;设：&lt;/p&gt;
+\[u=Vq.\]&lt;p&gt;Galerkin 投影：&lt;/p&gt;
+\[V^TMV\ddot q + V^TKVq = V^Tf.\]&lt;p&gt;定义：&lt;/p&gt;
+\[M_r=V^TMV,\]\[K_r=V^TKV.\]&lt;p&gt;这些矩阵可以在 offline 阶段提前算好。&lt;/p&gt;
+&lt;p&gt;在线计算只剩：&lt;/p&gt;
+\[M_r\ddot q+K_rq=f_r,\]&lt;p&gt;矩阵规模只有：&lt;/p&gt;
+\[r\times r.\]&lt;p&gt;于是 online cost 真正与：&lt;/p&gt;
+\[N\]&lt;p&gt;脱钩。&lt;/p&gt;
+&lt;p&gt;这叫：&lt;/p&gt;
+\[\boxed{\text{offline-online decomposition}}\]&lt;p&gt;，也是 Reduced Basis / projection ROM 最理想的状态。经典 projection-based model reduction 综述正是把“online cost 是否与高维系统规模无关”视为参数化降阶模型是否真正有效的重要标准。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-非线性一出现offline-online-decomposition-就断了&#34;&gt;2. 非线性一出现，offline-online decomposition 就断了
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[M\ddot u+f_{\rm int}(u)=f_{\rm ext}.\]&lt;p&gt;代入：&lt;/p&gt;
+\[u=Vq,\]&lt;p&gt;得到：&lt;/p&gt;
+\[M_r\ddot q + \boxed{ V^Tf_{\rm int}(Vq) } = f_r.\]&lt;p&gt;问题就在方框里。&lt;/p&gt;
+&lt;p&gt;即使：&lt;/p&gt;
+\[q\in\mathbb R^{50},\]&lt;p&gt;为了算：&lt;/p&gt;
+\[f_{\rm int}(Vq),\]&lt;p&gt;你通常仍需要：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;对所有 element:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    计算 F
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    计算 constitutive law
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    计算 element force
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    assemble
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此复杂度仍然接近：&lt;/p&gt;
+\[O(N).\]&lt;p&gt;如果是隐式求解，还要计算：&lt;/p&gt;
+\[K_t(u) = \frac{\partial f_{\rm int}}{\partial u}\]&lt;p&gt;以及：&lt;/p&gt;
+\[V^TK_t(Vq)V.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{降阶后的线性系统很小， 但构造这个小系统仍然很贵。} }\]&lt;p&gt;Farhat 等对 ECSW 的分析明确指出：对于 nonlinear ROM，显式计算的主要成本在 projected residual；隐式计算还需要 projected Jacobian，这两个高维算子求值正是 hyper-reduction 要消除的瓶颈。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-hyper-reduction-到底超在哪里&#34;&gt;3. Hyper-reduction 到底“超”在哪里？
+&lt;/h1&gt;&lt;p&gt;普通 reduction：&lt;/p&gt;
+\[u\in\mathbb R^N\]&lt;p&gt;被压缩成：&lt;/p&gt;
+\[q\in\mathbb R^r.\]&lt;p&gt;Hyper-reduction 再进一步问：&lt;/p&gt;
+\[\boxed{ \text{为了算 reduced equation， 真的有必要看全部 }N\text{ 个空间位置吗？} }\]&lt;p&gt;如果真正重要的 nonlinear information 只需要在：&lt;/p&gt;
+\[m\ll N\]&lt;p&gt;个位置上求值，&lt;/p&gt;
+&lt;p&gt;就可以把：&lt;/p&gt;
+\[O(N)\]&lt;p&gt;operator evaluation 进一步变成：&lt;/p&gt;
+\[O(m).\]&lt;p&gt;因此整个结构是：&lt;/p&gt;
+\[\text{Full-order model}\]\[\downarrow\]\[\text{POD / Reduced Basis}\]\[\boxed{\text{降低未知量数目}}\]\[\downarrow\]\[\text{Hyper-reduction}\]\[\boxed{\text{降低 nonlinear operator 求值成本}}.\]&lt;p&gt;这两个层次必须同时存在，nonlinear ROM 才可能真正获得数量级的在线加速。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-deim既然整个非线性向量有低维结构就没必要把它全部算出来&#34;&gt;4. DEIM：既然整个非线性向量有低维结构，就没必要把它全部算出来
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[f(u)\in\mathbb R^N\]&lt;p&gt;虽然有：&lt;/p&gt;
+\[N\]&lt;p&gt;个分量，但在训练数据中主要落在一个：&lt;/p&gt;
+\[m\]&lt;p&gt;维子空间：&lt;/p&gt;
+\[f(u)\approx Uc,\]&lt;p&gt;其中：&lt;/p&gt;
+\[U\in\mathbb R^{N\times m}.\]&lt;p&gt;这个：&lt;/p&gt;
+\[U\]&lt;p&gt;通常来自 nonlinear snapshots：&lt;/p&gt;
+\[[f(u^{(1)}),f(u^{(2)}),\ldots]\]&lt;p&gt;的 POD/SVD。&lt;/p&gt;
+&lt;p&gt;这相当于说：&lt;/p&gt;
+\[\boxed{ \text{不仅解 }u\text{ 有低秩结构， 非线性算子 }f(u)\text{ 本身也有低秩结构。} }\]&lt;p&gt;问题变成：&lt;/p&gt;
+\[c\]&lt;p&gt;怎么求？&lt;/p&gt;
+&lt;p&gt;如果用标准 projection：&lt;/p&gt;
+\[c=U^Tf,\]&lt;p&gt;仍然需要完整：&lt;/p&gt;
+\[f\in\mathbb R^N.\]&lt;p&gt;所以没有解决问题。&lt;/p&gt;
+&lt;p&gt;DEIM 的关键是：&lt;/p&gt;
+\[\boxed{ \text{只要求 }f\text{ 的 }m\text{ 个精选分量。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;5-deim-的核心公式非常漂亮&#34;&gt;5. DEIM 的核心公式非常漂亮
+&lt;/h1&gt;&lt;p&gt;选取：&lt;/p&gt;
+\[m\]&lt;p&gt;个索引：&lt;/p&gt;
+\[p_1,\ldots,p_m.\]&lt;p&gt;构造选择矩阵：&lt;/p&gt;
+\[P= [e_{p_1},\ldots,e_{p_m}] \in\mathbb R^{N\times m}.\]&lt;p&gt;DEIM 要求近似向量：&lt;/p&gt;
+\[Uc\]&lt;p&gt;在这些位置与真正的 nonlinear vector 一致：&lt;/p&gt;
+\[P^TUc = P^Tf(u).\]&lt;p&gt;于是：&lt;/p&gt;
+\[c= (P^TU)^{-1}P^Tf(u).\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ f(u) \approx U(P^TU)^{-1}P^Tf(u) }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;真正在线需要计算的只有：&lt;/p&gt;
+\[\boxed{ P^Tf(u) }\]&lt;p&gt;即：&lt;/p&gt;
+\[m\]&lt;p&gt;个 nonlinear entries。&lt;/p&gt;
+&lt;p&gt;而 reduced nonlinear term：&lt;/p&gt;
+\[V^Tf(u)\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{ V^TU(P^TU)^{-1}P^Tf(u). }\]&lt;p&gt;前面的：&lt;/p&gt;
+\[V^TU(P^TU)^{-1}\]&lt;p&gt;全部可以 offline 预计算。&lt;/p&gt;
+&lt;p&gt;因此 online 阶段只剩：&lt;/p&gt;
+\[\boxed{ \text{算 }m\text{ 个非线性分量。} }\]&lt;p&gt;Chaturantabut 与 Sorensen 2010 年的 DEIM 论文正是通过这个结构，让 POD nonlinear ROM 的复杂度显著摆脱 full system dimension。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-一个简单例子100-万维-nonlinear-vector只看-50-个坐标&#34;&gt;6. 一个简单例子：100 万维 nonlinear vector，只看 50 个坐标
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[N=10^6, \qquad r=30, \qquad m=50.\]&lt;p&gt;普通 POD ROM：&lt;/p&gt;
+\[q\in\mathbb R^{30}.\]&lt;p&gt;但每次仍计算：&lt;/p&gt;
+\[10^6\]&lt;p&gt;维 nonlinear force。&lt;/p&gt;
+&lt;p&gt;DEIM 则选择：&lt;/p&gt;
+\[50\]&lt;p&gt;个代表位置。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;9
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;q
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;u_selected
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;evaluate 50 nonlinear entries
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;DEIM reconstruction/projection
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;30-dimensional reduced force
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果 nonlinear evaluation 是主要瓶颈，理论上可以把这一部分从：&lt;/p&gt;
+\[10^6\]&lt;p&gt;级降到：&lt;/p&gt;
+\[50\]&lt;p&gt;级。&lt;/p&gt;
+&lt;p&gt;这就是为什么它被称作 hyper-reduction。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-deim-点不是随机选的&#34;&gt;7. DEIM 点不是随机选的
+&lt;/h1&gt;&lt;p&gt;如果随便选择：&lt;/p&gt;
+\[m\]&lt;p&gt;个坐标，很可能：&lt;/p&gt;
+\[P^TU\]&lt;p&gt;接近奇异。&lt;/p&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[(P^TU)^{-1}\]&lt;p&gt;会放大误差。&lt;/p&gt;
+&lt;p&gt;DEIM 原始算法通过 greedy 过程选 interpolation indices。&lt;/p&gt;
+&lt;p&gt;直觉上：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;取第一个 nonlinear POD mode；&lt;/li&gt;
+&lt;li&gt;找它幅值最大的坐标；&lt;/li&gt;
+&lt;li&gt;用已有点解释下一个 mode；&lt;/li&gt;
+&lt;li&gt;找剩余 residual 最大的位置；&lt;/li&gt;
+&lt;li&gt;加入新点；&lt;/li&gt;
+&lt;li&gt;重复。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;所以每一个 interpolation point 都在回答：&lt;/p&gt;
+\[\boxed{ \text{当前已有采样位置最难解释的 nonlinear mode 在哪里？} }\]&lt;p&gt;这和 greedy reduced basis、active learning 在思想上有明显相似性，但 DEIM 的目标很具体：&lt;/p&gt;
+\[\boxed{ \text{让 nonlinear field 能从少数坐标稳定重构。} }\]&lt;p&gt;pyMOR 当前仍直接提供 &lt;code&gt;deim()&lt;/code&gt; 和 empirical-interpolation operator 接口，并通过 nonlinear snapshots 生成 collateral basis 与 interpolation DOFs。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-deim-的误差由两个东西共同控制&#34;&gt;8. DEIM 的误差由两个东西共同控制
+&lt;/h1&gt;&lt;p&gt;其典型误差结构可以理解成：&lt;/p&gt;
+\[\|f-\tilde f\| \lesssim \underbrace{ \|(I-UU^T)f\| }_{\text{nonlinear basis 截断误差}} \times \underbrace{ \|(P^TU)^{-1}\| }_{\text{插值点条件数}} .\]&lt;p&gt;第一项回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;nonlinear POD basis 本身够不够表达 \(f\)？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;第二项回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;选出的 interpolation points 稳不稳定？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;因此只增加：&lt;/p&gt;
+\[m\]&lt;p&gt;并不自动保证效果好。&lt;/p&gt;
+&lt;p&gt;你同时需要：&lt;/p&gt;
+\[\boxed{ \text{good collateral basis} + \text{good sampling points}. }\]&lt;p&gt;后续 POD-DEIM 的理论分析明确给出了 reduced state error 与 neglected POD singular values、DEIM nonlinear approximation error 之间的关系。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-但-deim-用在非线性结构动力学上有一个隐患它主要近似向量不一定保持物理结构&#34;&gt;9. 但 DEIM 用在非线性结构动力学上有一个隐患：它主要近似“向量”，不一定保持“物理结构”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑有限元内力：&lt;/p&gt;
+\[f_{\rm int}(u) = \nabla_u \Pi(u).\]&lt;p&gt;也就是说它来自势能：&lt;/p&gt;
+\[\Pi(u).\]&lt;p&gt;这意味着完整模型拥有：&lt;/p&gt;
+\[\boxed{ \text{力—能量一致性} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;如果你直接用：&lt;/p&gt;
+\[f_{\rm int} \approx U(P^TU)^{-1}P^Tf_{\rm int},\]&lt;p&gt;得到的近似力未必仍然等于某个近似势能的梯度。&lt;/p&gt;
+&lt;p&gt;于是可能破坏：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;对称切线刚度；&lt;/li&gt;
+&lt;li&gt;势能结构；&lt;/li&gt;
+&lt;li&gt;Hamilton/Lagrangian structure；&lt;/li&gt;
+&lt;li&gt;数值稳定性。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这在结构动力学里比一般函数逼近严重得多。&lt;/p&gt;
+&lt;p&gt;Farhat、Chapman、Avery 对 ECSW 的分析中特别比较了这一点：ECSW 能保留与 Hamilton 原理相关的 Lagrangian structure，而 DEIM 及其一些变体在他们测试的 nonlinear structural dynamics 问题中可能产生数值不稳定。&lt;/p&gt;
+&lt;p&gt;这揭示了一个非常重要的原则：&lt;/p&gt;
+\[\boxed{ \text{非线性项拟合得准， 不代表 resulting dynamics 就一定好。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-ecsw与其重构整条-nonlinear-force不如直接挑少数代表单元&#34;&gt;10. ECSW：与其重构整条 nonlinear force，不如直接挑少数“代表单元”
+&lt;/h1&gt;&lt;p&gt;有限元内力天然可以写成单元求和：&lt;/p&gt;
+\[f_{\rm int}(u) = \sum_{e=1}^{N_e} L_e^T f_e(u_e).\]&lt;p&gt;Galerkin 投影：&lt;/p&gt;
+\[V^Tf_{\rm int}(Vq) = \sum_{e=1}^{N_e} V_e^T f_e(V_eq).\]&lt;p&gt;这提供了一个非常自然的机会：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;真的需要算所有单元吗？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;ECSW 选择一个小单元集合：&lt;/p&gt;
+\[\mathcal S \subset \{1,\ldots,N_e\}\]&lt;p&gt;以及正权重：&lt;/p&gt;
+\[\xi_e&gt;0.\]&lt;p&gt;然后近似：&lt;/p&gt;
+\[\boxed{ V^Tf_{\rm int}(Vq) \approx \sum_{e\in\mathcal S} \xi_e V_e^Tf_e(V_eq) }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;也就是说：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;full mesh:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;100000 elements
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;hyper-reduced mesh:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;only 500 sampled elements
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+ learned weights
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在线阶段只有这：&lt;/p&gt;
+\[500\]&lt;p&gt;个单元真正调用 constitutive model。&lt;/p&gt;
+&lt;p&gt;Farhat 等最初正是基于 mesh sampling、virtual work 和 energy structure 构造这一方法，并在 nonlinear finite-element structural dynamics 上获得最高约四个数量级的 CPU 加速案例。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么-ecsw-的权重必须认真学&#34;&gt;11. 为什么 ECSW 的权重必须认真学？
+&lt;/h1&gt;&lt;p&gt;如果只是随机取：&lt;/p&gt;
+\[1\%\]&lt;p&gt;单元：&lt;/p&gt;
+\[\sum_{e\in S}V_e^Tf_e\]&lt;p&gt;通常会严重低估整个结构的内力。&lt;/p&gt;
+&lt;p&gt;ECSW 使用：&lt;/p&gt;
+\[\xi_e\]&lt;p&gt;让被采样的少数单元代表未采样单元的整体贡献。&lt;/p&gt;
+&lt;p&gt;可以粗略理解成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;element 17  × 12.3
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;element 83  ×  5.7
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;element 91  × 21.5
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;...
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;训练阶段使用 full-order snapshots，希望：&lt;/p&gt;
+\[\sum_{e\in S} \xi_e V_e^Tf_e\]&lt;p&gt;尽可能匹配：&lt;/p&gt;
+\[\sum_{e=1}^{N_e} V_e^Tf_e.\]&lt;p&gt;因此 Hyper-reduction 本质上又变成：&lt;/p&gt;
+\[\boxed{ \text{寻找少数代表单元 + 合适 quadrature weights} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;从这个角度看，ECSW 很像一种：&lt;/p&gt;
+\[\boxed{\text{data-driven reduced quadrature}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-为什么-ecsw-会比直接重构-nonlinear-vector更适合结构力学&#34;&gt;12. 为什么 ECSW 会比“直接重构 nonlinear vector”更适合结构力学？
+&lt;/h1&gt;&lt;p&gt;因为有限元本身就是按单元积分/装配建立的。&lt;/p&gt;
+&lt;p&gt;ECSW 不打破：&lt;/p&gt;
+\[\text{element contribution}\]&lt;p&gt;这个基本结构。&lt;/p&gt;
+&lt;p&gt;如果原始 reduced internal force 是：&lt;/p&gt;
+\[f_r(q) = \nabla_q \Pi_r(q),\]&lt;p&gt;那么使用正权重：&lt;/p&gt;
+\[\xi_e\]&lt;p&gt;对单元能量加权后仍然可以构造：&lt;/p&gt;
+\[\tilde\Pi_r(q) = \sum_{e\in S} \xi_e\Pi_e(V_eq).\]&lt;p&gt;于是：&lt;/p&gt;
+\[\tilde f_r(q) = \nabla_q\tilde\Pi_r(q).\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{hyper-reduced force 仍然来自一个 hyper-reduced energy} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这就是所谓：&lt;/p&gt;
+\[\boxed{\text{structure preserving}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;2015 年 ECSW 理论工作证明了其对 Lagrangian structure 和相应数值稳定性质的保持，并报告在完整汽车发动机 nonlinear transient structural simulation 中获得超过四个数量级的 CPU 加速，同时维持较好准确度。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-deim-与-ecsw-最值得记住的区别&#34;&gt;13. DEIM 与 ECSW 最值得记住的区别
+&lt;/h1&gt;&lt;p&gt;可以这样理解：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;&lt;/th&gt;
+					&lt;th&gt;DEIM&lt;/th&gt;
+					&lt;th&gt;ECSW&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;近似对象&lt;/td&gt;
+					&lt;td&gt;nonlinear vector \(f(u)\)&lt;/td&gt;
+					&lt;td&gt;projected FE element contributions&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;采样对象&lt;/td&gt;
+					&lt;td&gt;vector entries / DOFs&lt;/td&gt;
+					&lt;td&gt;finite elements&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;核心结构&lt;/td&gt;
+					&lt;td&gt;interpolation&lt;/td&gt;
+					&lt;td&gt;sampled quadrature&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;主要优势&lt;/td&gt;
+					&lt;td&gt;通用、简单、适合一般 nonlinear operator&lt;/td&gt;
+					&lt;td&gt;特别适合 FE mechanics&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;物理结构&lt;/td&gt;
+					&lt;td&gt;不自动保持&lt;/td&gt;
+					&lt;td&gt;可保持能量/Lagrangian结构&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;在线成本&lt;/td&gt;
+					&lt;td&gt;与选中 DOF 数相关&lt;/td&gt;
+					&lt;td&gt;与选中单元数相关&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;所以对一般 nonlinear PDE：&lt;/p&gt;
+\[\boxed{\text{DEIM 是非常自然的入口}}\]&lt;p&gt;而对 nonlinear FEM / structural dynamics：&lt;/p&gt;
+\[\boxed{\text{ECSW 往往具有更强的物理结构优势}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-hyper-reduction-和普通网格粗化不是一回事&#34;&gt;14. Hyper-reduction 和普通“网格粗化”不是一回事
+&lt;/h1&gt;&lt;p&gt;假设原模型：&lt;/p&gt;
+\[100000\]&lt;p&gt;个单元。&lt;/p&gt;
+&lt;p&gt;直接做 coarse mesh：&lt;/p&gt;
+\[1000\]&lt;p&gt;个单元。&lt;/p&gt;
+&lt;p&gt;这会改变：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;geometry；&lt;/li&gt;
+&lt;li&gt;discretization；&lt;/li&gt;
+&lt;li&gt;local constitutive resolution；&lt;/li&gt;
+&lt;li&gt;mode shapes。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Hyper-reduction 则可能仍然使用：&lt;/p&gt;
+\[\boxed{\text{原始 fine-mesh basis 和 fine-mesh physics}}\]&lt;p&gt;，只是在每次 online evaluation 中跳过绝大多数单元。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{coarsening：改变离散模型} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{hyper-reduction：稀疏评估原模型的投影贡献} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这是很重要的区别。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15-为什么它与代理模型有本质区别&#34;&gt;15. 为什么它与代理模型有本质区别？
+&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; / &lt;span class=&#34;term-anchor&#34; data-term=&#34;neural-operator&#34; tabindex=&#34;0&#34;&gt;Neural Operator&lt;/span&gt; 通常直接学习：&lt;/p&gt;
+\[\mu \rightarrow y\]&lt;p&gt;或者：&lt;/p&gt;
+\[\mu \rightarrow u.\]&lt;p&gt;Hyper-reduced ROM 仍然显式保留：&lt;/p&gt;
+\[\boxed{ \text{reduced equations of motion} }\]&lt;p&gt;例如：&lt;/p&gt;
+\[M_r\ddot q+\tilde f_r(q)=f_r.\]&lt;p&gt;所以：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;conservation law 仍可能存在；&lt;/li&gt;
+&lt;li&gt;boundary condition 仍进入方程；&lt;/li&gt;
+&lt;li&gt;time integration 仍由物理 solver 执行；&lt;/li&gt;
+&lt;li&gt;新外力可以直接作用于模型。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此它属于：&lt;/p&gt;
+\[\boxed{\text{physics-based surrogate}}\]&lt;p&gt;，而不是纯粹 response fitting。&lt;/p&gt;
+&lt;p&gt;这使它在动力学、控制和反问题中非常有价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-但-hyper-reduction-仍然有一个非常明显的训练域问题&#34;&gt;16. 但 Hyper-reduction 仍然有一个非常明显的“训练域”问题
+&lt;/h1&gt;&lt;p&gt;假设 ECSW 只在：&lt;/p&gt;
+\[\text{small deformation}\]&lt;p&gt;数据上训练。&lt;/p&gt;
+&lt;p&gt;然后在线进入：&lt;/p&gt;
+\[\text{large bending + contact}.\]&lt;p&gt;原来选择的：&lt;/p&gt;
+\[\mathcal S\]&lt;p&gt;可能已经无法代表新的 nonlinear force field。&lt;/p&gt;
+&lt;p&gt;DEIM 同样如此：&lt;/p&gt;
+\[U_f\]&lt;p&gt;来自 training snapshots。&lt;/p&gt;
+&lt;p&gt;如果新的 nonlinear state 超出了：&lt;/p&gt;
+\[\operatorname{span}(U_f),\]&lt;p&gt;误差就会明显增大。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Hyper-reduction 并没有消灭 extrapolation problem。} }\]&lt;p&gt;它只是把问题从：&lt;/p&gt;
+\[\text{response surrogate}\]&lt;p&gt;转移到了：&lt;/p&gt;
+\[\text{operator surrogate}.\]&lt;p&gt;Localized DEIM 之所以出现，就是因为一个 global nonlinear subspace 可能无法覆盖具有多个不同局部行为区域的系统，因此改用多个 local subspaces。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-这和你的软体动力学尤其有一个值得注意的冲突接触高度局部且会移动&#34;&gt;17. 这和你的软体动力学尤其有一个值得注意的冲突：接触高度局部且会移动
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设软体落地。&lt;/p&gt;
+&lt;p&gt;时间：&lt;/p&gt;
+\[t_1\]&lt;p&gt;接触区域是底部左边；&lt;/p&gt;
+&lt;p&gt;时间：&lt;/p&gt;
+\[t_2\]&lt;p&gt;滚动后变成右边；&lt;/p&gt;
+&lt;p&gt;时间：&lt;/p&gt;
+\[t_3\]&lt;p&gt;又产生新的 self-contact。&lt;/p&gt;
+&lt;p&gt;如果 Hyper-reduction 固定只采：&lt;/p&gt;
+\[500\]&lt;p&gt;个单元，&lt;/p&gt;
+&lt;p&gt;而真正重要的 contact zone 没在：&lt;/p&gt;
+\[\mathcal S\]&lt;p&gt;里，就可能完全漏掉关键局部事件。&lt;/p&gt;
+&lt;p&gt;这说明 nonlinear structural ROM 中存在一个很深的张力：&lt;/p&gt;
+\[\boxed{ \text{Hyper-reduction 喜欢空间稀疏} }\]&lt;p&gt;但：&lt;/p&gt;
+\[\boxed{ \text{contact 喜欢动态移动的局部激活区域。} }\]&lt;p&gt;因此接触问题更可能需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;adaptive sampling；&lt;/li&gt;
+&lt;li&gt;local ROM；&lt;/li&gt;
+&lt;li&gt;state-dependent sampling；&lt;/li&gt;
+&lt;li&gt;contact region always-on；&lt;/li&gt;
+&lt;li&gt;ROM + full-order local correction。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这与固定 ECSW mesh 是不同的难度层级。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;18-一个特别值得迁移到物理引擎的思想不要降整个系统降最贵的算子调用次数&#34;&gt;18. 一个特别值得迁移到物理引擎的思想：不要降整个系统，降“最贵的算子调用次数”
+&lt;/h1&gt;&lt;p&gt;Hyper-reduction 给物理引擎开发最大的启发，甚至不一定要真正做 ROM。&lt;/p&gt;
+&lt;p&gt;假设一个 solver 每帧最贵的是：&lt;/p&gt;
+\[\boxed{\text{100 万个 tet constitutive evaluations}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;传统优化会问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;怎样让每个 tet 算得更快？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Hyper-reduction 的思考方式会问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;真的每个 tet 每一帧都值得重新算吗？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;如果大量区域：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;应变变化很小；&lt;/li&gt;
+&lt;li&gt;远离接触；&lt;/li&gt;
+&lt;li&gt;对当前低频形变贡献有限；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;也许真正应该优化的是：&lt;/p&gt;
+\[\boxed{\text{evaluation sparsity}}\]&lt;p&gt;而不只是：&lt;/p&gt;
+\[\text{evaluation FLOPS}.\]&lt;p&gt;这与：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;sleeping；&lt;/li&gt;
+&lt;li&gt;island activation；&lt;/li&gt;
+&lt;li&gt;adaptive substepping；&lt;/li&gt;
+&lt;li&gt;sparse collision detection；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;属于同一种更高级的工程思想：&lt;/p&gt;
+\[\boxed{ \text{最便宜的一次计算，是根本没有执行的那次计算。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;19-它对代理模型还有一个很强的启发可以代理算子不一定代理最终输出&#34;&gt;19. 它对代理模型还有一个很强的启发：可以代理“算子”，不一定代理最终输出
+&lt;/h1&gt;&lt;p&gt;通常代理模型研究：&lt;/p&gt;
+\[x\rightarrow y.\]&lt;p&gt;但 DEIM 实际做的是：&lt;/p&gt;
+\[\boxed{ \text{学习 nonlinear operator }f(u)\text{ 的低维表示} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;ECSW 更进一步：&lt;/p&gt;
+\[\boxed{ \text{学习哪些局部 operator contributions 值得计算} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以代理建模其实可以分成三层：&lt;/p&gt;
+\[\text{output surrogate}\]\[y\approx\hat y(x)\]&lt;hr&gt;
+\[\text{state surrogate}\]\[u\approx Vq\]&lt;hr&gt;
+\[\boxed{\text{operator surrogate}}\]\[F(u)\approx\tilde F(u).\]&lt;p&gt;第三层通常保留最多物理结构。&lt;/p&gt;
+&lt;p&gt;这对未来做：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;learned constitutive operators；&lt;/li&gt;
+&lt;li&gt;neural preconditioner；&lt;/li&gt;
+&lt;li&gt;learned coarse solver；&lt;/li&gt;
+&lt;li&gt;operator compression；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;都非常有迁移价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个特别适合亲手做的最小实验&#34;&gt;20. 一个特别适合亲手做的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以做一个 nonlinear spring chain：&lt;/p&gt;
+\[m\ddot x_i + k(x_i-x_{i-1}) + \beta(x_i-x_{i-1})^3 +\cdots =0.\]&lt;p&gt;取：&lt;/p&gt;
+\[N=1000.\]&lt;p&gt;首先收集 full-order snapshots：&lt;/p&gt;
+\[X=[x(t_1),\ldots,x(t_M)].\]&lt;p&gt;做 POD：&lt;/p&gt;
+\[X\approx VQ, \qquad r=10.\]&lt;p&gt;然后比较三种模型。&lt;/p&gt;
+&lt;h3 id=&#34;a-纯-pod&#34;&gt;A. 纯 POD
+&lt;/h3&gt;&lt;p&gt;每一步仍计算全部：&lt;/p&gt;
+\[N\]&lt;p&gt;个 cubic spring forces。&lt;/p&gt;
+&lt;h3 id=&#34;b-pod--deim&#34;&gt;B. POD + DEIM
+&lt;/h3&gt;&lt;p&gt;另外收集：&lt;/p&gt;
+\[F= [f_{\rm nl}(x(t_1)),\ldots].\]&lt;p&gt;对它做 POD：&lt;/p&gt;
+\[F\approx U_fC.\]&lt;p&gt;选：&lt;/p&gt;
+\[m=20\]&lt;p&gt;个 DEIM points。&lt;/p&gt;
+&lt;h3 id=&#34;c-full-model&#34;&gt;C. Full model
+&lt;/h3&gt;&lt;p&gt;作为基准。&lt;/p&gt;
+&lt;p&gt;记录：&lt;/p&gt;
+\[\boxed{\text{state error}}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{\text{wall-clock time}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;最重要的观察很可能是：&lt;/p&gt;
+\[\boxed{ \text{POD 已经把 1000 DOF 降到 10， 但真正的明显加速要等 DEIM 加进去才出现。} }\]&lt;p&gt;这个实验能够非常直接地理解为什么 Hyper-reduction 是 nonlinear ROM 不可缺少的第二步。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Hyper-reduction 最重要的公式并不是：&lt;/p&gt;
+\[f \approx U(P^TU)^{-1}P^Tf.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{减少未知量，并不自动减少构造方程的成本。} }\]&lt;p&gt;所以 nonlinear model reduction 真正完整的知识结构是：&lt;/p&gt;
+\[\text{Full nonlinear FEM}\]\[\downarrow\]\[\boxed{ u\approx Vq }\]&lt;p&gt;&lt;strong&gt;State reduction&lt;/strong&gt;&lt;/p&gt;
+\[\downarrow\]\[\boxed{ F(Vq) \text{只在少数 DOF / elements 上计算} }\]&lt;p&gt;&lt;strong&gt;Hyper-reduction&lt;/strong&gt;&lt;/p&gt;
+\[\downarrow\]\[\boxed{\text{Online cost 真正与 }N\text{ 脱钩}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;而 DEIM 与 ECSW 的区别又揭示了一个更深的原则：&lt;/p&gt;
+\[\boxed{ \text{“近似得准”只是第一层要求； 对于物理求解器，还要问近似以后保留了什么结构。} }\]&lt;p&gt;对非线性有限元、软体动力学乃至代理模型而言，这都是非常重要的分界线：&lt;/p&gt;
+\[\boxed{ \text{你究竟是在压缩状态， 压缩输出， 还是压缩物理算子的计算本身？} }\]&lt;p&gt;Hyper-reduction 正好卡在第三层。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Chaturantabut &amp;amp; Sorensen, &lt;em&gt;Nonlinear Model Reduction via Discrete Empirical Interpolation&lt;/em&gt;, SIAM Journal on Scientific Computing, 2010&lt;/strong&gt;。DEIM 原始论文。重点看 nonlinear POD 为什么仍然保留 \(N\)-dependent cost，以及 \(U(P^TU)^{-1}P^Tf\) 如何解决这个问题。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/090766498&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Farhat, Avery, Chapman &amp;amp; Cortial, &lt;em&gt;Dimensional reduction of nonlinear finite element dynamic models with finite rotations and energy-based mesh sampling and weighting for computational efficiency&lt;/em&gt;, IJNME, 2014&lt;/strong&gt;。ECSW 的核心工程论文，非常适合结构/软体方向；基于 mesh sampling 和 virtual work，并报告实际 nonlinear structural dynamics 中最高约四个数量级的 CPU 加速。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Farhat, Chapman &amp;amp; Avery, &lt;em&gt;Structure-preserving, stability, and accuracy properties of the Energy-Conserving Sampling and Weighting method&lt;/em&gt;, IJNME, 2015&lt;/strong&gt;。如果只读一篇深入 ECSW，我更推荐这篇。重点是为什么 energy/Lagrangian structure preservation 会直接影响 nonlinear ROM 的稳定性。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Benner, Gugercin &amp;amp; Willcox, &lt;em&gt;A Survey of Projection-Based Model Reduction Methods for Parametric Dynamical Systems&lt;/em&gt;, SIAM Review, 2015&lt;/strong&gt;。用于建立全局知识框架：POD、Reduced Basis、offline-online decomposition、parametric model reduction 都在一个体系里。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;pyMOR&lt;/strong&gt;。如果想实际实验 DEIM/EIM，这是成熟且仍在维护的开源入口；官方提供 POD、DEIM、empirical interpolation 和外部 PDE solver 接口。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://pymor.org/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;pyMOR 官网&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

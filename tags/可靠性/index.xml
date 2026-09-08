@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Tue, 01 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sat, 05 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
         <link>https://assranai.github.io/cards/02-ak-mcs/</link>
         <pubDate>Sat, 15 Aug 2026 00:00:00 +0000</pubDate>
@@ -2697,6 +2697,452 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;&lt;strong&gt;MAPIE&lt;/strong&gt;。一个成熟的 Python conformal-prediction/risk-control 工具库；截至 2026 年 8 月仍有更新，适合直接在现有 sklearn/ML workflow 上试验 calibration、prediction intervals 和 risk control。(&lt;a class=&#34;link&#34; href=&#34;https://pypi.org/project/MAPIE/?utm_source=chatgpt.com&#34;  title=&#34;MAPIE · PyPI&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;PyPI&lt;/a&gt;)&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Distributionally Robust Reliability：可靠性分析里更危险的，往往不是随机性，而是“你把随机性认错了”</title>
+        <link>https://assranai.github.io/cards/23-distributionally-robust-reliability/</link>
+        <pubDate>Sat, 05 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/23-distributionally-robust-reliability/</guid>
+        <description>&lt;h1 id=&#34;distributionally-robust-reliability可靠性分析里更危险的往往不是随机性而是你把随机性认错了&#34;&gt;Distributionally Robust Reliability：可靠性分析里更危险的，往往不是随机性，而是“你把随机性认错了”
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Distributionally Robust Optimization / Reliability（分布鲁棒优化 / 分布鲁棒可靠性）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：可靠性 × 不确定性量化 × 代理模型 × 数值优化&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这期值得学，因为传统可靠性分析通常偷偷做了一个非常强的假设：&lt;/p&gt;
+\[\boxed{ X\sim P \quad\text{且 }P\text{ 已知} }\]&lt;p&gt;例如：&lt;/p&gt;
+\[X\sim N(\mu,\sigma^2),\]&lt;p&gt;然后计算：&lt;/p&gt;
+\[P_f=P[g(X)\le0].\]&lt;p&gt;但工程现实往往只是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;我有 30 个、100 个、500 个观测样本，然后&lt;strong&gt;拟合&lt;/strong&gt;出了一个正态、Weibull、Copula 或 KDE。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这时真正存在两层不确定性：&lt;/p&gt;
+\[\boxed{\text{样本本身的随机性}}\]&lt;p&gt;以及&lt;/p&gt;
+\[\boxed{\text{“真实概率分布到底是什么”的不确定性}}\]&lt;p&gt;第二层通常称作 &lt;strong&gt;distributional ambiguity（分布模糊性）&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;Distributionally Robust Optimization（DRO）的核心，就是不再假装一个估计分布是真理，而是建立一个可能分布的集合：&lt;/p&gt;
+\[\mathcal P,\]&lt;p&gt;然后问：&lt;/p&gt;
+\[\boxed{ \text{在所有合理概率分布里，最坏情况会怎样？} }\]&lt;p&gt;2025 年 &lt;em&gt;Acta Numerica&lt;/em&gt; 的系统综述把 DRO 正式定义为：当不确定参数的概率分布本身未知时，在一个 &lt;strong&gt;ambiguity set&lt;/strong&gt; 中对最坏分布进行优化；这也是 DRO 与普通 stochastic optimization 的核心区别。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-可靠性里一个极容易被低估的问题&#34;&gt;1. 可靠性里一个极容易被低估的问题
+&lt;/h2&gt;&lt;p&gt;假设你得到 50 个制造误差测量：&lt;/p&gt;
+\[x_1,\ldots,x_{50}.\]&lt;p&gt;拟合得到：&lt;/p&gt;
+\[X\sim N(0,0.1^2).\]&lt;p&gt;然后极限状态：&lt;/p&gt;
+\[g(X)=0.35-X.\]&lt;p&gt;于是：&lt;/p&gt;
+\[P_f=P(X\ge0.35).\]&lt;p&gt;如果严格相信正态分布：&lt;/p&gt;
+\[P_f\approx2.3\times10^{-4}.\]&lt;p&gt;看起来非常可靠。&lt;/p&gt;
+&lt;p&gt;但现在考虑另一种分布：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;均值几乎一样；&lt;/li&gt;
+&lt;li&gt;标准差也几乎一样；&lt;/li&gt;
+&lt;li&gt;中心区域和你的 50 个样本都很吻合；&lt;/li&gt;
+&lt;li&gt;但右尾稍微更厚。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[P_f\]&lt;p&gt;可能从：&lt;/p&gt;
+\[10^{-4}\]&lt;p&gt;变成：&lt;/p&gt;
+\[10^{-3}\]&lt;p&gt;甚至更高。&lt;/p&gt;
+&lt;p&gt;这是可靠性中特别危险的一件事：&lt;/p&gt;
+\[\boxed{ \text{样本主体拟合得很好， 并不意味着尾部概率拟合得很好。} }\]&lt;p&gt;而可靠性恰恰主要依赖尾部。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-aleatory-uncertainty-与-distributional-ambiguity-要分开&#34;&gt;2. Aleatory uncertainty 与 distributional ambiguity 要分开
+&lt;/h1&gt;&lt;p&gt;通常我们把：&lt;/p&gt;
+\[X\sim P\]&lt;p&gt;中的随机性称为：&lt;/p&gt;
+\[\boxed{\text{aleatory uncertainty}}\]&lt;p&gt;例如加工误差、风载荷、材料离散性。&lt;/p&gt;
+&lt;p&gt;即使：&lt;/p&gt;
+\[P\]&lt;p&gt;完全已知，每一次 realization 仍不同。&lt;/p&gt;
+&lt;p&gt;而现在的问题是：&lt;/p&gt;
+\[P\]&lt;p&gt;本身也不知道。&lt;/p&gt;
+&lt;p&gt;例如你不确定：&lt;/p&gt;
+\[P=N(\mu,\sigma^2)?\]&lt;p&gt;还是：&lt;/p&gt;
+\[P=\text{logistic}?\]&lt;p&gt;或者：&lt;/p&gt;
+\[\mu,\sigma\]&lt;p&gt;本身估计得准不准。&lt;/p&gt;
+&lt;p&gt;这一层是：&lt;/p&gt;
+\[\boxed{\text{epistemic / distributional uncertainty}}\]&lt;p&gt;DRO 正是处理这一层。&lt;/p&gt;
+&lt;p&gt;所以可以把可靠性问题重新写成：&lt;/p&gt;
+\[\boxed{ P_f(P) = P[g(X)\le0], \qquad P\in\mathcal P. }\]&lt;p&gt;于是我们不再得到一个：&lt;/p&gt;
+\[P_f,\]&lt;p&gt;而得到一个范围：&lt;/p&gt;
+\[\boxed{ \underline P_f \le P_f \le \overline P_f. }\]&lt;p&gt;其中最常关心的是：&lt;/p&gt;
+\[\boxed{ \overline P_f = \sup_{P\in\mathcal P} P[g(X)\le0]. }\]&lt;hr&gt;
+&lt;h1 id=&#34;3-ambiguity-set-是整个-dro-的灵魂&#34;&gt;3. Ambiguity set 是整个 DRO 的灵魂
+&lt;/h1&gt;&lt;p&gt;DRO 最关键的不是“取最坏情况”。&lt;/p&gt;
+&lt;p&gt;真正关键的是：&lt;/p&gt;
+\[\boxed{ \mathcal P \text{ 怎么定义？} }\]&lt;p&gt;如果：&lt;/p&gt;
+\[\mathcal P\]&lt;p&gt;太小：&lt;/p&gt;
+\[\boxed{\text{你还是过度相信数据}}\]&lt;p&gt;如果：&lt;/p&gt;
+\[\mathcal P\]&lt;p&gt;太大：&lt;/p&gt;
+\[\boxed{\text{结果极度保守}}\]&lt;p&gt;所以 DRO 的核心其实是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;你允许真实分布偏离当前估计到什么程度？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;经典 ambiguity set 大致有三类。&lt;/p&gt;
+&lt;p&gt;第一类基于矩信息：&lt;/p&gt;
+\[E[X]=\mu,\qquad \operatorname{Cov}(X)=\Sigma.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\mathcal P = \{ P: E_P[X]=\mu,\, \operatorname{Cov}_P(X)=\Sigma \}.\]&lt;p&gt;第二类使用统计 divergence，例如：&lt;/p&gt;
+\[D_{\rm KL}(P\|\hat P)\le\epsilon.\]&lt;p&gt;第三类，也是近年非常重要的一类：&lt;/p&gt;
+\[\boxed{\text{Wasserstein ambiguity set}}\]&lt;p&gt;。DRO 文献通常把 moment constraints、\(\phi\)-divergence 和 optimal-transport/Wasserstein distance 视为几类核心 ambiguity-set 构造方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-wasserstein-dro-为什么特别适合只有有限样本的问题&#34;&gt;4. Wasserstein DRO 为什么特别适合“只有有限样本”的问题？
+&lt;/h1&gt;&lt;p&gt;假设你只有：&lt;/p&gt;
+\[N\]&lt;p&gt;个样本：&lt;/p&gt;
+\[\xi_1,\ldots,\xi_N.\]&lt;p&gt;经验分布：&lt;/p&gt;
+\[\boxed{ \hat P_N = \frac1N \sum_{i=1}^N \delta_{\xi_i}. }\]&lt;p&gt;最直接的 stochastic analysis 会把：&lt;/p&gt;
+\[\hat P_N\]&lt;p&gt;当成真实分布。&lt;/p&gt;
+&lt;p&gt;但它显然只是：&lt;/p&gt;
+\[\boxed{\text{有限样本产生的一个近似}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Wasserstein DRO 则构造：&lt;/p&gt;
+\[\boxed{ \mathcal P_\epsilon = \{ P: W(P,\hat P_N)\le\epsilon \}. }\]&lt;p&gt;意思是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;所有距离经验分布不超过 \(\epsilon\) 的概率分布，都认为可能是真实分布。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Mohajerin Esfahani 与 Kuhn 的经典 &lt;em&gt;Mathematical Programming&lt;/em&gt; 工作正是从有限 training data 出发，以经验分布为中心构造 Wasserstein ball，并证明许多 resulting DRO 问题可以转化为有限维凸规划，同时给出有限样本性能保证。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-wasserstein-distance-到底是什么意思&#34;&gt;5. Wasserstein distance 到底是什么意思？
+&lt;/h1&gt;&lt;p&gt;它来自 optimal transport。&lt;/p&gt;
+&lt;p&gt;假设两个离散概率分布：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;P:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0.5 mass at x=0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0.5 mass at x=1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Q:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0.5 mass at x=0.1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0.5 mass at x=1.4
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;为了把 \(P\) 变成 \(Q\)，你需要搬运概率质量。&lt;/p&gt;
+&lt;p&gt;Wasserstein distance 大致衡量：&lt;/p&gt;
+\[\boxed{ \text{把一个分布搬成另一个分布所需的最小“运输成本”} }\]&lt;p&gt;典型一阶形式：&lt;/p&gt;
+\[W_1(P,Q) = \inf_{\pi\in\Pi(P,Q)} E_\pi[\|X-Y\|].\]&lt;p&gt;这里：&lt;/p&gt;
+\[\pi\]&lt;p&gt;表示一种把 \(P\) 中概率质量运输到 \(Q\) 的方案。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[W(P,\hat P)\le\epsilon\]&lt;p&gt;可以直观理解成：&lt;/p&gt;
+\[\boxed{ \text{真实分布可以移动、扩散经验样本的概率质量， 但总移动预算不能超过 }\epsilon. }\]&lt;p&gt;这比“分布参数误差 ±5%”更一般，因为候选分布甚至不必属于同一个参数分布族。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6--是整个模型里最重要的旋钮&#34;&gt;6. \(\epsilon\) 是整个模型里最重要的旋钮
+&lt;/h1&gt;&lt;p&gt;如果：&lt;/p&gt;
+\[\epsilon=0,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\mathcal P_0=\{\hat P_N\}.\]&lt;p&gt;你退化成普通 empirical/SAA 方法。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[\epsilon\rightarrow\infty,\]&lt;p&gt;允许的概率分布越来越离谱，结果会越来越保守。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \epsilon = \text{你对当前数据分布有多少信任} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;从可靠性角度：&lt;/p&gt;
+\[\epsilon\uparrow\]&lt;p&gt;通常意味着：&lt;/p&gt;
+\[\sup_{P\in\mathcal P_\epsilon}P_f \uparrow.\]&lt;p&gt;因此你可以得到一条很有信息量的曲线：&lt;/p&gt;
+\[\boxed{ \epsilon \quad\longrightarrow\quad P_f^{\rm worst} }\]&lt;p&gt;它回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;只要真实分布稍微偏离拟合分布，我的可靠度会不会立刻崩掉？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这种分析往往比单独给：&lt;/p&gt;
+\[P_f=2.13\times10^{-4}\]&lt;p&gt;更有工程意义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-一个直观可靠性例子&#34;&gt;7. 一个直观可靠性例子
+&lt;/h1&gt;&lt;p&gt;假设失效条件：&lt;/p&gt;
+\[X&gt;10.\]&lt;p&gt;你有 100 个样本：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;7.9  8.2  8.7  9.1  8.4 ...
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;没有一个超过：&lt;/p&gt;
+\[10.\]&lt;p&gt;直接 empirical failure rate：&lt;/p&gt;
+\[\hat P_f=0.\]&lt;p&gt;显然这不能理解成：&lt;/p&gt;
+\[P_f=0.\]&lt;p&gt;Wasserstein ambiguity set 允许把一部分 probability mass 向右移动。&lt;/p&gt;
+&lt;p&gt;但搬到：&lt;/p&gt;
+\[X&gt;10\]&lt;p&gt;需要付 transportation cost。&lt;/p&gt;
+&lt;p&gt;于是 worst-case optimizer 会解决一个很有意思的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;在移动预算 \(\epsilon\) 下，最多能把多少概率质量搬进 failure domain？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{ \sup_{P:W(P,\hat P_N)\le\epsilon} P(X&gt;10). }\]&lt;p&gt;这其实给了 Wasserstein DRO 一个很直观的可靠性解释：&lt;/p&gt;
+\[\boxed{ \text{失效边界离现有样本越近， 少量 distributional perturbation 就越可能显著提高失败概率。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;8-这和-form-的-design-point-有一个很有趣的联系&#34;&gt;8. 这和 FORM 的 design point 有一个很有趣的联系
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;FORM 寻找：&lt;/p&gt;
+\[\boxed{ \text{概率空间中离原点最近的失效点} }\]&lt;p&gt;即 Most Probable Point：&lt;/p&gt;
+\[u^* = \arg\min_{g(u)=0}\|u\|.\]&lt;p&gt;Wasserstein worst-case reliability 则可以理解为：&lt;/p&gt;
+\[\boxed{ \text{概率质量从已有数据移动到 failure domain 的最低运输代价} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;两者都带有：&lt;/p&gt;
+\[\boxed{\text{距离失效域有多远}}\]&lt;p&gt;这个核心几何结构。&lt;/p&gt;
+&lt;p&gt;但距离的对象不同：&lt;/p&gt;
+&lt;p&gt;FORM：&lt;/p&gt;
+\[\text{sample point / random realization}\]&lt;p&gt;层面的距离。&lt;/p&gt;
+&lt;p&gt;Wasserstein DRO：&lt;/p&gt;
+\[\text{probability distribution}\]&lt;p&gt;层面的距离。&lt;/p&gt;
+&lt;p&gt;这是一个很好用的知识定位。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么-dro-和-robust-optimization-不是一回事&#34;&gt;9. 为什么 DRO 和 Robust Optimization 不是一回事？
+&lt;/h1&gt;&lt;p&gt;经典 Robust Optimization（RO）通常写：&lt;/p&gt;
+\[\boxed{ g(x,\xi)\le0 \quad \forall \xi\in\mathcal U. }\]&lt;p&gt;也就是说：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;uncertainty set 中每一个 realization 都必须安全。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这往往非常保守。&lt;/p&gt;
+&lt;p&gt;DRO 则是：&lt;/p&gt;
+\[\boxed{ P\in\mathcal P }\]&lt;p&gt;但在每个分布里面仍保留概率概念。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[\sup_{P\in\mathcal P} P[g(X)\le0] \le10^{-4}.\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{RO 对 realization 做 worst case} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{DRO 对 distribution 做 worst case} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;DRO 因而处于：&lt;/p&gt;
+\[\text{stochastic optimization} \quad\leftrightarrow\quad \text{robust optimization}\]&lt;p&gt;之间：既承认随机性，又不假设概率模型完全准确。现代 DRO 综述正是把这种“probability distribution itself is uncertain”的问题作为其理论出发点。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-分布鲁棒可靠性约束是什么&#34;&gt;10. 分布鲁棒可靠性约束是什么？
+&lt;/h1&gt;&lt;p&gt;传统 Reliability-Based Design Optimization（RBDO）可能写：&lt;/p&gt;
+\[\min_d C(d)\]&lt;p&gt;subject to：&lt;/p&gt;
+\[P[g(d,X)\le0] \le P_f^{\rm target}.\]&lt;p&gt;但这要求：&lt;/p&gt;
+\[P_X\]&lt;p&gt;已知。&lt;/p&gt;
+&lt;p&gt;Distributionally Robust RBDO 改成：&lt;/p&gt;
+\[\boxed{ \sup_{P\in\mathcal P} P_P[g(d,X)\le0] \le P_f^{\rm target}. }\]&lt;p&gt;也就是说：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;不只是当前拟合分布下可靠，而是 ambiguity set 里最坏分布下也可靠。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;已有结构可靠性工作直接采用这一 formulation：当输入分布的均值和协方差本身只知道属于某个集合时，设计需满足所有允许分布中的最坏失效概率约束。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这类问题为什么会很难算&#34;&gt;11. 这类问题为什么会很难算？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为现在原问题已经有：&lt;/p&gt;
+\[\text{design variable }d\]&lt;p&gt;外面又有：&lt;/p&gt;
+\[\sup_{P\in\mathcal P}\]&lt;p&gt;里面还有：&lt;/p&gt;
+\[P[g(d,X)\le0].\]&lt;p&gt;结构大致变成：&lt;/p&gt;
+\[\boxed{ \min_d \quad \sup_P \quad \int I[g(d,x)\le0]\,dP(x) }\]&lt;p&gt;其中 indicator：&lt;/p&gt;
+\[I[g\le0]\]&lt;p&gt;本身又是不连续的。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{reliability} + \text{distributional robustness} }\]&lt;p&gt;几乎把概率、非凸优化和高保真仿真三个难点叠在一起。&lt;/p&gt;
+&lt;p&gt;这也是为什么大量实际 DR chance-constraint 工作都在研究：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;CVaR reformulation；&lt;/li&gt;
+&lt;li&gt;convex approximation；&lt;/li&gt;
+&lt;li&gt;mixed-integer formulation；&lt;/li&gt;
+&lt;li&gt;sampling approximation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;例如 2023 年 Chen、Kuhn 与 Wiesemann 系统比较了 Wasserstein distributionally robust chance constraints 的几种常见近似，并指出这些 approximation 在数据驱动情形下也可能非常保守，甚至表现很差。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-wasserstein-dro-不是天然安全的它也有维数灾难&#34;&gt;12. Wasserstein DRO 不是“天然安全”的，它也有维数灾难
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这是今天最应该警惕的地方之一。&lt;/p&gt;
+&lt;p&gt;经验分布：&lt;/p&gt;
+\[\hat P_N\]&lt;p&gt;在 Wasserstein distance 下逼近真实高维分布，可能需要非常多样本。&lt;/p&gt;
+&lt;p&gt;简单说：&lt;/p&gt;
+\[\boxed{ \text{维度越高， 用有限样本锁定一个 Wasserstein ball 越困难。} }\]&lt;p&gt;如果输入有：&lt;/p&gt;
+\[50\]&lt;p&gt;维，而样本只有：&lt;/p&gt;
+\[100,\]&lt;p&gt;为了高置信度包含真实分布，你可能需要设置很大的：&lt;/p&gt;
+\[\epsilon.\]&lt;p&gt;这又导致：&lt;/p&gt;
+\[\boxed{\text{worst-case result 极度保守。}}\]&lt;p&gt;这被明确称为 Wasserstein DRO finite-sample theory 中的 curse of dimensionality；后续工作专门研究如何利用 loss function 的局部复杂度、Lipschitz/gradient variation 等结构获得更好的非渐近性能保证。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{Wasserstein DRO 不是高维小样本问题的免费解药。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这正好和前面讲过的-active-subspaces-接起来&#34;&gt;13. 这正好和前面讲过的 Active Subspaces 接起来
+&lt;/h1&gt;&lt;p&gt;如果原始变量：&lt;/p&gt;
+\[X\in\mathbb R^{50},\]&lt;p&gt;但失效函数：&lt;/p&gt;
+\[g(X)\]&lt;p&gt;实际上主要取决于：&lt;/p&gt;
+\[y=W^TX\in\mathbb R^3,\]&lt;p&gt;那么你有一个很诱人的组合：&lt;/p&gt;
+\[\boxed{ \text{Active Subspace} + \text{Wasserstein DRO} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;先识别：&lt;/p&gt;
+\[\text{failure-relevant low-dimensional directions},\]&lt;p&gt;然后只在：&lt;/p&gt;
+\[y\]&lt;p&gt;空间中建立 ambiguity set。&lt;/p&gt;
+&lt;p&gt;这可能显著缓解高维 Wasserstein 距离的统计困难。&lt;/p&gt;
+&lt;p&gt;但这里不能机械地“先 PCA 再 DRO”。&lt;/p&gt;
+&lt;p&gt;因为降维必须尽量保留：&lt;/p&gt;
+\[\boxed{ \text{failure-tail information} }\]&lt;p&gt;而不是只保留输入方差。&lt;/p&gt;
+&lt;p&gt;这也是为什么可靠性中的 active-subspace / goal-oriented reduction 比普通无监督降维更有价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-dro-与代理模型其实也天然互补&#34;&gt;14. DRO 与代理模型其实也天然互补
+&lt;/h1&gt;&lt;p&gt;假设高保真极限状态：&lt;/p&gt;
+\[g(x)\]&lt;p&gt;非常昂贵。&lt;/p&gt;
+&lt;p&gt;你训练 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt;：&lt;/p&gt;
+\[\hat g(x).\]&lt;p&gt;传统流程：&lt;/p&gt;
+\[\hat g \rightarrow P_f.\]&lt;p&gt;但现在其实有两种不同不确定性：&lt;/p&gt;
+&lt;h3 id=&#34;surrogate-uncertainty&#34;&gt;Surrogate uncertainty
+&lt;/h3&gt;\[\boxed{ g(x) \text{ 本身预测得准不准？} }\]&lt;h3 id=&#34;distribution-uncertainty&#34;&gt;Distribution uncertainty
+&lt;/h3&gt;\[\boxed{ X \text{ 到底服从什么分布？} }\]&lt;p&gt;这两者经常被混在一起。&lt;/p&gt;
+&lt;p&gt;一个成熟的 reliability pipeline 应明确区分：&lt;/p&gt;
+\[\boxed{ \text{model uncertainty} }\]&lt;p&gt;与：&lt;/p&gt;
+\[\boxed{ \text{input-distribution uncertainty}. }\]&lt;p&gt;因此可以形成：&lt;/p&gt;
+\[\text{Kriging / neural surrogate}\]\[+\]\[\text{Conformal / posterior calibration}\]\[+\]\[\boxed{\text{distributionally robust reliability}}\]&lt;p&gt;这种多层 uncertainty architecture。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15-和上一期-conformal-prediction-有什么本质区别&#34;&gt;15. 和上一期 Conformal Prediction 有什么本质区别？
+&lt;/h1&gt;&lt;p&gt;这是一个非常好的对照。&lt;/p&gt;
+&lt;p&gt;Conformal prediction 主要问：&lt;/p&gt;
+\[\boxed{ \text{对于新的 }X， Y\text{ 是否落在预测区间里？} }\]&lt;p&gt;它校准的是：&lt;/p&gt;
+\[Y|X\]&lt;p&gt;方向的预测误差。&lt;/p&gt;
+&lt;p&gt;DRO 主要问：&lt;/p&gt;
+\[\boxed{ \text{未来 }X \text{ 本身来自哪个概率分布？} }\]&lt;p&gt;它处理的是：&lt;/p&gt;
+\[P_X\]&lt;p&gt;的不确定性。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Conformal：模型输出不确定性} }\]\[\boxed{ \text{DRO：数据生成分布不确定性} }\]&lt;p&gt;二者解决的不是同一层。&lt;/p&gt;
+&lt;p&gt;一个实际系统甚至可能同时需要两者。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-一个非常容易犯的错误把最坏分布理解成真实最坏情况&#34;&gt;16. 一个非常容易犯的错误：把“最坏分布”理解成“真实最坏情况”
+&lt;/h1&gt;&lt;p&gt;DRO 得到：&lt;/p&gt;
+\[P^* = \arg\sup_{P\in\mathcal P} P_f(P).\]&lt;p&gt;但：&lt;/p&gt;
+\[P^*\]&lt;p&gt;未必是一个你真正认为现实世界会产生的分布。&lt;/p&gt;
+&lt;p&gt;它只是：&lt;/p&gt;
+\[\boxed{ \text{当前 ambiguity-set 建模下最不利的成员。} }\]&lt;p&gt;所以 DRO 最终质量高度依赖：&lt;/p&gt;
+\[\mathcal P.\]&lt;p&gt;如果 ambiguity set 包含很多物理上荒谬的分布：&lt;/p&gt;
+\[P^*\]&lt;p&gt;也会荒谬。&lt;/p&gt;
+&lt;p&gt;这就是为什么：&lt;/p&gt;
+\[\boxed{ \text{ambiguity set construction} }\]&lt;p&gt;比“求最坏情况”的数学技巧更加重要。&lt;/p&gt;
+&lt;p&gt;现代 DRO 综述也特别强调：不同 ambiguity sets 虽然可能数学上可解，但如果集合允许了不现实的分布，robust solution 就可能过度保守。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-对工程数据一个很实用的做法先画可靠度对-ambiguity-radius的曲线&#34;&gt;17. 对工程数据，一个很实用的做法：先画“可靠度对 ambiguity radius”的曲线
+&lt;/h1&gt;&lt;p&gt;假设你有：&lt;/p&gt;
+\[N\]&lt;p&gt;个制造样本。&lt;/p&gt;
+&lt;p&gt;不要直接只给一个：&lt;/p&gt;
+\[\epsilon.\]&lt;p&gt;而可以做：&lt;/p&gt;
+\[\epsilon= 0,\, 0.01,\, 0.02,\, 0.05,\, 0.1.\]&lt;p&gt;分别算：&lt;/p&gt;
+\[\overline P_f(\epsilon).\]&lt;p&gt;然后画：&lt;/p&gt;
+\[\boxed{ \log P_f^{\rm worst} \quad vs \quad \epsilon }\]&lt;p&gt;可能出现两种情况。&lt;/p&gt;
+&lt;h3 id=&#34;系统-a&#34;&gt;系统 A
+&lt;/h3&gt;\[\epsilon: 0\rightarrow0.05\]&lt;p&gt;时：&lt;/p&gt;
+\[P_f: 10^{-5}\rightarrow2\times10^{-5}.\]&lt;p&gt;说明可靠性对 distribution shift 很稳健。&lt;/p&gt;
+&lt;h3 id=&#34;系统-b&#34;&gt;系统 B
+&lt;/h3&gt;&lt;p&gt;同样：&lt;/p&gt;
+\[P_f: 10^{-5}\rightarrow10^{-2}.\]&lt;p&gt;说明：&lt;/p&gt;
+\[\boxed{ \text{所谓高可靠性高度依赖某个精确分布假设。} }\]&lt;p&gt;这个结果本身就具有非常高的工程解释价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-对你现在做的机构可靠性最值得迁移的一点&#34;&gt;18. 对你现在做的机构可靠性，最值得迁移的一点
+&lt;/h1&gt;&lt;p&gt;机构可靠性里常见输入可能包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;加工尺寸；&lt;/li&gt;
+&lt;li&gt;间隙；&lt;/li&gt;
+&lt;li&gt;摩擦系数；&lt;/li&gt;
+&lt;li&gt;驱动力；&lt;/li&gt;
+&lt;li&gt;材料参数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;实际数据经常非常少。&lt;/p&gt;
+&lt;p&gt;这时直接规定：&lt;/p&gt;
+\[L_i\sim N(\mu_i,\sigma_i^2)\]&lt;p&gt;然后输出：&lt;/p&gt;
+\[P_f=1.7\times10^{-4}\]&lt;p&gt;在数学上可以算得很精细，但结论可能主要来自：&lt;/p&gt;
+\[\boxed{ \text{你事先选了 Normal distribution} }\]&lt;p&gt;而不是来自真实工程数据。&lt;/p&gt;
+&lt;p&gt;一个更成熟的分析可以同时报告：&lt;/p&gt;
+\[\boxed{ P_f^{\rm nominal} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ P_f^{\rm worst}(\epsilon). }\]&lt;p&gt;这样你真正回答了两个问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;如果我的概率模型正确，可靠度是多少？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;以及：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;如果概率模型在数据允许范围内有偏差，可靠度最坏会变成什么样？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;第二个问题通常更接近工程决策。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;19-一个很值得进一步研究的组合dro--active-learning-reliability&#34;&gt;19. 一个很值得进一步研究的组合：DRO + Active Learning Reliability
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这里会自然产生一个新的采样问题。&lt;/p&gt;
+&lt;p&gt;传统 &lt;span class=&#34;term-anchor&#34; data-term=&#34;ak-mcs&#34; tabindex=&#34;0&#34;&gt;AK-MCS&lt;/span&gt; 选：&lt;/p&gt;
+\[\boxed{ \text{最可能误判极限状态的样本} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;DRO 还会告诉你：&lt;/p&gt;
+\[\boxed{ \text{worst-case distribution 正把概率质量往哪里推} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;于是可以设计新的 learning criterion：&lt;/p&gt;
+\[\boxed{ \text{surrogate uncertainty} \times \text{worst-case probability mass} }\]&lt;p&gt;也就是说，高保真计算优先放在：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;靠近 \(g=0\)；&lt;/li&gt;
+&lt;li&gt;surrogate 不确定；&lt;/li&gt;
+&lt;li&gt;同时又被 worst-case distribution 高度加权；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;的区域。&lt;/p&gt;
+&lt;p&gt;这比简单：&lt;/p&gt;
+\[U(x)=|\mu|/\sigma\]&lt;p&gt;更 task-aware。&lt;/p&gt;
+&lt;p&gt;从研究视角，这属于：&lt;/p&gt;
+\[\boxed{ \text{surrogate uncertainty} + \text{distributional uncertainty} }\]&lt;p&gt;的联合资源分配问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个最小可实践实验&#34;&gt;20. 一个最小可实践实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以从一维问题开始：&lt;/p&gt;
+\[g(x)=3-x.\]&lt;p&gt;有 30 个历史样本：&lt;/p&gt;
+\[x_i.\]&lt;p&gt;先计算 empirical：&lt;/p&gt;
+\[\hat P_f = \frac1{30} \sum_i I(x_i&gt;3).\]&lt;p&gt;然后假设正态分布，计算：&lt;/p&gt;
+\[P_f^{\rm Gaussian}.\]&lt;p&gt;再建立：&lt;/p&gt;
+\[\mathcal P_\epsilon = \{ P: W_1(P,\hat P_N)\le\epsilon \}.\]&lt;p&gt;分别取：&lt;/p&gt;
+\[\epsilon= 0,\, 0.02,\, 0.05,\, 0.1.\]&lt;p&gt;求：&lt;/p&gt;
+\[\sup_{P\in\mathcal P_\epsilon} P(X&gt;3).\]&lt;p&gt;你会非常直观地看到：&lt;/p&gt;
+\[\boxed{ \text{“样本中没见过失效” 和 “失效概率很小” 完全不是同一句话。} }\]&lt;p&gt;而 \(\epsilon\) 增大时，worst-case distribution 会逐渐把离 failure boundary 最近的概率质量搬进去。&lt;/p&gt;
+&lt;p&gt;这个实验很适合作为理解 Wasserstein reliability 的第一步。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Distributionally Robust Reliability 最值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{可靠性分析中的概率分布，本身也是一个模型。} }\]&lt;p&gt;传统分析关注：&lt;/p&gt;
+\[X\sim P\]&lt;p&gt;之后发生什么。&lt;/p&gt;
+&lt;p&gt;DRO 再向前追问一步：&lt;/p&gt;
+\[\boxed{ P \text{ 为什么是这个 }P？ }\]&lt;p&gt;于是整个知识体系变成：&lt;/p&gt;
+\[\text{Aleatory uncertainty}\]\[\downarrow\]\[\text{Probability model}\]\[\downarrow\]\[\boxed{\text{Distributional ambiguity / DRO}}\]\[\downarrow\]\[\text{Robust reliability / robust design}.\]&lt;p&gt;它真正值得学的原因是：&lt;/p&gt;
+\[\boxed{ \text{在小样本可靠性问题里， 计算误差可能远小于“概率模型选错”的误差。} }\]&lt;p&gt;如果一个模型能把：&lt;/p&gt;
+\[P_f\]&lt;p&gt;算到小数点后六位，却完全忽略：&lt;/p&gt;
+\[P_X\]&lt;p&gt;只有几十个样本支撑，那么“精确”很可能只是数值上的。&lt;/p&gt;
+&lt;p&gt;DRO 提供了一种更成熟的态度：&lt;/p&gt;
+\[\boxed{ \text{别只问“在我相信的分布下安全吗”， 还要问“如果我对分布的判断稍微错一点，还安全吗”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Mohajerin Esfahani &amp;amp; Kuhn, &lt;em&gt;Data-driven Distributionally Robust Optimization Using the Wasserstein Metric: Performance Guarantees and Tractable Reformulations&lt;/em&gt;, Mathematical Programming, 2018&lt;/strong&gt;。Wasserstein DRO 的奠基性论文之一。重点看 empirical distribution、Wasserstein ambiguity ball、有限样本 guarantee 和 tractable reformulation。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://link.springer.com/article/10.1007/s10107-017-1172-1&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Springer 开放论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Kuhn, Shafiee &amp;amp; Wiesemann, &lt;em&gt;Distributionally Robust Optimization&lt;/em&gt;, Acta Numerica, 2025&lt;/strong&gt;。目前非常好的系统综述，适合建立完整知识图：moment、\(\phi\)-divergence、Wasserstein ambiguity sets，以及 DRO 与 statistics、regularization、adversarial learning 的关系。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2411.02549&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文预印本&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Kanno, &lt;em&gt;Structural reliability under uncertainty in moments: distributionally-robust reliability-based design optimization&lt;/em&gt;, 2022&lt;/strong&gt;。如果重点是结构可靠性，这篇很直接：输入分布的均值和协方差本身不精确时，如何构造 worst-case reliability constraint。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Chen, Kuhn &amp;amp; Wiesemann, &lt;em&gt;On approximations of data-driven chance constrained programs over Wasserstein balls&lt;/em&gt;, Operations Research Letters, 2023&lt;/strong&gt;。很适合理解现实计算中的限制：distributionally robust chance constraints 很难，常见 CVaR 等近似虽然 tractable，却可能明显保守。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hammond, Crespo &amp;amp; Montomoli, &lt;em&gt;A distributionally robust data-driven framework to reliability analysis&lt;/em&gt;, 2024&lt;/strong&gt;。更接近纯可靠性分析而非优化：直接研究数据拟合概率模型带来的误差，并输出一个随数据增加而收缩的 failure-probability range。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

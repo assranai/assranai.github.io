@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Fri, 04 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Tue, 08 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>IPC：把“碰撞处理”改写成一个优化问题</title>
         <link>https://assranai.github.io/cards/01-ipc/</link>
         <pubDate>Fri, 14 Aug 2026 00:00:00 +0000</pubDate>
@@ -17833,6 +17833,1938 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 &lt;p&gt;&lt;strong&gt;Xue, &lt;em&gt;Implicit differentiation with second-order derivatives and benchmarks in finite-element-based differentiable physics&lt;/em&gt;, Computer Physics Communications, 2026&lt;/strong&gt;。这是很值得追的新进展：从一阶 adjoint 继续走到 implicit Hessian-vector product 和 Newton-CG PDE 反问题优化。&lt;br&gt;
 &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2505.12646&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;论文预印本&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Distributionally Robust Reliability：可靠性分析里更危险的，往往不是随机性，而是“你把随机性认错了”</title>
+        <link>https://assranai.github.io/cards/23-distributionally-robust-reliability/</link>
+        <pubDate>Sat, 05 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/23-distributionally-robust-reliability/</guid>
+        <description>&lt;h1 id=&#34;distributionally-robust-reliability可靠性分析里更危险的往往不是随机性而是你把随机性认错了&#34;&gt;Distributionally Robust Reliability：可靠性分析里更危险的，往往不是随机性，而是“你把随机性认错了”
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Distributionally Robust Optimization / Reliability（分布鲁棒优化 / 分布鲁棒可靠性）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：可靠性 × 不确定性量化 × 代理模型 × 数值优化&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这期值得学，因为传统可靠性分析通常偷偷做了一个非常强的假设：&lt;/p&gt;
+\[\boxed{ X\sim P \quad\text{且 }P\text{ 已知} }\]&lt;p&gt;例如：&lt;/p&gt;
+\[X\sim N(\mu,\sigma^2),\]&lt;p&gt;然后计算：&lt;/p&gt;
+\[P_f=P[g(X)\le0].\]&lt;p&gt;但工程现实往往只是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;我有 30 个、100 个、500 个观测样本，然后&lt;strong&gt;拟合&lt;/strong&gt;出了一个正态、Weibull、Copula 或 KDE。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这时真正存在两层不确定性：&lt;/p&gt;
+\[\boxed{\text{样本本身的随机性}}\]&lt;p&gt;以及&lt;/p&gt;
+\[\boxed{\text{“真实概率分布到底是什么”的不确定性}}\]&lt;p&gt;第二层通常称作 &lt;strong&gt;distributional ambiguity（分布模糊性）&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;Distributionally Robust Optimization（DRO）的核心，就是不再假装一个估计分布是真理，而是建立一个可能分布的集合：&lt;/p&gt;
+\[\mathcal P,\]&lt;p&gt;然后问：&lt;/p&gt;
+\[\boxed{ \text{在所有合理概率分布里，最坏情况会怎样？} }\]&lt;p&gt;2025 年 &lt;em&gt;Acta Numerica&lt;/em&gt; 的系统综述把 DRO 正式定义为：当不确定参数的概率分布本身未知时，在一个 &lt;strong&gt;ambiguity set&lt;/strong&gt; 中对最坏分布进行优化；这也是 DRO 与普通 stochastic optimization 的核心区别。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-可靠性里一个极容易被低估的问题&#34;&gt;1. 可靠性里一个极容易被低估的问题
+&lt;/h2&gt;&lt;p&gt;假设你得到 50 个制造误差测量：&lt;/p&gt;
+\[x_1,\ldots,x_{50}.\]&lt;p&gt;拟合得到：&lt;/p&gt;
+\[X\sim N(0,0.1^2).\]&lt;p&gt;然后极限状态：&lt;/p&gt;
+\[g(X)=0.35-X.\]&lt;p&gt;于是：&lt;/p&gt;
+\[P_f=P(X\ge0.35).\]&lt;p&gt;如果严格相信正态分布：&lt;/p&gt;
+\[P_f\approx2.3\times10^{-4}.\]&lt;p&gt;看起来非常可靠。&lt;/p&gt;
+&lt;p&gt;但现在考虑另一种分布：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;均值几乎一样；&lt;/li&gt;
+&lt;li&gt;标准差也几乎一样；&lt;/li&gt;
+&lt;li&gt;中心区域和你的 50 个样本都很吻合；&lt;/li&gt;
+&lt;li&gt;但右尾稍微更厚。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[P_f\]&lt;p&gt;可能从：&lt;/p&gt;
+\[10^{-4}\]&lt;p&gt;变成：&lt;/p&gt;
+\[10^{-3}\]&lt;p&gt;甚至更高。&lt;/p&gt;
+&lt;p&gt;这是可靠性中特别危险的一件事：&lt;/p&gt;
+\[\boxed{ \text{样本主体拟合得很好， 并不意味着尾部概率拟合得很好。} }\]&lt;p&gt;而可靠性恰恰主要依赖尾部。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-aleatory-uncertainty-与-distributional-ambiguity-要分开&#34;&gt;2. Aleatory uncertainty 与 distributional ambiguity 要分开
+&lt;/h1&gt;&lt;p&gt;通常我们把：&lt;/p&gt;
+\[X\sim P\]&lt;p&gt;中的随机性称为：&lt;/p&gt;
+\[\boxed{\text{aleatory uncertainty}}\]&lt;p&gt;例如加工误差、风载荷、材料离散性。&lt;/p&gt;
+&lt;p&gt;即使：&lt;/p&gt;
+\[P\]&lt;p&gt;完全已知，每一次 realization 仍不同。&lt;/p&gt;
+&lt;p&gt;而现在的问题是：&lt;/p&gt;
+\[P\]&lt;p&gt;本身也不知道。&lt;/p&gt;
+&lt;p&gt;例如你不确定：&lt;/p&gt;
+\[P=N(\mu,\sigma^2)?\]&lt;p&gt;还是：&lt;/p&gt;
+\[P=\text{logistic}?\]&lt;p&gt;或者：&lt;/p&gt;
+\[\mu,\sigma\]&lt;p&gt;本身估计得准不准。&lt;/p&gt;
+&lt;p&gt;这一层是：&lt;/p&gt;
+\[\boxed{\text{epistemic / distributional uncertainty}}\]&lt;p&gt;DRO 正是处理这一层。&lt;/p&gt;
+&lt;p&gt;所以可以把可靠性问题重新写成：&lt;/p&gt;
+\[\boxed{ P_f(P) = P[g(X)\le0], \qquad P\in\mathcal P. }\]&lt;p&gt;于是我们不再得到一个：&lt;/p&gt;
+\[P_f,\]&lt;p&gt;而得到一个范围：&lt;/p&gt;
+\[\boxed{ \underline P_f \le P_f \le \overline P_f. }\]&lt;p&gt;其中最常关心的是：&lt;/p&gt;
+\[\boxed{ \overline P_f = \sup_{P\in\mathcal P} P[g(X)\le0]. }\]&lt;hr&gt;
+&lt;h1 id=&#34;3-ambiguity-set-是整个-dro-的灵魂&#34;&gt;3. Ambiguity set 是整个 DRO 的灵魂
+&lt;/h1&gt;&lt;p&gt;DRO 最关键的不是“取最坏情况”。&lt;/p&gt;
+&lt;p&gt;真正关键的是：&lt;/p&gt;
+\[\boxed{ \mathcal P \text{ 怎么定义？} }\]&lt;p&gt;如果：&lt;/p&gt;
+\[\mathcal P\]&lt;p&gt;太小：&lt;/p&gt;
+\[\boxed{\text{你还是过度相信数据}}\]&lt;p&gt;如果：&lt;/p&gt;
+\[\mathcal P\]&lt;p&gt;太大：&lt;/p&gt;
+\[\boxed{\text{结果极度保守}}\]&lt;p&gt;所以 DRO 的核心其实是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;你允许真实分布偏离当前估计到什么程度？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;经典 ambiguity set 大致有三类。&lt;/p&gt;
+&lt;p&gt;第一类基于矩信息：&lt;/p&gt;
+\[E[X]=\mu,\qquad \operatorname{Cov}(X)=\Sigma.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\mathcal P = \{ P: E_P[X]=\mu,\, \operatorname{Cov}_P(X)=\Sigma \}.\]&lt;p&gt;第二类使用统计 divergence，例如：&lt;/p&gt;
+\[D_{\rm KL}(P\|\hat P)\le\epsilon.\]&lt;p&gt;第三类，也是近年非常重要的一类：&lt;/p&gt;
+\[\boxed{\text{Wasserstein ambiguity set}}\]&lt;p&gt;。DRO 文献通常把 moment constraints、\(\phi\)-divergence 和 optimal-transport/Wasserstein distance 视为几类核心 ambiguity-set 构造方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-wasserstein-dro-为什么特别适合只有有限样本的问题&#34;&gt;4. Wasserstein DRO 为什么特别适合“只有有限样本”的问题？
+&lt;/h1&gt;&lt;p&gt;假设你只有：&lt;/p&gt;
+\[N\]&lt;p&gt;个样本：&lt;/p&gt;
+\[\xi_1,\ldots,\xi_N.\]&lt;p&gt;经验分布：&lt;/p&gt;
+\[\boxed{ \hat P_N = \frac1N \sum_{i=1}^N \delta_{\xi_i}. }\]&lt;p&gt;最直接的 stochastic analysis 会把：&lt;/p&gt;
+\[\hat P_N\]&lt;p&gt;当成真实分布。&lt;/p&gt;
+&lt;p&gt;但它显然只是：&lt;/p&gt;
+\[\boxed{\text{有限样本产生的一个近似}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Wasserstein DRO 则构造：&lt;/p&gt;
+\[\boxed{ \mathcal P_\epsilon = \{ P: W(P,\hat P_N)\le\epsilon \}. }\]&lt;p&gt;意思是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;所有距离经验分布不超过 \(\epsilon\) 的概率分布，都认为可能是真实分布。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Mohajerin Esfahani 与 Kuhn 的经典 &lt;em&gt;Mathematical Programming&lt;/em&gt; 工作正是从有限 training data 出发，以经验分布为中心构造 Wasserstein ball，并证明许多 resulting DRO 问题可以转化为有限维凸规划，同时给出有限样本性能保证。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-wasserstein-distance-到底是什么意思&#34;&gt;5. Wasserstein distance 到底是什么意思？
+&lt;/h1&gt;&lt;p&gt;它来自 optimal transport。&lt;/p&gt;
+&lt;p&gt;假设两个离散概率分布：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;P:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0.5 mass at x=0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0.5 mass at x=1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Q:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0.5 mass at x=0.1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0.5 mass at x=1.4
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;为了把 \(P\) 变成 \(Q\)，你需要搬运概率质量。&lt;/p&gt;
+&lt;p&gt;Wasserstein distance 大致衡量：&lt;/p&gt;
+\[\boxed{ \text{把一个分布搬成另一个分布所需的最小“运输成本”} }\]&lt;p&gt;典型一阶形式：&lt;/p&gt;
+\[W_1(P,Q) = \inf_{\pi\in\Pi(P,Q)} E_\pi[\|X-Y\|].\]&lt;p&gt;这里：&lt;/p&gt;
+\[\pi\]&lt;p&gt;表示一种把 \(P\) 中概率质量运输到 \(Q\) 的方案。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[W(P,\hat P)\le\epsilon\]&lt;p&gt;可以直观理解成：&lt;/p&gt;
+\[\boxed{ \text{真实分布可以移动、扩散经验样本的概率质量， 但总移动预算不能超过 }\epsilon. }\]&lt;p&gt;这比“分布参数误差 ±5%”更一般，因为候选分布甚至不必属于同一个参数分布族。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6--是整个模型里最重要的旋钮&#34;&gt;6. \(\epsilon\) 是整个模型里最重要的旋钮
+&lt;/h1&gt;&lt;p&gt;如果：&lt;/p&gt;
+\[\epsilon=0,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\mathcal P_0=\{\hat P_N\}.\]&lt;p&gt;你退化成普通 empirical/SAA 方法。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[\epsilon\rightarrow\infty,\]&lt;p&gt;允许的概率分布越来越离谱，结果会越来越保守。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \epsilon = \text{你对当前数据分布有多少信任} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;从可靠性角度：&lt;/p&gt;
+\[\epsilon\uparrow\]&lt;p&gt;通常意味着：&lt;/p&gt;
+\[\sup_{P\in\mathcal P_\epsilon}P_f \uparrow.\]&lt;p&gt;因此你可以得到一条很有信息量的曲线：&lt;/p&gt;
+\[\boxed{ \epsilon \quad\longrightarrow\quad P_f^{\rm worst} }\]&lt;p&gt;它回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;只要真实分布稍微偏离拟合分布，我的可靠度会不会立刻崩掉？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这种分析往往比单独给：&lt;/p&gt;
+\[P_f=2.13\times10^{-4}\]&lt;p&gt;更有工程意义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-一个直观可靠性例子&#34;&gt;7. 一个直观可靠性例子
+&lt;/h1&gt;&lt;p&gt;假设失效条件：&lt;/p&gt;
+\[X&gt;10.\]&lt;p&gt;你有 100 个样本：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;7.9  8.2  8.7  9.1  8.4 ...
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;没有一个超过：&lt;/p&gt;
+\[10.\]&lt;p&gt;直接 empirical failure rate：&lt;/p&gt;
+\[\hat P_f=0.\]&lt;p&gt;显然这不能理解成：&lt;/p&gt;
+\[P_f=0.\]&lt;p&gt;Wasserstein ambiguity set 允许把一部分 probability mass 向右移动。&lt;/p&gt;
+&lt;p&gt;但搬到：&lt;/p&gt;
+\[X&gt;10\]&lt;p&gt;需要付 transportation cost。&lt;/p&gt;
+&lt;p&gt;于是 worst-case optimizer 会解决一个很有意思的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;在移动预算 \(\epsilon\) 下，最多能把多少概率质量搬进 failure domain？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{ \sup_{P:W(P,\hat P_N)\le\epsilon} P(X&gt;10). }\]&lt;p&gt;这其实给了 Wasserstein DRO 一个很直观的可靠性解释：&lt;/p&gt;
+\[\boxed{ \text{失效边界离现有样本越近， 少量 distributional perturbation 就越可能显著提高失败概率。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;8-这和-form-的-design-point-有一个很有趣的联系&#34;&gt;8. 这和 FORM 的 design point 有一个很有趣的联系
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;FORM 寻找：&lt;/p&gt;
+\[\boxed{ \text{概率空间中离原点最近的失效点} }\]&lt;p&gt;即 Most Probable Point：&lt;/p&gt;
+\[u^* = \arg\min_{g(u)=0}\|u\|.\]&lt;p&gt;Wasserstein worst-case reliability 则可以理解为：&lt;/p&gt;
+\[\boxed{ \text{概率质量从已有数据移动到 failure domain 的最低运输代价} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;两者都带有：&lt;/p&gt;
+\[\boxed{\text{距离失效域有多远}}\]&lt;p&gt;这个核心几何结构。&lt;/p&gt;
+&lt;p&gt;但距离的对象不同：&lt;/p&gt;
+&lt;p&gt;FORM：&lt;/p&gt;
+\[\text{sample point / random realization}\]&lt;p&gt;层面的距离。&lt;/p&gt;
+&lt;p&gt;Wasserstein DRO：&lt;/p&gt;
+\[\text{probability distribution}\]&lt;p&gt;层面的距离。&lt;/p&gt;
+&lt;p&gt;这是一个很好用的知识定位。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么-dro-和-robust-optimization-不是一回事&#34;&gt;9. 为什么 DRO 和 Robust Optimization 不是一回事？
+&lt;/h1&gt;&lt;p&gt;经典 Robust Optimization（RO）通常写：&lt;/p&gt;
+\[\boxed{ g(x,\xi)\le0 \quad \forall \xi\in\mathcal U. }\]&lt;p&gt;也就是说：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;uncertainty set 中每一个 realization 都必须安全。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这往往非常保守。&lt;/p&gt;
+&lt;p&gt;DRO 则是：&lt;/p&gt;
+\[\boxed{ P\in\mathcal P }\]&lt;p&gt;但在每个分布里面仍保留概率概念。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[\sup_{P\in\mathcal P} P[g(X)\le0] \le10^{-4}.\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{RO 对 realization 做 worst case} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{DRO 对 distribution 做 worst case} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;DRO 因而处于：&lt;/p&gt;
+\[\text{stochastic optimization} \quad\leftrightarrow\quad \text{robust optimization}\]&lt;p&gt;之间：既承认随机性，又不假设概率模型完全准确。现代 DRO 综述正是把这种“probability distribution itself is uncertain”的问题作为其理论出发点。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-分布鲁棒可靠性约束是什么&#34;&gt;10. 分布鲁棒可靠性约束是什么？
+&lt;/h1&gt;&lt;p&gt;传统 Reliability-Based Design Optimization（RBDO）可能写：&lt;/p&gt;
+\[\min_d C(d)\]&lt;p&gt;subject to：&lt;/p&gt;
+\[P[g(d,X)\le0] \le P_f^{\rm target}.\]&lt;p&gt;但这要求：&lt;/p&gt;
+\[P_X\]&lt;p&gt;已知。&lt;/p&gt;
+&lt;p&gt;Distributionally Robust RBDO 改成：&lt;/p&gt;
+\[\boxed{ \sup_{P\in\mathcal P} P_P[g(d,X)\le0] \le P_f^{\rm target}. }\]&lt;p&gt;也就是说：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;不只是当前拟合分布下可靠，而是 ambiguity set 里最坏分布下也可靠。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;已有结构可靠性工作直接采用这一 formulation：当输入分布的均值和协方差本身只知道属于某个集合时，设计需满足所有允许分布中的最坏失效概率约束。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这类问题为什么会很难算&#34;&gt;11. 这类问题为什么会很难算？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为现在原问题已经有：&lt;/p&gt;
+\[\text{design variable }d\]&lt;p&gt;外面又有：&lt;/p&gt;
+\[\sup_{P\in\mathcal P}\]&lt;p&gt;里面还有：&lt;/p&gt;
+\[P[g(d,X)\le0].\]&lt;p&gt;结构大致变成：&lt;/p&gt;
+\[\boxed{ \min_d \quad \sup_P \quad \int I[g(d,x)\le0]\,dP(x) }\]&lt;p&gt;其中 indicator：&lt;/p&gt;
+\[I[g\le0]\]&lt;p&gt;本身又是不连续的。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{reliability} + \text{distributional robustness} }\]&lt;p&gt;几乎把概率、非凸优化和高保真仿真三个难点叠在一起。&lt;/p&gt;
+&lt;p&gt;这也是为什么大量实际 DR chance-constraint 工作都在研究：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;CVaR reformulation；&lt;/li&gt;
+&lt;li&gt;convex approximation；&lt;/li&gt;
+&lt;li&gt;mixed-integer formulation；&lt;/li&gt;
+&lt;li&gt;sampling approximation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;例如 2023 年 Chen、Kuhn 与 Wiesemann 系统比较了 Wasserstein distributionally robust chance constraints 的几种常见近似，并指出这些 approximation 在数据驱动情形下也可能非常保守，甚至表现很差。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-wasserstein-dro-不是天然安全的它也有维数灾难&#34;&gt;12. Wasserstein DRO 不是“天然安全”的，它也有维数灾难
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这是今天最应该警惕的地方之一。&lt;/p&gt;
+&lt;p&gt;经验分布：&lt;/p&gt;
+\[\hat P_N\]&lt;p&gt;在 Wasserstein distance 下逼近真实高维分布，可能需要非常多样本。&lt;/p&gt;
+&lt;p&gt;简单说：&lt;/p&gt;
+\[\boxed{ \text{维度越高， 用有限样本锁定一个 Wasserstein ball 越困难。} }\]&lt;p&gt;如果输入有：&lt;/p&gt;
+\[50\]&lt;p&gt;维，而样本只有：&lt;/p&gt;
+\[100,\]&lt;p&gt;为了高置信度包含真实分布，你可能需要设置很大的：&lt;/p&gt;
+\[\epsilon.\]&lt;p&gt;这又导致：&lt;/p&gt;
+\[\boxed{\text{worst-case result 极度保守。}}\]&lt;p&gt;这被明确称为 Wasserstein DRO finite-sample theory 中的 curse of dimensionality；后续工作专门研究如何利用 loss function 的局部复杂度、Lipschitz/gradient variation 等结构获得更好的非渐近性能保证。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{Wasserstein DRO 不是高维小样本问题的免费解药。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这正好和前面讲过的-active-subspaces-接起来&#34;&gt;13. 这正好和前面讲过的 Active Subspaces 接起来
+&lt;/h1&gt;&lt;p&gt;如果原始变量：&lt;/p&gt;
+\[X\in\mathbb R^{50},\]&lt;p&gt;但失效函数：&lt;/p&gt;
+\[g(X)\]&lt;p&gt;实际上主要取决于：&lt;/p&gt;
+\[y=W^TX\in\mathbb R^3,\]&lt;p&gt;那么你有一个很诱人的组合：&lt;/p&gt;
+\[\boxed{ \text{Active Subspace} + \text{Wasserstein DRO} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;先识别：&lt;/p&gt;
+\[\text{failure-relevant low-dimensional directions},\]&lt;p&gt;然后只在：&lt;/p&gt;
+\[y\]&lt;p&gt;空间中建立 ambiguity set。&lt;/p&gt;
+&lt;p&gt;这可能显著缓解高维 Wasserstein 距离的统计困难。&lt;/p&gt;
+&lt;p&gt;但这里不能机械地“先 PCA 再 DRO”。&lt;/p&gt;
+&lt;p&gt;因为降维必须尽量保留：&lt;/p&gt;
+\[\boxed{ \text{failure-tail information} }\]&lt;p&gt;而不是只保留输入方差。&lt;/p&gt;
+&lt;p&gt;这也是为什么可靠性中的 active-subspace / goal-oriented reduction 比普通无监督降维更有价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-dro-与代理模型其实也天然互补&#34;&gt;14. DRO 与代理模型其实也天然互补
+&lt;/h1&gt;&lt;p&gt;假设高保真极限状态：&lt;/p&gt;
+\[g(x)\]&lt;p&gt;非常昂贵。&lt;/p&gt;
+&lt;p&gt;你训练 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt;：&lt;/p&gt;
+\[\hat g(x).\]&lt;p&gt;传统流程：&lt;/p&gt;
+\[\hat g \rightarrow P_f.\]&lt;p&gt;但现在其实有两种不同不确定性：&lt;/p&gt;
+&lt;h3 id=&#34;surrogate-uncertainty&#34;&gt;Surrogate uncertainty
+&lt;/h3&gt;\[\boxed{ g(x) \text{ 本身预测得准不准？} }\]&lt;h3 id=&#34;distribution-uncertainty&#34;&gt;Distribution uncertainty
+&lt;/h3&gt;\[\boxed{ X \text{ 到底服从什么分布？} }\]&lt;p&gt;这两者经常被混在一起。&lt;/p&gt;
+&lt;p&gt;一个成熟的 reliability pipeline 应明确区分：&lt;/p&gt;
+\[\boxed{ \text{model uncertainty} }\]&lt;p&gt;与：&lt;/p&gt;
+\[\boxed{ \text{input-distribution uncertainty}. }\]&lt;p&gt;因此可以形成：&lt;/p&gt;
+\[\text{Kriging / neural surrogate}\]\[+\]\[\text{Conformal / posterior calibration}\]\[+\]\[\boxed{\text{distributionally robust reliability}}\]&lt;p&gt;这种多层 uncertainty architecture。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15-和上一期-conformal-prediction-有什么本质区别&#34;&gt;15. 和上一期 Conformal Prediction 有什么本质区别？
+&lt;/h1&gt;&lt;p&gt;这是一个非常好的对照。&lt;/p&gt;
+&lt;p&gt;Conformal prediction 主要问：&lt;/p&gt;
+\[\boxed{ \text{对于新的 }X， Y\text{ 是否落在预测区间里？} }\]&lt;p&gt;它校准的是：&lt;/p&gt;
+\[Y|X\]&lt;p&gt;方向的预测误差。&lt;/p&gt;
+&lt;p&gt;DRO 主要问：&lt;/p&gt;
+\[\boxed{ \text{未来 }X \text{ 本身来自哪个概率分布？} }\]&lt;p&gt;它处理的是：&lt;/p&gt;
+\[P_X\]&lt;p&gt;的不确定性。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Conformal：模型输出不确定性} }\]\[\boxed{ \text{DRO：数据生成分布不确定性} }\]&lt;p&gt;二者解决的不是同一层。&lt;/p&gt;
+&lt;p&gt;一个实际系统甚至可能同时需要两者。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-一个非常容易犯的错误把最坏分布理解成真实最坏情况&#34;&gt;16. 一个非常容易犯的错误：把“最坏分布”理解成“真实最坏情况”
+&lt;/h1&gt;&lt;p&gt;DRO 得到：&lt;/p&gt;
+\[P^* = \arg\sup_{P\in\mathcal P} P_f(P).\]&lt;p&gt;但：&lt;/p&gt;
+\[P^*\]&lt;p&gt;未必是一个你真正认为现实世界会产生的分布。&lt;/p&gt;
+&lt;p&gt;它只是：&lt;/p&gt;
+\[\boxed{ \text{当前 ambiguity-set 建模下最不利的成员。} }\]&lt;p&gt;所以 DRO 最终质量高度依赖：&lt;/p&gt;
+\[\mathcal P.\]&lt;p&gt;如果 ambiguity set 包含很多物理上荒谬的分布：&lt;/p&gt;
+\[P^*\]&lt;p&gt;也会荒谬。&lt;/p&gt;
+&lt;p&gt;这就是为什么：&lt;/p&gt;
+\[\boxed{ \text{ambiguity set construction} }\]&lt;p&gt;比“求最坏情况”的数学技巧更加重要。&lt;/p&gt;
+&lt;p&gt;现代 DRO 综述也特别强调：不同 ambiguity sets 虽然可能数学上可解，但如果集合允许了不现实的分布，robust solution 就可能过度保守。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-对工程数据一个很实用的做法先画可靠度对-ambiguity-radius的曲线&#34;&gt;17. 对工程数据，一个很实用的做法：先画“可靠度对 ambiguity radius”的曲线
+&lt;/h1&gt;&lt;p&gt;假设你有：&lt;/p&gt;
+\[N\]&lt;p&gt;个制造样本。&lt;/p&gt;
+&lt;p&gt;不要直接只给一个：&lt;/p&gt;
+\[\epsilon.\]&lt;p&gt;而可以做：&lt;/p&gt;
+\[\epsilon= 0,\, 0.01,\, 0.02,\, 0.05,\, 0.1.\]&lt;p&gt;分别算：&lt;/p&gt;
+\[\overline P_f(\epsilon).\]&lt;p&gt;然后画：&lt;/p&gt;
+\[\boxed{ \log P_f^{\rm worst} \quad vs \quad \epsilon }\]&lt;p&gt;可能出现两种情况。&lt;/p&gt;
+&lt;h3 id=&#34;系统-a&#34;&gt;系统 A
+&lt;/h3&gt;\[\epsilon: 0\rightarrow0.05\]&lt;p&gt;时：&lt;/p&gt;
+\[P_f: 10^{-5}\rightarrow2\times10^{-5}.\]&lt;p&gt;说明可靠性对 distribution shift 很稳健。&lt;/p&gt;
+&lt;h3 id=&#34;系统-b&#34;&gt;系统 B
+&lt;/h3&gt;&lt;p&gt;同样：&lt;/p&gt;
+\[P_f: 10^{-5}\rightarrow10^{-2}.\]&lt;p&gt;说明：&lt;/p&gt;
+\[\boxed{ \text{所谓高可靠性高度依赖某个精确分布假设。} }\]&lt;p&gt;这个结果本身就具有非常高的工程解释价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-对你现在做的机构可靠性最值得迁移的一点&#34;&gt;18. 对你现在做的机构可靠性，最值得迁移的一点
+&lt;/h1&gt;&lt;p&gt;机构可靠性里常见输入可能包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;加工尺寸；&lt;/li&gt;
+&lt;li&gt;间隙；&lt;/li&gt;
+&lt;li&gt;摩擦系数；&lt;/li&gt;
+&lt;li&gt;驱动力；&lt;/li&gt;
+&lt;li&gt;材料参数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;实际数据经常非常少。&lt;/p&gt;
+&lt;p&gt;这时直接规定：&lt;/p&gt;
+\[L_i\sim N(\mu_i,\sigma_i^2)\]&lt;p&gt;然后输出：&lt;/p&gt;
+\[P_f=1.7\times10^{-4}\]&lt;p&gt;在数学上可以算得很精细，但结论可能主要来自：&lt;/p&gt;
+\[\boxed{ \text{你事先选了 Normal distribution} }\]&lt;p&gt;而不是来自真实工程数据。&lt;/p&gt;
+&lt;p&gt;一个更成熟的分析可以同时报告：&lt;/p&gt;
+\[\boxed{ P_f^{\rm nominal} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ P_f^{\rm worst}(\epsilon). }\]&lt;p&gt;这样你真正回答了两个问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;如果我的概率模型正确，可靠度是多少？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;以及：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;如果概率模型在数据允许范围内有偏差，可靠度最坏会变成什么样？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;第二个问题通常更接近工程决策。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;19-一个很值得进一步研究的组合dro--active-learning-reliability&#34;&gt;19. 一个很值得进一步研究的组合：DRO + Active Learning Reliability
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这里会自然产生一个新的采样问题。&lt;/p&gt;
+&lt;p&gt;传统 &lt;span class=&#34;term-anchor&#34; data-term=&#34;ak-mcs&#34; tabindex=&#34;0&#34;&gt;AK-MCS&lt;/span&gt; 选：&lt;/p&gt;
+\[\boxed{ \text{最可能误判极限状态的样本} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;DRO 还会告诉你：&lt;/p&gt;
+\[\boxed{ \text{worst-case distribution 正把概率质量往哪里推} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;于是可以设计新的 learning criterion：&lt;/p&gt;
+\[\boxed{ \text{surrogate uncertainty} \times \text{worst-case probability mass} }\]&lt;p&gt;也就是说，高保真计算优先放在：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;靠近 \(g=0\)；&lt;/li&gt;
+&lt;li&gt;surrogate 不确定；&lt;/li&gt;
+&lt;li&gt;同时又被 worst-case distribution 高度加权；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;的区域。&lt;/p&gt;
+&lt;p&gt;这比简单：&lt;/p&gt;
+\[U(x)=|\mu|/\sigma\]&lt;p&gt;更 task-aware。&lt;/p&gt;
+&lt;p&gt;从研究视角，这属于：&lt;/p&gt;
+\[\boxed{ \text{surrogate uncertainty} + \text{distributional uncertainty} }\]&lt;p&gt;的联合资源分配问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个最小可实践实验&#34;&gt;20. 一个最小可实践实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以从一维问题开始：&lt;/p&gt;
+\[g(x)=3-x.\]&lt;p&gt;有 30 个历史样本：&lt;/p&gt;
+\[x_i.\]&lt;p&gt;先计算 empirical：&lt;/p&gt;
+\[\hat P_f = \frac1{30} \sum_i I(x_i&gt;3).\]&lt;p&gt;然后假设正态分布，计算：&lt;/p&gt;
+\[P_f^{\rm Gaussian}.\]&lt;p&gt;再建立：&lt;/p&gt;
+\[\mathcal P_\epsilon = \{ P: W_1(P,\hat P_N)\le\epsilon \}.\]&lt;p&gt;分别取：&lt;/p&gt;
+\[\epsilon= 0,\, 0.02,\, 0.05,\, 0.1.\]&lt;p&gt;求：&lt;/p&gt;
+\[\sup_{P\in\mathcal P_\epsilon} P(X&gt;3).\]&lt;p&gt;你会非常直观地看到：&lt;/p&gt;
+\[\boxed{ \text{“样本中没见过失效” 和 “失效概率很小” 完全不是同一句话。} }\]&lt;p&gt;而 \(\epsilon\) 增大时，worst-case distribution 会逐渐把离 failure boundary 最近的概率质量搬进去。&lt;/p&gt;
+&lt;p&gt;这个实验很适合作为理解 Wasserstein reliability 的第一步。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Distributionally Robust Reliability 最值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{可靠性分析中的概率分布，本身也是一个模型。} }\]&lt;p&gt;传统分析关注：&lt;/p&gt;
+\[X\sim P\]&lt;p&gt;之后发生什么。&lt;/p&gt;
+&lt;p&gt;DRO 再向前追问一步：&lt;/p&gt;
+\[\boxed{ P \text{ 为什么是这个 }P？ }\]&lt;p&gt;于是整个知识体系变成：&lt;/p&gt;
+\[\text{Aleatory uncertainty}\]\[\downarrow\]\[\text{Probability model}\]\[\downarrow\]\[\boxed{\text{Distributional ambiguity / DRO}}\]\[\downarrow\]\[\text{Robust reliability / robust design}.\]&lt;p&gt;它真正值得学的原因是：&lt;/p&gt;
+\[\boxed{ \text{在小样本可靠性问题里， 计算误差可能远小于“概率模型选错”的误差。} }\]&lt;p&gt;如果一个模型能把：&lt;/p&gt;
+\[P_f\]&lt;p&gt;算到小数点后六位，却完全忽略：&lt;/p&gt;
+\[P_X\]&lt;p&gt;只有几十个样本支撑，那么“精确”很可能只是数值上的。&lt;/p&gt;
+&lt;p&gt;DRO 提供了一种更成熟的态度：&lt;/p&gt;
+\[\boxed{ \text{别只问“在我相信的分布下安全吗”， 还要问“如果我对分布的判断稍微错一点，还安全吗”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Mohajerin Esfahani &amp;amp; Kuhn, &lt;em&gt;Data-driven Distributionally Robust Optimization Using the Wasserstein Metric: Performance Guarantees and Tractable Reformulations&lt;/em&gt;, Mathematical Programming, 2018&lt;/strong&gt;。Wasserstein DRO 的奠基性论文之一。重点看 empirical distribution、Wasserstein ambiguity ball、有限样本 guarantee 和 tractable reformulation。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://link.springer.com/article/10.1007/s10107-017-1172-1&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Springer 开放论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Kuhn, Shafiee &amp;amp; Wiesemann, &lt;em&gt;Distributionally Robust Optimization&lt;/em&gt;, Acta Numerica, 2025&lt;/strong&gt;。目前非常好的系统综述，适合建立完整知识图：moment、\(\phi\)-divergence、Wasserstein ambiguity sets，以及 DRO 与 statistics、regularization、adversarial learning 的关系。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2411.02549&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文预印本&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Kanno, &lt;em&gt;Structural reliability under uncertainty in moments: distributionally-robust reliability-based design optimization&lt;/em&gt;, 2022&lt;/strong&gt;。如果重点是结构可靠性，这篇很直接：输入分布的均值和协方差本身不精确时，如何构造 worst-case reliability constraint。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Chen, Kuhn &amp;amp; Wiesemann, &lt;em&gt;On approximations of data-driven chance constrained programs over Wasserstein balls&lt;/em&gt;, Operations Research Letters, 2023&lt;/strong&gt;。很适合理解现实计算中的限制：distributionally robust chance constraints 很难，常见 CVaR 等近似虽然 tractable，却可能明显保守。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hammond, Crespo &amp;amp; Montomoli, &lt;em&gt;A distributionally robust data-driven framework to reliability analysis&lt;/em&gt;, 2024&lt;/strong&gt;。更接近纯可靠性分析而非优化：直接研究数据拟合概率模型带来的误差，并输出一个随数据增加而收缩的 failure-probability range。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里</title>
+        <link>https://assranai.github.io/cards/24-lora/</link>
+        <pubDate>Sun, 06 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/24-lora/</guid>
+        <description>&lt;h1 id=&#34;lora真正高效的模型适配往往不是少改几个参数而是只允许参数更新发生在低秩子空间里&#34;&gt;LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：LoRA（Low-Rank Adaptation）与低秩参数更新&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × 科学机器学习&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;LoRA 值得深入理解，因为它表面上是一个“大模型省显存微调技巧”，但更深层的问题其实是：&lt;/p&gt;
+\[\boxed{ \text{一个拥有数十亿参数的模型，在适配新任务时，真的需要在整个参数空间里自由移动吗？} }\]&lt;p&gt;LoRA 的回答是：&lt;/p&gt;
+\[\boxed{ \text{很多任务适配所需的权重变化，本身可能近似低秩。} }\]&lt;p&gt;于是它不直接优化完整权重更新：&lt;/p&gt;
+\[\Delta W\in\mathbb R^{d_{\text{out}}\times d_{\text{in}}},\]&lt;p&gt;而把更新限制成：&lt;/p&gt;
+\[\boxed{ \Delta W=BA }\]&lt;p&gt;其中：&lt;/p&gt;
+\[A\in\mathbb R^{r\times d_{\text{in}}}, \qquad B\in\mathbb R^{d_{\text{out}}\times r},\]&lt;p&gt;且：&lt;/p&gt;
+\[r\ll \min(d_{\text{in}},d_{\text{out}}).\]&lt;p&gt;原始 LoRA 论文正是基于这种 rank decomposition：冻结预训练权重，只训练低秩更新矩阵。作者在 GPT-3 175B 的实验设置中报告，相比完整 Adam 微调，可将可训练参数数量降低约 \(10^4\) 倍、GPU 内存需求降低约 3 倍，同时保持相当或更好的任务性能。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看完整微调到底浪费在哪里&#34;&gt;1. 先看完整微调到底浪费在哪里
+&lt;/h2&gt;&lt;p&gt;假设一个 Transformer 线性层：&lt;/p&gt;
+\[W\in\mathbb R^{4096\times4096}.\]&lt;p&gt;它拥有：&lt;/p&gt;
+\[4096^2 \approx 16.8\text{ million}\]&lt;p&gt;个参数。&lt;/p&gt;
+&lt;p&gt;完整微调意味着：&lt;/p&gt;
+\[W \rightarrow W+\Delta W,\]&lt;p&gt;其中：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;也是一个完整的：&lt;/p&gt;
+\[4096\times4096\]&lt;p&gt;矩阵。&lt;/p&gt;
+&lt;p&gt;即使新任务只是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;让模型适应某种新的写作风格、领域术语或指令格式，&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;优化器理论上仍然允许：&lt;/p&gt;
+\[16.8\text{ million}\]&lt;p&gt;个独立更新方向。&lt;/p&gt;
+&lt;p&gt;LoRA 质疑的就是这一点：&lt;/p&gt;
+\[\boxed{ \text{新任务真正需要的自由度，也许远远小于参数矩阵自身维度。} }\]&lt;p&gt;于是取：&lt;/p&gt;
+\[r=8.\]&lt;p&gt;只训练：&lt;/p&gt;
+\[A\in\mathbb R^{8\times4096},\]\[B\in\mathbb R^{4096\times8}.\]&lt;p&gt;参数数量变成：&lt;/p&gt;
+\[2\times4096\times8 = 65536.\]&lt;p&gt;相比：&lt;/p&gt;
+\[16.8\text{ million},\]&lt;p&gt;只有约：&lt;/p&gt;
+\[0.39\%.\]&lt;p&gt;这不是简单“少训练一些原参数”。&lt;/p&gt;
+&lt;p&gt;它实际上重新定义了：&lt;/p&gt;
+\[\boxed{ \text{允许模型如何变化。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;2-lora-真正施加的是一个-rank-constraint&#34;&gt;2. LoRA 真正施加的是一个 rank constraint
+&lt;/h1&gt;&lt;p&gt;完整更新：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;可以是任意矩阵，理论最大秩：&lt;/p&gt;
+\[\operatorname{rank}(\Delta W) = \min(d_{\rm in},d_{\rm out}).\]&lt;p&gt;LoRA 写成：&lt;/p&gt;
+\[\Delta W=BA.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \operatorname{rank}(\Delta W)\le r. }\]&lt;p&gt;这意味着模型更新只能发生在一个低秩结构中。&lt;/p&gt;
+&lt;p&gt;对输入：&lt;/p&gt;
+\[x,\]&lt;p&gt;原层输出：&lt;/p&gt;
+\[y=Wx.\]&lt;p&gt;加入 LoRA：&lt;/p&gt;
+\[y = Wx + BAx.\]&lt;p&gt;可以按两步理解：&lt;/p&gt;
+\[x \xrightarrow{A} z\in\mathbb R^r \xrightarrow{B} \Delta y.\]&lt;p&gt;所以 LoRA 实际做的是：&lt;/p&gt;
+\[\boxed{ \text{先把高维输入压缩到一个小的 adaptation space， 再从这个空间生成任务相关修正。} }\]&lt;p&gt;这里的：&lt;/p&gt;
+\[r\]&lt;p&gt;就是 adaptation bottleneck dimension。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-为什么低秩会有效&#34;&gt;3. 为什么“低秩”会有效？
+&lt;/h1&gt;&lt;p&gt;这是 LoRA 最值得学的地方。&lt;/p&gt;
+&lt;p&gt;它不是因为：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;参数越少一定越好。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;而是基于一个经验观察：&lt;/p&gt;
+\[\boxed{ \text{大型预训练模型做下游任务适配时， 真正需要改变的功能方向可能具有很低的 intrinsic dimension。} }\]&lt;p&gt;原始 LoRA 论文专门研究了 adaptation update 的 rank deficiency，并发现即使：&lt;/p&gt;
+\[r\]&lt;p&gt;相当小，往往仍能取得接近 full fine-tuning 的性能。&lt;/p&gt;
+&lt;p&gt;可以把预训练模型理解成已经拥有一个非常丰富的能力空间：&lt;/p&gt;
+\[\boxed{ \text{语言、知识、推理模式、语法、表征} }\]&lt;p&gt;下游微调很多时候并不是：&lt;/p&gt;
+\[\text{重新学习这些能力},\]&lt;p&gt;而更像：&lt;/p&gt;
+\[\boxed{ \text{重新组合、偏置或激活已有能力。} }\]&lt;p&gt;因此更新空间可能天然比原始参数空间低维得多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-一个二维类比&#34;&gt;4. 一个二维类比
+&lt;/h1&gt;&lt;p&gt;假设系统参数有：&lt;/p&gt;
+\[1000\]&lt;p&gt;维：&lt;/p&gt;
+\[\theta\in\mathbb R^{1000}.\]&lt;p&gt;但任务变化真正只需要沿两个方向：&lt;/p&gt;
+\[v_1,\quad v_2.\]&lt;p&gt;那么：&lt;/p&gt;
+\[\Delta\theta = a_1v_1+a_2v_2.\]&lt;p&gt;虽然：&lt;/p&gt;
+\[\theta\]&lt;p&gt;是 1000 维，&lt;/p&gt;
+&lt;p&gt;真正适配自由度却只有：&lt;/p&gt;
+\[2.\]&lt;p&gt;LoRA 做的事情，本质上就是寻找一个类似：&lt;/p&gt;
+\[\boxed{ \text{task adaptation subspace} }\]&lt;p&gt;的结构。&lt;/p&gt;
+&lt;p&gt;这和之前讲过的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;active-subspace&#34; tabindex=&#34;0&#34;&gt;Active Subspaces&lt;/span&gt; 有一个非常有趣的对应：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Active Subspace：寻找&lt;strong&gt;输入空间&lt;/strong&gt;里的低维敏感方向；&lt;/li&gt;
+&lt;li&gt;LoRA：假设&lt;strong&gt;参数更新空间&lt;/strong&gt;本身具有低维结构。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;二者都建立在同一个更一般的思想上：&lt;/p&gt;
+\[\boxed{ \text{名义维度很高，不代表有效自由度真的很高。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么-lora-比冻结大部分层更加精细&#34;&gt;5. 为什么 LoRA 比“冻结大部分层”更加精细？
+&lt;/h1&gt;&lt;p&gt;另一种参数高效方法是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;冻结前 30 层
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;只训练最后 2 层
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这等于假设：&lt;/p&gt;
+\[\boxed{ \text{任务变化只发生在某些特定层。} }\]&lt;p&gt;LoRA 的假设不同：&lt;/p&gt;
+\[\boxed{ \text{许多层都可以变化， 但每一层只需要少量低秩变化方向。} }\]&lt;p&gt;这通常更灵活。&lt;/p&gt;
+&lt;p&gt;例如一个 attention projection：&lt;/p&gt;
+\[W_q\]&lt;p&gt;可能只需要轻微改变若干 feature directions。&lt;/p&gt;
+&lt;p&gt;另一个：&lt;/p&gt;
+\[W_v\]&lt;p&gt;也需要适配。&lt;/p&gt;
+&lt;p&gt;LoRA 可以分别给它们：&lt;/p&gt;
+\[\Delta W_q=B_qA_q,\]\[\Delta W_v=B_vA_v.\]&lt;p&gt;于是变化是：&lt;/p&gt;
+\[\boxed{ \text{distributed but low-dimensional} }\]&lt;p&gt;，而不是：&lt;/p&gt;
+\[\text{localized but full-dimensional}.\]&lt;p&gt;这是两种完全不同的 inductive bias。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么它能显著省显存&#34;&gt;6. 为什么它能显著省显存？
+&lt;/h1&gt;&lt;p&gt;训练模型时，显存不只是存：&lt;/p&gt;
+\[W.\]&lt;p&gt;还要存：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;gradient；&lt;/li&gt;
+&lt;li&gt;optimizer states；&lt;/li&gt;
+&lt;li&gt;activation；&lt;/li&gt;
+&lt;li&gt;temporary buffers。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;以 Adam 为例，每个 trainable parameter 通常还会有：&lt;/p&gt;
+\[m,\quad v\]&lt;p&gt;两个 optimizer states。&lt;/p&gt;
+&lt;p&gt;如果完整微调：&lt;/p&gt;
+\[10^9\]&lt;p&gt;参数，就意味着这些状态也全部存在。&lt;/p&gt;
+&lt;p&gt;LoRA 冻结：&lt;/p&gt;
+\[W_0.\]&lt;p&gt;只优化：&lt;/p&gt;
+\[A,B.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{optimizer state 和 gradient memory 只跟 LoRA 参数数量增长。} }\]&lt;p&gt;这也是为什么 PEFT 在消费级 GPU 上非常有价值。Hugging Face 当前 PEFT 官方文档仍把 LoRA 作为最主要的参数高效微调方法之一，并强调只更新少量 adapter 参数可显著降低训练和存储成本。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-lora-的-inference-为什么可以几乎没有额外结构成本&#34;&gt;7. LoRA 的 inference 为什么可以几乎没有额外结构成本？
+&lt;/h1&gt;&lt;p&gt;因为：&lt;/p&gt;
+\[W_{\rm adapted} = W_0+BA.\]&lt;p&gt;训练结束以后，可以直接做：&lt;/p&gt;
+\[\boxed{ W&#39; = W_0+BA }\]&lt;p&gt;把 LoRA merge 回原权重。&lt;/p&gt;
+&lt;p&gt;于是 inference 仍然只是：&lt;/p&gt;
+\[y=W&#39;x.\]&lt;p&gt;不需要额外 adapter branch。&lt;/p&gt;
+&lt;p&gt;这也是原始 LoRA 相比某些传统 adapter architecture 的重要工程优势之一：原论文强调 LoRA 可以避免额外 inference latency。&lt;/p&gt;
+&lt;p&gt;但现代 serving 中也经常&lt;strong&gt;不 merge&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;为什么？&lt;/p&gt;
+&lt;p&gt;因为同一个 base model 可以挂：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Base LLM
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ├─ Finance LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ├─ Coding LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ├─ Legal LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ├─ Game NPC LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; └─ Internal Tool LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{一个大模型权重} + \text{很多轻量任务增量} }\]&lt;p&gt;就能支持多租户、多角色、多领域部署。&lt;/p&gt;
+&lt;p&gt;这是 LoRA 的系统价值，不只是训练价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-这和版本控制有一个很好的类比&#34;&gt;8. 这和版本控制有一个很好的类比
+&lt;/h1&gt;&lt;p&gt;假设 base model：&lt;/p&gt;
+\[W_0\]&lt;p&gt;有：&lt;/p&gt;
+\[20\text{ GB}.\]&lt;p&gt;有 100 个不同客户。&lt;/p&gt;
+&lt;p&gt;Full fine-tuning 要保存：&lt;/p&gt;
+\[100\times20 = 2000\text{ GB}.\]&lt;p&gt;LoRA 则保存：&lt;/p&gt;
+\[W_0\]&lt;p&gt;一次，然后每个客户只保存：&lt;/p&gt;
+\[\Delta W_i=B_iA_i.\]&lt;p&gt;如果每个 LoRA：&lt;/p&gt;
+\[100\text{ MB},\]&lt;p&gt;总量大约：&lt;/p&gt;
+\[20+100\times0.1 = 30\text{ GB}.\]&lt;p&gt;这实际上是一种：&lt;/p&gt;
+\[\boxed{ \text{base state + delta state} }\]&lt;p&gt;架构。&lt;/p&gt;
+&lt;p&gt;它和：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Git delta；&lt;/li&gt;
+&lt;li&gt;patch；&lt;/li&gt;
+&lt;li&gt;copy-on-write；&lt;/li&gt;
+&lt;li&gt;layered filesystem；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;的系统思想很相似。&lt;/p&gt;
+&lt;p&gt;所以 LoRA 在部署层面的本质，也可以理解为：&lt;/p&gt;
+\[\boxed{ \text{不要复制整个系统状态，只保存任务相关差分。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;9-rank--到底控制什么&#34;&gt;9. Rank \(r\) 到底控制什么？
+&lt;/h1&gt;&lt;p&gt;LoRA 最重要的超参数之一：&lt;/p&gt;
+\[r.\]&lt;p&gt;如果：&lt;/p&gt;
+\[r=1,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\Delta W=ba^T\]&lt;p&gt;只能产生一个 rank-1 更新。&lt;/p&gt;
+&lt;p&gt;表达能力非常有限。&lt;/p&gt;
+&lt;p&gt;随着：&lt;/p&gt;
+\[r\uparrow,\]&lt;p&gt;允许的 adaptation subspace 越丰富。&lt;/p&gt;
+&lt;p&gt;但同时：&lt;/p&gt;
+\[\boxed{ \text{参数量、计算量、显存} }\]&lt;p&gt;都增加。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[r\]&lt;p&gt;本质上是：&lt;/p&gt;
+\[\boxed{ \text{adaptation capacity budget} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;一个很重要的工程认识是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;所有层不一定需要相同 rank。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;有些层：&lt;/p&gt;
+\[r=4\]&lt;p&gt;就够。&lt;/p&gt;
+&lt;p&gt;有些层可能需要：&lt;/p&gt;
+\[r=32.\]&lt;p&gt;这也自然引出了 AdaLoRA、rank allocation 等后续方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-lora-并不是简单地做-svd&#34;&gt;10. LoRA 并不是简单地“做 SVD”
+&lt;/h1&gt;&lt;p&gt;这一点很容易误解。&lt;/p&gt;
+&lt;p&gt;LoRA 并不是：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;先完整 fine-tune；&lt;/li&gt;
+&lt;li&gt;得到 \(\Delta W\)；&lt;/li&gt;
+&lt;li&gt;再做 SVD；&lt;/li&gt;
+&lt;li&gt;保留前 \(r\) 个奇异值。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;真正训练时：&lt;/p&gt;
+\[A,B\]&lt;p&gt;从一开始就是优化变量。&lt;/p&gt;
+&lt;p&gt;也就是说模型直接搜索：&lt;/p&gt;
+\[\boxed{ \operatorname{rank}(\Delta W)\le r }\]&lt;p&gt;这个低秩参数空间。&lt;/p&gt;
+&lt;p&gt;所以 LoRA 是：&lt;/p&gt;
+\[\boxed{ \text{low-rank parameterization} }\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\text{post-hoc matrix compression}.\]&lt;p&gt;区别非常重要。&lt;/p&gt;
+&lt;p&gt;前者改变优化问题本身。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么--的训练动力学也很重要&#34;&gt;11. 为什么 \(A,B\) 的训练动力学也很重要？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;把：&lt;/p&gt;
+\[\Delta W=BA\]&lt;p&gt;分解以后，参数化不再唯一。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[BA = (BS)(S^{-1}A)\]&lt;p&gt;对可逆：&lt;/p&gt;
+\[S\]&lt;p&gt;都成立。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[A,B\]&lt;p&gt;之间有 scaling freedom。&lt;/p&gt;
+&lt;p&gt;这意味着优化器看到的参数空间 geometry 和直接优化：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;并不一样。&lt;/p&gt;
+&lt;p&gt;2024 年 LoRA+ 就专门指出，随着模型 width 增大，给：&lt;/p&gt;
+\[A,B\]&lt;p&gt;使用相同 learning rate 会导致低效 feature learning；其方法为两组矩阵使用不同学习率，在论文实验中报告最高约 \(2\times\) 微调速度提升以及约 1–2% 的性能改进。&lt;/p&gt;
+&lt;p&gt;这个结果很有启发性：&lt;/p&gt;
+\[\boxed{ \text{选择低维参数化以后， 优化几何本身也随之改变。} }\]&lt;p&gt;所以“降维”不是免费的。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-lora-fa-又揭示了另一个系统问题参数少不等于-activation-少&#34;&gt;12. LoRA-FA 又揭示了另一个系统问题：参数少，不等于 activation 少
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;普通 LoRA 虽然 trainable parameters 大幅减少，&lt;/p&gt;
+&lt;p&gt;但为了计算：&lt;/p&gt;
+\[A x\]&lt;p&gt;和：&lt;/p&gt;
+\[B(Ax),\]&lt;p&gt;训练时仍需要保存相应 activation。&lt;/p&gt;
+&lt;p&gt;所以显存瓶颈并没有完全消失。&lt;/p&gt;
+&lt;p&gt;LoRA-FA 的做法是固定其中一个投影矩阵，只更新另一部分，从而减少需要保存的 activation；论文报告相比标准 LoRA 可进一步降低总体训练内存，最高约 \(1.4\times\)。&lt;/p&gt;
+&lt;p&gt;这提醒我们：&lt;/p&gt;
+\[\boxed{ \text{参数压缩} \neq \text{训练系统整体压缩} }\]&lt;p&gt;工程优化必须同时看：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;parameters；&lt;/li&gt;
+&lt;li&gt;gradients；&lt;/li&gt;
+&lt;li&gt;optimizer states；&lt;/li&gt;
+&lt;li&gt;activations；&lt;/li&gt;
+&lt;li&gt;communication。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这一点和物理求解器非常类似：DOF 少了，并不代表 sparse solve 就一定便宜。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-lora-真正有迁移价值的部分低秩更新不是低秩模型&#34;&gt;13. LoRA 真正有迁移价值的部分：低秩“更新”，不是低秩“模型”
+&lt;/h1&gt;&lt;p&gt;这一点尤其值得区分。&lt;/p&gt;
+&lt;p&gt;LoRA 并没有假设：&lt;/p&gt;
+\[W_0\]&lt;p&gt;本身低秩。&lt;/p&gt;
+&lt;p&gt;事实上预训练权重可以是：&lt;/p&gt;
+\[\boxed{\text{full-rank}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;它只假设：&lt;/p&gt;
+\[\boxed{ \Delta W }\]&lt;p&gt;近似低秩。&lt;/p&gt;
+&lt;p&gt;这是一种非常强的建模思想：&lt;/p&gt;
+\[\boxed{ \text{复杂系统本身可以是高维的， 但从一个已知良好状态到另一个邻近状态的变化可能是低维的。} }\]&lt;p&gt;这个思想远远不只属于 LLM。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-这和有限元中的低秩更新高度相似&#34;&gt;14. 这和有限元中的低秩更新高度相似
+&lt;/h1&gt;&lt;p&gt;设结构刚度矩阵：&lt;/p&gt;
+\[K_0.\]&lt;p&gt;只有局部参数变化：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;一个连接点刚度变化；&lt;/li&gt;
+&lt;li&gt;少数单元材料改变；&lt;/li&gt;
+&lt;li&gt;边界条件小范围改变。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[K = K_0+\Delta K.\]&lt;p&gt;很多时候：&lt;/p&gt;
+\[\Delta K\]&lt;p&gt;虽然嵌在巨大：&lt;/p&gt;
+\[N\times N\]&lt;p&gt;系统里，但本身影响的自由度很少。&lt;/p&gt;
+&lt;p&gt;于是可以写成近似：&lt;/p&gt;
+\[\boxed{ \Delta K = UV^T. }\]&lt;p&gt;那么：&lt;/p&gt;
+\[(K_0+UV^T)^{-1}\]&lt;p&gt;就可能利用 Woodbury identity：&lt;/p&gt;
+\[(A+UCV)^{-1} = A^{-1} - A^{-1}U (C^{-1}+VA^{-1}U)^{-1} VA^{-1}.\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \text{无需把整个系统重新当成一个全新问题。} }\]&lt;p&gt;LoRA 和这种思维非常接近：&lt;/p&gt;
+\[\boxed{ \text{base operator} + \text{low-rank correction}. }\]&lt;hr&gt;
+&lt;h1 id=&#34;15-这对代理模型也有一个非常好的启发&#34;&gt;15. 这对代理模型也有一个非常好的启发
+&lt;/h1&gt;&lt;p&gt;假设已经有一个基础代理：&lt;/p&gt;
+\[f_0(x)\]&lt;p&gt;对应工况 A。&lt;/p&gt;
+&lt;p&gt;现在工况 B：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;材料稍有变化；&lt;/li&gt;
+&lt;li&gt;边界条件变化；&lt;/li&gt;
+&lt;li&gt;软件模型升级；&lt;/li&gt;
+&lt;li&gt;fidelity 提升。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;最粗暴做法：&lt;/p&gt;
+\[\boxed{ \text{重新训练一个完整 surrogate} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;但如果新旧任务差异：&lt;/p&gt;
+\[\delta f(x) = f_B(x)-f_A(x)\]&lt;p&gt;具有低维结构，&lt;/p&gt;
+&lt;p&gt;更合理的做法可能是：&lt;/p&gt;
+\[\boxed{ f_B = f_0 + \Delta f_{\rm low-dimensional}. }\]&lt;p&gt;这和 multifidelity discrepancy modeling 很接近。&lt;/p&gt;
+&lt;p&gt;LoRA 提醒我们：&lt;/p&gt;
+\[\boxed{ \text{迁移学习真正应该建模的， 往往是任务之间的“变化”， 而不是重新建模整个任务。} }\]&lt;p&gt;这是代理模型中非常值得吸收的一层。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-对可靠性模型同样成立&#34;&gt;16. 对可靠性模型同样成立
+&lt;/h1&gt;&lt;p&gt;假设已有一个极限状态代理：&lt;/p&gt;
+\[g_0(x)\]&lt;p&gt;对应 nominal design。&lt;/p&gt;
+&lt;p&gt;设计稍微变化：&lt;/p&gt;
+\[d_0\rightarrow d_1.\]&lt;p&gt;通常会重新生成：&lt;/p&gt;
+\[N\]&lt;p&gt;个高保真样本，重训：&lt;/p&gt;
+\[g_1(x).\]&lt;p&gt;但如果：&lt;/p&gt;
+\[g(x,d)\]&lt;p&gt;对设计变化主要发生在某个低维 response direction 上，&lt;/p&gt;
+&lt;p&gt;则可能构造：&lt;/p&gt;
+\[\boxed{ g_1(x) = g_0(x) + \Delta g(x) }\]&lt;p&gt;并只学习：&lt;/p&gt;
+\[\Delta g.\]&lt;p&gt;这其实就是一种：&lt;/p&gt;
+\[\boxed{ \text{surrogate adaptation} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;LoRA 最大的研究启发之一，就是让人去问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;多工况、多设计、多 fidelity 的代理模型之间，真正需要独立学习的自由度到底有多少？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-对游戏引擎--agent-部署一个特别现实的价值共享-base动态挂-adapter&#34;&gt;17. 对游戏引擎 / Agent 部署，一个特别现实的价值：共享 base，动态挂 adapter
+&lt;/h1&gt;&lt;p&gt;假设一个游戏中需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;商人 NPC；&lt;/li&gt;
+&lt;li&gt;战斗教官；&lt;/li&gt;
+&lt;li&gt;世界观讲解者；&lt;/li&gt;
+&lt;li&gt;任务生成器；&lt;/li&gt;
+&lt;li&gt;QA 助手。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;每个角色都完整部署一个：&lt;/p&gt;
+\[8B\]&lt;p&gt;模型通常不现实。&lt;/p&gt;
+&lt;p&gt;LoRA 架构允许：&lt;/p&gt;
+\[\boxed{ \text{同一个 base model} + \text{多个轻量 adapter}. }\]&lt;p&gt;服务端可以根据请求动态选择：&lt;/p&gt;
+\[A_i,B_i.\]&lt;p&gt;这和前一期 &lt;span class=&#34;term-anchor&#34; data-term=&#34;paged-attention&#34; tabindex=&#34;0&#34;&gt;PagedAttention&lt;/span&gt; 所体现的思路非常相似：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PagedAttention：共享/虚拟化 KV memory；&lt;/li&gt;
+&lt;li&gt;LoRA：共享 base parameters，只保存任务增量。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;两者都是：&lt;/p&gt;
+\[\boxed{ \text{把“大而稳定的公共部分” 与 “小而动态的差异部分” 分离。}\]&lt;p&gt;这是现代 AI serving 很核心的一种架构思想。&lt;/p&gt;
+&lt;p&gt;Hugging Face 当前 PEFT 已支持加载、切换、删除不同 LoRA adapters，并支持 tensor parallel 等部署场景。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-lora-的局限低秩假设不是永远成立&#34;&gt;18. LoRA 的局限：低秩假设不是永远成立
+&lt;/h1&gt;&lt;p&gt;如果新任务与 base model 相距很远：&lt;/p&gt;
+\[\boxed{ \text{domain shift 很大} }\]&lt;p&gt;或者需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;大规模新知识；&lt;/li&gt;
+&lt;li&gt;新语言；&lt;/li&gt;
+&lt;li&gt;新视觉模式；&lt;/li&gt;
+&lt;li&gt;全新推理结构；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[r\]&lt;p&gt;可能必须不断增加。&lt;/p&gt;
+&lt;p&gt;最终：&lt;/p&gt;
+\[r\rightarrow d.\]&lt;p&gt;LoRA 的优势就会逐渐消失。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{LoRA 最适合“已有模型附近的任务适配”， 而不是所有形式的知识重建。} }\]&lt;p&gt;它依赖一个隐含条件：&lt;/p&gt;
+\[\boxed{ \text{base representation 已经足够好。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;19-另一个局限低秩不等于低函数复杂度&#34;&gt;19. 另一个局限：低秩不等于低函数复杂度
+&lt;/h1&gt;&lt;p&gt;即使：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;只有 rank 4，&lt;/p&gt;
+&lt;p&gt;经过：&lt;/p&gt;
+\[100\]&lt;p&gt;层网络、非线性、attention 后，&lt;/p&gt;
+&lt;p&gt;最终函数变化：&lt;/p&gt;
+\[\Delta f(x)\]&lt;p&gt;仍然可能非常复杂。&lt;/p&gt;
+&lt;p&gt;所以不要简单理解为：&lt;/p&gt;
+\[r=8 \Rightarrow \text{模型只学 8 个功能}.\]&lt;p&gt;\(r\) 控制的是：&lt;/p&gt;
+\[\boxed{ \text{单个权重更新矩阵的线性代数自由度} }\]&lt;p&gt;而不是最终模型行为的直接语义维数。&lt;/p&gt;
+&lt;p&gt;这是理解 LoRA 时一个非常重要的边界。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个很值得自己做的最小实验&#34;&gt;20. 一个很值得自己做的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;即使不训练 LLM，也可以用一个小 MLP 理解 LoRA。&lt;/p&gt;
+&lt;p&gt;先训练：&lt;/p&gt;
+\[f_0(x)\]&lt;p&gt;拟合：&lt;/p&gt;
+\[y=\sin x.\]&lt;p&gt;然后新任务：&lt;/p&gt;
+\[y=\sin x+0.2\sin3x.\]&lt;p&gt;固定原模型。&lt;/p&gt;
+&lt;p&gt;只对其中一个：&lt;/p&gt;
+\[W\in\mathbb R^{128\times128}\]&lt;p&gt;加入：&lt;/p&gt;
+\[\Delta W=BA.\]&lt;p&gt;分别尝试：&lt;/p&gt;
+\[r=1,2,4,8,16.\]&lt;p&gt;比较：&lt;/p&gt;
+\[\boxed{ \text{validation error} }\]&lt;p&gt;与：&lt;/p&gt;
+\[\boxed{ \text{trainable parameter count}. }\]&lt;p&gt;然后再和 full fine-tuning 比较。&lt;/p&gt;
+&lt;p&gt;最值得看的问题是：&lt;/p&gt;
+\[\boxed{ \text{性能在什么 rank 后开始饱和？} }\]&lt;p&gt;如果：&lt;/p&gt;
+\[r=4\]&lt;p&gt;已经和：&lt;/p&gt;
+\[r=64\]&lt;p&gt;几乎一样，&lt;/p&gt;
+&lt;p&gt;你就实际看到了：&lt;/p&gt;
+\[\boxed{ \text{task adaptation 的 intrinsic rank 很低。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;LoRA 最值得记住的并不是：&lt;/p&gt;
+\[\Delta W=BA.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{一个系统可以极其高维， 但“从一个已经很好状态到另一个任务状态的变化” 可能只占据很小的低维子空间。} }\]&lt;p&gt;所以它在整个知识体系中的位置更应该理解成：&lt;/p&gt;
+\[\text{Large pretrained model}\]\[\downarrow\]\[\boxed{\text{Low-rank update subspace}}\]\[\downarrow\]\[\text{Parameter-efficient adaptation}.\]&lt;p&gt;而这个思想可以迁移到很多地方：&lt;/p&gt;
+\[\boxed{ \text{base model} + \text{low-dimensional correction} }\]&lt;p&gt;可能对应：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;LLM：LoRA；&lt;/li&gt;
+&lt;li&gt;FEM：low-rank stiffness update；&lt;/li&gt;
+&lt;li&gt;代理模型：discrepancy adaptation；&lt;/li&gt;
+&lt;li&gt;多保真模型：低维 fidelity correction；&lt;/li&gt;
+&lt;li&gt;游戏/Agent 部署：base model + task adapters；&lt;/li&gt;
+&lt;li&gt;优化：在低维更新空间内搜索。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;它真正教会我们的，是一个非常普遍的工程原则：&lt;/p&gt;
+\[\boxed{ \text{面对一个已经很复杂、但已经工作良好的系统， 优先学习“怎样改变它”， 而不一定重新学习“整个系统是什么”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hu et al., &lt;em&gt;LoRA: Low-Rank Adaptation of Large Language Models&lt;/em&gt;, ICLR 2022&lt;/strong&gt;。原始论文，最值得重点看 §4 方法、§7 对 adaptation rank 的分析，以及不同 \(r\) 下的性能。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2106.09685&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;LoRA 原论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Microsoft &lt;code&gt;loralib&lt;/code&gt; 官方实现&lt;/strong&gt;。源码非常短，适合直接看 LoRA 怎样注入 &lt;code&gt;Linear&lt;/code&gt; / attention projection，以及如何 merge/unmerge 权重。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://github.com/microsoft/LoRA&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Microsoft LoRA GitHub&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hugging Face PEFT — LoRA 官方文档&lt;/strong&gt;。目前最实用的工程入口，包含 &lt;code&gt;LoraConfig&lt;/code&gt;、target modules、rank、LoRA-FA、LoRA+、adapter 加载/切换以及 tensor parallel 支持。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://huggingface.co/docs/peft/main/package_reference/lora&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;PEFT LoRA 文档&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hayou, Ghosh &amp;amp; Yu, &lt;em&gt;LoRA+: Efficient Low Rank Adaptation of Large Models&lt;/em&gt;, 2024&lt;/strong&gt;。适合进一步理解：选了低秩参数化以后，\(A/B\) 两个因子的优化尺度为什么本身会成为问题。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Zhang et al., &lt;em&gt;LoRA-FA: Memory-efficient Low-rank Adaptation for Large Language Models Fine-tuning&lt;/em&gt;, 2023&lt;/strong&gt;。适合从“参数效率”继续走到“完整训练系统效率”，尤其是 activation memory 为什么仍可能成为瓶颈。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</title>
+        <link>https://assranai.github.io/cards/25-hyper-reduction/</link>
+        <pubDate>Mon, 07 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/25-hyper-reduction/</guid>
+        <description>&lt;h1 id=&#34;hyper-reduction状态维数降到几十并不意味着非线性有限元真的变快&#34;&gt;Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 数值方法 × 代理模型 × 软体动力学&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：&lt;/p&gt;
+\[\boxed{ \text{“自由度少了”与“计算成本少了”不是同一件事。} }\]&lt;p&gt;假设原始有限元有：&lt;/p&gt;
+\[N=10^6\]&lt;p&gt;个自由度。&lt;/p&gt;
+&lt;p&gt;通过 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt;/&lt;span class=&#34;term-anchor&#34; data-term=&#34;reduced-basis&#34; tabindex=&#34;0&#34;&gt;Reduced Basis&lt;/span&gt; 得到：&lt;/p&gt;
+\[u\approx Vq, \qquad V\in\mathbb R^{N\times r}, \quad r=50.\]&lt;p&gt;看起来问题已经从：&lt;/p&gt;
+\[10^6\]&lt;p&gt;维降到了：&lt;/p&gt;
+\[50\]&lt;p&gt;维。&lt;/p&gt;
+&lt;p&gt;但如果系统含有非线性内力：&lt;/p&gt;
+\[f_{\rm int}(u),\]&lt;p&gt;每一步仍然必须先在完整网格上计算：&lt;/p&gt;
+\[f_{\rm int}(Vq)\in\mathbb R^N,\]&lt;p&gt;然后才投影：&lt;/p&gt;
+\[V^T f_{\rm int}(Vq).\]&lt;p&gt;于是你虽然只求 50 个未知量，却可能依然遍历：&lt;/p&gt;
+\[\boxed{\text{全部百万个自由度 / 全部有限元单元。}}\]&lt;p&gt;这就是 projection-based nonlinear ROM 的经典瓶颈。DEIM 正是为此提出：让非线性项只在少数经过挑选的位置上求值；ECSW 则进一步从有限元虚功/能量结构出发，只计算少量具有权重的代表单元。&lt;/p&gt;
+&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{Model reduction 降的是状态空间； Hyper-reduction 降的是算子求值成本。} }\]&lt;hr&gt;
+&lt;h2 id=&#34;1-为什么线性-rom-很容易真正做到快非线性-rom-却不行&#34;&gt;1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？
+&lt;/h2&gt;&lt;p&gt;先看线性有限元：&lt;/p&gt;
+\[M\ddot u+Ku=f.\]&lt;p&gt;设：&lt;/p&gt;
+\[u=Vq.\]&lt;p&gt;Galerkin 投影：&lt;/p&gt;
+\[V^TMV\ddot q + V^TKVq = V^Tf.\]&lt;p&gt;定义：&lt;/p&gt;
+\[M_r=V^TMV,\]\[K_r=V^TKV.\]&lt;p&gt;这些矩阵可以在 offline 阶段提前算好。&lt;/p&gt;
+&lt;p&gt;在线计算只剩：&lt;/p&gt;
+\[M_r\ddot q+K_rq=f_r,\]&lt;p&gt;矩阵规模只有：&lt;/p&gt;
+\[r\times r.\]&lt;p&gt;于是 online cost 真正与：&lt;/p&gt;
+\[N\]&lt;p&gt;脱钩。&lt;/p&gt;
+&lt;p&gt;这叫：&lt;/p&gt;
+\[\boxed{\text{offline-online decomposition}}\]&lt;p&gt;，也是 Reduced Basis / projection ROM 最理想的状态。经典 projection-based model reduction 综述正是把“online cost 是否与高维系统规模无关”视为参数化降阶模型是否真正有效的重要标准。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-非线性一出现offline-online-decomposition-就断了&#34;&gt;2. 非线性一出现，offline-online decomposition 就断了
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[M\ddot u+f_{\rm int}(u)=f_{\rm ext}.\]&lt;p&gt;代入：&lt;/p&gt;
+\[u=Vq,\]&lt;p&gt;得到：&lt;/p&gt;
+\[M_r\ddot q + \boxed{ V^Tf_{\rm int}(Vq) } = f_r.\]&lt;p&gt;问题就在方框里。&lt;/p&gt;
+&lt;p&gt;即使：&lt;/p&gt;
+\[q\in\mathbb R^{50},\]&lt;p&gt;为了算：&lt;/p&gt;
+\[f_{\rm int}(Vq),\]&lt;p&gt;你通常仍需要：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;对所有 element:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    计算 F
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    计算 constitutive law
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    计算 element force
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    assemble
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此复杂度仍然接近：&lt;/p&gt;
+\[O(N).\]&lt;p&gt;如果是隐式求解，还要计算：&lt;/p&gt;
+\[K_t(u) = \frac{\partial f_{\rm int}}{\partial u}\]&lt;p&gt;以及：&lt;/p&gt;
+\[V^TK_t(Vq)V.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{降阶后的线性系统很小， 但构造这个小系统仍然很贵。} }\]&lt;p&gt;Farhat 等对 ECSW 的分析明确指出：对于 nonlinear ROM，显式计算的主要成本在 projected residual；隐式计算还需要 projected Jacobian，这两个高维算子求值正是 hyper-reduction 要消除的瓶颈。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-hyper-reduction-到底超在哪里&#34;&gt;3. Hyper-reduction 到底“超”在哪里？
+&lt;/h1&gt;&lt;p&gt;普通 reduction：&lt;/p&gt;
+\[u\in\mathbb R^N\]&lt;p&gt;被压缩成：&lt;/p&gt;
+\[q\in\mathbb R^r.\]&lt;p&gt;Hyper-reduction 再进一步问：&lt;/p&gt;
+\[\boxed{ \text{为了算 reduced equation， 真的有必要看全部 }N\text{ 个空间位置吗？} }\]&lt;p&gt;如果真正重要的 nonlinear information 只需要在：&lt;/p&gt;
+\[m\ll N\]&lt;p&gt;个位置上求值，&lt;/p&gt;
+&lt;p&gt;就可以把：&lt;/p&gt;
+\[O(N)\]&lt;p&gt;operator evaluation 进一步变成：&lt;/p&gt;
+\[O(m).\]&lt;p&gt;因此整个结构是：&lt;/p&gt;
+\[\text{Full-order model}\]\[\downarrow\]\[\text{POD / Reduced Basis}\]\[\boxed{\text{降低未知量数目}}\]\[\downarrow\]\[\text{Hyper-reduction}\]\[\boxed{\text{降低 nonlinear operator 求值成本}}.\]&lt;p&gt;这两个层次必须同时存在，nonlinear ROM 才可能真正获得数量级的在线加速。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-deim既然整个非线性向量有低维结构就没必要把它全部算出来&#34;&gt;4. DEIM：既然整个非线性向量有低维结构，就没必要把它全部算出来
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[f(u)\in\mathbb R^N\]&lt;p&gt;虽然有：&lt;/p&gt;
+\[N\]&lt;p&gt;个分量，但在训练数据中主要落在一个：&lt;/p&gt;
+\[m\]&lt;p&gt;维子空间：&lt;/p&gt;
+\[f(u)\approx Uc,\]&lt;p&gt;其中：&lt;/p&gt;
+\[U\in\mathbb R^{N\times m}.\]&lt;p&gt;这个：&lt;/p&gt;
+\[U\]&lt;p&gt;通常来自 nonlinear snapshots：&lt;/p&gt;
+\[[f(u^{(1)}),f(u^{(2)}),\ldots]\]&lt;p&gt;的 POD/SVD。&lt;/p&gt;
+&lt;p&gt;这相当于说：&lt;/p&gt;
+\[\boxed{ \text{不仅解 }u\text{ 有低秩结构， 非线性算子 }f(u)\text{ 本身也有低秩结构。} }\]&lt;p&gt;问题变成：&lt;/p&gt;
+\[c\]&lt;p&gt;怎么求？&lt;/p&gt;
+&lt;p&gt;如果用标准 projection：&lt;/p&gt;
+\[c=U^Tf,\]&lt;p&gt;仍然需要完整：&lt;/p&gt;
+\[f\in\mathbb R^N.\]&lt;p&gt;所以没有解决问题。&lt;/p&gt;
+&lt;p&gt;DEIM 的关键是：&lt;/p&gt;
+\[\boxed{ \text{只要求 }f\text{ 的 }m\text{ 个精选分量。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;5-deim-的核心公式非常漂亮&#34;&gt;5. DEIM 的核心公式非常漂亮
+&lt;/h1&gt;&lt;p&gt;选取：&lt;/p&gt;
+\[m\]&lt;p&gt;个索引：&lt;/p&gt;
+\[p_1,\ldots,p_m.\]&lt;p&gt;构造选择矩阵：&lt;/p&gt;
+\[P= [e_{p_1},\ldots,e_{p_m}] \in\mathbb R^{N\times m}.\]&lt;p&gt;DEIM 要求近似向量：&lt;/p&gt;
+\[Uc\]&lt;p&gt;在这些位置与真正的 nonlinear vector 一致：&lt;/p&gt;
+\[P^TUc = P^Tf(u).\]&lt;p&gt;于是：&lt;/p&gt;
+\[c= (P^TU)^{-1}P^Tf(u).\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ f(u) \approx U(P^TU)^{-1}P^Tf(u) }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;真正在线需要计算的只有：&lt;/p&gt;
+\[\boxed{ P^Tf(u) }\]&lt;p&gt;即：&lt;/p&gt;
+\[m\]&lt;p&gt;个 nonlinear entries。&lt;/p&gt;
+&lt;p&gt;而 reduced nonlinear term：&lt;/p&gt;
+\[V^Tf(u)\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{ V^TU(P^TU)^{-1}P^Tf(u). }\]&lt;p&gt;前面的：&lt;/p&gt;
+\[V^TU(P^TU)^{-1}\]&lt;p&gt;全部可以 offline 预计算。&lt;/p&gt;
+&lt;p&gt;因此 online 阶段只剩：&lt;/p&gt;
+\[\boxed{ \text{算 }m\text{ 个非线性分量。} }\]&lt;p&gt;Chaturantabut 与 Sorensen 2010 年的 DEIM 论文正是通过这个结构，让 POD nonlinear ROM 的复杂度显著摆脱 full system dimension。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-一个简单例子100-万维-nonlinear-vector只看-50-个坐标&#34;&gt;6. 一个简单例子：100 万维 nonlinear vector，只看 50 个坐标
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[N=10^6, \qquad r=30, \qquad m=50.\]&lt;p&gt;普通 POD ROM：&lt;/p&gt;
+\[q\in\mathbb R^{30}.\]&lt;p&gt;但每次仍计算：&lt;/p&gt;
+\[10^6\]&lt;p&gt;维 nonlinear force。&lt;/p&gt;
+&lt;p&gt;DEIM 则选择：&lt;/p&gt;
+\[50\]&lt;p&gt;个代表位置。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;9
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;q
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;u_selected
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;evaluate 50 nonlinear entries
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;DEIM reconstruction/projection
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;30-dimensional reduced force
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果 nonlinear evaluation 是主要瓶颈，理论上可以把这一部分从：&lt;/p&gt;
+\[10^6\]&lt;p&gt;级降到：&lt;/p&gt;
+\[50\]&lt;p&gt;级。&lt;/p&gt;
+&lt;p&gt;这就是为什么它被称作 hyper-reduction。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-deim-点不是随机选的&#34;&gt;7. DEIM 点不是随机选的
+&lt;/h1&gt;&lt;p&gt;如果随便选择：&lt;/p&gt;
+\[m\]&lt;p&gt;个坐标，很可能：&lt;/p&gt;
+\[P^TU\]&lt;p&gt;接近奇异。&lt;/p&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[(P^TU)^{-1}\]&lt;p&gt;会放大误差。&lt;/p&gt;
+&lt;p&gt;DEIM 原始算法通过 greedy 过程选 interpolation indices。&lt;/p&gt;
+&lt;p&gt;直觉上：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;取第一个 nonlinear POD mode；&lt;/li&gt;
+&lt;li&gt;找它幅值最大的坐标；&lt;/li&gt;
+&lt;li&gt;用已有点解释下一个 mode；&lt;/li&gt;
+&lt;li&gt;找剩余 residual 最大的位置；&lt;/li&gt;
+&lt;li&gt;加入新点；&lt;/li&gt;
+&lt;li&gt;重复。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;所以每一个 interpolation point 都在回答：&lt;/p&gt;
+\[\boxed{ \text{当前已有采样位置最难解释的 nonlinear mode 在哪里？} }\]&lt;p&gt;这和 greedy reduced basis、active learning 在思想上有明显相似性，但 DEIM 的目标很具体：&lt;/p&gt;
+\[\boxed{ \text{让 nonlinear field 能从少数坐标稳定重构。} }\]&lt;p&gt;pyMOR 当前仍直接提供 &lt;code&gt;deim()&lt;/code&gt; 和 empirical-interpolation operator 接口，并通过 nonlinear snapshots 生成 collateral basis 与 interpolation DOFs。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-deim-的误差由两个东西共同控制&#34;&gt;8. DEIM 的误差由两个东西共同控制
+&lt;/h1&gt;&lt;p&gt;其典型误差结构可以理解成：&lt;/p&gt;
+\[\|f-\tilde f\| \lesssim \underbrace{ \|(I-UU^T)f\| }_{\text{nonlinear basis 截断误差}} \times \underbrace{ \|(P^TU)^{-1}\| }_{\text{插值点条件数}} .\]&lt;p&gt;第一项回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;nonlinear POD basis 本身够不够表达 \(f\)？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;第二项回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;选出的 interpolation points 稳不稳定？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;因此只增加：&lt;/p&gt;
+\[m\]&lt;p&gt;并不自动保证效果好。&lt;/p&gt;
+&lt;p&gt;你同时需要：&lt;/p&gt;
+\[\boxed{ \text{good collateral basis} + \text{good sampling points}. }\]&lt;p&gt;后续 POD-DEIM 的理论分析明确给出了 reduced state error 与 neglected POD singular values、DEIM nonlinear approximation error 之间的关系。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-但-deim-用在非线性结构动力学上有一个隐患它主要近似向量不一定保持物理结构&#34;&gt;9. 但 DEIM 用在非线性结构动力学上有一个隐患：它主要近似“向量”，不一定保持“物理结构”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑有限元内力：&lt;/p&gt;
+\[f_{\rm int}(u) = \nabla_u \Pi(u).\]&lt;p&gt;也就是说它来自势能：&lt;/p&gt;
+\[\Pi(u).\]&lt;p&gt;这意味着完整模型拥有：&lt;/p&gt;
+\[\boxed{ \text{力—能量一致性} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;如果你直接用：&lt;/p&gt;
+\[f_{\rm int} \approx U(P^TU)^{-1}P^Tf_{\rm int},\]&lt;p&gt;得到的近似力未必仍然等于某个近似势能的梯度。&lt;/p&gt;
+&lt;p&gt;于是可能破坏：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;对称切线刚度；&lt;/li&gt;
+&lt;li&gt;势能结构；&lt;/li&gt;
+&lt;li&gt;Hamilton/Lagrangian structure；&lt;/li&gt;
+&lt;li&gt;数值稳定性。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这在结构动力学里比一般函数逼近严重得多。&lt;/p&gt;
+&lt;p&gt;Farhat、Chapman、Avery 对 ECSW 的分析中特别比较了这一点：ECSW 能保留与 Hamilton 原理相关的 Lagrangian structure，而 DEIM 及其一些变体在他们测试的 nonlinear structural dynamics 问题中可能产生数值不稳定。&lt;/p&gt;
+&lt;p&gt;这揭示了一个非常重要的原则：&lt;/p&gt;
+\[\boxed{ \text{非线性项拟合得准， 不代表 resulting dynamics 就一定好。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-ecsw与其重构整条-nonlinear-force不如直接挑少数代表单元&#34;&gt;10. ECSW：与其重构整条 nonlinear force，不如直接挑少数“代表单元”
+&lt;/h1&gt;&lt;p&gt;有限元内力天然可以写成单元求和：&lt;/p&gt;
+\[f_{\rm int}(u) = \sum_{e=1}^{N_e} L_e^T f_e(u_e).\]&lt;p&gt;Galerkin 投影：&lt;/p&gt;
+\[V^Tf_{\rm int}(Vq) = \sum_{e=1}^{N_e} V_e^T f_e(V_eq).\]&lt;p&gt;这提供了一个非常自然的机会：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;真的需要算所有单元吗？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;ECSW 选择一个小单元集合：&lt;/p&gt;
+\[\mathcal S \subset \{1,\ldots,N_e\}\]&lt;p&gt;以及正权重：&lt;/p&gt;
+\[\xi_e&gt;0.\]&lt;p&gt;然后近似：&lt;/p&gt;
+\[\boxed{ V^Tf_{\rm int}(Vq) \approx \sum_{e\in\mathcal S} \xi_e V_e^Tf_e(V_eq) }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;也就是说：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;full mesh:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;100000 elements
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;hyper-reduced mesh:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;only 500 sampled elements
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+ learned weights
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;在线阶段只有这：&lt;/p&gt;
+\[500\]&lt;p&gt;个单元真正调用 constitutive model。&lt;/p&gt;
+&lt;p&gt;Farhat 等最初正是基于 mesh sampling、virtual work 和 energy structure 构造这一方法，并在 nonlinear finite-element structural dynamics 上获得最高约四个数量级的 CPU 加速案例。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么-ecsw-的权重必须认真学&#34;&gt;11. 为什么 ECSW 的权重必须认真学？
+&lt;/h1&gt;&lt;p&gt;如果只是随机取：&lt;/p&gt;
+\[1\%\]&lt;p&gt;单元：&lt;/p&gt;
+\[\sum_{e\in S}V_e^Tf_e\]&lt;p&gt;通常会严重低估整个结构的内力。&lt;/p&gt;
+&lt;p&gt;ECSW 使用：&lt;/p&gt;
+\[\xi_e\]&lt;p&gt;让被采样的少数单元代表未采样单元的整体贡献。&lt;/p&gt;
+&lt;p&gt;可以粗略理解成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;element 17  × 12.3
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;element 83  ×  5.7
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;element 91  × 21.5
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;...
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;训练阶段使用 full-order snapshots，希望：&lt;/p&gt;
+\[\sum_{e\in S} \xi_e V_e^Tf_e\]&lt;p&gt;尽可能匹配：&lt;/p&gt;
+\[\sum_{e=1}^{N_e} V_e^Tf_e.\]&lt;p&gt;因此 Hyper-reduction 本质上又变成：&lt;/p&gt;
+\[\boxed{ \text{寻找少数代表单元 + 合适 quadrature weights} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;从这个角度看，ECSW 很像一种：&lt;/p&gt;
+\[\boxed{\text{data-driven reduced quadrature}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-为什么-ecsw-会比直接重构-nonlinear-vector更适合结构力学&#34;&gt;12. 为什么 ECSW 会比“直接重构 nonlinear vector”更适合结构力学？
+&lt;/h1&gt;&lt;p&gt;因为有限元本身就是按单元积分/装配建立的。&lt;/p&gt;
+&lt;p&gt;ECSW 不打破：&lt;/p&gt;
+\[\text{element contribution}\]&lt;p&gt;这个基本结构。&lt;/p&gt;
+&lt;p&gt;如果原始 reduced internal force 是：&lt;/p&gt;
+\[f_r(q) = \nabla_q \Pi_r(q),\]&lt;p&gt;那么使用正权重：&lt;/p&gt;
+\[\xi_e\]&lt;p&gt;对单元能量加权后仍然可以构造：&lt;/p&gt;
+\[\tilde\Pi_r(q) = \sum_{e\in S} \xi_e\Pi_e(V_eq).\]&lt;p&gt;于是：&lt;/p&gt;
+\[\tilde f_r(q) = \nabla_q\tilde\Pi_r(q).\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{hyper-reduced force 仍然来自一个 hyper-reduced energy} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这就是所谓：&lt;/p&gt;
+\[\boxed{\text{structure preserving}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;2015 年 ECSW 理论工作证明了其对 Lagrangian structure 和相应数值稳定性质的保持，并报告在完整汽车发动机 nonlinear transient structural simulation 中获得超过四个数量级的 CPU 加速，同时维持较好准确度。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-deim-与-ecsw-最值得记住的区别&#34;&gt;13. DEIM 与 ECSW 最值得记住的区别
+&lt;/h1&gt;&lt;p&gt;可以这样理解：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;&lt;/th&gt;
+					&lt;th&gt;DEIM&lt;/th&gt;
+					&lt;th&gt;ECSW&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;近似对象&lt;/td&gt;
+					&lt;td&gt;nonlinear vector \(f(u)\)&lt;/td&gt;
+					&lt;td&gt;projected FE element contributions&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;采样对象&lt;/td&gt;
+					&lt;td&gt;vector entries / DOFs&lt;/td&gt;
+					&lt;td&gt;finite elements&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;核心结构&lt;/td&gt;
+					&lt;td&gt;interpolation&lt;/td&gt;
+					&lt;td&gt;sampled quadrature&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;主要优势&lt;/td&gt;
+					&lt;td&gt;通用、简单、适合一般 nonlinear operator&lt;/td&gt;
+					&lt;td&gt;特别适合 FE mechanics&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;物理结构&lt;/td&gt;
+					&lt;td&gt;不自动保持&lt;/td&gt;
+					&lt;td&gt;可保持能量/Lagrangian结构&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;在线成本&lt;/td&gt;
+					&lt;td&gt;与选中 DOF 数相关&lt;/td&gt;
+					&lt;td&gt;与选中单元数相关&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;所以对一般 nonlinear PDE：&lt;/p&gt;
+\[\boxed{\text{DEIM 是非常自然的入口}}\]&lt;p&gt;而对 nonlinear FEM / structural dynamics：&lt;/p&gt;
+\[\boxed{\text{ECSW 往往具有更强的物理结构优势}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-hyper-reduction-和普通网格粗化不是一回事&#34;&gt;14. Hyper-reduction 和普通“网格粗化”不是一回事
+&lt;/h1&gt;&lt;p&gt;假设原模型：&lt;/p&gt;
+\[100000\]&lt;p&gt;个单元。&lt;/p&gt;
+&lt;p&gt;直接做 coarse mesh：&lt;/p&gt;
+\[1000\]&lt;p&gt;个单元。&lt;/p&gt;
+&lt;p&gt;这会改变：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;geometry；&lt;/li&gt;
+&lt;li&gt;discretization；&lt;/li&gt;
+&lt;li&gt;local constitutive resolution；&lt;/li&gt;
+&lt;li&gt;mode shapes。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Hyper-reduction 则可能仍然使用：&lt;/p&gt;
+\[\boxed{\text{原始 fine-mesh basis 和 fine-mesh physics}}\]&lt;p&gt;，只是在每次 online evaluation 中跳过绝大多数单元。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{coarsening：改变离散模型} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{hyper-reduction：稀疏评估原模型的投影贡献} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这是很重要的区别。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15-为什么它与代理模型有本质区别&#34;&gt;15. 为什么它与代理模型有本质区别？
+&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; / &lt;span class=&#34;term-anchor&#34; data-term=&#34;neural-operator&#34; tabindex=&#34;0&#34;&gt;Neural Operator&lt;/span&gt; 通常直接学习：&lt;/p&gt;
+\[\mu \rightarrow y\]&lt;p&gt;或者：&lt;/p&gt;
+\[\mu \rightarrow u.\]&lt;p&gt;Hyper-reduced ROM 仍然显式保留：&lt;/p&gt;
+\[\boxed{ \text{reduced equations of motion} }\]&lt;p&gt;例如：&lt;/p&gt;
+\[M_r\ddot q+\tilde f_r(q)=f_r.\]&lt;p&gt;所以：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;conservation law 仍可能存在；&lt;/li&gt;
+&lt;li&gt;boundary condition 仍进入方程；&lt;/li&gt;
+&lt;li&gt;time integration 仍由物理 solver 执行；&lt;/li&gt;
+&lt;li&gt;新外力可以直接作用于模型。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此它属于：&lt;/p&gt;
+\[\boxed{\text{physics-based surrogate}}\]&lt;p&gt;，而不是纯粹 response fitting。&lt;/p&gt;
+&lt;p&gt;这使它在动力学、控制和反问题中非常有价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-但-hyper-reduction-仍然有一个非常明显的训练域问题&#34;&gt;16. 但 Hyper-reduction 仍然有一个非常明显的“训练域”问题
+&lt;/h1&gt;&lt;p&gt;假设 ECSW 只在：&lt;/p&gt;
+\[\text{small deformation}\]&lt;p&gt;数据上训练。&lt;/p&gt;
+&lt;p&gt;然后在线进入：&lt;/p&gt;
+\[\text{large bending + contact}.\]&lt;p&gt;原来选择的：&lt;/p&gt;
+\[\mathcal S\]&lt;p&gt;可能已经无法代表新的 nonlinear force field。&lt;/p&gt;
+&lt;p&gt;DEIM 同样如此：&lt;/p&gt;
+\[U_f\]&lt;p&gt;来自 training snapshots。&lt;/p&gt;
+&lt;p&gt;如果新的 nonlinear state 超出了：&lt;/p&gt;
+\[\operatorname{span}(U_f),\]&lt;p&gt;误差就会明显增大。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Hyper-reduction 并没有消灭 extrapolation problem。} }\]&lt;p&gt;它只是把问题从：&lt;/p&gt;
+\[\text{response surrogate}\]&lt;p&gt;转移到了：&lt;/p&gt;
+\[\text{operator surrogate}.\]&lt;p&gt;Localized DEIM 之所以出现，就是因为一个 global nonlinear subspace 可能无法覆盖具有多个不同局部行为区域的系统，因此改用多个 local subspaces。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-这和你的软体动力学尤其有一个值得注意的冲突接触高度局部且会移动&#34;&gt;17. 这和你的软体动力学尤其有一个值得注意的冲突：接触高度局部且会移动
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设软体落地。&lt;/p&gt;
+&lt;p&gt;时间：&lt;/p&gt;
+\[t_1\]&lt;p&gt;接触区域是底部左边；&lt;/p&gt;
+&lt;p&gt;时间：&lt;/p&gt;
+\[t_2\]&lt;p&gt;滚动后变成右边；&lt;/p&gt;
+&lt;p&gt;时间：&lt;/p&gt;
+\[t_3\]&lt;p&gt;又产生新的 self-contact。&lt;/p&gt;
+&lt;p&gt;如果 Hyper-reduction 固定只采：&lt;/p&gt;
+\[500\]&lt;p&gt;个单元，&lt;/p&gt;
+&lt;p&gt;而真正重要的 contact zone 没在：&lt;/p&gt;
+\[\mathcal S\]&lt;p&gt;里，就可能完全漏掉关键局部事件。&lt;/p&gt;
+&lt;p&gt;这说明 nonlinear structural ROM 中存在一个很深的张力：&lt;/p&gt;
+\[\boxed{ \text{Hyper-reduction 喜欢空间稀疏} }\]&lt;p&gt;但：&lt;/p&gt;
+\[\boxed{ \text{contact 喜欢动态移动的局部激活区域。} }\]&lt;p&gt;因此接触问题更可能需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;adaptive sampling；&lt;/li&gt;
+&lt;li&gt;local ROM；&lt;/li&gt;
+&lt;li&gt;state-dependent sampling；&lt;/li&gt;
+&lt;li&gt;contact region always-on；&lt;/li&gt;
+&lt;li&gt;ROM + full-order local correction。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这与固定 ECSW mesh 是不同的难度层级。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;18-一个特别值得迁移到物理引擎的思想不要降整个系统降最贵的算子调用次数&#34;&gt;18. 一个特别值得迁移到物理引擎的思想：不要降整个系统，降“最贵的算子调用次数”
+&lt;/h1&gt;&lt;p&gt;Hyper-reduction 给物理引擎开发最大的启发，甚至不一定要真正做 ROM。&lt;/p&gt;
+&lt;p&gt;假设一个 solver 每帧最贵的是：&lt;/p&gt;
+\[\boxed{\text{100 万个 tet constitutive evaluations}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;传统优化会问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;怎样让每个 tet 算得更快？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Hyper-reduction 的思考方式会问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;真的每个 tet 每一帧都值得重新算吗？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;如果大量区域：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;应变变化很小；&lt;/li&gt;
+&lt;li&gt;远离接触；&lt;/li&gt;
+&lt;li&gt;对当前低频形变贡献有限；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;也许真正应该优化的是：&lt;/p&gt;
+\[\boxed{\text{evaluation sparsity}}\]&lt;p&gt;而不只是：&lt;/p&gt;
+\[\text{evaluation FLOPS}.\]&lt;p&gt;这与：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;sleeping；&lt;/li&gt;
+&lt;li&gt;island activation；&lt;/li&gt;
+&lt;li&gt;adaptive substepping；&lt;/li&gt;
+&lt;li&gt;sparse collision detection；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;属于同一种更高级的工程思想：&lt;/p&gt;
+\[\boxed{ \text{最便宜的一次计算，是根本没有执行的那次计算。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;19-它对代理模型还有一个很强的启发可以代理算子不一定代理最终输出&#34;&gt;19. 它对代理模型还有一个很强的启发：可以代理“算子”，不一定代理最终输出
+&lt;/h1&gt;&lt;p&gt;通常代理模型研究：&lt;/p&gt;
+\[x\rightarrow y.\]&lt;p&gt;但 DEIM 实际做的是：&lt;/p&gt;
+\[\boxed{ \text{学习 nonlinear operator }f(u)\text{ 的低维表示} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;ECSW 更进一步：&lt;/p&gt;
+\[\boxed{ \text{学习哪些局部 operator contributions 值得计算} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以代理建模其实可以分成三层：&lt;/p&gt;
+\[\text{output surrogate}\]\[y\approx\hat y(x)\]&lt;hr&gt;
+\[\text{state surrogate}\]\[u\approx Vq\]&lt;hr&gt;
+\[\boxed{\text{operator surrogate}}\]\[F(u)\approx\tilde F(u).\]&lt;p&gt;第三层通常保留最多物理结构。&lt;/p&gt;
+&lt;p&gt;这对未来做：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;learned constitutive operators；&lt;/li&gt;
+&lt;li&gt;neural preconditioner；&lt;/li&gt;
+&lt;li&gt;learned coarse solver；&lt;/li&gt;
+&lt;li&gt;operator compression；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;都非常有迁移价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个特别适合亲手做的最小实验&#34;&gt;20. 一个特别适合亲手做的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以做一个 nonlinear spring chain：&lt;/p&gt;
+\[m\ddot x_i + k(x_i-x_{i-1}) + \beta(x_i-x_{i-1})^3 +\cdots =0.\]&lt;p&gt;取：&lt;/p&gt;
+\[N=1000.\]&lt;p&gt;首先收集 full-order snapshots：&lt;/p&gt;
+\[X=[x(t_1),\ldots,x(t_M)].\]&lt;p&gt;做 POD：&lt;/p&gt;
+\[X\approx VQ, \qquad r=10.\]&lt;p&gt;然后比较三种模型。&lt;/p&gt;
+&lt;h3 id=&#34;a-纯-pod&#34;&gt;A. 纯 POD
+&lt;/h3&gt;&lt;p&gt;每一步仍计算全部：&lt;/p&gt;
+\[N\]&lt;p&gt;个 cubic spring forces。&lt;/p&gt;
+&lt;h3 id=&#34;b-pod--deim&#34;&gt;B. POD + DEIM
+&lt;/h3&gt;&lt;p&gt;另外收集：&lt;/p&gt;
+\[F= [f_{\rm nl}(x(t_1)),\ldots].\]&lt;p&gt;对它做 POD：&lt;/p&gt;
+\[F\approx U_fC.\]&lt;p&gt;选：&lt;/p&gt;
+\[m=20\]&lt;p&gt;个 DEIM points。&lt;/p&gt;
+&lt;h3 id=&#34;c-full-model&#34;&gt;C. Full model
+&lt;/h3&gt;&lt;p&gt;作为基准。&lt;/p&gt;
+&lt;p&gt;记录：&lt;/p&gt;
+\[\boxed{\text{state error}}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{\text{wall-clock time}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;最重要的观察很可能是：&lt;/p&gt;
+\[\boxed{ \text{POD 已经把 1000 DOF 降到 10， 但真正的明显加速要等 DEIM 加进去才出现。} }\]&lt;p&gt;这个实验能够非常直接地理解为什么 Hyper-reduction 是 nonlinear ROM 不可缺少的第二步。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Hyper-reduction 最重要的公式并不是：&lt;/p&gt;
+\[f \approx U(P^TU)^{-1}P^Tf.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{减少未知量，并不自动减少构造方程的成本。} }\]&lt;p&gt;所以 nonlinear model reduction 真正完整的知识结构是：&lt;/p&gt;
+\[\text{Full nonlinear FEM}\]\[\downarrow\]\[\boxed{ u\approx Vq }\]&lt;p&gt;&lt;strong&gt;State reduction&lt;/strong&gt;&lt;/p&gt;
+\[\downarrow\]\[\boxed{ F(Vq) \text{只在少数 DOF / elements 上计算} }\]&lt;p&gt;&lt;strong&gt;Hyper-reduction&lt;/strong&gt;&lt;/p&gt;
+\[\downarrow\]\[\boxed{\text{Online cost 真正与 }N\text{ 脱钩}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;而 DEIM 与 ECSW 的区别又揭示了一个更深的原则：&lt;/p&gt;
+\[\boxed{ \text{“近似得准”只是第一层要求； 对于物理求解器，还要问近似以后保留了什么结构。} }\]&lt;p&gt;对非线性有限元、软体动力学乃至代理模型而言，这都是非常重要的分界线：&lt;/p&gt;
+\[\boxed{ \text{你究竟是在压缩状态， 压缩输出， 还是压缩物理算子的计算本身？} }\]&lt;p&gt;Hyper-reduction 正好卡在第三层。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Chaturantabut &amp;amp; Sorensen, &lt;em&gt;Nonlinear Model Reduction via Discrete Empirical Interpolation&lt;/em&gt;, SIAM Journal on Scientific Computing, 2010&lt;/strong&gt;。DEIM 原始论文。重点看 nonlinear POD 为什么仍然保留 \(N\)-dependent cost，以及 \(U(P^TU)^{-1}P^Tf\) 如何解决这个问题。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/090766498&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Farhat, Avery, Chapman &amp;amp; Cortial, &lt;em&gt;Dimensional reduction of nonlinear finite element dynamic models with finite rotations and energy-based mesh sampling and weighting for computational efficiency&lt;/em&gt;, IJNME, 2014&lt;/strong&gt;。ECSW 的核心工程论文，非常适合结构/软体方向；基于 mesh sampling 和 virtual work，并报告实际 nonlinear structural dynamics 中最高约四个数量级的 CPU 加速。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Farhat, Chapman &amp;amp; Avery, &lt;em&gt;Structure-preserving, stability, and accuracy properties of the Energy-Conserving Sampling and Weighting method&lt;/em&gt;, IJNME, 2015&lt;/strong&gt;。如果只读一篇深入 ECSW，我更推荐这篇。重点是为什么 energy/Lagrangian structure preservation 会直接影响 nonlinear ROM 的稳定性。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Benner, Gugercin &amp;amp; Willcox, &lt;em&gt;A Survey of Projection-Based Model Reduction Methods for Parametric Dynamical Systems&lt;/em&gt;, SIAM Review, 2015&lt;/strong&gt;。用于建立全局知识框架：POD、Reduced Basis、offline-online decomposition、parametric model reduction 都在一个体系里。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;pyMOR&lt;/strong&gt;。如果想实际实验 DEIM/EIM，这是成熟且仍在维护的开源入口；官方提供 POD、DEIM、empirical interpolation 和外部 PDE solver 接口。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://pymor.org/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;pyMOR 官网&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题</title>
+        <link>https://assranai.github.io/cards/26-nitsche-method/</link>
+        <pubDate>Tue, 08 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/26-nitsche-method/</guid>
+        <description>&lt;h1 id=&#34;nitsche-method为什么施加边界条件本身也可以变成一个变分问题&#34;&gt;Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Nitsche Method（Nitsche 方法）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 计算力学 × 接触力学 × 数值方法&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：&lt;/p&gt;
+\[\boxed{\text{边界条件一定要“强制写死”在自由度上吗？}}\]&lt;p&gt;传统 FEM 里，Dirichlet 边界条件：&lt;/p&gt;
+\[u=g \quad \text{on }\Gamma_D\]&lt;p&gt;通常通过直接修改自由度来施加：&lt;/p&gt;
+\[u_i=g_i.\]&lt;p&gt;这当然简单有效。&lt;/p&gt;
+&lt;p&gt;但一旦遇到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;非匹配网格；&lt;/li&gt;
+&lt;li&gt;两个独立网格的界面耦合；&lt;/li&gt;
+&lt;li&gt;immersed / unfitted FEM；&lt;/li&gt;
+&lt;li&gt;接触；&lt;/li&gt;
+&lt;li&gt;多物理场界面；&lt;/li&gt;
+&lt;li&gt;几何在运动、界面不断变化；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;“节点一一对应”这件事可能根本不存在。&lt;/p&gt;
+&lt;p&gt;Nitsche 方法的核心思想是：&lt;/p&gt;
+\[\boxed{ \text{不要直接消灭边界自由度，而是把边界约束以一致、稳定的方式嵌入弱式。} }\]&lt;p&gt;这使它成为一种非常通用的“弱施加约束”技术。Hansbo 的综述把 Nitsche 方法应用于真实/人工界面、unfitted meshes、Chimera meshes、cut meshes、fictitious-domain methods 和模型耦合，正说明了它已经远超“施加 Dirichlet 条件”这一最初用途。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看普通-fem-为什么天然喜欢强制-dirichlet-条件&#34;&gt;1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件”
+&lt;/h2&gt;&lt;p&gt;考虑 Poisson：&lt;/p&gt;
+\[-\Delta u=f\]&lt;p&gt;并规定：&lt;/p&gt;
+\[u=g \quad\text{on }\Gamma_D.\]&lt;p&gt;标准弱式：&lt;/p&gt;
+\[\int_\Omega \nabla u\cdot\nabla v\,d\Omega = \int_\Omega fv\,d\Omega + \int_{\Gamma_N}tv\,d\Gamma.\]&lt;p&gt;如果：&lt;/p&gt;
+\[u=g\]&lt;p&gt;在 \(\Gamma_D\) 上被强制满足，&lt;/p&gt;
+&lt;p&gt;那么测试函数：&lt;/p&gt;
+\[v=0 \quad\text{on }\Gamma_D.\]&lt;p&gt;于是 Dirichlet 边界甚至不会显式出现在 weak form 中。&lt;/p&gt;
+&lt;p&gt;这非常干净。&lt;/p&gt;
+&lt;p&gt;但代价是：&lt;/p&gt;
+\[\boxed{ \text{trial/test space 必须预先服从边界约束。} }\]&lt;p&gt;也就是说有限元空间本身就依赖：&lt;/p&gt;
+\[\Gamma_D.\]&lt;p&gt;这在 fitted mesh 上完全没问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-一旦网格不匹配强制约束立刻变麻烦&#34;&gt;2. 一旦网格不匹配，强制约束立刻变麻烦
+&lt;/h1&gt;&lt;p&gt;假设两个子域：&lt;/p&gt;
+\[\Omega_1,\qquad\Omega_2\]&lt;p&gt;在界面：&lt;/p&gt;
+\[\Gamma\]&lt;p&gt;相接。&lt;/p&gt;
+&lt;p&gt;物理要求：&lt;/p&gt;
+\[u_1=u_2.\]&lt;p&gt;但两边网格可能是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;mesh 1:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;|---|---|---|---|
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;interface
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;mesh 2:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;|-|-|-|-|-|-|-|-|
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;节点不对应。&lt;/p&gt;
+&lt;p&gt;于是你没法简单写：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;node 17 of mesh1 = node 44 of mesh2
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因为：&lt;/p&gt;
+\[\boxed{\text{不存在一一对应自由度}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这时常见思路有三类：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Lagrange multipliers；&lt;/li&gt;
+&lt;li&gt;penalty；&lt;/li&gt;
+&lt;li&gt;Nitsche。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;而 Nitsche 的吸引力就在于：&lt;/p&gt;
+\[\boxed{ \text{它能弱施加约束，却通常不需要额外 multiplier DOFs。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;3-先理解-penalty简单但有一个根本-trade-off&#34;&gt;3. 先理解 penalty：简单，但有一个根本 trade-off
+&lt;/h1&gt;&lt;p&gt;如果要强制：&lt;/p&gt;
+\[u=g,\]&lt;p&gt;可以在能量里加入：&lt;/p&gt;
+\[\frac{\gamma}{2} \int_{\Gamma_D} (u-g)^2\,d\Gamma.\]&lt;p&gt;对应弱式增加：&lt;/p&gt;
+\[\gamma \int_{\Gamma_D} (u-g)v\,d\Gamma.\]&lt;p&gt;当：&lt;/p&gt;
+\[\gamma\rightarrow\infty,\]&lt;p&gt;就趋向：&lt;/p&gt;
+\[u=g.\]&lt;p&gt;问题是：&lt;/p&gt;
+\[\gamma\]&lt;p&gt;太小：&lt;/p&gt;
+\[\Rightarrow \text{约束违反明显}\]&lt;p&gt;太大：&lt;/p&gt;
+\[\Rightarrow \text{系统条件数恶化}.\]&lt;p&gt;所以 penalty 法的经典矛盾是：&lt;/p&gt;
+\[\boxed{ \text{constraint accuracy} \quad\leftrightarrow\quad \text{conditioning} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Nitsche 方法的价值之一，就是引入&lt;strong&gt;一致性项&lt;/strong&gt;，让稳定化参数不再承担“单独逼近真实边界条件”的全部责任。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-nitsche-方法从分部积分重新把边界物理拿回来&#34;&gt;4. Nitsche 方法从分部积分重新把“边界物理”拿回来
+&lt;/h1&gt;&lt;p&gt;考虑齐次 Dirichlet：&lt;/p&gt;
+\[u=0 \quad\text{on }\Gamma_D.\]&lt;p&gt;如果我们暂时不要求测试函数：&lt;/p&gt;
+\[v=0\]&lt;p&gt;那么分部积分得到：&lt;/p&gt;
+\[\int_\Omega \nabla u\cdot\nabla v - \int_{\Gamma_D} \partial_n u\,v = \int_\Omega fv.\]&lt;p&gt;这里出现了自然边界通量：&lt;/p&gt;
+\[\partial_n u.\]&lt;p&gt;Nitsche 方法加入一个对称的一致性项：&lt;/p&gt;
+\[-\int_{\Gamma_D} \partial_n v\,u\]&lt;p&gt;以及一个稳定化项：&lt;/p&gt;
+\[\frac{\gamma}{h} \int_{\Gamma_D} uv.\]&lt;p&gt;于是典型 symmetric Nitsche bilinear form 是：&lt;/p&gt;
+\[\boxed{ a_h(u,v) = \int_\Omega\nabla u\cdot\nabla v - \int_{\Gamma_D}\partial_nu\,v - \int_{\Gamma_D}\partial_nv\,u + \frac{\gamma}{h} \int_{\Gamma_D}uv }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这三类边界项分别承担：&lt;/p&gt;
+\[\boxed{\text{consistency}}\]\[\boxed{\text{symmetry / adjoint consistency}}\]\[\boxed{\text{stability}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这就是 Nitsche 与单纯 penalty 最核心的区别。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么说-nitsche-是consistent-penalty&#34;&gt;5. 为什么说 Nitsche 是“consistent penalty”？
+&lt;/h1&gt;&lt;p&gt;看最后一项：&lt;/p&gt;
+\[\frac{\gamma}{h}uv.\]&lt;p&gt;它确实长得像 penalty。&lt;/p&gt;
+&lt;p&gt;但如果只保留这一项，那就是 penalty method。&lt;/p&gt;
+&lt;p&gt;Nitsche 还额外保留：&lt;/p&gt;
+\[-\partial_nu\,v\]&lt;p&gt;和：&lt;/p&gt;
+\[-\partial_nv\,u.\]&lt;p&gt;这些项来自 PDE 本身的 boundary flux structure。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Nitsche = consistency terms + stabilization} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;因此 \(\gamma\) 的主要作用变成保证 coercivity/stability，而不是通过无限大的数值强行把：&lt;/p&gt;
+\[u-g\]&lt;p&gt;压到零。&lt;/p&gt;
+&lt;p&gt;这就是为什么 Nitsche 可以做到：&lt;/p&gt;
+\[\boxed{ \text{弱施加边界条件，同时保持有限元的一致收敛阶。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;6-一个直观理解nitsche-不把约束写成命令而是写成界面交换定律&#34;&gt;6. 一个直观理解：Nitsche 不把约束写成“命令”，而是写成“界面交换定律”
+&lt;/h1&gt;&lt;p&gt;强制 Dirichlet：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;u_boundary = g
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;像是在直接锁死自由度。&lt;/p&gt;
+&lt;p&gt;Nitsche 更像：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;如果 u 偏离 g：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    通过边界 traction / flux 与 stabilization
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    在 weak equilibrium 中产生修正
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此它不是：&lt;/p&gt;
+\[\boxed{\text{直接删除自由度}}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\text{让弱平衡方程自己把状态拉回合法约束}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这就是为什么它特别适合：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;两个独立网格；&lt;/li&gt;
+&lt;li&gt;接触；&lt;/li&gt;
+&lt;li&gt;immersed boundaries；&lt;/li&gt;
+&lt;li&gt;移动界面。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些问题中的约束本来就更适合写成“界面交换条件”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-非匹配网格耦合时nitsche-的价值最容易看清&#34;&gt;7. 非匹配网格耦合时，Nitsche 的价值最容易看清
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[\Omega_1\]&lt;p&gt;和：&lt;/p&gt;
+\[\Omega_2\]&lt;p&gt;之间要求：&lt;/p&gt;
+\[u_1=u_2\]&lt;p&gt;以及通量平衡：&lt;/p&gt;
+\[\sigma_1n_1+\sigma_2n_2=0.\]&lt;p&gt;定义 jump：&lt;/p&gt;
+\[[u]=u_1-u_2.\]&lt;p&gt;以及某种 traction average：&lt;/p&gt;
+\[\{\sigma n\}.\]&lt;p&gt;典型界面 Nitsche 项可以写成类似：&lt;/p&gt;
+\[-\int_\Gamma \{\sigma(u)n\}\cdot[v]\]\[-\int_\Gamma \{\sigma(v)n\}\cdot[u]\]\[+ \frac{\gamma}{h} \int_\Gamma [u]\cdot[v].\]&lt;p&gt;于是：&lt;/p&gt;
+\[[u]=0\]&lt;p&gt;没有通过节点对应被强制，&lt;/p&gt;
+&lt;p&gt;而是在：&lt;/p&gt;
+\[\boxed{\text{interface weak form}}\]&lt;p&gt;中被满足。&lt;/p&gt;
+&lt;p&gt;这允许两边完全独立划分网格。&lt;/p&gt;
+&lt;p&gt;Ruess 等在 isogeometric analysis 中正是利用 Nitsche weak coupling，把 non-matching B-spline/NURBS patches 与普通有限元网格连接起来，而无需昂贵的几何重新参数化。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-这为什么对-cad--fem-很重要&#34;&gt;8. 这为什么对 CAD → FEM 很重要？
+&lt;/h1&gt;&lt;p&gt;CAD 几何经常天然由多个 patch 组成。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[\text{NURBS patch A} + \text{patch B} + \text{patch C}.\]&lt;p&gt;如果要求：&lt;/p&gt;
+\[\boxed{\text{所有 patch 接口节点严格匹配}}\]&lt;p&gt;网格生成会非常痛苦。&lt;/p&gt;
+&lt;p&gt;Nitsche 提供另一条路线：&lt;/p&gt;
+\[\boxed{ \text{每个 patch 独立离散， 然后在界面上弱耦合。} }\]&lt;p&gt;这相当于把复杂度从：&lt;/p&gt;
+\[\text{mesh conformity}\]&lt;p&gt;转移到：&lt;/p&gt;
+\[\text{variational coupling}.\]&lt;p&gt;这是一个非常重要的工程思想：&lt;/p&gt;
+\[\boxed{ \text{与其为了数值方法强迫几何/网格适配， 不如让数值方法适应真实几何结构。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;9-nitsche-和-lagrange-multiplier-的区别在哪里&#34;&gt;9. Nitsche 和 Lagrange multiplier 的区别在哪里？
+&lt;/h1&gt;&lt;p&gt;Lagrange multiplier 方法：&lt;/p&gt;
+\[u_1-u_2=0\]&lt;p&gt;通过额外变量：&lt;/p&gt;
+\[\lambda\]&lt;p&gt;施加。&lt;/p&gt;
+&lt;p&gt;系统变成：&lt;/p&gt;
+\[\begin{bmatrix} K &amp; B^T\\ B &amp; 0 \end{bmatrix} \begin{bmatrix} u\\ \lambda \end{bmatrix} = \begin{bmatrix} f\\ 0 \end{bmatrix}.\]&lt;p&gt;优点：&lt;/p&gt;
+\[\lambda\]&lt;p&gt;往往具有清晰物理意义，例如：&lt;/p&gt;
+\[\boxed{\text{contact traction / interface traction}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;但代价是 saddle-point system，并需要满足类似 inf-sup stability 条件。&lt;/p&gt;
+&lt;p&gt;Nitsche 通常可以把 multiplier 的效果通过：&lt;/p&gt;
+\[\boxed{ \text{consistent interface flux + stabilization} }\]&lt;p&gt;隐式消去。&lt;/p&gt;
+&lt;p&gt;所以它可以理解成：&lt;/p&gt;
+\[\boxed{ \text{一种 stabilized multiplier elimination} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这也是为什么很多 Nitsche 推导和 stabilized Lagrange multiplier formulation 之间存在紧密联系；对于弹性接触，已有分析就把 Nitsche 解释为稳定化有限元方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-那-nitsche-和-mortar-方法又是什么关系&#34;&gt;10. 那 Nitsche 和 Mortar 方法又是什么关系？
+&lt;/h1&gt;&lt;p&gt;Mortar 方法也主要用于：&lt;/p&gt;
+\[\boxed{\text{nonmatching interfaces}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;经典 mortar 通常在接口引入 multiplier space：&lt;/p&gt;
+\[\lambda_h.\]&lt;p&gt;所以更自然地表示 traction，并对 nonmatching discretization 做积分投影。&lt;/p&gt;
+&lt;p&gt;Nitsche 则倾向于直接利用：&lt;/p&gt;
+\[u,\quad \sigma n\]&lt;p&gt;构造弱界面项。&lt;/p&gt;
+&lt;p&gt;可以粗略理解：&lt;/p&gt;
+\[\boxed{ \text{Mortar：显式 interface multiplier} }\]\[\boxed{ \text{Nitsche：隐式 interface stabilization} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;两者在高级接触算法里并非完全对立；甚至存在 Nitsche mortaring 的组合。Gustafsson、Stenberg、Videman 的弹性接触工作就研究了三种 Nitsche mortaring 技术，并给出 quasi-optimality 和 a posteriori error estimates。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么-nitsche-可以处理接触&#34;&gt;11. 为什么 Nitsche 可以处理接触？
+&lt;/h1&gt;&lt;p&gt;接触条件本质上不是简单：&lt;/p&gt;
+\[u=0.\]&lt;p&gt;以无摩擦 Signorini contact 为例：&lt;/p&gt;
+\[g_n(u)\ge0,\]\[\lambda_n\le0,\]\[\lambda_ng_n=0.\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \text{要么分离，要么接触} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这和你之前看到的 complementarity 是同一个物理结构。&lt;/p&gt;
+&lt;p&gt;Nitsche 的做法不是简单加：&lt;/p&gt;
+\[u_1-u_2=0\]&lt;p&gt;，而是把 contact condition 转成一种 nonlinear interface relation，然后在 weak form 中施加。&lt;/p&gt;
+&lt;p&gt;Chouly–Hild 以及后续 Burman–Hansbo–Larson 的工作证明，Nitsche 方法可以用于 unilateral contact；后者甚至构造了 nonsymmetric penalty-free Nitsche formulation，并证明 energy norm 下的 optimal error estimates。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Nitsche 不只适用于 equality constraints， 也能扩展到 inequality/contact constraints。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;12-penalty-free-nitsche-为什么听起来有点反直觉&#34;&gt;12. Penalty-free Nitsche 为什么听起来有点反直觉？
+&lt;/h1&gt;&lt;p&gt;前面 symmetric Nitsche 有：&lt;/p&gt;
+\[\frac{\gamma}{h} \int_\Gamma uv.\]&lt;p&gt;看起来 penalty 不可缺少。&lt;/p&gt;
+&lt;p&gt;但 Nitsche 还有 nonsymmetric variants。&lt;/p&gt;
+&lt;p&gt;某些 formulations 可以通过改变 consistency terms 的符号结构，在理论上不依赖 penalty term 获得稳定性。&lt;/p&gt;
+&lt;p&gt;Burman、Hansbo、Larson 2017 年对 Signorini 问题的工作就是这样：他们用 displacement 的 nonlinear contact condition 构造 nonsymmetric Nitsche method，不需要 penalty term 来保证稳定，并证明最优能量范数误差估计。&lt;/p&gt;
+&lt;p&gt;这说明：&lt;/p&gt;
+\[\boxed{ \text{“Nitsche = penalty 方法”是不准确的。} }\]&lt;p&gt;Penalty-like term 只是常见构造的一部分，不是方法的本质定义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-但工程实现里-penaltystabilization-parameter-仍然很关键&#34;&gt;13. 但工程实现里 penalty/stabilization parameter 仍然很关键
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;在很多 symmetric Nitsche formulation 中，需要：&lt;/p&gt;
+\[\gamma\]&lt;p&gt;足够大以保证稳定。&lt;/p&gt;
+&lt;p&gt;但：&lt;/p&gt;
+\[\gamma\]&lt;p&gt;过大仍然会恶化 conditioning。&lt;/p&gt;
+&lt;p&gt;所以工程上依然存在：&lt;/p&gt;
+\[\boxed{ \text{stability} \quad\leftrightarrow\quad \text{conditioning} }\]&lt;p&gt;，只是相比纯 penalty method 更可控。&lt;/p&gt;
+&lt;p&gt;对于复杂热机接触，Seitz、Wall、Popp 的 Nitsche formulation 就通过局部 generalized eigenvalue problems 估计稳定化参数，并进一步构造 harmonic weighting，以应对大变形、摩擦和热耦合。&lt;/p&gt;
+&lt;p&gt;这说明真正成熟的 Nitsche 实现通常不会：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;gamma = 1e8
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;然后结束。&lt;/p&gt;
+&lt;p&gt;而会考虑：&lt;/p&gt;
+\[\boxed{ \text{mesh size} + \text{material stiffness} + \text{local interface geometry} }\]&lt;p&gt;共同决定 scaling。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-为什么系数通常是-&#34;&gt;14. 为什么系数通常是 \(\gamma/h\)？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为边界项和体积分项具有不同尺度。&lt;/p&gt;
+&lt;p&gt;例如 Poisson：&lt;/p&gt;
+\[\int_\Omega |\nabla u|^2\,d\Omega\]&lt;p&gt;与：&lt;/p&gt;
+\[\int_\Gamma u^2\,d\Gamma\]&lt;p&gt;的量纲/mesh scaling 不同。&lt;/p&gt;
+&lt;p&gt;通过 trace inequality，可以得到边界量与体积分之间的尺度关系：&lt;/p&gt;
+\[\|u\|_{\Gamma} \sim h^{-1/2}\|u\|_\Omega+\cdots\]&lt;p&gt;所以稳定化一般需要：&lt;/p&gt;
+\[\boxed{ \frac{\gamma}{h} }\]&lt;p&gt;级别。&lt;/p&gt;
+&lt;p&gt;对于弹性：&lt;/p&gt;
+\[\gamma\]&lt;p&gt;还常乘上代表材料刚度的量，例如：&lt;/p&gt;
+\[E,\mu,\lambda.\]&lt;p&gt;因此更合理的理解不是：&lt;/p&gt;
+\[\gamma=\text{一个神秘经验参数},\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \text{稳定化参数必须与离散尺度和 PDE operator 的尺度匹配。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-nitsche-和-cutfem-为什么天然是一对&#34;&gt;15. Nitsche 和 CutFEM 为什么天然是一对？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;CutFEM / unfitted FEM 的思想是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;网格不必贴合真实边界。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;例如一个圆：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;background mesh:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+---+---+---+
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;|  /圆\      |
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+ /---\---+
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;|/     \   |
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+---+---\--+
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;真实边界会穿过：&lt;/p&gt;
+\[\boxed{\text{element interiors}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;于是根本没有传统意义上的 boundary nodes。&lt;/p&gt;
+&lt;p&gt;这时你无法直接：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;set boundary DOF = g
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因为：&lt;/p&gt;
+\[\Gamma_D\]&lt;p&gt;甚至不沿网格边界。&lt;/p&gt;
+&lt;p&gt;Nitsche 正好允许直接在：&lt;/p&gt;
+\[\Gamma_D\cap K\]&lt;p&gt;这些 cut interfaces 上积分并弱施加边界条件。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{unfitted geometry} + \text{Nitsche weak boundary enforcement} }\]&lt;p&gt;成为非常自然的组合。&lt;/p&gt;
+&lt;p&gt;Hansbo 的综述明确把 Nitsche 与 fictitious domain、cut meshes 和 Chimera meshes 放在同一体系中；Massing、Larson、Logg 的实现工作也专门处理三维 nonmatching/overlapping meshes 中的 cut-cell intersection 和积分问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-这对参数化几何和优化非常有价值&#34;&gt;16. 这对参数化几何和优化非常有价值
+&lt;/h1&gt;&lt;p&gt;假设做 shape optimization。&lt;/p&gt;
+&lt;p&gt;传统 fitted mesh：&lt;/p&gt;
+\[\text{geometry changes} \Rightarrow \text{mesh deformation/remeshing}.\]&lt;p&gt;如果每次设计迭代都：&lt;/p&gt;
+\[\boxed{\text{重新网格化}}\]&lt;p&gt;成本高，而且容易产生质量问题。&lt;/p&gt;
+&lt;p&gt;MultiMesh / Nitsche 思路可以让多个独立网格移动，而通过 Nitsche 在 nonmatching interfaces 上保证连续。&lt;/p&gt;
+&lt;p&gt;Dokken 等的工作正是利用多个独立 nonmatching meshes 做 shape optimization，使部分几何变化可以通过网格刚体移动/缩放实现，从而避免每一步整体 remeshing。&lt;/p&gt;
+&lt;p&gt;这对参数化机构尤其有启发：&lt;/p&gt;
+\[\boxed{ \text{几何参数变化不一定要等价于全局重新划网格。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;17-这和你熟悉的接触-penalty-有什么最实用的区别&#34;&gt;17. 这和你熟悉的接触 penalty 有什么最实用的区别？
+&lt;/h1&gt;&lt;p&gt;销轴—孔接触里常用 penalty：&lt;/p&gt;
+\[F_n=k\delta^n.\]&lt;p&gt;其思想是：&lt;/p&gt;
+\[\boxed{ \text{允许少量穿透，用很大恢复力惩罚。} }\]&lt;p&gt;Nitsche contact 则从变分一致性的角度构造：&lt;/p&gt;
+\[\boxed{ \text{接触 traction} + \text{gap constraint} + \text{stabilization} }\]&lt;p&gt;之间的弱耦合。&lt;/p&gt;
+&lt;p&gt;所以二者虽然都可能出现一个“类似 penalty parameter”的量，&lt;/p&gt;
+&lt;p&gt;但数学角色不同：&lt;/p&gt;
+&lt;h3 id=&#34;penalty-contact&#34;&gt;Penalty contact
+&lt;/h3&gt;\[\text{penetration} \Rightarrow \text{artificial stiffness}\]&lt;h3 id=&#34;nitsche-contact&#34;&gt;Nitsche contact
+&lt;/h3&gt;\[\text{contact condition} \Rightarrow \text{consistent weak interface equation}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;因此 Nitsche 更接近：&lt;/p&gt;
+\[\boxed{\text{一种有限元约束离散方法}}\]&lt;p&gt;而 penalty contact 更接近：&lt;/p&gt;
+\[\boxed{\text{一种约束正则化方法}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-nitsche-的真正难点积分几何&#34;&gt;18. Nitsche 的真正难点：积分几何
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;公式看起来不复杂。&lt;/p&gt;
+&lt;p&gt;但 nonmatching interface 上真正实现：&lt;/p&gt;
+\[\int_\Gamma (\cdots)\,d\Gamma\]&lt;p&gt;时，需要知道：&lt;/p&gt;
+\[\boxed{ \text{mesh A 和 mesh B 的交界到底切在哪里？} }\]&lt;p&gt;于是要做：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;triangle–triangle intersection；&lt;/li&gt;
+&lt;li&gt;cut-cell decomposition；&lt;/li&gt;
+&lt;li&gt;quadrature on intersections；&lt;/li&gt;
+&lt;li&gt;normal orientation；&lt;/li&gt;
+&lt;li&gt;master/slave side lookup；&lt;/li&gt;
+&lt;li&gt;search acceleration。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;三维情况下，这部分代码可能比 Nitsche 公式本身复杂得多。&lt;/p&gt;
+&lt;p&gt;Massing 等关于三维 nonmatching/overlapping mesh 的实现论文就指出，实际困难集中在 mesh intersections 与 cut cells/subsimplices 上的积分，并专门设计自动检测和积分框架。&lt;/p&gt;
+&lt;p&gt;这是一个很典型的数值软件规律：&lt;/p&gt;
+\[\boxed{ \text{理论公式可能只有一行， 工程复杂度却集中在几何、数据结构和积分层。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;19-对物理引擎开发一个很值得迁移的思想约束不一定非得变成投影&#34;&gt;19. 对物理引擎开发，一个很值得迁移的思想：约束不一定非得变成“投影”
+&lt;/h1&gt;&lt;p&gt;游戏物理里通常想到约束：&lt;/p&gt;
+\[C(x)=0\]&lt;p&gt;就会自然进入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt; projection；&lt;/li&gt;
+&lt;li&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;impulse；&lt;/li&gt;
+&lt;li&gt;LCP。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Nitsche 提醒我们，还有另一种思路：&lt;/p&gt;
+\[\boxed{ \text{把约束直接嵌入 variational residual / energy balance。} }\]&lt;p&gt;即：&lt;/p&gt;
+\[\text{bulk physics} + \text{interface consistency} + \text{stabilization}.\]&lt;p&gt;这对：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;deformable–rigid coupling；&lt;/li&gt;
+&lt;li&gt;embedded objects；&lt;/li&gt;
+&lt;li&gt;fluid–structure interfaces；&lt;/li&gt;
+&lt;li&gt;mixed discretizations；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;尤其有吸引力。&lt;/p&gt;
+&lt;p&gt;如果两个物理模块本身都是 variational FEM，&lt;/p&gt;
+&lt;p&gt;那么用：&lt;/p&gt;
+\[\boxed{\text{weak interface coupling}}\]&lt;p&gt;往往比“找到节点然后绑死”更自然。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;20-对代理模型数字孪生还有一个不那么显眼的价值模块化高保真模型&#34;&gt;20. 对代理模型/数字孪生还有一个不那么显眼的价值：模块化高保真模型
+&lt;/h1&gt;&lt;p&gt;假设复杂系统由：&lt;/p&gt;
+\[\Omega_1,\Omega_2,\Omega_3\]&lt;p&gt;几个子结构组成。&lt;/p&gt;
+&lt;p&gt;每个子结构：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;网格不同；&lt;/li&gt;
+&lt;li&gt;fidelity 不同；&lt;/li&gt;
+&lt;li&gt;solver 不同；&lt;/li&gt;
+&lt;li&gt;更新频率不同。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果界面必须 node-conforming，&lt;/p&gt;
+&lt;p&gt;整个系统只能一起重建。&lt;/p&gt;
+&lt;p&gt;如果使用弱耦合：&lt;/p&gt;
+\[\boxed{ \text{子模型可以保持各自 discretization} }\]&lt;p&gt;然后通过 interface operator 连接。&lt;/p&gt;
+&lt;p&gt;这就提供一种：&lt;/p&gt;
+\[\boxed{ \text{模块化多保真物理模型} }\]&lt;p&gt;基础。&lt;/p&gt;
+&lt;p&gt;从这个角度看，Nitsche 不只是一个 FEM trick，&lt;/p&gt;
+&lt;p&gt;它实际上是一种：&lt;/p&gt;
+\[\boxed{\text{physics module coupling abstraction}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;21-一个很值得自己实现的最小实验&#34;&gt;21. 一个很值得自己实现的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;最简单可以做 1D Poisson：&lt;/p&gt;
+\[-u&#39;&#39;=f, \qquad x\in[0,1].\]&lt;p&gt;边界：&lt;/p&gt;
+\[u(0)=0,\qquad u(1)=0.\]&lt;p&gt;先做普通强制 Dirichlet FEM。&lt;/p&gt;
+&lt;p&gt;然后不要删除边界 DOFs，改用 symmetric Nitsche：&lt;/p&gt;
+\[a_h(u,v) = (u&#39;,v&#39;) - u&#39; n\,v - v&#39;n\,u + \frac{\gamma}{h}uv\]&lt;p&gt;在两个端点加入边界贡献。&lt;/p&gt;
+&lt;p&gt;分别测试：&lt;/p&gt;
+\[\gamma=0.1,\ 1,\ 10,\ 100,\ 10^4.\]&lt;p&gt;记录：&lt;/p&gt;
+\[\boxed{\text{boundary error}}\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{\kappa(K)}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;你会看到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(\gamma\) 太小可能失稳；&lt;/li&gt;
+&lt;li&gt;合理范围内误差正常；&lt;/li&gt;
+&lt;li&gt;\(\gamma\) 极大时 conditioning 变差。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;然后进一步把：&lt;/p&gt;
+\[[0,1]\]&lt;p&gt;切成两个&lt;strong&gt;节点不匹配&lt;/strong&gt;子网格：&lt;/p&gt;
+\[[0,0.5]\]&lt;p&gt;和：&lt;/p&gt;
+\[[0.5,1],\]&lt;p&gt;用 Nitsche coupling 连接。&lt;/p&gt;
+&lt;p&gt;如果这个实验做通，你基本就理解了 Nitsche 80% 的核心价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Nitsche 方法最值得记住的不是：&lt;/p&gt;
+\[-\langle\partial_nu,v\rangle -\langle\partial_nv,u\rangle + \frac{\gamma}{h}\langle u,v\rangle.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{有限元中的约束，不一定要通过修改自由度来强制满足； 它也可以成为弱平衡方程的一部分。} }\]&lt;p&gt;于是知识体系可以这样定位：&lt;/p&gt;
+\[\text{Strong constraints}\]\[\downarrow\]\[\text{Penalty / Lagrange multiplier}\]\[\downarrow\]\[\boxed{\text{Nitsche weak enforcement}}\]\[\downarrow\]\[\text{nonmatching meshes / contact / CutFEM / multiphysics coupling}.\]&lt;p&gt;它最深的工程价值在于：&lt;/p&gt;
+\[\boxed{ \text{解除“物理界面必须与网格节点严格对齐”这一人为限制。} }\]&lt;p&gt;一旦这层限制解除，很多复杂问题会变得更模块化：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;CAD patch 可以独立；&lt;/li&gt;
+&lt;li&gt;接触界面可以移动；&lt;/li&gt;
+&lt;li&gt;子模型可以独立网格；&lt;/li&gt;
+&lt;li&gt;几何优化可以减少 remeshing；&lt;/li&gt;
+&lt;li&gt;多物理场可以通过弱接口组合。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;从这个角度看，Nitsche 方法真正解决的不是“边界条件怎么施加”，而是一个更普遍的问题：&lt;/p&gt;
+\[\boxed{ \text{如何让不同离散世界在同一个物理界面上保持一致。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Peter Hansbo, &lt;em&gt;Nitsche&amp;rsquo;s method for interface problems in computational mechanics&lt;/em&gt;, GAMM-Mitteilungen, 2014&lt;/strong&gt;。很适合作为总览，覆盖 unfitted meshes、Chimera、cut meshes、fictitious domains 和 model coupling。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://onlinelibrary.wiley.com/doi/10.1002/gamm.201490018&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Wiley 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Burman, Hansbo &amp;amp; Larson, &lt;em&gt;The Penalty-Free Nitsche Method and Nonconforming Finite Elements for the Signorini Problem&lt;/em&gt;, SIAM JNA, 2017&lt;/strong&gt;。如果重点关心接触，这篇很值得看：它展示了 Nitsche 如何处理 unilateral contact，并构造 penalty-free nonsymmetric formulation。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/16M107846X&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Seitz, Wall &amp;amp; Popp, &lt;em&gt;Nitsche’s method for finite deformation thermomechanical contact problems&lt;/em&gt;&lt;/strong&gt;。适合进一步看大变形、摩擦和热接触，以及实际工程中 stabilization parameter 如何通过局部 generalized eigenvalue problem 估计。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Ruess et al., &lt;em&gt;Weak coupling for isogeometric analysis of non-matching and trimmed multi-patch geometries&lt;/em&gt;, CMAME, 2014&lt;/strong&gt;。非常适合理解 Nitsche 为什么能把 CAD/NURBS patch、非匹配网格和有限元耦合起来。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Massing, Larson &amp;amp; Logg, &lt;em&gt;Efficient Implementation of Finite Element Methods on Nonmatching and Overlapping Meshes in Three Dimensions&lt;/em&gt;, SIAM JSC&lt;/strong&gt;。如果以后自己写 solver，这篇尤其有价值，因为它把真正困难的 intersection detection、cut-cell integration 和三维工程实现摆到了台面上。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里 主题：LoRA（Low-Rank Adaptation）与低秩参数更新\n领域：AI 全栈工程 × 大模型推理 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\nLoRA 值得深入理解，因为它表面上是一个“大模型省显存微调技巧”，但更深层的问题其实是：\n\\[\\boxed{ \\text{一个拥有数十亿参数的模型，在适配新任务时，真的需要在整个参数空间里自由移动吗？} }\\]LoRA 的回答是：\n\\[\\boxed{ \\text{很多任务适配所需的权重变化，本身可能近似低秩。} }\\]于是它不直接优化完整权重更新：\n\\[\\Delta W\\in\\mathbb R^{d_{\\text{out}}\\times d_{\\text{in}}},\\]而把更新限制成：\n\\[\\boxed{ \\Delta W=BA }\\]其中：\n\\[A\\in\\mathbb R^{r\\times d_{\\text{in}}}, \\qquad B\\in\\mathbb R^{d_{\\text{out}}\\times r},\\]且：\n\\[r\\ll \\min(d_{\\text{in}},d_{\\text{out}}).\\]原始 LoRA 论文正是基于这种 rank decomposition：冻结预训练权重，只训练低秩更新矩阵。作者在 GPT-3 175B 的实验设置中报告，相比完整 Adam 微调，可将可训练参数数量降低约 \\(10^4\\) 倍、GPU 内存需求降低约 3 倍，同时保持相当或更好的任务性能。\n1. 先看完整微调到底浪费在哪里 假设一个 Transformer 线性层：\n\\[W\\in\\mathbb R^{4096\\times4096}.\\]它拥有：\n\\[4096^2 \\approx 16.8\\text{ million}\\]个参数。\n完整微调意味着：\n\\[W \\rightarrow W+\\Delta W,\\]其中：\n\\[\\Delta W\\]也是一个完整的：\n">
+<title>LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/24-lora/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里">
+<meta property='og:description' content="LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里 主题：LoRA（Low-Rank Adaptation）与低秩参数更新\n领域：AI 全栈工程 × 大模型推理 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\nLoRA 值得深入理解，因为它表面上是一个“大模型省显存微调技巧”，但更深层的问题其实是：\n\\[\\boxed{ \\text{一个拥有数十亿参数的模型，在适配新任务时，真的需要在整个参数空间里自由移动吗？} }\\]LoRA 的回答是：\n\\[\\boxed{ \\text{很多任务适配所需的权重变化，本身可能近似低秩。} }\\]于是它不直接优化完整权重更新：\n\\[\\Delta W\\in\\mathbb R^{d_{\\text{out}}\\times d_{\\text{in}}},\\]而把更新限制成：\n\\[\\boxed{ \\Delta W=BA }\\]其中：\n\\[A\\in\\mathbb R^{r\\times d_{\\text{in}}}, \\qquad B\\in\\mathbb R^{d_{\\text{out}}\\times r},\\]且：\n\\[r\\ll \\min(d_{\\text{in}},d_{\\text{out}}).\\]原始 LoRA 论文正是基于这种 rank decomposition：冻结预训练权重，只训练低秩更新矩阵。作者在 GPT-3 175B 的实验设置中报告，相比完整 Adam 微调，可将可训练参数数量降低约 \\(10^4\\) 倍、GPU 内存需求降低约 3 倍，同时保持相当或更好的任务性能。\n1. 先看完整微调到底浪费在哪里 假设一个 Transformer 线性层：\n\\[W\\in\\mathbb R^{4096\\times4096}.\\]它拥有：\n\\[4096^2 \\approx 16.8\\text{ million}\\]个参数。\n完整微调意味着：\n\\[W \\rightarrow W+\\Delta W,\\]其中：\n\\[\\Delta W\\]也是一个完整的：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/24-lora/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:tag' content='大模型推理' /><meta property='article:tag' content='科学机器学习' /><meta property='article:published_time' content='2026-09-06T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-06T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里">
+<meta name="twitter:description" content="LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里 主题：LoRA（Low-Rank Adaptation）与低秩参数更新\n领域：AI 全栈工程 × 大模型推理 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\nLoRA 值得深入理解，因为它表面上是一个“大模型省显存微调技巧”，但更深层的问题其实是：\n\\[\\boxed{ \\text{一个拥有数十亿参数的模型，在适配新任务时，真的需要在整个参数空间里自由移动吗？} }\\]LoRA 的回答是：\n\\[\\boxed{ \\text{很多任务适配所需的权重变化，本身可能近似低秩。} }\\]于是它不直接优化完整权重更新：\n\\[\\Delta W\\in\\mathbb R^{d_{\\text{out}}\\times d_{\\text{in}}},\\]而把更新限制成：\n\\[\\boxed{ \\Delta W=BA }\\]其中：\n\\[A\\in\\mathbb R^{r\\times d_{\\text{in}}}, \\qquad B\\in\\mathbb R^{d_{\\text{out}}\\times r},\\]且：\n\\[r\\ll \\min(d_{\\text{in}},d_{\\text{out}}).\\]原始 LoRA 论文正是基于这种 rank decomposition：冻结预训练权重，只训练低秩更新矩阵。作者在 GPT-3 175B 的实验设置中报告，相比完整 Adam 微调，可将可训练参数数量降低约 \\(10^4\\) 倍、GPU 内存需求降低约 3 倍，同时保持相当或更好的任务性能。\n1. 先看完整微调到底浪费在哪里 假设一个 Transformer 线性层：\n\\[W\\in\\mathbb R^{4096\\times4096}.\\]它拥有：\n\\[4096^2 \\approx 16.8\\text{ million}\\]个参数。\n完整微调意味着：\n\\[W \\rightarrow W+\\Delta W,\\]其中：\n\\[\\Delta W\\]也是一个完整的：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先看完整微调到底浪费在哪里">1. 先看完整微调到底浪费在哪里</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/24-lora/">LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-06T00:00:00Z'>Sep 06, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 5 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="lora真正高效的模型适配往往不是少改几个参数而是只允许参数更新发生在低秩子空间里">LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里
+</h1><p><strong>主题：LoRA（Low-Rank Adaptation）与低秩参数更新</strong><br>
+<strong>领域：AI 全栈工程 × 大模型推理 × 科学机器学习</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>LoRA 值得深入理解，因为它表面上是一个“大模型省显存微调技巧”，但更深层的问题其实是：</p>
+\[\boxed{ \text{一个拥有数十亿参数的模型，在适配新任务时，真的需要在整个参数空间里自由移动吗？} }\]<p>LoRA 的回答是：</p>
+\[\boxed{ \text{很多任务适配所需的权重变化，本身可能近似低秩。} }\]<p>于是它不直接优化完整权重更新：</p>
+\[\Delta W\in\mathbb R^{d_{\text{out}}\times d_{\text{in}}},\]<p>而把更新限制成：</p>
+\[\boxed{ \Delta W=BA }\]<p>其中：</p>
+\[A\in\mathbb R^{r\times d_{\text{in}}}, \qquad B\in\mathbb R^{d_{\text{out}}\times r},\]<p>且：</p>
+\[r\ll \min(d_{\text{in}},d_{\text{out}}).\]<p>原始 LoRA 论文正是基于这种 rank decomposition：冻结预训练权重，只训练低秩更新矩阵。作者在 GPT-3 175B 的实验设置中报告，相比完整 Adam 微调，可将可训练参数数量降低约 \(10^4\) 倍、GPU 内存需求降低约 3 倍，同时保持相当或更好的任务性能。</p>
+<hr>
+<h2 id="1-先看完整微调到底浪费在哪里">1. 先看完整微调到底浪费在哪里
+</h2><p>假设一个 Transformer 线性层：</p>
+\[W\in\mathbb R^{4096\times4096}.\]<p>它拥有：</p>
+\[4096^2 \approx 16.8\text{ million}\]<p>个参数。</p>
+<p>完整微调意味着：</p>
+\[W \rightarrow W+\Delta W,\]<p>其中：</p>
+\[\Delta W\]<p>也是一个完整的：</p>
+\[4096\times4096\]<p>矩阵。</p>
+<p>即使新任务只是：</p>
+<blockquote>
+<p>让模型适应某种新的写作风格、领域术语或指令格式，</p>
+</blockquote>
+<p>优化器理论上仍然允许：</p>
+\[16.8\text{ million}\]<p>个独立更新方向。</p>
+<p>LoRA 质疑的就是这一点：</p>
+\[\boxed{ \text{新任务真正需要的自由度，也许远远小于参数矩阵自身维度。} }\]<p>于是取：</p>
+\[r=8.\]<p>只训练：</p>
+\[A\in\mathbb R^{8\times4096},\]\[B\in\mathbb R^{4096\times8}.\]<p>参数数量变成：</p>
+\[2\times4096\times8 = 65536.\]<p>相比：</p>
+\[16.8\text{ million},\]<p>只有约：</p>
+\[0.39\%.\]<p>这不是简单“少训练一些原参数”。</p>
+<p>它实际上重新定义了：</p>
+\[\boxed{ \text{允许模型如何变化。} }\]<hr>
+<h1 id="2-lora-真正施加的是一个-rank-constraint">2. LoRA 真正施加的是一个 rank constraint
+</h1><p>完整更新：</p>
+\[\Delta W\]<p>可以是任意矩阵，理论最大秩：</p>
+\[\operatorname{rank}(\Delta W) = \min(d_{\rm in},d_{\rm out}).\]<p>LoRA 写成：</p>
+\[\Delta W=BA.\]<p>于是：</p>
+\[\boxed{ \operatorname{rank}(\Delta W)\le r. }\]<p>这意味着模型更新只能发生在一个低秩结构中。</p>
+<p>对输入：</p>
+\[x,\]<p>原层输出：</p>
+\[y=Wx.\]<p>加入 LoRA：</p>
+\[y = Wx + BAx.\]<p>可以按两步理解：</p>
+\[x \xrightarrow{A} z\in\mathbb R^r \xrightarrow{B} \Delta y.\]<p>所以 LoRA 实际做的是：</p>
+\[\boxed{ \text{先把高维输入压缩到一个小的 adaptation space， 再从这个空间生成任务相关修正。} }\]<p>这里的：</p>
+\[r\]<p>就是 adaptation bottleneck dimension。</p>
+<hr>
+<h1 id="3-为什么低秩会有效">3. 为什么“低秩”会有效？
+</h1><p>这是 LoRA 最值得学的地方。</p>
+<p>它不是因为：</p>
+<blockquote>
+<p>参数越少一定越好。</p>
+</blockquote>
+<p>而是基于一个经验观察：</p>
+\[\boxed{ \text{大型预训练模型做下游任务适配时， 真正需要改变的功能方向可能具有很低的 intrinsic dimension。} }\]<p>原始 LoRA 论文专门研究了 adaptation update 的 rank deficiency，并发现即使：</p>
+\[r\]<p>相当小，往往仍能取得接近 full fine-tuning 的性能。</p>
+<p>可以把预训练模型理解成已经拥有一个非常丰富的能力空间：</p>
+\[\boxed{ \text{语言、知识、推理模式、语法、表征} }\]<p>下游微调很多时候并不是：</p>
+\[\text{重新学习这些能力},\]<p>而更像：</p>
+\[\boxed{ \text{重新组合、偏置或激活已有能力。} }\]<p>因此更新空间可能天然比原始参数空间低维得多。</p>
+<hr>
+<h1 id="4-一个二维类比">4. 一个二维类比
+</h1><p>假设系统参数有：</p>
+\[1000\]<p>维：</p>
+\[\theta\in\mathbb R^{1000}.\]<p>但任务变化真正只需要沿两个方向：</p>
+\[v_1,\quad v_2.\]<p>那么：</p>
+\[\Delta\theta = a_1v_1+a_2v_2.\]<p>虽然：</p>
+\[\theta\]<p>是 1000 维，</p>
+<p>真正适配自由度却只有：</p>
+\[2.\]<p>LoRA 做的事情，本质上就是寻找一个类似：</p>
+\[\boxed{ \text{task adaptation subspace} }\]<p>的结构。</p>
+<p>这和之前讲过的 <span class="term-anchor" data-term="active-subspace" tabindex="0">Active Subspaces</span> 有一个非常有趣的对应：</p>
+<ul>
+<li>Active Subspace：寻找<strong>输入空间</strong>里的低维敏感方向；</li>
+<li>LoRA：假设<strong>参数更新空间</strong>本身具有低维结构。</li>
+</ul>
+<p>二者都建立在同一个更一般的思想上：</p>
+\[\boxed{ \text{名义维度很高，不代表有效自由度真的很高。} }\]<hr>
+<h1 id="5-为什么-lora-比冻结大部分层更加精细">5. 为什么 LoRA 比“冻结大部分层”更加精细？
+</h1><p>另一种参数高效方法是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">冻结前 30 层
+</span></span><span class="line"><span class="cl">只训练最后 2 层
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这等于假设：</p>
+\[\boxed{ \text{任务变化只发生在某些特定层。} }\]<p>LoRA 的假设不同：</p>
+\[\boxed{ \text{许多层都可以变化， 但每一层只需要少量低秩变化方向。} }\]<p>这通常更灵活。</p>
+<p>例如一个 attention projection：</p>
+\[W_q\]<p>可能只需要轻微改变若干 feature directions。</p>
+<p>另一个：</p>
+\[W_v\]<p>也需要适配。</p>
+<p>LoRA 可以分别给它们：</p>
+\[\Delta W_q=B_qA_q,\]\[\Delta W_v=B_vA_v.\]<p>于是变化是：</p>
+\[\boxed{ \text{distributed but low-dimensional} }\]<p>，而不是：</p>
+\[\text{localized but full-dimensional}.\]<p>这是两种完全不同的 inductive bias。</p>
+<hr>
+<h1 id="6-为什么它能显著省显存">6. 为什么它能显著省显存？
+</h1><p>训练模型时，显存不只是存：</p>
+\[W.\]<p>还要存：</p>
+<ul>
+<li>gradient；</li>
+<li>optimizer states；</li>
+<li>activation；</li>
+<li>temporary buffers。</li>
+</ul>
+<p>以 Adam 为例，每个 trainable parameter 通常还会有：</p>
+\[m,\quad v\]<p>两个 optimizer states。</p>
+<p>如果完整微调：</p>
+\[10^9\]<p>参数，就意味着这些状态也全部存在。</p>
+<p>LoRA 冻结：</p>
+\[W_0.\]<p>只优化：</p>
+\[A,B.\]<p>于是：</p>
+\[\boxed{ \text{optimizer state 和 gradient memory 只跟 LoRA 参数数量增长。} }\]<p>这也是为什么 PEFT 在消费级 GPU 上非常有价值。Hugging Face 当前 PEFT 官方文档仍把 LoRA 作为最主要的参数高效微调方法之一，并强调只更新少量 adapter 参数可显著降低训练和存储成本。</p>
+<hr>
+<h1 id="7-lora-的-inference-为什么可以几乎没有额外结构成本">7. LoRA 的 inference 为什么可以几乎没有额外结构成本？
+</h1><p>因为：</p>
+\[W_{\rm adapted} = W_0+BA.\]<p>训练结束以后，可以直接做：</p>
+\[\boxed{ W' = W_0+BA }\]<p>把 LoRA merge 回原权重。</p>
+<p>于是 inference 仍然只是：</p>
+\[y=W'x.\]<p>不需要额外 adapter branch。</p>
+<p>这也是原始 LoRA 相比某些传统 adapter architecture 的重要工程优势之一：原论文强调 LoRA 可以避免额外 inference latency。</p>
+<p>但现代 serving 中也经常<strong>不 merge</strong>。</p>
+<p>为什么？</p>
+<p>因为同一个 base model 可以挂：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Base LLM
+</span></span><span class="line"><span class="cl"> ├─ Finance LoRA
+</span></span><span class="line"><span class="cl"> ├─ Coding LoRA
+</span></span><span class="line"><span class="cl"> ├─ Legal LoRA
+</span></span><span class="line"><span class="cl"> ├─ Game NPC LoRA
+</span></span><span class="line"><span class="cl"> └─ Internal Tool LoRA
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>于是：</p>
+\[\boxed{ \text{一个大模型权重} + \text{很多轻量任务增量} }\]<p>就能支持多租户、多角色、多领域部署。</p>
+<p>这是 LoRA 的系统价值，不只是训练价值。</p>
+<hr>
+<h1 id="8-这和版本控制有一个很好的类比">8. 这和版本控制有一个很好的类比
+</h1><p>假设 base model：</p>
+\[W_0\]<p>有：</p>
+\[20\text{ GB}.\]<p>有 100 个不同客户。</p>
+<p>Full fine-tuning 要保存：</p>
+\[100\times20 = 2000\text{ GB}.\]<p>LoRA 则保存：</p>
+\[W_0\]<p>一次，然后每个客户只保存：</p>
+\[\Delta W_i=B_iA_i.\]<p>如果每个 LoRA：</p>
+\[100\text{ MB},\]<p>总量大约：</p>
+\[20+100\times0.1 = 30\text{ GB}.\]<p>这实际上是一种：</p>
+\[\boxed{ \text{base state + delta state} }\]<p>架构。</p>
+<p>它和：</p>
+<ul>
+<li>Git delta；</li>
+<li>patch；</li>
+<li>copy-on-write；</li>
+<li>layered filesystem；</li>
+</ul>
+<p>的系统思想很相似。</p>
+<p>所以 LoRA 在部署层面的本质，也可以理解为：</p>
+\[\boxed{ \text{不要复制整个系统状态，只保存任务相关差分。} }\]<hr>
+<h1 id="9-rank--到底控制什么">9. Rank \(r\) 到底控制什么？
+</h1><p>LoRA 最重要的超参数之一：</p>
+\[r.\]<p>如果：</p>
+\[r=1,\]<p>那么：</p>
+\[\Delta W=ba^T\]<p>只能产生一个 rank-1 更新。</p>
+<p>表达能力非常有限。</p>
+<p>随着：</p>
+\[r\uparrow,\]<p>允许的 adaptation subspace 越丰富。</p>
+<p>但同时：</p>
+\[\boxed{ \text{参数量、计算量、显存} }\]<p>都增加。</p>
+<p>于是：</p>
+\[r\]<p>本质上是：</p>
+\[\boxed{ \text{adaptation capacity budget} }\]<p>。</p>
+<p>一个很重要的工程认识是：</p>
+<blockquote>
+<p>所有层不一定需要相同 rank。</p>
+</blockquote>
+<p>有些层：</p>
+\[r=4\]<p>就够。</p>
+<p>有些层可能需要：</p>
+\[r=32.\]<p>这也自然引出了 AdaLoRA、rank allocation 等后续方法。</p>
+<hr>
+<h1 id="10-lora-并不是简单地做-svd">10. LoRA 并不是简单地“做 SVD”
+</h1><p>这一点很容易误解。</p>
+<p>LoRA 并不是：</p>
+<ol>
+<li>先完整 fine-tune；</li>
+<li>得到 \(\Delta W\)；</li>
+<li>再做 SVD；</li>
+<li>保留前 \(r\) 个奇异值。</li>
+</ol>
+<p>真正训练时：</p>
+\[A,B\]<p>从一开始就是优化变量。</p>
+<p>也就是说模型直接搜索：</p>
+\[\boxed{ \operatorname{rank}(\Delta W)\le r }\]<p>这个低秩参数空间。</p>
+<p>所以 LoRA 是：</p>
+\[\boxed{ \text{low-rank parameterization} }\]<p>而不是：</p>
+\[\text{post-hoc matrix compression}.\]<p>区别非常重要。</p>
+<p>前者改变优化问题本身。</p>
+<hr>
+<h1 id="11-为什么--的训练动力学也很重要">11. 为什么 \(A,B\) 的训练动力学也很重要？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>把：</p>
+\[\Delta W=BA\]<p>分解以后，参数化不再唯一。</p>
+<p>例如：</p>
+\[BA = (BS)(S^{-1}A)\]<p>对可逆：</p>
+\[S\]<p>都成立。</p>
+<p>所以：</p>
+\[A,B\]<p>之间有 scaling freedom。</p>
+<p>这意味着优化器看到的参数空间 geometry 和直接优化：</p>
+\[\Delta W\]<p>并不一样。</p>
+<p>2024 年 LoRA+ 就专门指出，随着模型 width 增大，给：</p>
+\[A,B\]<p>使用相同 learning rate 会导致低效 feature learning；其方法为两组矩阵使用不同学习率，在论文实验中报告最高约 \(2\times\) 微调速度提升以及约 1–2% 的性能改进。</p>
+<p>这个结果很有启发性：</p>
+\[\boxed{ \text{选择低维参数化以后， 优化几何本身也随之改变。} }\]<p>所以“降维”不是免费的。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="12-lora-fa-又揭示了另一个系统问题参数少不等于-activation-少">12. LoRA-FA 又揭示了另一个系统问题：参数少，不等于 activation 少
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>普通 LoRA 虽然 trainable parameters 大幅减少，</p>
+<p>但为了计算：</p>
+\[A x\]<p>和：</p>
+\[B(Ax),\]<p>训练时仍需要保存相应 activation。</p>
+<p>所以显存瓶颈并没有完全消失。</p>
+<p>LoRA-FA 的做法是固定其中一个投影矩阵，只更新另一部分，从而减少需要保存的 activation；论文报告相比标准 LoRA 可进一步降低总体训练内存，最高约 \(1.4\times\)。</p>
+<p>这提醒我们：</p>
+\[\boxed{ \text{参数压缩} \neq \text{训练系统整体压缩} }\]<p>工程优化必须同时看：</p>
+<ul>
+<li>parameters；</li>
+<li>gradients；</li>
+<li>optimizer states；</li>
+<li>activations；</li>
+<li>communication。</li>
+</ul>
+<p>这一点和物理求解器非常类似：DOF 少了，并不代表 sparse solve 就一定便宜。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="13-lora-真正有迁移价值的部分低秩更新不是低秩模型">13. LoRA 真正有迁移价值的部分：低秩“更新”，不是低秩“模型”
+</h1><p>这一点尤其值得区分。</p>
+<p>LoRA 并没有假设：</p>
+\[W_0\]<p>本身低秩。</p>
+<p>事实上预训练权重可以是：</p>
+\[\boxed{\text{full-rank}}\]<p>。</p>
+<p>它只假设：</p>
+\[\boxed{ \Delta W }\]<p>近似低秩。</p>
+<p>这是一种非常强的建模思想：</p>
+\[\boxed{ \text{复杂系统本身可以是高维的， 但从一个已知良好状态到另一个邻近状态的变化可能是低维的。} }\]<p>这个思想远远不只属于 LLM。</p>
+<hr>
+<h1 id="14-这和有限元中的低秩更新高度相似">14. 这和有限元中的低秩更新高度相似
+</h1><p>设结构刚度矩阵：</p>
+\[K_0.\]<p>只有局部参数变化：</p>
+<ul>
+<li>一个连接点刚度变化；</li>
+<li>少数单元材料改变；</li>
+<li>边界条件小范围改变。</li>
+</ul>
+<p>于是：</p>
+\[K = K_0+\Delta K.\]<p>很多时候：</p>
+\[\Delta K\]<p>虽然嵌在巨大：</p>
+\[N\times N\]<p>系统里，但本身影响的自由度很少。</p>
+<p>于是可以写成近似：</p>
+\[\boxed{ \Delta K = UV^T. }\]<p>那么：</p>
+\[(K_0+UV^T)^{-1}\]<p>就可能利用 Woodbury identity：</p>
+\[(A+UCV)^{-1} = A^{-1} - A^{-1}U (C^{-1}+VA^{-1}U)^{-1} VA^{-1}.\]<p>也就是说：</p>
+\[\boxed{ \text{无需把整个系统重新当成一个全新问题。} }\]<p>LoRA 和这种思维非常接近：</p>
+\[\boxed{ \text{base operator} + \text{low-rank correction}. }\]<hr>
+<h1 id="15-这对代理模型也有一个非常好的启发">15. 这对代理模型也有一个非常好的启发
+</h1><p>假设已经有一个基础代理：</p>
+\[f_0(x)\]<p>对应工况 A。</p>
+<p>现在工况 B：</p>
+<ul>
+<li>材料稍有变化；</li>
+<li>边界条件变化；</li>
+<li>软件模型升级；</li>
+<li>fidelity 提升。</li>
+</ul>
+<p>最粗暴做法：</p>
+\[\boxed{ \text{重新训练一个完整 surrogate} }\]<p>。</p>
+<p>但如果新旧任务差异：</p>
+\[\delta f(x) = f_B(x)-f_A(x)\]<p>具有低维结构，</p>
+<p>更合理的做法可能是：</p>
+\[\boxed{ f_B = f_0 + \Delta f_{\rm low-dimensional}. }\]<p>这和 multifidelity discrepancy modeling 很接近。</p>
+<p>LoRA 提醒我们：</p>
+\[\boxed{ \text{迁移学习真正应该建模的， 往往是任务之间的“变化”， 而不是重新建模整个任务。} }\]<p>这是代理模型中非常值得吸收的一层。</p>
+<hr>
+<h1 id="16-对可靠性模型同样成立">16. 对可靠性模型同样成立
+</h1><p>假设已有一个极限状态代理：</p>
+\[g_0(x)\]<p>对应 nominal design。</p>
+<p>设计稍微变化：</p>
+\[d_0\rightarrow d_1.\]<p>通常会重新生成：</p>
+\[N\]<p>个高保真样本，重训：</p>
+\[g_1(x).\]<p>但如果：</p>
+\[g(x,d)\]<p>对设计变化主要发生在某个低维 response direction 上，</p>
+<p>则可能构造：</p>
+\[\boxed{ g_1(x) = g_0(x) + \Delta g(x) }\]<p>并只学习：</p>
+\[\Delta g.\]<p>这其实就是一种：</p>
+\[\boxed{ \text{surrogate adaptation} }\]<p>。</p>
+<p>LoRA 最大的研究启发之一，就是让人去问：</p>
+<blockquote>
+<p><strong>多工况、多设计、多 fidelity 的代理模型之间，真正需要独立学习的自由度到底有多少？</strong></p>
+</blockquote>
+<hr>
+<h1 id="17-对游戏引擎--agent-部署一个特别现实的价值共享-base动态挂-adapter">17. 对游戏引擎 / Agent 部署，一个特别现实的价值：共享 base，动态挂 adapter
+</h1><p>假设一个游戏中需要：</p>
+<ul>
+<li>商人 NPC；</li>
+<li>战斗教官；</li>
+<li>世界观讲解者；</li>
+<li>任务生成器；</li>
+<li>QA 助手。</li>
+</ul>
+<p>每个角色都完整部署一个：</p>
+\[8B\]<p>模型通常不现实。</p>
+<p>LoRA 架构允许：</p>
+\[\boxed{ \text{同一个 base model} + \text{多个轻量 adapter}. }\]<p>服务端可以根据请求动态选择：</p>
+\[A_i,B_i.\]<p>这和前一期 <span class="term-anchor" data-term="paged-attention" tabindex="0">PagedAttention</span> 所体现的思路非常相似：</p>
+<ul>
+<li>PagedAttention：共享/虚拟化 KV memory；</li>
+<li>LoRA：共享 base parameters，只保存任务增量。</li>
+</ul>
+<p>两者都是：</p>
+\[\boxed{ \text{把“大而稳定的公共部分” 与 “小而动态的差异部分” 分离。}\]<p>这是现代 AI serving 很核心的一种架构思想。</p>
+<p>Hugging Face 当前 PEFT 已支持加载、切换、删除不同 LoRA adapters，并支持 tensor parallel 等部署场景。</p>
+<hr>
+<h1 id="18-lora-的局限低秩假设不是永远成立">18. LoRA 的局限：低秩假设不是永远成立
+</h1><p>如果新任务与 base model 相距很远：</p>
+\[\boxed{ \text{domain shift 很大} }\]<p>或者需要：</p>
+<ul>
+<li>大规模新知识；</li>
+<li>新语言；</li>
+<li>新视觉模式；</li>
+<li>全新推理结构；</li>
+</ul>
+<p>那么：</p>
+\[r\]<p>可能必须不断增加。</p>
+<p>最终：</p>
+\[r\rightarrow d.\]<p>LoRA 的优势就会逐渐消失。</p>
+<p>因此：</p>
+\[\boxed{ \text{LoRA 最适合“已有模型附近的任务适配”， 而不是所有形式的知识重建。} }\]<p>它依赖一个隐含条件：</p>
+\[\boxed{ \text{base representation 已经足够好。} }\]<hr>
+<h1 id="19-另一个局限低秩不等于低函数复杂度">19. 另一个局限：低秩不等于低函数复杂度
+</h1><p>即使：</p>
+\[\Delta W\]<p>只有 rank 4，</p>
+<p>经过：</p>
+\[100\]<p>层网络、非线性、attention 后，</p>
+<p>最终函数变化：</p>
+\[\Delta f(x)\]<p>仍然可能非常复杂。</p>
+<p>所以不要简单理解为：</p>
+\[r=8 \Rightarrow \text{模型只学 8 个功能}.\]<p>\(r\) 控制的是：</p>
+\[\boxed{ \text{单个权重更新矩阵的线性代数自由度} }\]<p>而不是最终模型行为的直接语义维数。</p>
+<p>这是理解 LoRA 时一个非常重要的边界。</p>
+<hr>
+<h1 id="20-一个很值得自己做的最小实验">20. 一个很值得自己做的最小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>即使不训练 LLM，也可以用一个小 MLP 理解 LoRA。</p>
+<p>先训练：</p>
+\[f_0(x)\]<p>拟合：</p>
+\[y=\sin x.\]<p>然后新任务：</p>
+\[y=\sin x+0.2\sin3x.\]<p>固定原模型。</p>
+<p>只对其中一个：</p>
+\[W\in\mathbb R^{128\times128}\]<p>加入：</p>
+\[\Delta W=BA.\]<p>分别尝试：</p>
+\[r=1,2,4,8,16.\]<p>比较：</p>
+\[\boxed{ \text{validation error} }\]<p>与：</p>
+\[\boxed{ \text{trainable parameter count}. }\]<p>然后再和 full fine-tuning 比较。</p>
+<p>最值得看的问题是：</p>
+\[\boxed{ \text{性能在什么 rank 后开始饱和？} }\]<p>如果：</p>
+\[r=4\]<p>已经和：</p>
+\[r=64\]<p>几乎一样，</p>
+<p>你就实际看到了：</p>
+\[\boxed{ \text{task adaptation 的 intrinsic rank 很低。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>LoRA 最值得记住的并不是：</p>
+\[\Delta W=BA.\]<p>真正值得记住的是：</p>
+\[\boxed{ \text{一个系统可以极其高维， 但“从一个已经很好状态到另一个任务状态的变化” 可能只占据很小的低维子空间。} }\]<p>所以它在整个知识体系中的位置更应该理解成：</p>
+\[\text{Large pretrained model}\]\[\downarrow\]\[\boxed{\text{Low-rank update subspace}}\]\[\downarrow\]\[\text{Parameter-efficient adaptation}.\]<p>而这个思想可以迁移到很多地方：</p>
+\[\boxed{ \text{base model} + \text{low-dimensional correction} }\]<p>可能对应：</p>
+<ul>
+<li>LLM：LoRA；</li>
+<li>FEM：low-rank stiffness update；</li>
+<li>代理模型：discrepancy adaptation；</li>
+<li>多保真模型：低维 fidelity correction；</li>
+<li>游戏/Agent 部署：base model + task adapters；</li>
+<li>优化：在低维更新空间内搜索。</li>
+</ul>
+<p>它真正教会我们的，是一个非常普遍的工程原则：</p>
+\[\boxed{ \text{面对一个已经很复杂、但已经工作良好的系统， 优先学习“怎样改变它”， 而不一定重新学习“整个系统是什么”。} }\]<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p><strong>Hu et al., <em>LoRA: Low-Rank Adaptation of Large Language Models</em>, ICLR 2022</strong>。原始论文，最值得重点看 §4 方法、§7 对 adaptation rank 的分析，以及不同 \(r\) 下的性能。<br>
+<a class="link" href="https://arxiv.org/abs/2106.09685"  target="_blank" rel="noopener"
+    >LoRA 原论文</a></p>
+</li>
+<li>
+<p><strong>Microsoft <code>loralib</code> 官方实现</strong>。源码非常短，适合直接看 LoRA 怎样注入 <code>Linear</code> / attention projection，以及如何 merge/unmerge 权重。<br>
+<a class="link" href="https://github.com/microsoft/LoRA"  target="_blank" rel="noopener"
+    >Microsoft LoRA GitHub</a></p>
+</li>
+<li>
+<p><strong>Hugging Face PEFT — LoRA 官方文档</strong>。目前最实用的工程入口，包含 <code>LoraConfig</code>、target modules、rank、LoRA-FA、LoRA+、adapter 加载/切换以及 tensor parallel 支持。<br>
+<a class="link" href="https://huggingface.co/docs/peft/main/package_reference/lora"  target="_blank" rel="noopener"
+    >PEFT LoRA 文档</a></p>
+</li>
+<li>
+<p><strong>Hayou, Ghosh &amp; Yu, <em>LoRA+: Efficient Low Rank Adaptation of Large Models</em>, 2024</strong>。适合进一步理解：选了低秩参数化以后，\(A/B\) 两个因子的优化尺度为什么本身会成为问题。</p>
+</li>
+<li>
+<p><strong>Zhang et al., <em>LoRA-FA: Memory-efficient Low-rank Adaptation for Large Language Models Fine-tuning</em>, 2023</strong>。适合从“参数效率”继续走到“完整训练系统效率”，尤其是 activation memory 为什么仍可能成为瓶颈。</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/">AI 全栈工程</a>
+        
+            <a href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86/">大模型推理</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/22-implicit-differentiation/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/18-paged-attention/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/13-neural-operator/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

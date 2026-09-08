@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Thu, 03 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%8E%A5%E8%A7%A6%E5%8A%9B%E5%AD%A6/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Tue, 08 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%8E%A5%E8%A7%A6%E5%8A%9B%E5%AD%A6/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>IPC：把“碰撞处理”改写成一个优化问题</title>
         <link>https://assranai.github.io/cards/01-ipc/</link>
         <pubDate>Fri, 14 Aug 2026 00:00:00 +0000</pubDate>
@@ -1564,6 +1564,503 @@
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Farrell 等, &lt;em&gt;A Full Approximation Scheme Multilevel Method for Nonlinear Variational Inequalities&lt;/em&gt;, SIAM JSC, 2024&lt;/strong&gt;。如果想把 FAS 与 contact/complementarity 联系起来，这篇尤其值得看；它把 FAS 扩展到 nonlinear variational inequalities，并提供可复现实验代码。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题</title>
+        <link>https://assranai.github.io/cards/26-nitsche-method/</link>
+        <pubDate>Tue, 08 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/26-nitsche-method/</guid>
+        <description>&lt;h1 id=&#34;nitsche-method为什么施加边界条件本身也可以变成一个变分问题&#34;&gt;Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Nitsche Method（Nitsche 方法）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 计算力学 × 接触力学 × 数值方法&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：&lt;/p&gt;
+\[\boxed{\text{边界条件一定要“强制写死”在自由度上吗？}}\]&lt;p&gt;传统 FEM 里，Dirichlet 边界条件：&lt;/p&gt;
+\[u=g \quad \text{on }\Gamma_D\]&lt;p&gt;通常通过直接修改自由度来施加：&lt;/p&gt;
+\[u_i=g_i.\]&lt;p&gt;这当然简单有效。&lt;/p&gt;
+&lt;p&gt;但一旦遇到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;非匹配网格；&lt;/li&gt;
+&lt;li&gt;两个独立网格的界面耦合；&lt;/li&gt;
+&lt;li&gt;immersed / unfitted FEM；&lt;/li&gt;
+&lt;li&gt;接触；&lt;/li&gt;
+&lt;li&gt;多物理场界面；&lt;/li&gt;
+&lt;li&gt;几何在运动、界面不断变化；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;“节点一一对应”这件事可能根本不存在。&lt;/p&gt;
+&lt;p&gt;Nitsche 方法的核心思想是：&lt;/p&gt;
+\[\boxed{ \text{不要直接消灭边界自由度，而是把边界约束以一致、稳定的方式嵌入弱式。} }\]&lt;p&gt;这使它成为一种非常通用的“弱施加约束”技术。Hansbo 的综述把 Nitsche 方法应用于真实/人工界面、unfitted meshes、Chimera meshes、cut meshes、fictitious-domain methods 和模型耦合，正说明了它已经远超“施加 Dirichlet 条件”这一最初用途。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看普通-fem-为什么天然喜欢强制-dirichlet-条件&#34;&gt;1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件”
+&lt;/h2&gt;&lt;p&gt;考虑 Poisson：&lt;/p&gt;
+\[-\Delta u=f\]&lt;p&gt;并规定：&lt;/p&gt;
+\[u=g \quad\text{on }\Gamma_D.\]&lt;p&gt;标准弱式：&lt;/p&gt;
+\[\int_\Omega \nabla u\cdot\nabla v\,d\Omega = \int_\Omega fv\,d\Omega + \int_{\Gamma_N}tv\,d\Gamma.\]&lt;p&gt;如果：&lt;/p&gt;
+\[u=g\]&lt;p&gt;在 \(\Gamma_D\) 上被强制满足，&lt;/p&gt;
+&lt;p&gt;那么测试函数：&lt;/p&gt;
+\[v=0 \quad\text{on }\Gamma_D.\]&lt;p&gt;于是 Dirichlet 边界甚至不会显式出现在 weak form 中。&lt;/p&gt;
+&lt;p&gt;这非常干净。&lt;/p&gt;
+&lt;p&gt;但代价是：&lt;/p&gt;
+\[\boxed{ \text{trial/test space 必须预先服从边界约束。} }\]&lt;p&gt;也就是说有限元空间本身就依赖：&lt;/p&gt;
+\[\Gamma_D.\]&lt;p&gt;这在 fitted mesh 上完全没问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-一旦网格不匹配强制约束立刻变麻烦&#34;&gt;2. 一旦网格不匹配，强制约束立刻变麻烦
+&lt;/h1&gt;&lt;p&gt;假设两个子域：&lt;/p&gt;
+\[\Omega_1,\qquad\Omega_2\]&lt;p&gt;在界面：&lt;/p&gt;
+\[\Gamma\]&lt;p&gt;相接。&lt;/p&gt;
+&lt;p&gt;物理要求：&lt;/p&gt;
+\[u_1=u_2.\]&lt;p&gt;但两边网格可能是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;mesh 1:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;|---|---|---|---|
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;interface
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;mesh 2:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;|-|-|-|-|-|-|-|-|
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;节点不对应。&lt;/p&gt;
+&lt;p&gt;于是你没法简单写：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;node 17 of mesh1 = node 44 of mesh2
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因为：&lt;/p&gt;
+\[\boxed{\text{不存在一一对应自由度}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这时常见思路有三类：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Lagrange multipliers；&lt;/li&gt;
+&lt;li&gt;penalty；&lt;/li&gt;
+&lt;li&gt;Nitsche。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;而 Nitsche 的吸引力就在于：&lt;/p&gt;
+\[\boxed{ \text{它能弱施加约束，却通常不需要额外 multiplier DOFs。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;3-先理解-penalty简单但有一个根本-trade-off&#34;&gt;3. 先理解 penalty：简单，但有一个根本 trade-off
+&lt;/h1&gt;&lt;p&gt;如果要强制：&lt;/p&gt;
+\[u=g,\]&lt;p&gt;可以在能量里加入：&lt;/p&gt;
+\[\frac{\gamma}{2} \int_{\Gamma_D} (u-g)^2\,d\Gamma.\]&lt;p&gt;对应弱式增加：&lt;/p&gt;
+\[\gamma \int_{\Gamma_D} (u-g)v\,d\Gamma.\]&lt;p&gt;当：&lt;/p&gt;
+\[\gamma\rightarrow\infty,\]&lt;p&gt;就趋向：&lt;/p&gt;
+\[u=g.\]&lt;p&gt;问题是：&lt;/p&gt;
+\[\gamma\]&lt;p&gt;太小：&lt;/p&gt;
+\[\Rightarrow \text{约束违反明显}\]&lt;p&gt;太大：&lt;/p&gt;
+\[\Rightarrow \text{系统条件数恶化}.\]&lt;p&gt;所以 penalty 法的经典矛盾是：&lt;/p&gt;
+\[\boxed{ \text{constraint accuracy} \quad\leftrightarrow\quad \text{conditioning} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Nitsche 方法的价值之一，就是引入&lt;strong&gt;一致性项&lt;/strong&gt;，让稳定化参数不再承担“单独逼近真实边界条件”的全部责任。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-nitsche-方法从分部积分重新把边界物理拿回来&#34;&gt;4. Nitsche 方法从分部积分重新把“边界物理”拿回来
+&lt;/h1&gt;&lt;p&gt;考虑齐次 Dirichlet：&lt;/p&gt;
+\[u=0 \quad\text{on }\Gamma_D.\]&lt;p&gt;如果我们暂时不要求测试函数：&lt;/p&gt;
+\[v=0\]&lt;p&gt;那么分部积分得到：&lt;/p&gt;
+\[\int_\Omega \nabla u\cdot\nabla v - \int_{\Gamma_D} \partial_n u\,v = \int_\Omega fv.\]&lt;p&gt;这里出现了自然边界通量：&lt;/p&gt;
+\[\partial_n u.\]&lt;p&gt;Nitsche 方法加入一个对称的一致性项：&lt;/p&gt;
+\[-\int_{\Gamma_D} \partial_n v\,u\]&lt;p&gt;以及一个稳定化项：&lt;/p&gt;
+\[\frac{\gamma}{h} \int_{\Gamma_D} uv.\]&lt;p&gt;于是典型 symmetric Nitsche bilinear form 是：&lt;/p&gt;
+\[\boxed{ a_h(u,v) = \int_\Omega\nabla u\cdot\nabla v - \int_{\Gamma_D}\partial_nu\,v - \int_{\Gamma_D}\partial_nv\,u + \frac{\gamma}{h} \int_{\Gamma_D}uv }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这三类边界项分别承担：&lt;/p&gt;
+\[\boxed{\text{consistency}}\]\[\boxed{\text{symmetry / adjoint consistency}}\]\[\boxed{\text{stability}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这就是 Nitsche 与单纯 penalty 最核心的区别。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么说-nitsche-是consistent-penalty&#34;&gt;5. 为什么说 Nitsche 是“consistent penalty”？
+&lt;/h1&gt;&lt;p&gt;看最后一项：&lt;/p&gt;
+\[\frac{\gamma}{h}uv.\]&lt;p&gt;它确实长得像 penalty。&lt;/p&gt;
+&lt;p&gt;但如果只保留这一项，那就是 penalty method。&lt;/p&gt;
+&lt;p&gt;Nitsche 还额外保留：&lt;/p&gt;
+\[-\partial_nu\,v\]&lt;p&gt;和：&lt;/p&gt;
+\[-\partial_nv\,u.\]&lt;p&gt;这些项来自 PDE 本身的 boundary flux structure。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Nitsche = consistency terms + stabilization} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;因此 \(\gamma\) 的主要作用变成保证 coercivity/stability，而不是通过无限大的数值强行把：&lt;/p&gt;
+\[u-g\]&lt;p&gt;压到零。&lt;/p&gt;
+&lt;p&gt;这就是为什么 Nitsche 可以做到：&lt;/p&gt;
+\[\boxed{ \text{弱施加边界条件，同时保持有限元的一致收敛阶。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;6-一个直观理解nitsche-不把约束写成命令而是写成界面交换定律&#34;&gt;6. 一个直观理解：Nitsche 不把约束写成“命令”，而是写成“界面交换定律”
+&lt;/h1&gt;&lt;p&gt;强制 Dirichlet：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;u_boundary = g
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;像是在直接锁死自由度。&lt;/p&gt;
+&lt;p&gt;Nitsche 更像：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;如果 u 偏离 g：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    通过边界 traction / flux 与 stabilization
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    在 weak equilibrium 中产生修正
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此它不是：&lt;/p&gt;
+\[\boxed{\text{直接删除自由度}}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\text{让弱平衡方程自己把状态拉回合法约束}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这就是为什么它特别适合：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;两个独立网格；&lt;/li&gt;
+&lt;li&gt;接触；&lt;/li&gt;
+&lt;li&gt;immersed boundaries；&lt;/li&gt;
+&lt;li&gt;移动界面。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些问题中的约束本来就更适合写成“界面交换条件”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-非匹配网格耦合时nitsche-的价值最容易看清&#34;&gt;7. 非匹配网格耦合时，Nitsche 的价值最容易看清
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[\Omega_1\]&lt;p&gt;和：&lt;/p&gt;
+\[\Omega_2\]&lt;p&gt;之间要求：&lt;/p&gt;
+\[u_1=u_2\]&lt;p&gt;以及通量平衡：&lt;/p&gt;
+\[\sigma_1n_1+\sigma_2n_2=0.\]&lt;p&gt;定义 jump：&lt;/p&gt;
+\[[u]=u_1-u_2.\]&lt;p&gt;以及某种 traction average：&lt;/p&gt;
+\[\{\sigma n\}.\]&lt;p&gt;典型界面 Nitsche 项可以写成类似：&lt;/p&gt;
+\[-\int_\Gamma \{\sigma(u)n\}\cdot[v]\]\[-\int_\Gamma \{\sigma(v)n\}\cdot[u]\]\[+ \frac{\gamma}{h} \int_\Gamma [u]\cdot[v].\]&lt;p&gt;于是：&lt;/p&gt;
+\[[u]=0\]&lt;p&gt;没有通过节点对应被强制，&lt;/p&gt;
+&lt;p&gt;而是在：&lt;/p&gt;
+\[\boxed{\text{interface weak form}}\]&lt;p&gt;中被满足。&lt;/p&gt;
+&lt;p&gt;这允许两边完全独立划分网格。&lt;/p&gt;
+&lt;p&gt;Ruess 等在 isogeometric analysis 中正是利用 Nitsche weak coupling，把 non-matching B-spline/NURBS patches 与普通有限元网格连接起来，而无需昂贵的几何重新参数化。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-这为什么对-cad--fem-很重要&#34;&gt;8. 这为什么对 CAD → FEM 很重要？
+&lt;/h1&gt;&lt;p&gt;CAD 几何经常天然由多个 patch 组成。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[\text{NURBS patch A} + \text{patch B} + \text{patch C}.\]&lt;p&gt;如果要求：&lt;/p&gt;
+\[\boxed{\text{所有 patch 接口节点严格匹配}}\]&lt;p&gt;网格生成会非常痛苦。&lt;/p&gt;
+&lt;p&gt;Nitsche 提供另一条路线：&lt;/p&gt;
+\[\boxed{ \text{每个 patch 独立离散， 然后在界面上弱耦合。} }\]&lt;p&gt;这相当于把复杂度从：&lt;/p&gt;
+\[\text{mesh conformity}\]&lt;p&gt;转移到：&lt;/p&gt;
+\[\text{variational coupling}.\]&lt;p&gt;这是一个非常重要的工程思想：&lt;/p&gt;
+\[\boxed{ \text{与其为了数值方法强迫几何/网格适配， 不如让数值方法适应真实几何结构。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;9-nitsche-和-lagrange-multiplier-的区别在哪里&#34;&gt;9. Nitsche 和 Lagrange multiplier 的区别在哪里？
+&lt;/h1&gt;&lt;p&gt;Lagrange multiplier 方法：&lt;/p&gt;
+\[u_1-u_2=0\]&lt;p&gt;通过额外变量：&lt;/p&gt;
+\[\lambda\]&lt;p&gt;施加。&lt;/p&gt;
+&lt;p&gt;系统变成：&lt;/p&gt;
+\[\begin{bmatrix} K &amp; B^T\\ B &amp; 0 \end{bmatrix} \begin{bmatrix} u\\ \lambda \end{bmatrix} = \begin{bmatrix} f\\ 0 \end{bmatrix}.\]&lt;p&gt;优点：&lt;/p&gt;
+\[\lambda\]&lt;p&gt;往往具有清晰物理意义，例如：&lt;/p&gt;
+\[\boxed{\text{contact traction / interface traction}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;但代价是 saddle-point system，并需要满足类似 inf-sup stability 条件。&lt;/p&gt;
+&lt;p&gt;Nitsche 通常可以把 multiplier 的效果通过：&lt;/p&gt;
+\[\boxed{ \text{consistent interface flux + stabilization} }\]&lt;p&gt;隐式消去。&lt;/p&gt;
+&lt;p&gt;所以它可以理解成：&lt;/p&gt;
+\[\boxed{ \text{一种 stabilized multiplier elimination} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这也是为什么很多 Nitsche 推导和 stabilized Lagrange multiplier formulation 之间存在紧密联系；对于弹性接触，已有分析就把 Nitsche 解释为稳定化有限元方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-那-nitsche-和-mortar-方法又是什么关系&#34;&gt;10. 那 Nitsche 和 Mortar 方法又是什么关系？
+&lt;/h1&gt;&lt;p&gt;Mortar 方法也主要用于：&lt;/p&gt;
+\[\boxed{\text{nonmatching interfaces}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;经典 mortar 通常在接口引入 multiplier space：&lt;/p&gt;
+\[\lambda_h.\]&lt;p&gt;所以更自然地表示 traction，并对 nonmatching discretization 做积分投影。&lt;/p&gt;
+&lt;p&gt;Nitsche 则倾向于直接利用：&lt;/p&gt;
+\[u,\quad \sigma n\]&lt;p&gt;构造弱界面项。&lt;/p&gt;
+&lt;p&gt;可以粗略理解：&lt;/p&gt;
+\[\boxed{ \text{Mortar：显式 interface multiplier} }\]\[\boxed{ \text{Nitsche：隐式 interface stabilization} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;两者在高级接触算法里并非完全对立；甚至存在 Nitsche mortaring 的组合。Gustafsson、Stenberg、Videman 的弹性接触工作就研究了三种 Nitsche mortaring 技术，并给出 quasi-optimality 和 a posteriori error estimates。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么-nitsche-可以处理接触&#34;&gt;11. 为什么 Nitsche 可以处理接触？
+&lt;/h1&gt;&lt;p&gt;接触条件本质上不是简单：&lt;/p&gt;
+\[u=0.\]&lt;p&gt;以无摩擦 Signorini contact 为例：&lt;/p&gt;
+\[g_n(u)\ge0,\]\[\lambda_n\le0,\]\[\lambda_ng_n=0.\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \text{要么分离，要么接触} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这和你之前看到的 complementarity 是同一个物理结构。&lt;/p&gt;
+&lt;p&gt;Nitsche 的做法不是简单加：&lt;/p&gt;
+\[u_1-u_2=0\]&lt;p&gt;，而是把 contact condition 转成一种 nonlinear interface relation，然后在 weak form 中施加。&lt;/p&gt;
+&lt;p&gt;Chouly–Hild 以及后续 Burman–Hansbo–Larson 的工作证明，Nitsche 方法可以用于 unilateral contact；后者甚至构造了 nonsymmetric penalty-free Nitsche formulation，并证明 energy norm 下的 optimal error estimates。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Nitsche 不只适用于 equality constraints， 也能扩展到 inequality/contact constraints。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;12-penalty-free-nitsche-为什么听起来有点反直觉&#34;&gt;12. Penalty-free Nitsche 为什么听起来有点反直觉？
+&lt;/h1&gt;&lt;p&gt;前面 symmetric Nitsche 有：&lt;/p&gt;
+\[\frac{\gamma}{h} \int_\Gamma uv.\]&lt;p&gt;看起来 penalty 不可缺少。&lt;/p&gt;
+&lt;p&gt;但 Nitsche 还有 nonsymmetric variants。&lt;/p&gt;
+&lt;p&gt;某些 formulations 可以通过改变 consistency terms 的符号结构，在理论上不依赖 penalty term 获得稳定性。&lt;/p&gt;
+&lt;p&gt;Burman、Hansbo、Larson 2017 年对 Signorini 问题的工作就是这样：他们用 displacement 的 nonlinear contact condition 构造 nonsymmetric Nitsche method，不需要 penalty term 来保证稳定，并证明最优能量范数误差估计。&lt;/p&gt;
+&lt;p&gt;这说明：&lt;/p&gt;
+\[\boxed{ \text{“Nitsche = penalty 方法”是不准确的。} }\]&lt;p&gt;Penalty-like term 只是常见构造的一部分，不是方法的本质定义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-但工程实现里-penaltystabilization-parameter-仍然很关键&#34;&gt;13. 但工程实现里 penalty/stabilization parameter 仍然很关键
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;在很多 symmetric Nitsche formulation 中，需要：&lt;/p&gt;
+\[\gamma\]&lt;p&gt;足够大以保证稳定。&lt;/p&gt;
+&lt;p&gt;但：&lt;/p&gt;
+\[\gamma\]&lt;p&gt;过大仍然会恶化 conditioning。&lt;/p&gt;
+&lt;p&gt;所以工程上依然存在：&lt;/p&gt;
+\[\boxed{ \text{stability} \quad\leftrightarrow\quad \text{conditioning} }\]&lt;p&gt;，只是相比纯 penalty method 更可控。&lt;/p&gt;
+&lt;p&gt;对于复杂热机接触，Seitz、Wall、Popp 的 Nitsche formulation 就通过局部 generalized eigenvalue problems 估计稳定化参数，并进一步构造 harmonic weighting，以应对大变形、摩擦和热耦合。&lt;/p&gt;
+&lt;p&gt;这说明真正成熟的 Nitsche 实现通常不会：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;gamma = 1e8
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;然后结束。&lt;/p&gt;
+&lt;p&gt;而会考虑：&lt;/p&gt;
+\[\boxed{ \text{mesh size} + \text{material stiffness} + \text{local interface geometry} }\]&lt;p&gt;共同决定 scaling。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-为什么系数通常是-&#34;&gt;14. 为什么系数通常是 \(\gamma/h\)？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为边界项和体积分项具有不同尺度。&lt;/p&gt;
+&lt;p&gt;例如 Poisson：&lt;/p&gt;
+\[\int_\Omega |\nabla u|^2\,d\Omega\]&lt;p&gt;与：&lt;/p&gt;
+\[\int_\Gamma u^2\,d\Gamma\]&lt;p&gt;的量纲/mesh scaling 不同。&lt;/p&gt;
+&lt;p&gt;通过 trace inequality，可以得到边界量与体积分之间的尺度关系：&lt;/p&gt;
+\[\|u\|_{\Gamma} \sim h^{-1/2}\|u\|_\Omega+\cdots\]&lt;p&gt;所以稳定化一般需要：&lt;/p&gt;
+\[\boxed{ \frac{\gamma}{h} }\]&lt;p&gt;级别。&lt;/p&gt;
+&lt;p&gt;对于弹性：&lt;/p&gt;
+\[\gamma\]&lt;p&gt;还常乘上代表材料刚度的量，例如：&lt;/p&gt;
+\[E,\mu,\lambda.\]&lt;p&gt;因此更合理的理解不是：&lt;/p&gt;
+\[\gamma=\text{一个神秘经验参数},\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \text{稳定化参数必须与离散尺度和 PDE operator 的尺度匹配。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-nitsche-和-cutfem-为什么天然是一对&#34;&gt;15. Nitsche 和 CutFEM 为什么天然是一对？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;CutFEM / unfitted FEM 的思想是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;网格不必贴合真实边界。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;例如一个圆：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;background mesh:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+---+---+---+
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;|  /圆\      |
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+ /---\---+
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;|/     \   |
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+---+---\--+
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;真实边界会穿过：&lt;/p&gt;
+\[\boxed{\text{element interiors}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;于是根本没有传统意义上的 boundary nodes。&lt;/p&gt;
+&lt;p&gt;这时你无法直接：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;set boundary DOF = g
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因为：&lt;/p&gt;
+\[\Gamma_D\]&lt;p&gt;甚至不沿网格边界。&lt;/p&gt;
+&lt;p&gt;Nitsche 正好允许直接在：&lt;/p&gt;
+\[\Gamma_D\cap K\]&lt;p&gt;这些 cut interfaces 上积分并弱施加边界条件。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{unfitted geometry} + \text{Nitsche weak boundary enforcement} }\]&lt;p&gt;成为非常自然的组合。&lt;/p&gt;
+&lt;p&gt;Hansbo 的综述明确把 Nitsche 与 fictitious domain、cut meshes 和 Chimera meshes 放在同一体系中；Massing、Larson、Logg 的实现工作也专门处理三维 nonmatching/overlapping meshes 中的 cut-cell intersection 和积分问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-这对参数化几何和优化非常有价值&#34;&gt;16. 这对参数化几何和优化非常有价值
+&lt;/h1&gt;&lt;p&gt;假设做 shape optimization。&lt;/p&gt;
+&lt;p&gt;传统 fitted mesh：&lt;/p&gt;
+\[\text{geometry changes} \Rightarrow \text{mesh deformation/remeshing}.\]&lt;p&gt;如果每次设计迭代都：&lt;/p&gt;
+\[\boxed{\text{重新网格化}}\]&lt;p&gt;成本高，而且容易产生质量问题。&lt;/p&gt;
+&lt;p&gt;MultiMesh / Nitsche 思路可以让多个独立网格移动，而通过 Nitsche 在 nonmatching interfaces 上保证连续。&lt;/p&gt;
+&lt;p&gt;Dokken 等的工作正是利用多个独立 nonmatching meshes 做 shape optimization，使部分几何变化可以通过网格刚体移动/缩放实现，从而避免每一步整体 remeshing。&lt;/p&gt;
+&lt;p&gt;这对参数化机构尤其有启发：&lt;/p&gt;
+\[\boxed{ \text{几何参数变化不一定要等价于全局重新划网格。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;17-这和你熟悉的接触-penalty-有什么最实用的区别&#34;&gt;17. 这和你熟悉的接触 penalty 有什么最实用的区别？
+&lt;/h1&gt;&lt;p&gt;销轴—孔接触里常用 penalty：&lt;/p&gt;
+\[F_n=k\delta^n.\]&lt;p&gt;其思想是：&lt;/p&gt;
+\[\boxed{ \text{允许少量穿透，用很大恢复力惩罚。} }\]&lt;p&gt;Nitsche contact 则从变分一致性的角度构造：&lt;/p&gt;
+\[\boxed{ \text{接触 traction} + \text{gap constraint} + \text{stabilization} }\]&lt;p&gt;之间的弱耦合。&lt;/p&gt;
+&lt;p&gt;所以二者虽然都可能出现一个“类似 penalty parameter”的量，&lt;/p&gt;
+&lt;p&gt;但数学角色不同：&lt;/p&gt;
+&lt;h3 id=&#34;penalty-contact&#34;&gt;Penalty contact
+&lt;/h3&gt;\[\text{penetration} \Rightarrow \text{artificial stiffness}\]&lt;h3 id=&#34;nitsche-contact&#34;&gt;Nitsche contact
+&lt;/h3&gt;\[\text{contact condition} \Rightarrow \text{consistent weak interface equation}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;因此 Nitsche 更接近：&lt;/p&gt;
+\[\boxed{\text{一种有限元约束离散方法}}\]&lt;p&gt;而 penalty contact 更接近：&lt;/p&gt;
+\[\boxed{\text{一种约束正则化方法}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-nitsche-的真正难点积分几何&#34;&gt;18. Nitsche 的真正难点：积分几何
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;公式看起来不复杂。&lt;/p&gt;
+&lt;p&gt;但 nonmatching interface 上真正实现：&lt;/p&gt;
+\[\int_\Gamma (\cdots)\,d\Gamma\]&lt;p&gt;时，需要知道：&lt;/p&gt;
+\[\boxed{ \text{mesh A 和 mesh B 的交界到底切在哪里？} }\]&lt;p&gt;于是要做：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;triangle–triangle intersection；&lt;/li&gt;
+&lt;li&gt;cut-cell decomposition；&lt;/li&gt;
+&lt;li&gt;quadrature on intersections；&lt;/li&gt;
+&lt;li&gt;normal orientation；&lt;/li&gt;
+&lt;li&gt;master/slave side lookup；&lt;/li&gt;
+&lt;li&gt;search acceleration。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;三维情况下，这部分代码可能比 Nitsche 公式本身复杂得多。&lt;/p&gt;
+&lt;p&gt;Massing 等关于三维 nonmatching/overlapping mesh 的实现论文就指出，实际困难集中在 mesh intersections 与 cut cells/subsimplices 上的积分，并专门设计自动检测和积分框架。&lt;/p&gt;
+&lt;p&gt;这是一个很典型的数值软件规律：&lt;/p&gt;
+\[\boxed{ \text{理论公式可能只有一行， 工程复杂度却集中在几何、数据结构和积分层。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;19-对物理引擎开发一个很值得迁移的思想约束不一定非得变成投影&#34;&gt;19. 对物理引擎开发，一个很值得迁移的思想：约束不一定非得变成“投影”
+&lt;/h1&gt;&lt;p&gt;游戏物理里通常想到约束：&lt;/p&gt;
+\[C(x)=0\]&lt;p&gt;就会自然进入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt; projection；&lt;/li&gt;
+&lt;li&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;impulse；&lt;/li&gt;
+&lt;li&gt;LCP。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Nitsche 提醒我们，还有另一种思路：&lt;/p&gt;
+\[\boxed{ \text{把约束直接嵌入 variational residual / energy balance。} }\]&lt;p&gt;即：&lt;/p&gt;
+\[\text{bulk physics} + \text{interface consistency} + \text{stabilization}.\]&lt;p&gt;这对：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;deformable–rigid coupling；&lt;/li&gt;
+&lt;li&gt;embedded objects；&lt;/li&gt;
+&lt;li&gt;fluid–structure interfaces；&lt;/li&gt;
+&lt;li&gt;mixed discretizations；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;尤其有吸引力。&lt;/p&gt;
+&lt;p&gt;如果两个物理模块本身都是 variational FEM，&lt;/p&gt;
+&lt;p&gt;那么用：&lt;/p&gt;
+\[\boxed{\text{weak interface coupling}}\]&lt;p&gt;往往比“找到节点然后绑死”更自然。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;20-对代理模型数字孪生还有一个不那么显眼的价值模块化高保真模型&#34;&gt;20. 对代理模型/数字孪生还有一个不那么显眼的价值：模块化高保真模型
+&lt;/h1&gt;&lt;p&gt;假设复杂系统由：&lt;/p&gt;
+\[\Omega_1,\Omega_2,\Omega_3\]&lt;p&gt;几个子结构组成。&lt;/p&gt;
+&lt;p&gt;每个子结构：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;网格不同；&lt;/li&gt;
+&lt;li&gt;fidelity 不同；&lt;/li&gt;
+&lt;li&gt;solver 不同；&lt;/li&gt;
+&lt;li&gt;更新频率不同。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果界面必须 node-conforming，&lt;/p&gt;
+&lt;p&gt;整个系统只能一起重建。&lt;/p&gt;
+&lt;p&gt;如果使用弱耦合：&lt;/p&gt;
+\[\boxed{ \text{子模型可以保持各自 discretization} }\]&lt;p&gt;然后通过 interface operator 连接。&lt;/p&gt;
+&lt;p&gt;这就提供一种：&lt;/p&gt;
+\[\boxed{ \text{模块化多保真物理模型} }\]&lt;p&gt;基础。&lt;/p&gt;
+&lt;p&gt;从这个角度看，Nitsche 不只是一个 FEM trick，&lt;/p&gt;
+&lt;p&gt;它实际上是一种：&lt;/p&gt;
+\[\boxed{\text{physics module coupling abstraction}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;21-一个很值得自己实现的最小实验&#34;&gt;21. 一个很值得自己实现的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;最简单可以做 1D Poisson：&lt;/p&gt;
+\[-u&#39;&#39;=f, \qquad x\in[0,1].\]&lt;p&gt;边界：&lt;/p&gt;
+\[u(0)=0,\qquad u(1)=0.\]&lt;p&gt;先做普通强制 Dirichlet FEM。&lt;/p&gt;
+&lt;p&gt;然后不要删除边界 DOFs，改用 symmetric Nitsche：&lt;/p&gt;
+\[a_h(u,v) = (u&#39;,v&#39;) - u&#39; n\,v - v&#39;n\,u + \frac{\gamma}{h}uv\]&lt;p&gt;在两个端点加入边界贡献。&lt;/p&gt;
+&lt;p&gt;分别测试：&lt;/p&gt;
+\[\gamma=0.1,\ 1,\ 10,\ 100,\ 10^4.\]&lt;p&gt;记录：&lt;/p&gt;
+\[\boxed{\text{boundary error}}\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{\kappa(K)}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;你会看到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(\gamma\) 太小可能失稳；&lt;/li&gt;
+&lt;li&gt;合理范围内误差正常；&lt;/li&gt;
+&lt;li&gt;\(\gamma\) 极大时 conditioning 变差。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;然后进一步把：&lt;/p&gt;
+\[[0,1]\]&lt;p&gt;切成两个&lt;strong&gt;节点不匹配&lt;/strong&gt;子网格：&lt;/p&gt;
+\[[0,0.5]\]&lt;p&gt;和：&lt;/p&gt;
+\[[0.5,1],\]&lt;p&gt;用 Nitsche coupling 连接。&lt;/p&gt;
+&lt;p&gt;如果这个实验做通，你基本就理解了 Nitsche 80% 的核心价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Nitsche 方法最值得记住的不是：&lt;/p&gt;
+\[-\langle\partial_nu,v\rangle -\langle\partial_nv,u\rangle + \frac{\gamma}{h}\langle u,v\rangle.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{有限元中的约束，不一定要通过修改自由度来强制满足； 它也可以成为弱平衡方程的一部分。} }\]&lt;p&gt;于是知识体系可以这样定位：&lt;/p&gt;
+\[\text{Strong constraints}\]\[\downarrow\]\[\text{Penalty / Lagrange multiplier}\]\[\downarrow\]\[\boxed{\text{Nitsche weak enforcement}}\]\[\downarrow\]\[\text{nonmatching meshes / contact / CutFEM / multiphysics coupling}.\]&lt;p&gt;它最深的工程价值在于：&lt;/p&gt;
+\[\boxed{ \text{解除“物理界面必须与网格节点严格对齐”这一人为限制。} }\]&lt;p&gt;一旦这层限制解除，很多复杂问题会变得更模块化：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;CAD patch 可以独立；&lt;/li&gt;
+&lt;li&gt;接触界面可以移动；&lt;/li&gt;
+&lt;li&gt;子模型可以独立网格；&lt;/li&gt;
+&lt;li&gt;几何优化可以减少 remeshing；&lt;/li&gt;
+&lt;li&gt;多物理场可以通过弱接口组合。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;从这个角度看，Nitsche 方法真正解决的不是“边界条件怎么施加”，而是一个更普遍的问题：&lt;/p&gt;
+\[\boxed{ \text{如何让不同离散世界在同一个物理界面上保持一致。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Peter Hansbo, &lt;em&gt;Nitsche&amp;rsquo;s method for interface problems in computational mechanics&lt;/em&gt;, GAMM-Mitteilungen, 2014&lt;/strong&gt;。很适合作为总览，覆盖 unfitted meshes、Chimera、cut meshes、fictitious domains 和 model coupling。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://onlinelibrary.wiley.com/doi/10.1002/gamm.201490018&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Wiley 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Burman, Hansbo &amp;amp; Larson, &lt;em&gt;The Penalty-Free Nitsche Method and Nonconforming Finite Elements for the Signorini Problem&lt;/em&gt;, SIAM JNA, 2017&lt;/strong&gt;。如果重点关心接触，这篇很值得看：它展示了 Nitsche 如何处理 unilateral contact，并构造 penalty-free nonsymmetric formulation。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/16M107846X&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Seitz, Wall &amp;amp; Popp, &lt;em&gt;Nitsche’s method for finite deformation thermomechanical contact problems&lt;/em&gt;&lt;/strong&gt;。适合进一步看大变形、摩擦和热接触，以及实际工程中 stabilization parameter 如何通过局部 generalized eigenvalue problem 估计。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Ruess et al., &lt;em&gt;Weak coupling for isogeometric analysis of non-matching and trimmed multi-patch geometries&lt;/em&gt;, CMAME, 2014&lt;/strong&gt;。非常适合理解 Nitsche 为什么能把 CAD/NURBS patch、非匹配网格和有限元耦合起来。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Massing, Larson &amp;amp; Logg, &lt;em&gt;Efficient Implementation of Finite Element Methods on Nonmatching and Overlapping Meshes in Three Dimensions&lt;/em&gt;, SIAM JSC&lt;/strong&gt;。如果以后自己写 solver，这篇尤其有价值，因为它把真正困难的 intersection detection、cut-cell integration 和三维工程实现摆到了台面上。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

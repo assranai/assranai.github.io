@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Mon, 31 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sun, 06 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”</title>
         <link>https://assranai.github.io/cards/18-paged-attention/</link>
         <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
@@ -549,6 +549,462 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;如果继续追近期 KV 系统方向，可以关注 &lt;strong&gt;KV Cache quantization、eviction、offloading、prefix caching 和 prefill/decode disaggregation&lt;/strong&gt;；当前 vLLM 已经把其中多项纳入生产 serving stack，这条线比单独研究某一个 CUDA kernel 更接近现代 LLM inference system 的全貌。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/?utm_source=chatgpt.com&#34;  title=&#34;vllm - vLLM&#34;
      target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里</title>
+        <link>https://assranai.github.io/cards/24-lora/</link>
+        <pubDate>Sun, 06 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/24-lora/</guid>
+        <description>&lt;h1 id=&#34;lora真正高效的模型适配往往不是少改几个参数而是只允许参数更新发生在低秩子空间里&#34;&gt;LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：LoRA（Low-Rank Adaptation）与低秩参数更新&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × 科学机器学习&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;LoRA 值得深入理解，因为它表面上是一个“大模型省显存微调技巧”，但更深层的问题其实是：&lt;/p&gt;
+\[\boxed{ \text{一个拥有数十亿参数的模型，在适配新任务时，真的需要在整个参数空间里自由移动吗？} }\]&lt;p&gt;LoRA 的回答是：&lt;/p&gt;
+\[\boxed{ \text{很多任务适配所需的权重变化，本身可能近似低秩。} }\]&lt;p&gt;于是它不直接优化完整权重更新：&lt;/p&gt;
+\[\Delta W\in\mathbb R^{d_{\text{out}}\times d_{\text{in}}},\]&lt;p&gt;而把更新限制成：&lt;/p&gt;
+\[\boxed{ \Delta W=BA }\]&lt;p&gt;其中：&lt;/p&gt;
+\[A\in\mathbb R^{r\times d_{\text{in}}}, \qquad B\in\mathbb R^{d_{\text{out}}\times r},\]&lt;p&gt;且：&lt;/p&gt;
+\[r\ll \min(d_{\text{in}},d_{\text{out}}).\]&lt;p&gt;原始 LoRA 论文正是基于这种 rank decomposition：冻结预训练权重，只训练低秩更新矩阵。作者在 GPT-3 175B 的实验设置中报告，相比完整 Adam 微调，可将可训练参数数量降低约 \(10^4\) 倍、GPU 内存需求降低约 3 倍，同时保持相当或更好的任务性能。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看完整微调到底浪费在哪里&#34;&gt;1. 先看完整微调到底浪费在哪里
+&lt;/h2&gt;&lt;p&gt;假设一个 Transformer 线性层：&lt;/p&gt;
+\[W\in\mathbb R^{4096\times4096}.\]&lt;p&gt;它拥有：&lt;/p&gt;
+\[4096^2 \approx 16.8\text{ million}\]&lt;p&gt;个参数。&lt;/p&gt;
+&lt;p&gt;完整微调意味着：&lt;/p&gt;
+\[W \rightarrow W+\Delta W,\]&lt;p&gt;其中：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;也是一个完整的：&lt;/p&gt;
+\[4096\times4096\]&lt;p&gt;矩阵。&lt;/p&gt;
+&lt;p&gt;即使新任务只是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;让模型适应某种新的写作风格、领域术语或指令格式，&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;优化器理论上仍然允许：&lt;/p&gt;
+\[16.8\text{ million}\]&lt;p&gt;个独立更新方向。&lt;/p&gt;
+&lt;p&gt;LoRA 质疑的就是这一点：&lt;/p&gt;
+\[\boxed{ \text{新任务真正需要的自由度，也许远远小于参数矩阵自身维度。} }\]&lt;p&gt;于是取：&lt;/p&gt;
+\[r=8.\]&lt;p&gt;只训练：&lt;/p&gt;
+\[A\in\mathbb R^{8\times4096},\]\[B\in\mathbb R^{4096\times8}.\]&lt;p&gt;参数数量变成：&lt;/p&gt;
+\[2\times4096\times8 = 65536.\]&lt;p&gt;相比：&lt;/p&gt;
+\[16.8\text{ million},\]&lt;p&gt;只有约：&lt;/p&gt;
+\[0.39\%.\]&lt;p&gt;这不是简单“少训练一些原参数”。&lt;/p&gt;
+&lt;p&gt;它实际上重新定义了：&lt;/p&gt;
+\[\boxed{ \text{允许模型如何变化。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;2-lora-真正施加的是一个-rank-constraint&#34;&gt;2. LoRA 真正施加的是一个 rank constraint
+&lt;/h1&gt;&lt;p&gt;完整更新：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;可以是任意矩阵，理论最大秩：&lt;/p&gt;
+\[\operatorname{rank}(\Delta W) = \min(d_{\rm in},d_{\rm out}).\]&lt;p&gt;LoRA 写成：&lt;/p&gt;
+\[\Delta W=BA.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \operatorname{rank}(\Delta W)\le r. }\]&lt;p&gt;这意味着模型更新只能发生在一个低秩结构中。&lt;/p&gt;
+&lt;p&gt;对输入：&lt;/p&gt;
+\[x,\]&lt;p&gt;原层输出：&lt;/p&gt;
+\[y=Wx.\]&lt;p&gt;加入 LoRA：&lt;/p&gt;
+\[y = Wx + BAx.\]&lt;p&gt;可以按两步理解：&lt;/p&gt;
+\[x \xrightarrow{A} z\in\mathbb R^r \xrightarrow{B} \Delta y.\]&lt;p&gt;所以 LoRA 实际做的是：&lt;/p&gt;
+\[\boxed{ \text{先把高维输入压缩到一个小的 adaptation space， 再从这个空间生成任务相关修正。} }\]&lt;p&gt;这里的：&lt;/p&gt;
+\[r\]&lt;p&gt;就是 adaptation bottleneck dimension。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-为什么低秩会有效&#34;&gt;3. 为什么“低秩”会有效？
+&lt;/h1&gt;&lt;p&gt;这是 LoRA 最值得学的地方。&lt;/p&gt;
+&lt;p&gt;它不是因为：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;参数越少一定越好。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;而是基于一个经验观察：&lt;/p&gt;
+\[\boxed{ \text{大型预训练模型做下游任务适配时， 真正需要改变的功能方向可能具有很低的 intrinsic dimension。} }\]&lt;p&gt;原始 LoRA 论文专门研究了 adaptation update 的 rank deficiency，并发现即使：&lt;/p&gt;
+\[r\]&lt;p&gt;相当小，往往仍能取得接近 full fine-tuning 的性能。&lt;/p&gt;
+&lt;p&gt;可以把预训练模型理解成已经拥有一个非常丰富的能力空间：&lt;/p&gt;
+\[\boxed{ \text{语言、知识、推理模式、语法、表征} }\]&lt;p&gt;下游微调很多时候并不是：&lt;/p&gt;
+\[\text{重新学习这些能力},\]&lt;p&gt;而更像：&lt;/p&gt;
+\[\boxed{ \text{重新组合、偏置或激活已有能力。} }\]&lt;p&gt;因此更新空间可能天然比原始参数空间低维得多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-一个二维类比&#34;&gt;4. 一个二维类比
+&lt;/h1&gt;&lt;p&gt;假设系统参数有：&lt;/p&gt;
+\[1000\]&lt;p&gt;维：&lt;/p&gt;
+\[\theta\in\mathbb R^{1000}.\]&lt;p&gt;但任务变化真正只需要沿两个方向：&lt;/p&gt;
+\[v_1,\quad v_2.\]&lt;p&gt;那么：&lt;/p&gt;
+\[\Delta\theta = a_1v_1+a_2v_2.\]&lt;p&gt;虽然：&lt;/p&gt;
+\[\theta\]&lt;p&gt;是 1000 维，&lt;/p&gt;
+&lt;p&gt;真正适配自由度却只有：&lt;/p&gt;
+\[2.\]&lt;p&gt;LoRA 做的事情，本质上就是寻找一个类似：&lt;/p&gt;
+\[\boxed{ \text{task adaptation subspace} }\]&lt;p&gt;的结构。&lt;/p&gt;
+&lt;p&gt;这和之前讲过的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;active-subspace&#34; tabindex=&#34;0&#34;&gt;Active Subspaces&lt;/span&gt; 有一个非常有趣的对应：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Active Subspace：寻找&lt;strong&gt;输入空间&lt;/strong&gt;里的低维敏感方向；&lt;/li&gt;
+&lt;li&gt;LoRA：假设&lt;strong&gt;参数更新空间&lt;/strong&gt;本身具有低维结构。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;二者都建立在同一个更一般的思想上：&lt;/p&gt;
+\[\boxed{ \text{名义维度很高，不代表有效自由度真的很高。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么-lora-比冻结大部分层更加精细&#34;&gt;5. 为什么 LoRA 比“冻结大部分层”更加精细？
+&lt;/h1&gt;&lt;p&gt;另一种参数高效方法是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;冻结前 30 层
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;只训练最后 2 层
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这等于假设：&lt;/p&gt;
+\[\boxed{ \text{任务变化只发生在某些特定层。} }\]&lt;p&gt;LoRA 的假设不同：&lt;/p&gt;
+\[\boxed{ \text{许多层都可以变化， 但每一层只需要少量低秩变化方向。} }\]&lt;p&gt;这通常更灵活。&lt;/p&gt;
+&lt;p&gt;例如一个 attention projection：&lt;/p&gt;
+\[W_q\]&lt;p&gt;可能只需要轻微改变若干 feature directions。&lt;/p&gt;
+&lt;p&gt;另一个：&lt;/p&gt;
+\[W_v\]&lt;p&gt;也需要适配。&lt;/p&gt;
+&lt;p&gt;LoRA 可以分别给它们：&lt;/p&gt;
+\[\Delta W_q=B_qA_q,\]\[\Delta W_v=B_vA_v.\]&lt;p&gt;于是变化是：&lt;/p&gt;
+\[\boxed{ \text{distributed but low-dimensional} }\]&lt;p&gt;，而不是：&lt;/p&gt;
+\[\text{localized but full-dimensional}.\]&lt;p&gt;这是两种完全不同的 inductive bias。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么它能显著省显存&#34;&gt;6. 为什么它能显著省显存？
+&lt;/h1&gt;&lt;p&gt;训练模型时，显存不只是存：&lt;/p&gt;
+\[W.\]&lt;p&gt;还要存：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;gradient；&lt;/li&gt;
+&lt;li&gt;optimizer states；&lt;/li&gt;
+&lt;li&gt;activation；&lt;/li&gt;
+&lt;li&gt;temporary buffers。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;以 Adam 为例，每个 trainable parameter 通常还会有：&lt;/p&gt;
+\[m,\quad v\]&lt;p&gt;两个 optimizer states。&lt;/p&gt;
+&lt;p&gt;如果完整微调：&lt;/p&gt;
+\[10^9\]&lt;p&gt;参数，就意味着这些状态也全部存在。&lt;/p&gt;
+&lt;p&gt;LoRA 冻结：&lt;/p&gt;
+\[W_0.\]&lt;p&gt;只优化：&lt;/p&gt;
+\[A,B.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{optimizer state 和 gradient memory 只跟 LoRA 参数数量增长。} }\]&lt;p&gt;这也是为什么 PEFT 在消费级 GPU 上非常有价值。Hugging Face 当前 PEFT 官方文档仍把 LoRA 作为最主要的参数高效微调方法之一，并强调只更新少量 adapter 参数可显著降低训练和存储成本。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-lora-的-inference-为什么可以几乎没有额外结构成本&#34;&gt;7. LoRA 的 inference 为什么可以几乎没有额外结构成本？
+&lt;/h1&gt;&lt;p&gt;因为：&lt;/p&gt;
+\[W_{\rm adapted} = W_0+BA.\]&lt;p&gt;训练结束以后，可以直接做：&lt;/p&gt;
+\[\boxed{ W&#39; = W_0+BA }\]&lt;p&gt;把 LoRA merge 回原权重。&lt;/p&gt;
+&lt;p&gt;于是 inference 仍然只是：&lt;/p&gt;
+\[y=W&#39;x.\]&lt;p&gt;不需要额外 adapter branch。&lt;/p&gt;
+&lt;p&gt;这也是原始 LoRA 相比某些传统 adapter architecture 的重要工程优势之一：原论文强调 LoRA 可以避免额外 inference latency。&lt;/p&gt;
+&lt;p&gt;但现代 serving 中也经常&lt;strong&gt;不 merge&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;为什么？&lt;/p&gt;
+&lt;p&gt;因为同一个 base model 可以挂：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Base LLM
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ├─ Finance LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ├─ Coding LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ├─ Legal LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ├─ Game NPC LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; └─ Internal Tool LoRA
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{一个大模型权重} + \text{很多轻量任务增量} }\]&lt;p&gt;就能支持多租户、多角色、多领域部署。&lt;/p&gt;
+&lt;p&gt;这是 LoRA 的系统价值，不只是训练价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-这和版本控制有一个很好的类比&#34;&gt;8. 这和版本控制有一个很好的类比
+&lt;/h1&gt;&lt;p&gt;假设 base model：&lt;/p&gt;
+\[W_0\]&lt;p&gt;有：&lt;/p&gt;
+\[20\text{ GB}.\]&lt;p&gt;有 100 个不同客户。&lt;/p&gt;
+&lt;p&gt;Full fine-tuning 要保存：&lt;/p&gt;
+\[100\times20 = 2000\text{ GB}.\]&lt;p&gt;LoRA 则保存：&lt;/p&gt;
+\[W_0\]&lt;p&gt;一次，然后每个客户只保存：&lt;/p&gt;
+\[\Delta W_i=B_iA_i.\]&lt;p&gt;如果每个 LoRA：&lt;/p&gt;
+\[100\text{ MB},\]&lt;p&gt;总量大约：&lt;/p&gt;
+\[20+100\times0.1 = 30\text{ GB}.\]&lt;p&gt;这实际上是一种：&lt;/p&gt;
+\[\boxed{ \text{base state + delta state} }\]&lt;p&gt;架构。&lt;/p&gt;
+&lt;p&gt;它和：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Git delta；&lt;/li&gt;
+&lt;li&gt;patch；&lt;/li&gt;
+&lt;li&gt;copy-on-write；&lt;/li&gt;
+&lt;li&gt;layered filesystem；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;的系统思想很相似。&lt;/p&gt;
+&lt;p&gt;所以 LoRA 在部署层面的本质，也可以理解为：&lt;/p&gt;
+\[\boxed{ \text{不要复制整个系统状态，只保存任务相关差分。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;9-rank--到底控制什么&#34;&gt;9. Rank \(r\) 到底控制什么？
+&lt;/h1&gt;&lt;p&gt;LoRA 最重要的超参数之一：&lt;/p&gt;
+\[r.\]&lt;p&gt;如果：&lt;/p&gt;
+\[r=1,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\Delta W=ba^T\]&lt;p&gt;只能产生一个 rank-1 更新。&lt;/p&gt;
+&lt;p&gt;表达能力非常有限。&lt;/p&gt;
+&lt;p&gt;随着：&lt;/p&gt;
+\[r\uparrow,\]&lt;p&gt;允许的 adaptation subspace 越丰富。&lt;/p&gt;
+&lt;p&gt;但同时：&lt;/p&gt;
+\[\boxed{ \text{参数量、计算量、显存} }\]&lt;p&gt;都增加。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[r\]&lt;p&gt;本质上是：&lt;/p&gt;
+\[\boxed{ \text{adaptation capacity budget} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;一个很重要的工程认识是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;所有层不一定需要相同 rank。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;有些层：&lt;/p&gt;
+\[r=4\]&lt;p&gt;就够。&lt;/p&gt;
+&lt;p&gt;有些层可能需要：&lt;/p&gt;
+\[r=32.\]&lt;p&gt;这也自然引出了 AdaLoRA、rank allocation 等后续方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-lora-并不是简单地做-svd&#34;&gt;10. LoRA 并不是简单地“做 SVD”
+&lt;/h1&gt;&lt;p&gt;这一点很容易误解。&lt;/p&gt;
+&lt;p&gt;LoRA 并不是：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;先完整 fine-tune；&lt;/li&gt;
+&lt;li&gt;得到 \(\Delta W\)；&lt;/li&gt;
+&lt;li&gt;再做 SVD；&lt;/li&gt;
+&lt;li&gt;保留前 \(r\) 个奇异值。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;真正训练时：&lt;/p&gt;
+\[A,B\]&lt;p&gt;从一开始就是优化变量。&lt;/p&gt;
+&lt;p&gt;也就是说模型直接搜索：&lt;/p&gt;
+\[\boxed{ \operatorname{rank}(\Delta W)\le r }\]&lt;p&gt;这个低秩参数空间。&lt;/p&gt;
+&lt;p&gt;所以 LoRA 是：&lt;/p&gt;
+\[\boxed{ \text{low-rank parameterization} }\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\text{post-hoc matrix compression}.\]&lt;p&gt;区别非常重要。&lt;/p&gt;
+&lt;p&gt;前者改变优化问题本身。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么--的训练动力学也很重要&#34;&gt;11. 为什么 \(A,B\) 的训练动力学也很重要？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;把：&lt;/p&gt;
+\[\Delta W=BA\]&lt;p&gt;分解以后，参数化不再唯一。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[BA = (BS)(S^{-1}A)\]&lt;p&gt;对可逆：&lt;/p&gt;
+\[S\]&lt;p&gt;都成立。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[A,B\]&lt;p&gt;之间有 scaling freedom。&lt;/p&gt;
+&lt;p&gt;这意味着优化器看到的参数空间 geometry 和直接优化：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;并不一样。&lt;/p&gt;
+&lt;p&gt;2024 年 LoRA+ 就专门指出，随着模型 width 增大，给：&lt;/p&gt;
+\[A,B\]&lt;p&gt;使用相同 learning rate 会导致低效 feature learning；其方法为两组矩阵使用不同学习率，在论文实验中报告最高约 \(2\times\) 微调速度提升以及约 1–2% 的性能改进。&lt;/p&gt;
+&lt;p&gt;这个结果很有启发性：&lt;/p&gt;
+\[\boxed{ \text{选择低维参数化以后， 优化几何本身也随之改变。} }\]&lt;p&gt;所以“降维”不是免费的。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-lora-fa-又揭示了另一个系统问题参数少不等于-activation-少&#34;&gt;12. LoRA-FA 又揭示了另一个系统问题：参数少，不等于 activation 少
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;普通 LoRA 虽然 trainable parameters 大幅减少，&lt;/p&gt;
+&lt;p&gt;但为了计算：&lt;/p&gt;
+\[A x\]&lt;p&gt;和：&lt;/p&gt;
+\[B(Ax),\]&lt;p&gt;训练时仍需要保存相应 activation。&lt;/p&gt;
+&lt;p&gt;所以显存瓶颈并没有完全消失。&lt;/p&gt;
+&lt;p&gt;LoRA-FA 的做法是固定其中一个投影矩阵，只更新另一部分，从而减少需要保存的 activation；论文报告相比标准 LoRA 可进一步降低总体训练内存，最高约 \(1.4\times\)。&lt;/p&gt;
+&lt;p&gt;这提醒我们：&lt;/p&gt;
+\[\boxed{ \text{参数压缩} \neq \text{训练系统整体压缩} }\]&lt;p&gt;工程优化必须同时看：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;parameters；&lt;/li&gt;
+&lt;li&gt;gradients；&lt;/li&gt;
+&lt;li&gt;optimizer states；&lt;/li&gt;
+&lt;li&gt;activations；&lt;/li&gt;
+&lt;li&gt;communication。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这一点和物理求解器非常类似：DOF 少了，并不代表 sparse solve 就一定便宜。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-lora-真正有迁移价值的部分低秩更新不是低秩模型&#34;&gt;13. LoRA 真正有迁移价值的部分：低秩“更新”，不是低秩“模型”
+&lt;/h1&gt;&lt;p&gt;这一点尤其值得区分。&lt;/p&gt;
+&lt;p&gt;LoRA 并没有假设：&lt;/p&gt;
+\[W_0\]&lt;p&gt;本身低秩。&lt;/p&gt;
+&lt;p&gt;事实上预训练权重可以是：&lt;/p&gt;
+\[\boxed{\text{full-rank}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;它只假设：&lt;/p&gt;
+\[\boxed{ \Delta W }\]&lt;p&gt;近似低秩。&lt;/p&gt;
+&lt;p&gt;这是一种非常强的建模思想：&lt;/p&gt;
+\[\boxed{ \text{复杂系统本身可以是高维的， 但从一个已知良好状态到另一个邻近状态的变化可能是低维的。} }\]&lt;p&gt;这个思想远远不只属于 LLM。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-这和有限元中的低秩更新高度相似&#34;&gt;14. 这和有限元中的低秩更新高度相似
+&lt;/h1&gt;&lt;p&gt;设结构刚度矩阵：&lt;/p&gt;
+\[K_0.\]&lt;p&gt;只有局部参数变化：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;一个连接点刚度变化；&lt;/li&gt;
+&lt;li&gt;少数单元材料改变；&lt;/li&gt;
+&lt;li&gt;边界条件小范围改变。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[K = K_0+\Delta K.\]&lt;p&gt;很多时候：&lt;/p&gt;
+\[\Delta K\]&lt;p&gt;虽然嵌在巨大：&lt;/p&gt;
+\[N\times N\]&lt;p&gt;系统里，但本身影响的自由度很少。&lt;/p&gt;
+&lt;p&gt;于是可以写成近似：&lt;/p&gt;
+\[\boxed{ \Delta K = UV^T. }\]&lt;p&gt;那么：&lt;/p&gt;
+\[(K_0+UV^T)^{-1}\]&lt;p&gt;就可能利用 Woodbury identity：&lt;/p&gt;
+\[(A+UCV)^{-1} = A^{-1} - A^{-1}U (C^{-1}+VA^{-1}U)^{-1} VA^{-1}.\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \text{无需把整个系统重新当成一个全新问题。} }\]&lt;p&gt;LoRA 和这种思维非常接近：&lt;/p&gt;
+\[\boxed{ \text{base operator} + \text{low-rank correction}. }\]&lt;hr&gt;
+&lt;h1 id=&#34;15-这对代理模型也有一个非常好的启发&#34;&gt;15. 这对代理模型也有一个非常好的启发
+&lt;/h1&gt;&lt;p&gt;假设已经有一个基础代理：&lt;/p&gt;
+\[f_0(x)\]&lt;p&gt;对应工况 A。&lt;/p&gt;
+&lt;p&gt;现在工况 B：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;材料稍有变化；&lt;/li&gt;
+&lt;li&gt;边界条件变化；&lt;/li&gt;
+&lt;li&gt;软件模型升级；&lt;/li&gt;
+&lt;li&gt;fidelity 提升。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;最粗暴做法：&lt;/p&gt;
+\[\boxed{ \text{重新训练一个完整 surrogate} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;但如果新旧任务差异：&lt;/p&gt;
+\[\delta f(x) = f_B(x)-f_A(x)\]&lt;p&gt;具有低维结构，&lt;/p&gt;
+&lt;p&gt;更合理的做法可能是：&lt;/p&gt;
+\[\boxed{ f_B = f_0 + \Delta f_{\rm low-dimensional}. }\]&lt;p&gt;这和 multifidelity discrepancy modeling 很接近。&lt;/p&gt;
+&lt;p&gt;LoRA 提醒我们：&lt;/p&gt;
+\[\boxed{ \text{迁移学习真正应该建模的， 往往是任务之间的“变化”， 而不是重新建模整个任务。} }\]&lt;p&gt;这是代理模型中非常值得吸收的一层。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-对可靠性模型同样成立&#34;&gt;16. 对可靠性模型同样成立
+&lt;/h1&gt;&lt;p&gt;假设已有一个极限状态代理：&lt;/p&gt;
+\[g_0(x)\]&lt;p&gt;对应 nominal design。&lt;/p&gt;
+&lt;p&gt;设计稍微变化：&lt;/p&gt;
+\[d_0\rightarrow d_1.\]&lt;p&gt;通常会重新生成：&lt;/p&gt;
+\[N\]&lt;p&gt;个高保真样本，重训：&lt;/p&gt;
+\[g_1(x).\]&lt;p&gt;但如果：&lt;/p&gt;
+\[g(x,d)\]&lt;p&gt;对设计变化主要发生在某个低维 response direction 上，&lt;/p&gt;
+&lt;p&gt;则可能构造：&lt;/p&gt;
+\[\boxed{ g_1(x) = g_0(x) + \Delta g(x) }\]&lt;p&gt;并只学习：&lt;/p&gt;
+\[\Delta g.\]&lt;p&gt;这其实就是一种：&lt;/p&gt;
+\[\boxed{ \text{surrogate adaptation} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;LoRA 最大的研究启发之一，就是让人去问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;多工况、多设计、多 fidelity 的代理模型之间，真正需要独立学习的自由度到底有多少？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-对游戏引擎--agent-部署一个特别现实的价值共享-base动态挂-adapter&#34;&gt;17. 对游戏引擎 / Agent 部署，一个特别现实的价值：共享 base，动态挂 adapter
+&lt;/h1&gt;&lt;p&gt;假设一个游戏中需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;商人 NPC；&lt;/li&gt;
+&lt;li&gt;战斗教官；&lt;/li&gt;
+&lt;li&gt;世界观讲解者；&lt;/li&gt;
+&lt;li&gt;任务生成器；&lt;/li&gt;
+&lt;li&gt;QA 助手。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;每个角色都完整部署一个：&lt;/p&gt;
+\[8B\]&lt;p&gt;模型通常不现实。&lt;/p&gt;
+&lt;p&gt;LoRA 架构允许：&lt;/p&gt;
+\[\boxed{ \text{同一个 base model} + \text{多个轻量 adapter}. }\]&lt;p&gt;服务端可以根据请求动态选择：&lt;/p&gt;
+\[A_i,B_i.\]&lt;p&gt;这和前一期 &lt;span class=&#34;term-anchor&#34; data-term=&#34;paged-attention&#34; tabindex=&#34;0&#34;&gt;PagedAttention&lt;/span&gt; 所体现的思路非常相似：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PagedAttention：共享/虚拟化 KV memory；&lt;/li&gt;
+&lt;li&gt;LoRA：共享 base parameters，只保存任务增量。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;两者都是：&lt;/p&gt;
+\[\boxed{ \text{把“大而稳定的公共部分” 与 “小而动态的差异部分” 分离。}\]&lt;p&gt;这是现代 AI serving 很核心的一种架构思想。&lt;/p&gt;
+&lt;p&gt;Hugging Face 当前 PEFT 已支持加载、切换、删除不同 LoRA adapters，并支持 tensor parallel 等部署场景。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-lora-的局限低秩假设不是永远成立&#34;&gt;18. LoRA 的局限：低秩假设不是永远成立
+&lt;/h1&gt;&lt;p&gt;如果新任务与 base model 相距很远：&lt;/p&gt;
+\[\boxed{ \text{domain shift 很大} }\]&lt;p&gt;或者需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;大规模新知识；&lt;/li&gt;
+&lt;li&gt;新语言；&lt;/li&gt;
+&lt;li&gt;新视觉模式；&lt;/li&gt;
+&lt;li&gt;全新推理结构；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[r\]&lt;p&gt;可能必须不断增加。&lt;/p&gt;
+&lt;p&gt;最终：&lt;/p&gt;
+\[r\rightarrow d.\]&lt;p&gt;LoRA 的优势就会逐渐消失。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{LoRA 最适合“已有模型附近的任务适配”， 而不是所有形式的知识重建。} }\]&lt;p&gt;它依赖一个隐含条件：&lt;/p&gt;
+\[\boxed{ \text{base representation 已经足够好。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;19-另一个局限低秩不等于低函数复杂度&#34;&gt;19. 另一个局限：低秩不等于低函数复杂度
+&lt;/h1&gt;&lt;p&gt;即使：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;只有 rank 4，&lt;/p&gt;
+&lt;p&gt;经过：&lt;/p&gt;
+\[100\]&lt;p&gt;层网络、非线性、attention 后，&lt;/p&gt;
+&lt;p&gt;最终函数变化：&lt;/p&gt;
+\[\Delta f(x)\]&lt;p&gt;仍然可能非常复杂。&lt;/p&gt;
+&lt;p&gt;所以不要简单理解为：&lt;/p&gt;
+\[r=8 \Rightarrow \text{模型只学 8 个功能}.\]&lt;p&gt;\(r\) 控制的是：&lt;/p&gt;
+\[\boxed{ \text{单个权重更新矩阵的线性代数自由度} }\]&lt;p&gt;而不是最终模型行为的直接语义维数。&lt;/p&gt;
+&lt;p&gt;这是理解 LoRA 时一个非常重要的边界。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个很值得自己做的最小实验&#34;&gt;20. 一个很值得自己做的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;即使不训练 LLM，也可以用一个小 MLP 理解 LoRA。&lt;/p&gt;
+&lt;p&gt;先训练：&lt;/p&gt;
+\[f_0(x)\]&lt;p&gt;拟合：&lt;/p&gt;
+\[y=\sin x.\]&lt;p&gt;然后新任务：&lt;/p&gt;
+\[y=\sin x+0.2\sin3x.\]&lt;p&gt;固定原模型。&lt;/p&gt;
+&lt;p&gt;只对其中一个：&lt;/p&gt;
+\[W\in\mathbb R^{128\times128}\]&lt;p&gt;加入：&lt;/p&gt;
+\[\Delta W=BA.\]&lt;p&gt;分别尝试：&lt;/p&gt;
+\[r=1,2,4,8,16.\]&lt;p&gt;比较：&lt;/p&gt;
+\[\boxed{ \text{validation error} }\]&lt;p&gt;与：&lt;/p&gt;
+\[\boxed{ \text{trainable parameter count}. }\]&lt;p&gt;然后再和 full fine-tuning 比较。&lt;/p&gt;
+&lt;p&gt;最值得看的问题是：&lt;/p&gt;
+\[\boxed{ \text{性能在什么 rank 后开始饱和？} }\]&lt;p&gt;如果：&lt;/p&gt;
+\[r=4\]&lt;p&gt;已经和：&lt;/p&gt;
+\[r=64\]&lt;p&gt;几乎一样，&lt;/p&gt;
+&lt;p&gt;你就实际看到了：&lt;/p&gt;
+\[\boxed{ \text{task adaptation 的 intrinsic rank 很低。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;LoRA 最值得记住的并不是：&lt;/p&gt;
+\[\Delta W=BA.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \text{一个系统可以极其高维， 但“从一个已经很好状态到另一个任务状态的变化” 可能只占据很小的低维子空间。} }\]&lt;p&gt;所以它在整个知识体系中的位置更应该理解成：&lt;/p&gt;
+\[\text{Large pretrained model}\]\[\downarrow\]\[\boxed{\text{Low-rank update subspace}}\]\[\downarrow\]\[\text{Parameter-efficient adaptation}.\]&lt;p&gt;而这个思想可以迁移到很多地方：&lt;/p&gt;
+\[\boxed{ \text{base model} + \text{low-dimensional correction} }\]&lt;p&gt;可能对应：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;LLM：LoRA；&lt;/li&gt;
+&lt;li&gt;FEM：low-rank stiffness update；&lt;/li&gt;
+&lt;li&gt;代理模型：discrepancy adaptation；&lt;/li&gt;
+&lt;li&gt;多保真模型：低维 fidelity correction；&lt;/li&gt;
+&lt;li&gt;游戏/Agent 部署：base model + task adapters；&lt;/li&gt;
+&lt;li&gt;优化：在低维更新空间内搜索。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;它真正教会我们的，是一个非常普遍的工程原则：&lt;/p&gt;
+\[\boxed{ \text{面对一个已经很复杂、但已经工作良好的系统， 优先学习“怎样改变它”， 而不一定重新学习“整个系统是什么”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hu et al., &lt;em&gt;LoRA: Low-Rank Adaptation of Large Language Models&lt;/em&gt;, ICLR 2022&lt;/strong&gt;。原始论文，最值得重点看 §4 方法、§7 对 adaptation rank 的分析，以及不同 \(r\) 下的性能。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2106.09685&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;LoRA 原论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Microsoft &lt;code&gt;loralib&lt;/code&gt; 官方实现&lt;/strong&gt;。源码非常短，适合直接看 LoRA 怎样注入 &lt;code&gt;Linear&lt;/code&gt; / attention projection，以及如何 merge/unmerge 权重。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://github.com/microsoft/LoRA&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Microsoft LoRA GitHub&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hugging Face PEFT — LoRA 官方文档&lt;/strong&gt;。目前最实用的工程入口，包含 &lt;code&gt;LoraConfig&lt;/code&gt;、target modules、rank、LoRA-FA、LoRA+、adapter 加载/切换以及 tensor parallel 支持。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://huggingface.co/docs/peft/main/package_reference/lora&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;PEFT LoRA 文档&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hayou, Ghosh &amp;amp; Yu, &lt;em&gt;LoRA+: Efficient Low Rank Adaptation of Large Models&lt;/em&gt;, 2024&lt;/strong&gt;。适合进一步理解：选了低秩参数化以后，\(A/B\) 两个因子的优化尺度为什么本身会成为问题。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Zhang et al., &lt;em&gt;LoRA-FA: Memory-efficient Low-rank Adaptation for Large Language Models Fine-tuning&lt;/em&gt;, 2023&lt;/strong&gt;。适合从“参数效率”继续走到“完整训练系统效率”，尤其是 activation memory 为什么仍可能成为瓶颈。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

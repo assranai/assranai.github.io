@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题 主题：Nitsche Method（Nitsche 方法）\n领域：有限元 × 计算力学 × 接触力学 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：\n\\[\\boxed{\\text{边界条件一定要“强制写死”在自由度上吗？}}\\]传统 FEM 里，Dirichlet 边界条件：\n\\[u=g \\quad \\text{on }\\Gamma_D\\]通常通过直接修改自由度来施加：\n\\[u_i=g_i.\\]这当然简单有效。\n但一旦遇到：\n非匹配网格； 两个独立网格的界面耦合； immersed / unfitted FEM； 接触； 多物理场界面； 几何在运动、界面不断变化； “节点一一对应”这件事可能根本不存在。\nNitsche 方法的核心思想是：\n\\[\\boxed{ \\text{不要直接消灭边界自由度，而是把边界约束以一致、稳定的方式嵌入弱式。} }\\]这使它成为一种非常通用的“弱施加约束”技术。Hansbo 的综述把 Nitsche 方法应用于真实/人工界面、unfitted meshes、Chimera meshes、cut meshes、fictitious-domain methods 和模型耦合，正说明了它已经远超“施加 Dirichlet 条件”这一最初用途。\n1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件” 考虑 Poisson：\n\\[-\\Delta u=f\\]并规定：\n\\[u=g \\quad\\text{on }\\Gamma_D.\\]标准弱式：\n\\[\\int_\\Omega \\nabla u\\cdot\\nabla v\\,d\\Omega = \\int_\\Omega fv\\,d\\Omega + \\int_{\\Gamma_N}tv\\,d\\Gamma.\\]如果：\n">
+<title>Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/26-nitsche-method/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题">
+<meta property='og:description' content="Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题 主题：Nitsche Method（Nitsche 方法）\n领域：有限元 × 计算力学 × 接触力学 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：\n\\[\\boxed{\\text{边界条件一定要“强制写死”在自由度上吗？}}\\]传统 FEM 里，Dirichlet 边界条件：\n\\[u=g \\quad \\text{on }\\Gamma_D\\]通常通过直接修改自由度来施加：\n\\[u_i=g_i.\\]这当然简单有效。\n但一旦遇到：\n非匹配网格； 两个独立网格的界面耦合； immersed / unfitted FEM； 接触； 多物理场界面； 几何在运动、界面不断变化； “节点一一对应”这件事可能根本不存在。\nNitsche 方法的核心思想是：\n\\[\\boxed{ \\text{不要直接消灭边界自由度，而是把边界约束以一致、稳定的方式嵌入弱式。} }\\]这使它成为一种非常通用的“弱施加约束”技术。Hansbo 的综述把 Nitsche 方法应用于真实/人工界面、unfitted meshes、Chimera meshes、cut meshes、fictitious-domain methods 和模型耦合，正说明了它已经远超“施加 Dirichlet 条件”这一最初用途。\n1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件” 考虑 Poisson：\n\\[-\\Delta u=f\\]并规定：\n\\[u=g \\quad\\text{on }\\Gamma_D.\\]标准弱式：\n\\[\\int_\\Omega \\nabla u\\cdot\\nabla v\\,d\\Omega = \\int_\\Omega fv\\,d\\Omega + \\int_{\\Gamma_N}tv\\,d\\Gamma.\\]如果：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/26-nitsche-method/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='计算力学' /><meta property='article:tag' content='接触力学' /><meta property='article:tag' content='数值方法' /><meta property='article:published_time' content='2026-09-08T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-08T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题">
+<meta name="twitter:description" content="Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题 主题：Nitsche Method（Nitsche 方法）\n领域：有限元 × 计算力学 × 接触力学 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：\n\\[\\boxed{\\text{边界条件一定要“强制写死”在自由度上吗？}}\\]传统 FEM 里，Dirichlet 边界条件：\n\\[u=g \\quad \\text{on }\\Gamma_D\\]通常通过直接修改自由度来施加：\n\\[u_i=g_i.\\]这当然简单有效。\n但一旦遇到：\n非匹配网格； 两个独立网格的界面耦合； immersed / unfitted FEM； 接触； 多物理场界面； 几何在运动、界面不断变化； “节点一一对应”这件事可能根本不存在。\nNitsche 方法的核心思想是：\n\\[\\boxed{ \\text{不要直接消灭边界自由度，而是把边界约束以一致、稳定的方式嵌入弱式。} }\\]这使它成为一种非常通用的“弱施加约束”技术。Hansbo 的综述把 Nitsche 方法应用于真实/人工界面、unfitted meshes、Chimera meshes、cut meshes、fictitious-domain methods 和模型耦合，正说明了它已经远超“施加 Dirichlet 条件”这一最初用途。\n1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件” 考虑 Poisson：\n\\[-\\Delta u=f\\]并规定：\n\\[u=g \\quad\\text{on }\\Gamma_D.\\]标准弱式：\n\\[\\int_\\Omega \\nabla u\\cdot\\nabla v\\,d\\Omega = \\int_\\Omega fv\\,d\\Omega + \\int_{\\Gamma_N}tv\\,d\\Gamma.\\]如果：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先看普通-fem-为什么天然喜欢强制-dirichlet-条件">1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件”</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#penalty-contact">Penalty contact</a></li>
+        <li><a href="#nitsche-contact">Nitsche contact</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/26-nitsche-method/">Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-08T00:00:00Z'>Sep 08, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 6 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="nitsche-method为什么施加边界条件本身也可以变成一个变分问题">Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题
+</h1><p><strong>主题：Nitsche Method（Nitsche 方法）</strong><br>
+<strong>领域：有限元 × 计算力学 × 接触力学 × 数值方法</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：</p>
+\[\boxed{\text{边界条件一定要“强制写死”在自由度上吗？}}\]<p>传统 FEM 里，Dirichlet 边界条件：</p>
+\[u=g \quad \text{on }\Gamma_D\]<p>通常通过直接修改自由度来施加：</p>
+\[u_i=g_i.\]<p>这当然简单有效。</p>
+<p>但一旦遇到：</p>
+<ul>
+<li>非匹配网格；</li>
+<li>两个独立网格的界面耦合；</li>
+<li>immersed / unfitted FEM；</li>
+<li>接触；</li>
+<li>多物理场界面；</li>
+<li>几何在运动、界面不断变化；</li>
+</ul>
+<p>“节点一一对应”这件事可能根本不存在。</p>
+<p>Nitsche 方法的核心思想是：</p>
+\[\boxed{ \text{不要直接消灭边界自由度，而是把边界约束以一致、稳定的方式嵌入弱式。} }\]<p>这使它成为一种非常通用的“弱施加约束”技术。Hansbo 的综述把 Nitsche 方法应用于真实/人工界面、unfitted meshes、Chimera meshes、cut meshes、fictitious-domain methods 和模型耦合，正说明了它已经远超“施加 Dirichlet 条件”这一最初用途。</p>
+<hr>
+<h2 id="1-先看普通-fem-为什么天然喜欢强制-dirichlet-条件">1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件”
+</h2><p>考虑 Poisson：</p>
+\[-\Delta u=f\]<p>并规定：</p>
+\[u=g \quad\text{on }\Gamma_D.\]<p>标准弱式：</p>
+\[\int_\Omega \nabla u\cdot\nabla v\,d\Omega = \int_\Omega fv\,d\Omega + \int_{\Gamma_N}tv\,d\Gamma.\]<p>如果：</p>
+\[u=g\]<p>在 \(\Gamma_D\) 上被强制满足，</p>
+<p>那么测试函数：</p>
+\[v=0 \quad\text{on }\Gamma_D.\]<p>于是 Dirichlet 边界甚至不会显式出现在 weak form 中。</p>
+<p>这非常干净。</p>
+<p>但代价是：</p>
+\[\boxed{ \text{trial/test space 必须预先服从边界约束。} }\]<p>也就是说有限元空间本身就依赖：</p>
+\[\Gamma_D.\]<p>这在 fitted mesh 上完全没问题。</p>
+<hr>
+<h1 id="2-一旦网格不匹配强制约束立刻变麻烦">2. 一旦网格不匹配，强制约束立刻变麻烦
+</h1><p>假设两个子域：</p>
+\[\Omega_1,\qquad\Omega_2\]<p>在界面：</p>
+\[\Gamma\]<p>相接。</p>
+<p>物理要求：</p>
+\[u_1=u_2.\]<p>但两边网格可能是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">mesh 1:
+</span></span><span class="line"><span class="cl">|---|---|---|---|
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">interface
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">mesh 2:
+</span></span><span class="line"><span class="cl">|-|-|-|-|-|-|-|-|
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>节点不对应。</p>
+<p>于是你没法简单写：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">node 17 of mesh1 = node 44 of mesh2
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>因为：</p>
+\[\boxed{\text{不存在一一对应自由度}}\]<p>。</p>
+<p>这时常见思路有三类：</p>
+<ol>
+<li>Lagrange multipliers；</li>
+<li>penalty；</li>
+<li>Nitsche。</li>
+</ol>
+<p>而 Nitsche 的吸引力就在于：</p>
+\[\boxed{ \text{它能弱施加约束，却通常不需要额外 multiplier DOFs。} }\]<hr>
+<h1 id="3-先理解-penalty简单但有一个根本-trade-off">3. 先理解 penalty：简单，但有一个根本 trade-off
+</h1><p>如果要强制：</p>
+\[u=g,\]<p>可以在能量里加入：</p>
+\[\frac{\gamma}{2} \int_{\Gamma_D} (u-g)^2\,d\Gamma.\]<p>对应弱式增加：</p>
+\[\gamma \int_{\Gamma_D} (u-g)v\,d\Gamma.\]<p>当：</p>
+\[\gamma\rightarrow\infty,\]<p>就趋向：</p>
+\[u=g.\]<p>问题是：</p>
+\[\gamma\]<p>太小：</p>
+\[\Rightarrow \text{约束违反明显}\]<p>太大：</p>
+\[\Rightarrow \text{系统条件数恶化}.\]<p>所以 penalty 法的经典矛盾是：</p>
+\[\boxed{ \text{constraint accuracy} \quad\leftrightarrow\quad \text{conditioning} }\]<p>。</p>
+<p>Nitsche 方法的价值之一，就是引入<strong>一致性项</strong>，让稳定化参数不再承担“单独逼近真实边界条件”的全部责任。</p>
+<hr>
+<h1 id="4-nitsche-方法从分部积分重新把边界物理拿回来">4. Nitsche 方法从分部积分重新把“边界物理”拿回来
+</h1><p>考虑齐次 Dirichlet：</p>
+\[u=0 \quad\text{on }\Gamma_D.\]<p>如果我们暂时不要求测试函数：</p>
+\[v=0\]<p>那么分部积分得到：</p>
+\[\int_\Omega \nabla u\cdot\nabla v - \int_{\Gamma_D} \partial_n u\,v = \int_\Omega fv.\]<p>这里出现了自然边界通量：</p>
+\[\partial_n u.\]<p>Nitsche 方法加入一个对称的一致性项：</p>
+\[-\int_{\Gamma_D} \partial_n v\,u\]<p>以及一个稳定化项：</p>
+\[\frac{\gamma}{h} \int_{\Gamma_D} uv.\]<p>于是典型 symmetric Nitsche bilinear form 是：</p>
+\[\boxed{ a_h(u,v) = \int_\Omega\nabla u\cdot\nabla v - \int_{\Gamma_D}\partial_nu\,v - \int_{\Gamma_D}\partial_nv\,u + \frac{\gamma}{h} \int_{\Gamma_D}uv }\]<p>。</p>
+<p>这三类边界项分别承担：</p>
+\[\boxed{\text{consistency}}\]\[\boxed{\text{symmetry / adjoint consistency}}\]\[\boxed{\text{stability}}\]<p>。</p>
+<p>这就是 Nitsche 与单纯 penalty 最核心的区别。</p>
+<hr>
+<h1 id="5-为什么说-nitsche-是consistent-penalty">5. 为什么说 Nitsche 是“consistent penalty”？
+</h1><p>看最后一项：</p>
+\[\frac{\gamma}{h}uv.\]<p>它确实长得像 penalty。</p>
+<p>但如果只保留这一项，那就是 penalty method。</p>
+<p>Nitsche 还额外保留：</p>
+\[-\partial_nu\,v\]<p>和：</p>
+\[-\partial_nv\,u.\]<p>这些项来自 PDE 本身的 boundary flux structure。</p>
+<p>所以：</p>
+\[\boxed{ \text{Nitsche = consistency terms + stabilization} }\]<p>。</p>
+<p>因此 \(\gamma\) 的主要作用变成保证 coercivity/stability，而不是通过无限大的数值强行把：</p>
+\[u-g\]<p>压到零。</p>
+<p>这就是为什么 Nitsche 可以做到：</p>
+\[\boxed{ \text{弱施加边界条件，同时保持有限元的一致收敛阶。} }\]<hr>
+<h1 id="6-一个直观理解nitsche-不把约束写成命令而是写成界面交换定律">6. 一个直观理解：Nitsche 不把约束写成“命令”，而是写成“界面交换定律”
+</h1><p>强制 Dirichlet：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">u_boundary = g
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>像是在直接锁死自由度。</p>
+<p>Nitsche 更像：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">如果 u 偏离 g：
+</span></span><span class="line"><span class="cl">    通过边界 traction / flux 与 stabilization
+</span></span><span class="line"><span class="cl">    在 weak equilibrium 中产生修正
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>因此它不是：</p>
+\[\boxed{\text{直接删除自由度}}\]<p>而是：</p>
+\[\boxed{\text{让弱平衡方程自己把状态拉回合法约束}}\]<p>。</p>
+<p>这就是为什么它特别适合：</p>
+<ul>
+<li>两个独立网格；</li>
+<li>接触；</li>
+<li>immersed boundaries；</li>
+<li>移动界面。</li>
+</ul>
+<p>这些问题中的约束本来就更适合写成“界面交换条件”。</p>
+<hr>
+<h1 id="7-非匹配网格耦合时nitsche-的价值最容易看清">7. 非匹配网格耦合时，Nitsche 的价值最容易看清
+</h1><p>假设：</p>
+\[\Omega_1\]<p>和：</p>
+\[\Omega_2\]<p>之间要求：</p>
+\[u_1=u_2\]<p>以及通量平衡：</p>
+\[\sigma_1n_1+\sigma_2n_2=0.\]<p>定义 jump：</p>
+\[[u]=u_1-u_2.\]<p>以及某种 traction average：</p>
+\[\{\sigma n\}.\]<p>典型界面 Nitsche 项可以写成类似：</p>
+\[-\int_\Gamma \{\sigma(u)n\}\cdot[v]\]\[-\int_\Gamma \{\sigma(v)n\}\cdot[u]\]\[+ \frac{\gamma}{h} \int_\Gamma [u]\cdot[v].\]<p>于是：</p>
+\[[u]=0\]<p>没有通过节点对应被强制，</p>
+<p>而是在：</p>
+\[\boxed{\text{interface weak form}}\]<p>中被满足。</p>
+<p>这允许两边完全独立划分网格。</p>
+<p>Ruess 等在 isogeometric analysis 中正是利用 Nitsche weak coupling，把 non-matching B-spline/NURBS patches 与普通有限元网格连接起来，而无需昂贵的几何重新参数化。</p>
+<hr>
+<h1 id="8-这为什么对-cad--fem-很重要">8. 这为什么对 CAD → FEM 很重要？
+</h1><p>CAD 几何经常天然由多个 patch 组成。</p>
+<p>例如：</p>
+\[\text{NURBS patch A} + \text{patch B} + \text{patch C}.\]<p>如果要求：</p>
+\[\boxed{\text{所有 patch 接口节点严格匹配}}\]<p>网格生成会非常痛苦。</p>
+<p>Nitsche 提供另一条路线：</p>
+\[\boxed{ \text{每个 patch 独立离散， 然后在界面上弱耦合。} }\]<p>这相当于把复杂度从：</p>
+\[\text{mesh conformity}\]<p>转移到：</p>
+\[\text{variational coupling}.\]<p>这是一个非常重要的工程思想：</p>
+\[\boxed{ \text{与其为了数值方法强迫几何/网格适配， 不如让数值方法适应真实几何结构。} }\]<hr>
+<h1 id="9-nitsche-和-lagrange-multiplier-的区别在哪里">9. Nitsche 和 Lagrange multiplier 的区别在哪里？
+</h1><p>Lagrange multiplier 方法：</p>
+\[u_1-u_2=0\]<p>通过额外变量：</p>
+\[\lambda\]<p>施加。</p>
+<p>系统变成：</p>
+\[\begin{bmatrix} K & B^T\\ B & 0 \end{bmatrix} \begin{bmatrix} u\\ \lambda \end{bmatrix} = \begin{bmatrix} f\\ 0 \end{bmatrix}.\]<p>优点：</p>
+\[\lambda\]<p>往往具有清晰物理意义，例如：</p>
+\[\boxed{\text{contact traction / interface traction}}\]<p>。</p>
+<p>但代价是 saddle-point system，并需要满足类似 inf-sup stability 条件。</p>
+<p>Nitsche 通常可以把 multiplier 的效果通过：</p>
+\[\boxed{ \text{consistent interface flux + stabilization} }\]<p>隐式消去。</p>
+<p>所以它可以理解成：</p>
+\[\boxed{ \text{一种 stabilized multiplier elimination} }\]<p>。</p>
+<p>这也是为什么很多 Nitsche 推导和 stabilized Lagrange multiplier formulation 之间存在紧密联系；对于弹性接触，已有分析就把 Nitsche 解释为稳定化有限元方法。</p>
+<hr>
+<h1 id="10-那-nitsche-和-mortar-方法又是什么关系">10. 那 Nitsche 和 Mortar 方法又是什么关系？
+</h1><p>Mortar 方法也主要用于：</p>
+\[\boxed{\text{nonmatching interfaces}}\]<p>。</p>
+<p>经典 mortar 通常在接口引入 multiplier space：</p>
+\[\lambda_h.\]<p>所以更自然地表示 traction，并对 nonmatching discretization 做积分投影。</p>
+<p>Nitsche 则倾向于直接利用：</p>
+\[u,\quad \sigma n\]<p>构造弱界面项。</p>
+<p>可以粗略理解：</p>
+\[\boxed{ \text{Mortar：显式 interface multiplier} }\]\[\boxed{ \text{Nitsche：隐式 interface stabilization} }\]<p>。</p>
+<p>两者在高级接触算法里并非完全对立；甚至存在 Nitsche mortaring 的组合。Gustafsson、Stenberg、Videman 的弹性接触工作就研究了三种 Nitsche mortaring 技术，并给出 quasi-optimality 和 a posteriori error estimates。</p>
+<hr>
+<h1 id="11-为什么-nitsche-可以处理接触">11. 为什么 Nitsche 可以处理接触？
+</h1><p>接触条件本质上不是简单：</p>
+\[u=0.\]<p>以无摩擦 Signorini contact 为例：</p>
+\[g_n(u)\ge0,\]\[\lambda_n\le0,\]\[\lambda_ng_n=0.\]<p>也就是说：</p>
+\[\boxed{ \text{要么分离，要么接触} }\]<p>。</p>
+<p>这和你之前看到的 complementarity 是同一个物理结构。</p>
+<p>Nitsche 的做法不是简单加：</p>
+\[u_1-u_2=0\]<p>，而是把 contact condition 转成一种 nonlinear interface relation，然后在 weak form 中施加。</p>
+<p>Chouly–Hild 以及后续 Burman–Hansbo–Larson 的工作证明，Nitsche 方法可以用于 unilateral contact；后者甚至构造了 nonsymmetric penalty-free Nitsche formulation，并证明 energy norm 下的 optimal error estimates。</p>
+<p>所以：</p>
+\[\boxed{ \text{Nitsche 不只适用于 equality constraints， 也能扩展到 inequality/contact constraints。} }\]<hr>
+<h1 id="12-penalty-free-nitsche-为什么听起来有点反直觉">12. Penalty-free Nitsche 为什么听起来有点反直觉？
+</h1><p>前面 symmetric Nitsche 有：</p>
+\[\frac{\gamma}{h} \int_\Gamma uv.\]<p>看起来 penalty 不可缺少。</p>
+<p>但 Nitsche 还有 nonsymmetric variants。</p>
+<p>某些 formulations 可以通过改变 consistency terms 的符号结构，在理论上不依赖 penalty term 获得稳定性。</p>
+<p>Burman、Hansbo、Larson 2017 年对 Signorini 问题的工作就是这样：他们用 displacement 的 nonlinear contact condition 构造 nonsymmetric Nitsche method，不需要 penalty term 来保证稳定，并证明最优能量范数误差估计。</p>
+<p>这说明：</p>
+\[\boxed{ \text{“Nitsche = penalty 方法”是不准确的。} }\]<p>Penalty-like term 只是常见构造的一部分，不是方法的本质定义。</p>
+<hr>
+<h1 id="13-但工程实现里-penaltystabilization-parameter-仍然很关键">13. 但工程实现里 penalty/stabilization parameter 仍然很关键
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>在很多 symmetric Nitsche formulation 中，需要：</p>
+\[\gamma\]<p>足够大以保证稳定。</p>
+<p>但：</p>
+\[\gamma\]<p>过大仍然会恶化 conditioning。</p>
+<p>所以工程上依然存在：</p>
+\[\boxed{ \text{stability} \quad\leftrightarrow\quad \text{conditioning} }\]<p>，只是相比纯 penalty method 更可控。</p>
+<p>对于复杂热机接触，Seitz、Wall、Popp 的 Nitsche formulation 就通过局部 generalized eigenvalue problems 估计稳定化参数，并进一步构造 harmonic weighting，以应对大变形、摩擦和热耦合。</p>
+<p>这说明真正成熟的 Nitsche 实现通常不会：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">gamma = 1e8
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>然后结束。</p>
+<p>而会考虑：</p>
+\[\boxed{ \text{mesh size} + \text{material stiffness} + \text{local interface geometry} }\]<p>共同决定 scaling。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="14-为什么系数通常是-">14. 为什么系数通常是 \(\gamma/h\)？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>因为边界项和体积分项具有不同尺度。</p>
+<p>例如 Poisson：</p>
+\[\int_\Omega |\nabla u|^2\,d\Omega\]<p>与：</p>
+\[\int_\Gamma u^2\,d\Gamma\]<p>的量纲/mesh scaling 不同。</p>
+<p>通过 trace inequality，可以得到边界量与体积分之间的尺度关系：</p>
+\[\|u\|_{\Gamma} \sim h^{-1/2}\|u\|_\Omega+\cdots\]<p>所以稳定化一般需要：</p>
+\[\boxed{ \frac{\gamma}{h} }\]<p>级别。</p>
+<p>对于弹性：</p>
+\[\gamma\]<p>还常乘上代表材料刚度的量，例如：</p>
+\[E,\mu,\lambda.\]<p>因此更合理的理解不是：</p>
+\[\gamma=\text{一个神秘经验参数},\]<p>而是：</p>
+\[\boxed{ \text{稳定化参数必须与离散尺度和 PDE operator 的尺度匹配。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="15-nitsche-和-cutfem-为什么天然是一对">15. Nitsche 和 CutFEM 为什么天然是一对？
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>CutFEM / unfitted FEM 的思想是：</p>
+<blockquote>
+<p>网格不必贴合真实边界。</p>
+</blockquote>
+<p>例如一个圆：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">background mesh:
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">+---+---+---+
+</span></span><span class="line"><span class="cl">|  /圆\      |
+</span></span><span class="line"><span class="cl">+ /---\---+
+</span></span><span class="line"><span class="cl">|/     \   |
+</span></span><span class="line"><span class="cl">+---+---\--+
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>真实边界会穿过：</p>
+\[\boxed{\text{element interiors}}\]<p>。</p>
+<p>于是根本没有传统意义上的 boundary nodes。</p>
+<p>这时你无法直接：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">set boundary DOF = g
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>因为：</p>
+\[\Gamma_D\]<p>甚至不沿网格边界。</p>
+<p>Nitsche 正好允许直接在：</p>
+\[\Gamma_D\cap K\]<p>这些 cut interfaces 上积分并弱施加边界条件。</p>
+<p>因此：</p>
+\[\boxed{ \text{unfitted geometry} + \text{Nitsche weak boundary enforcement} }\]<p>成为非常自然的组合。</p>
+<p>Hansbo 的综述明确把 Nitsche 与 fictitious domain、cut meshes 和 Chimera meshes 放在同一体系中；Massing、Larson、Logg 的实现工作也专门处理三维 nonmatching/overlapping meshes 中的 cut-cell intersection 和积分问题。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="16-这对参数化几何和优化非常有价值">16. 这对参数化几何和优化非常有价值
+</h1><p>假设做 shape optimization。</p>
+<p>传统 fitted mesh：</p>
+\[\text{geometry changes} \Rightarrow \text{mesh deformation/remeshing}.\]<p>如果每次设计迭代都：</p>
+\[\boxed{\text{重新网格化}}\]<p>成本高，而且容易产生质量问题。</p>
+<p>MultiMesh / Nitsche 思路可以让多个独立网格移动，而通过 Nitsche 在 nonmatching interfaces 上保证连续。</p>
+<p>Dokken 等的工作正是利用多个独立 nonmatching meshes 做 shape optimization，使部分几何变化可以通过网格刚体移动/缩放实现，从而避免每一步整体 remeshing。</p>
+<p>这对参数化机构尤其有启发：</p>
+\[\boxed{ \text{几何参数变化不一定要等价于全局重新划网格。} }\]<hr>
+<h1 id="17-这和你熟悉的接触-penalty-有什么最实用的区别">17. 这和你熟悉的接触 penalty 有什么最实用的区别？
+</h1><p>销轴—孔接触里常用 penalty：</p>
+\[F_n=k\delta^n.\]<p>其思想是：</p>
+\[\boxed{ \text{允许少量穿透，用很大恢复力惩罚。} }\]<p>Nitsche contact 则从变分一致性的角度构造：</p>
+\[\boxed{ \text{接触 traction} + \text{gap constraint} + \text{stabilization} }\]<p>之间的弱耦合。</p>
+<p>所以二者虽然都可能出现一个“类似 penalty parameter”的量，</p>
+<p>但数学角色不同：</p>
+<h3 id="penalty-contact">Penalty contact
+</h3>\[\text{penetration} \Rightarrow \text{artificial stiffness}\]<h3 id="nitsche-contact">Nitsche contact
+</h3>\[\text{contact condition} \Rightarrow \text{consistent weak interface equation}\]<p>。</p>
+<p>因此 Nitsche 更接近：</p>
+\[\boxed{\text{一种有限元约束离散方法}}\]<p>而 penalty contact 更接近：</p>
+\[\boxed{\text{一种约束正则化方法}}\]<p>。</p>
+<hr>
+<h1 id="18-nitsche-的真正难点积分几何">18. Nitsche 的真正难点：积分几何
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>公式看起来不复杂。</p>
+<p>但 nonmatching interface 上真正实现：</p>
+\[\int_\Gamma (\cdots)\,d\Gamma\]<p>时，需要知道：</p>
+\[\boxed{ \text{mesh A 和 mesh B 的交界到底切在哪里？} }\]<p>于是要做：</p>
+<ul>
+<li>triangle–triangle intersection；</li>
+<li>cut-cell decomposition；</li>
+<li>quadrature on intersections；</li>
+<li>normal orientation；</li>
+<li>master/slave side lookup；</li>
+<li>search acceleration。</li>
+</ul>
+<p>三维情况下，这部分代码可能比 Nitsche 公式本身复杂得多。</p>
+<p>Massing 等关于三维 nonmatching/overlapping mesh 的实现论文就指出，实际困难集中在 mesh intersections 与 cut cells/subsimplices 上的积分，并专门设计自动检测和积分框架。</p>
+<p>这是一个很典型的数值软件规律：</p>
+\[\boxed{ \text{理论公式可能只有一行， 工程复杂度却集中在几何、数据结构和积分层。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="19-对物理引擎开发一个很值得迁移的思想约束不一定非得变成投影">19. 对物理引擎开发，一个很值得迁移的思想：约束不一定非得变成“投影”
+</h1><p>游戏物理里通常想到约束：</p>
+\[C(x)=0\]<p>就会自然进入：</p>
+<ul>
+<li><span class="term-anchor" data-term="pbd" tabindex="0">PBD</span> projection；</li>
+<li><span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span>；</li>
+<li>impulse；</li>
+<li>LCP。</li>
+</ul>
+<p>Nitsche 提醒我们，还有另一种思路：</p>
+\[\boxed{ \text{把约束直接嵌入 variational residual / energy balance。} }\]<p>即：</p>
+\[\text{bulk physics} + \text{interface consistency} + \text{stabilization}.\]<p>这对：</p>
+<ul>
+<li>deformable–rigid coupling；</li>
+<li>embedded objects；</li>
+<li>fluid–structure interfaces；</li>
+<li>mixed discretizations；</li>
+</ul>
+<p>尤其有吸引力。</p>
+<p>如果两个物理模块本身都是 variational FEM，</p>
+<p>那么用：</p>
+\[\boxed{\text{weak interface coupling}}\]<p>往往比“找到节点然后绑死”更自然。</p>
+<hr>
+<h1 id="20-对代理模型数字孪生还有一个不那么显眼的价值模块化高保真模型">20. 对代理模型/数字孪生还有一个不那么显眼的价值：模块化高保真模型
+</h1><p>假设复杂系统由：</p>
+\[\Omega_1,\Omega_2,\Omega_3\]<p>几个子结构组成。</p>
+<p>每个子结构：</p>
+<ul>
+<li>网格不同；</li>
+<li>fidelity 不同；</li>
+<li>solver 不同；</li>
+<li>更新频率不同。</li>
+</ul>
+<p>如果界面必须 node-conforming，</p>
+<p>整个系统只能一起重建。</p>
+<p>如果使用弱耦合：</p>
+\[\boxed{ \text{子模型可以保持各自 discretization} }\]<p>然后通过 interface operator 连接。</p>
+<p>这就提供一种：</p>
+\[\boxed{ \text{模块化多保真物理模型} }\]<p>基础。</p>
+<p>从这个角度看，Nitsche 不只是一个 FEM trick，</p>
+<p>它实际上是一种：</p>
+\[\boxed{\text{physics module coupling abstraction}}\]<p>。</p>
+<hr>
+<h1 id="21-一个很值得自己实现的最小实验">21. 一个很值得自己实现的最小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>最简单可以做 1D Poisson：</p>
+\[-u''=f, \qquad x\in[0,1].\]<p>边界：</p>
+\[u(0)=0,\qquad u(1)=0.\]<p>先做普通强制 Dirichlet FEM。</p>
+<p>然后不要删除边界 DOFs，改用 symmetric Nitsche：</p>
+\[a_h(u,v) = (u',v') - u' n\,v - v'n\,u + \frac{\gamma}{h}uv\]<p>在两个端点加入边界贡献。</p>
+<p>分别测试：</p>
+\[\gamma=0.1,\ 1,\ 10,\ 100,\ 10^4.\]<p>记录：</p>
+\[\boxed{\text{boundary error}}\]<p>以及：</p>
+\[\boxed{\kappa(K)}\]<p>。</p>
+<p>你会看到：</p>
+<ul>
+<li>\(\gamma\) 太小可能失稳；</li>
+<li>合理范围内误差正常；</li>
+<li>\(\gamma\) 极大时 conditioning 变差。</li>
+</ul>
+<p>然后进一步把：</p>
+\[[0,1]\]<p>切成两个<strong>节点不匹配</strong>子网格：</p>
+\[[0,0.5]\]<p>和：</p>
+\[[0.5,1],\]<p>用 Nitsche coupling 连接。</p>
+<p>如果这个实验做通，你基本就理解了 Nitsche 80% 的核心价值。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Nitsche 方法最值得记住的不是：</p>
+\[-\langle\partial_nu,v\rangle -\langle\partial_nv,u\rangle + \frac{\gamma}{h}\langle u,v\rangle.\]<p>真正值得记住的是：</p>
+\[\boxed{ \text{有限元中的约束，不一定要通过修改自由度来强制满足； 它也可以成为弱平衡方程的一部分。} }\]<p>于是知识体系可以这样定位：</p>
+\[\text{Strong constraints}\]\[\downarrow\]\[\text{Penalty / Lagrange multiplier}\]\[\downarrow\]\[\boxed{\text{Nitsche weak enforcement}}\]\[\downarrow\]\[\text{nonmatching meshes / contact / CutFEM / multiphysics coupling}.\]<p>它最深的工程价值在于：</p>
+\[\boxed{ \text{解除“物理界面必须与网格节点严格对齐”这一人为限制。} }\]<p>一旦这层限制解除，很多复杂问题会变得更模块化：</p>
+<ul>
+<li>CAD patch 可以独立；</li>
+<li>接触界面可以移动；</li>
+<li>子模型可以独立网格；</li>
+<li>几何优化可以减少 remeshing；</li>
+<li>多物理场可以通过弱接口组合。</li>
+</ul>
+<p>从这个角度看，Nitsche 方法真正解决的不是“边界条件怎么施加”，而是一个更普遍的问题：</p>
+\[\boxed{ \text{如何让不同离散世界在同一个物理界面上保持一致。} }\]<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p><strong>Peter Hansbo, <em>Nitsche&rsquo;s method for interface problems in computational mechanics</em>, GAMM-Mitteilungen, 2014</strong>。很适合作为总览，覆盖 unfitted meshes、Chimera、cut meshes、fictitious domains 和 model coupling。<br>
+<a class="link" href="https://onlinelibrary.wiley.com/doi/10.1002/gamm.201490018"  target="_blank" rel="noopener"
+    >Wiley 论文页</a></p>
+</li>
+<li>
+<p><strong>Burman, Hansbo &amp; Larson, <em>The Penalty-Free Nitsche Method and Nonconforming Finite Elements for the Signorini Problem</em>, SIAM JNA, 2017</strong>。如果重点关心接触，这篇很值得看：它展示了 Nitsche 如何处理 unilateral contact，并构造 penalty-free nonsymmetric formulation。<br>
+<a class="link" href="https://epubs.siam.org/doi/10.1137/16M107846X"  target="_blank" rel="noopener"
+    >SIAM 论文页</a></p>
+</li>
+<li>
+<p><strong>Seitz, Wall &amp; Popp, <em>Nitsche’s method for finite deformation thermomechanical contact problems</em></strong>。适合进一步看大变形、摩擦和热接触，以及实际工程中 stabilization parameter 如何通过局部 generalized eigenvalue problem 估计。</p>
+</li>
+<li>
+<p><strong>Ruess et al., <em>Weak coupling for isogeometric analysis of non-matching and trimmed multi-patch geometries</em>, CMAME, 2014</strong>。非常适合理解 Nitsche 为什么能把 CAD/NURBS patch、非匹配网格和有限元耦合起来。</p>
+</li>
+<li>
+<p><strong>Massing, Larson &amp; Logg, <em>Efficient Implementation of Finite Element Methods on Nonmatching and Overlapping Meshes in Three Dimensions</em>, SIAM JSC</strong>。如果以后自己写 solver，这篇尤其有价值，因为它把真正困难的 intersection detection、cut-cell integration 和三维工程实现摆到了台面上。</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E8%AE%A1%E7%AE%97%E5%8A%9B%E5%AD%A6/">计算力学</a>
+        
+            <a href="/tags/%E6%8E%A5%E8%A7%A6%E5%8A%9B%E5%AD%A6/">接触力学</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/21-fas/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">FAS：非线性问题的“粗网格”不该只修正误差，而应该直接解一个粗尺度的完整非线性状态</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/04-variational-integrators/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Variational Integrators：时间积分器也可以“从力学原理里推出来”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/25-hyper-reduction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/20-multigrid/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/17-dual-weighted-residual/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

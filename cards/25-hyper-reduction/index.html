@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快 主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW\n领域：有限元 × 数值方法 × 代理模型 × 软体动力学\n推荐阅读时间：约 8–10 分钟\n这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：\n\\[\\boxed{ \\text{“自由度少了”与“计算成本少了”不是同一件事。} }\\]假设原始有限元有：\n\\[N=10^6\\]个自由度。\n通过 POD/Reduced Basis 得到：\n\\[u\\approx Vq, \\qquad V\\in\\mathbb R^{N\\times r}, \\quad r=50.\\]看起来问题已经从：\n\\[10^6\\]维降到了：\n\\[50\\]维。\n但如果系统含有非线性内力：\n\\[f_{\\rm int}(u),\\]每一步仍然必须先在完整网格上计算：\n\\[f_{\\rm int}(Vq)\\in\\mathbb R^N,\\]然后才投影：\n\\[V^T f_{\\rm int}(Vq).\\]于是你虽然只求 50 个未知量，却可能依然遍历：\n\\[\\boxed{\\text{全部百万个自由度 / 全部有限元单元。}}\\]这就是 projection-based nonlinear ROM 的经典瓶颈。DEIM 正是为此提出：让非线性项只在少数经过挑选的位置上求值；ECSW 则进一步从有限元虚功/能量结构出发，只计算少量具有权重的代表单元。\n真正值得记住的是：\n\\[\\boxed{ \\text{Model reduction 降的是状态空间； Hyper-reduction 降的是算子求值成本。} }\\] 1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？ 先看线性有限元：\n">
+<title>Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/25-hyper-reduction/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快">
+<meta property='og:description' content="Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快 主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW\n领域：有限元 × 数值方法 × 代理模型 × 软体动力学\n推荐阅读时间：约 8–10 分钟\n这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：\n\\[\\boxed{ \\text{“自由度少了”与“计算成本少了”不是同一件事。} }\\]假设原始有限元有：\n\\[N=10^6\\]个自由度。\n通过 POD/Reduced Basis 得到：\n\\[u\\approx Vq, \\qquad V\\in\\mathbb R^{N\\times r}, \\quad r=50.\\]看起来问题已经从：\n\\[10^6\\]维降到了：\n\\[50\\]维。\n但如果系统含有非线性内力：\n\\[f_{\\rm int}(u),\\]每一步仍然必须先在完整网格上计算：\n\\[f_{\\rm int}(Vq)\\in\\mathbb R^N,\\]然后才投影：\n\\[V^T f_{\\rm int}(Vq).\\]于是你虽然只求 50 个未知量，却可能依然遍历：\n\\[\\boxed{\\text{全部百万个自由度 / 全部有限元单元。}}\\]这就是 projection-based nonlinear ROM 的经典瓶颈。DEIM 正是为此提出：让非线性项只在少数经过挑选的位置上求值；ECSW 则进一步从有限元虚功/能量结构出发，只计算少量具有权重的代表单元。\n真正值得记住的是：\n\\[\\boxed{ \\text{Model reduction 降的是状态空间； Hyper-reduction 降的是算子求值成本。} }\\] 1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？ 先看线性有限元：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/25-hyper-reduction/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='软体动力学' /><meta property='article:published_time' content='2026-09-07T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-07T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快">
+<meta name="twitter:description" content="Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快 主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW\n领域：有限元 × 数值方法 × 代理模型 × 软体动力学\n推荐阅读时间：约 8–10 分钟\n这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：\n\\[\\boxed{ \\text{“自由度少了”与“计算成本少了”不是同一件事。} }\\]假设原始有限元有：\n\\[N=10^6\\]个自由度。\n通过 POD/Reduced Basis 得到：\n\\[u\\approx Vq, \\qquad V\\in\\mathbb R^{N\\times r}, \\quad r=50.\\]看起来问题已经从：\n\\[10^6\\]维降到了：\n\\[50\\]维。\n但如果系统含有非线性内力：\n\\[f_{\\rm int}(u),\\]每一步仍然必须先在完整网格上计算：\n\\[f_{\\rm int}(Vq)\\in\\mathbb R^N,\\]然后才投影：\n\\[V^T f_{\\rm int}(Vq).\\]于是你虽然只求 50 个未知量，却可能依然遍历：\n\\[\\boxed{\\text{全部百万个自由度 / 全部有限元单元。}}\\]这就是 projection-based nonlinear ROM 的经典瓶颈。DEIM 正是为此提出：让非线性项只在少数经过挑选的位置上求值；ECSW 则进一步从有限元虚功/能量结构出发，只计算少量具有权重的代表单元。\n真正值得记住的是：\n\\[\\boxed{ \\text{Model reduction 降的是状态空间； Hyper-reduction 降的是算子求值成本。} }\\] 1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？ 先看线性有限元：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_b5976aa1afdc1d2e.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-为什么线性-rom-很容易真正做到快非线性-rom-却不行">1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/25-hyper-reduction/">Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-07T00:00:00Z'>Sep 07, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 7 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="hyper-reduction状态维数降到几十并不意味着非线性有限元真的变快">Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快
+</h1><p><strong>主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW</strong><br>
+<strong>领域：有限元 × 数值方法 × 代理模型 × 软体动力学</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：</p>
+\[\boxed{ \text{“自由度少了”与“计算成本少了”不是同一件事。} }\]<p>假设原始有限元有：</p>
+\[N=10^6\]<p>个自由度。</p>
+<p>通过 <span class="term-anchor" data-term="pod" tabindex="0">POD</span>/<span class="term-anchor" data-term="reduced-basis" tabindex="0">Reduced Basis</span> 得到：</p>
+\[u\approx Vq, \qquad V\in\mathbb R^{N\times r}, \quad r=50.\]<p>看起来问题已经从：</p>
+\[10^6\]<p>维降到了：</p>
+\[50\]<p>维。</p>
+<p>但如果系统含有非线性内力：</p>
+\[f_{\rm int}(u),\]<p>每一步仍然必须先在完整网格上计算：</p>
+\[f_{\rm int}(Vq)\in\mathbb R^N,\]<p>然后才投影：</p>
+\[V^T f_{\rm int}(Vq).\]<p>于是你虽然只求 50 个未知量，却可能依然遍历：</p>
+\[\boxed{\text{全部百万个自由度 / 全部有限元单元。}}\]<p>这就是 projection-based nonlinear ROM 的经典瓶颈。DEIM 正是为此提出：让非线性项只在少数经过挑选的位置上求值；ECSW 则进一步从有限元虚功/能量结构出发，只计算少量具有权重的代表单元。</p>
+<p>真正值得记住的是：</p>
+\[\boxed{ \text{Model reduction 降的是状态空间； Hyper-reduction 降的是算子求值成本。} }\]<hr>
+<h2 id="1-为什么线性-rom-很容易真正做到快非线性-rom-却不行">1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？
+</h2><p>先看线性有限元：</p>
+\[M\ddot u+Ku=f.\]<p>设：</p>
+\[u=Vq.\]<p>Galerkin 投影：</p>
+\[V^TMV\ddot q + V^TKVq = V^Tf.\]<p>定义：</p>
+\[M_r=V^TMV,\]\[K_r=V^TKV.\]<p>这些矩阵可以在 offline 阶段提前算好。</p>
+<p>在线计算只剩：</p>
+\[M_r\ddot q+K_rq=f_r,\]<p>矩阵规模只有：</p>
+\[r\times r.\]<p>于是 online cost 真正与：</p>
+\[N\]<p>脱钩。</p>
+<p>这叫：</p>
+\[\boxed{\text{offline-online decomposition}}\]<p>，也是 Reduced Basis / projection ROM 最理想的状态。经典 projection-based model reduction 综述正是把“online cost 是否与高维系统规模无关”视为参数化降阶模型是否真正有效的重要标准。</p>
+<hr>
+<h1 id="2-非线性一出现offline-online-decomposition-就断了">2. 非线性一出现，offline-online decomposition 就断了
+</h1><p>假设：</p>
+\[M\ddot u+f_{\rm int}(u)=f_{\rm ext}.\]<p>代入：</p>
+\[u=Vq,\]<p>得到：</p>
+\[M_r\ddot q + \boxed{ V^Tf_{\rm int}(Vq) } = f_r.\]<p>问题就在方框里。</p>
+<p>即使：</p>
+\[q\in\mathbb R^{50},\]<p>为了算：</p>
+\[f_{\rm int}(Vq),\]<p>你通常仍需要：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">对所有 element:
+</span></span><span class="line"><span class="cl">    计算 F
+</span></span><span class="line"><span class="cl">    计算 constitutive law
+</span></span><span class="line"><span class="cl">    计算 element force
+</span></span><span class="line"><span class="cl">    assemble
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>因此复杂度仍然接近：</p>
+\[O(N).\]<p>如果是隐式求解，还要计算：</p>
+\[K_t(u) = \frac{\partial f_{\rm int}}{\partial u}\]<p>以及：</p>
+\[V^TK_t(Vq)V.\]<p>于是：</p>
+\[\boxed{ \text{降阶后的线性系统很小， 但构造这个小系统仍然很贵。} }\]<p>Farhat 等对 ECSW 的分析明确指出：对于 nonlinear ROM，显式计算的主要成本在 projected residual；隐式计算还需要 projected Jacobian，这两个高维算子求值正是 hyper-reduction 要消除的瓶颈。</p>
+<hr>
+<h1 id="3-hyper-reduction-到底超在哪里">3. Hyper-reduction 到底“超”在哪里？
+</h1><p>普通 reduction：</p>
+\[u\in\mathbb R^N\]<p>被压缩成：</p>
+\[q\in\mathbb R^r.\]<p>Hyper-reduction 再进一步问：</p>
+\[\boxed{ \text{为了算 reduced equation， 真的有必要看全部 }N\text{ 个空间位置吗？} }\]<p>如果真正重要的 nonlinear information 只需要在：</p>
+\[m\ll N\]<p>个位置上求值，</p>
+<p>就可以把：</p>
+\[O(N)\]<p>operator evaluation 进一步变成：</p>
+\[O(m).\]<p>因此整个结构是：</p>
+\[\text{Full-order model}\]\[\downarrow\]\[\text{POD / Reduced Basis}\]\[\boxed{\text{降低未知量数目}}\]\[\downarrow\]\[\text{Hyper-reduction}\]\[\boxed{\text{降低 nonlinear operator 求值成本}}.\]<p>这两个层次必须同时存在，nonlinear ROM 才可能真正获得数量级的在线加速。</p>
+<hr>
+<h1 id="4-deim既然整个非线性向量有低维结构就没必要把它全部算出来">4. DEIM：既然整个非线性向量有低维结构，就没必要把它全部算出来
+</h1><p>假设：</p>
+\[f(u)\in\mathbb R^N\]<p>虽然有：</p>
+\[N\]<p>个分量，但在训练数据中主要落在一个：</p>
+\[m\]<p>维子空间：</p>
+\[f(u)\approx Uc,\]<p>其中：</p>
+\[U\in\mathbb R^{N\times m}.\]<p>这个：</p>
+\[U\]<p>通常来自 nonlinear snapshots：</p>
+\[[f(u^{(1)}),f(u^{(2)}),\ldots]\]<p>的 POD/SVD。</p>
+<p>这相当于说：</p>
+\[\boxed{ \text{不仅解 }u\text{ 有低秩结构， 非线性算子 }f(u)\text{ 本身也有低秩结构。} }\]<p>问题变成：</p>
+\[c\]<p>怎么求？</p>
+<p>如果用标准 projection：</p>
+\[c=U^Tf,\]<p>仍然需要完整：</p>
+\[f\in\mathbb R^N.\]<p>所以没有解决问题。</p>
+<p>DEIM 的关键是：</p>
+\[\boxed{ \text{只要求 }f\text{ 的 }m\text{ 个精选分量。} }\]<hr>
+<h1 id="5-deim-的核心公式非常漂亮">5. DEIM 的核心公式非常漂亮
+</h1><p>选取：</p>
+\[m\]<p>个索引：</p>
+\[p_1,\ldots,p_m.\]<p>构造选择矩阵：</p>
+\[P= [e_{p_1},\ldots,e_{p_m}] \in\mathbb R^{N\times m}.\]<p>DEIM 要求近似向量：</p>
+\[Uc\]<p>在这些位置与真正的 nonlinear vector 一致：</p>
+\[P^TUc = P^Tf(u).\]<p>于是：</p>
+\[c= (P^TU)^{-1}P^Tf(u).\]<p>所以：</p>
+\[\boxed{ f(u) \approx U(P^TU)^{-1}P^Tf(u) }\]<p>。</p>
+<p>真正在线需要计算的只有：</p>
+\[\boxed{ P^Tf(u) }\]<p>即：</p>
+\[m\]<p>个 nonlinear entries。</p>
+<p>而 reduced nonlinear term：</p>
+\[V^Tf(u)\]<p>变成：</p>
+\[\boxed{ V^TU(P^TU)^{-1}P^Tf(u). }\]<p>前面的：</p>
+\[V^TU(P^TU)^{-1}\]<p>全部可以 offline 预计算。</p>
+<p>因此 online 阶段只剩：</p>
+\[\boxed{ \text{算 }m\text{ 个非线性分量。} }\]<p>Chaturantabut 与 Sorensen 2010 年的 DEIM 论文正是通过这个结构，让 POD nonlinear ROM 的复杂度显著摆脱 full system dimension。</p>
+<hr>
+<h1 id="6-一个简单例子100-万维-nonlinear-vector只看-50-个坐标">6. 一个简单例子：100 万维 nonlinear vector，只看 50 个坐标
+</h1><p>假设：</p>
+\[N=10^6, \qquad r=30, \qquad m=50.\]<p>普通 POD ROM：</p>
+\[q\in\mathbb R^{30}.\]<p>但每次仍计算：</p>
+\[10^6\]<p>维 nonlinear force。</p>
+<p>DEIM 则选择：</p>
+\[50\]<p>个代表位置。</p>
+<p>于是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">q
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">u_selected
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">evaluate 50 nonlinear entries
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">DEIM reconstruction/projection
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">30-dimensional reduced force
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果 nonlinear evaluation 是主要瓶颈，理论上可以把这一部分从：</p>
+\[10^6\]<p>级降到：</p>
+\[50\]<p>级。</p>
+<p>这就是为什么它被称作 hyper-reduction。</p>
+<hr>
+<h1 id="7-deim-点不是随机选的">7. DEIM 点不是随机选的
+</h1><p>如果随便选择：</p>
+\[m\]<p>个坐标，很可能：</p>
+\[P^TU\]<p>接近奇异。</p>
+<p>那么：</p>
+\[(P^TU)^{-1}\]<p>会放大误差。</p>
+<p>DEIM 原始算法通过 greedy 过程选 interpolation indices。</p>
+<p>直觉上：</p>
+<ol>
+<li>取第一个 nonlinear POD mode；</li>
+<li>找它幅值最大的坐标；</li>
+<li>用已有点解释下一个 mode；</li>
+<li>找剩余 residual 最大的位置；</li>
+<li>加入新点；</li>
+<li>重复。</li>
+</ol>
+<p>所以每一个 interpolation point 都在回答：</p>
+\[\boxed{ \text{当前已有采样位置最难解释的 nonlinear mode 在哪里？} }\]<p>这和 greedy reduced basis、active learning 在思想上有明显相似性，但 DEIM 的目标很具体：</p>
+\[\boxed{ \text{让 nonlinear field 能从少数坐标稳定重构。} }\]<p>pyMOR 当前仍直接提供 <code>deim()</code> 和 empirical-interpolation operator 接口，并通过 nonlinear snapshots 生成 collateral basis 与 interpolation DOFs。</p>
+<hr>
+<h1 id="8-deim-的误差由两个东西共同控制">8. DEIM 的误差由两个东西共同控制
+</h1><p>其典型误差结构可以理解成：</p>
+\[\|f-\tilde f\| \lesssim \underbrace{ \|(I-UU^T)f\| }_{\text{nonlinear basis 截断误差}} \times \underbrace{ \|(P^TU)^{-1}\| }_{\text{插值点条件数}} .\]<p>第一项回答：</p>
+<blockquote>
+<p>nonlinear POD basis 本身够不够表达 \(f\)？</p>
+</blockquote>
+<p>第二项回答：</p>
+<blockquote>
+<p>选出的 interpolation points 稳不稳定？</p>
+</blockquote>
+<p>因此只增加：</p>
+\[m\]<p>并不自动保证效果好。</p>
+<p>你同时需要：</p>
+\[\boxed{ \text{good collateral basis} + \text{good sampling points}. }\]<p>后续 POD-DEIM 的理论分析明确给出了 reduced state error 与 neglected POD singular values、DEIM nonlinear approximation error 之间的关系。</p>
+<hr>
+<h1 id="9-但-deim-用在非线性结构动力学上有一个隐患它主要近似向量不一定保持物理结构">9. 但 DEIM 用在非线性结构动力学上有一个隐患：它主要近似“向量”，不一定保持“物理结构”
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>考虑有限元内力：</p>
+\[f_{\rm int}(u) = \nabla_u \Pi(u).\]<p>也就是说它来自势能：</p>
+\[\Pi(u).\]<p>这意味着完整模型拥有：</p>
+\[\boxed{ \text{力—能量一致性} }\]<p>。</p>
+<p>如果你直接用：</p>
+\[f_{\rm int} \approx U(P^TU)^{-1}P^Tf_{\rm int},\]<p>得到的近似力未必仍然等于某个近似势能的梯度。</p>
+<p>于是可能破坏：</p>
+<ul>
+<li>对称切线刚度；</li>
+<li>势能结构；</li>
+<li>Hamilton/Lagrangian structure；</li>
+<li>数值稳定性。</li>
+</ul>
+<p>这在结构动力学里比一般函数逼近严重得多。</p>
+<p>Farhat、Chapman、Avery 对 ECSW 的分析中特别比较了这一点：ECSW 能保留与 Hamilton 原理相关的 Lagrangian structure，而 DEIM 及其一些变体在他们测试的 nonlinear structural dynamics 问题中可能产生数值不稳定。</p>
+<p>这揭示了一个非常重要的原则：</p>
+\[\boxed{ \text{非线性项拟合得准， 不代表 resulting dynamics 就一定好。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="10-ecsw与其重构整条-nonlinear-force不如直接挑少数代表单元">10. ECSW：与其重构整条 nonlinear force，不如直接挑少数“代表单元”
+</h1><p>有限元内力天然可以写成单元求和：</p>
+\[f_{\rm int}(u) = \sum_{e=1}^{N_e} L_e^T f_e(u_e).\]<p>Galerkin 投影：</p>
+\[V^Tf_{\rm int}(Vq) = \sum_{e=1}^{N_e} V_e^T f_e(V_eq).\]<p>这提供了一个非常自然的机会：</p>
+<blockquote>
+<p><strong>真的需要算所有单元吗？</strong></p>
+</blockquote>
+<p>ECSW 选择一个小单元集合：</p>
+\[\mathcal S \subset \{1,\ldots,N_e\}\]<p>以及正权重：</p>
+\[\xi_e>0.\]<p>然后近似：</p>
+\[\boxed{ V^Tf_{\rm int}(Vq) \approx \sum_{e\in\mathcal S} \xi_e V_e^Tf_e(V_eq) }\]<p>。</p>
+<p>也就是说：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">full mesh:
+</span></span><span class="line"><span class="cl">100000 elements
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">hyper-reduced mesh:
+</span></span><span class="line"><span class="cl">only 500 sampled elements
+</span></span><span class="line"><span class="cl">+ learned weights
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>在线阶段只有这：</p>
+\[500\]<p>个单元真正调用 constitutive model。</p>
+<p>Farhat 等最初正是基于 mesh sampling、virtual work 和 energy structure 构造这一方法，并在 nonlinear finite-element structural dynamics 上获得最高约四个数量级的 CPU 加速案例。</p>
+<hr>
+<h1 id="11-为什么-ecsw-的权重必须认真学">11. 为什么 ECSW 的权重必须认真学？
+</h1><p>如果只是随机取：</p>
+\[1\%\]<p>单元：</p>
+\[\sum_{e\in S}V_e^Tf_e\]<p>通常会严重低估整个结构的内力。</p>
+<p>ECSW 使用：</p>
+\[\xi_e\]<p>让被采样的少数单元代表未采样单元的整体贡献。</p>
+<p>可以粗略理解成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">element 17  × 12.3
+</span></span><span class="line"><span class="cl">element 83  ×  5.7
+</span></span><span class="line"><span class="cl">element 91  × 21.5
+</span></span><span class="line"><span class="cl">...
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>训练阶段使用 full-order snapshots，希望：</p>
+\[\sum_{e\in S} \xi_e V_e^Tf_e\]<p>尽可能匹配：</p>
+\[\sum_{e=1}^{N_e} V_e^Tf_e.\]<p>因此 Hyper-reduction 本质上又变成：</p>
+\[\boxed{ \text{寻找少数代表单元 + 合适 quadrature weights} }\]<p>。</p>
+<p>从这个角度看，ECSW 很像一种：</p>
+\[\boxed{\text{data-driven reduced quadrature}}\]<p>。</p>
+<hr>
+<h1 id="12-为什么-ecsw-会比直接重构-nonlinear-vector更适合结构力学">12. 为什么 ECSW 会比“直接重构 nonlinear vector”更适合结构力学？
+</h1><p>因为有限元本身就是按单元积分/装配建立的。</p>
+<p>ECSW 不打破：</p>
+\[\text{element contribution}\]<p>这个基本结构。</p>
+<p>如果原始 reduced internal force 是：</p>
+\[f_r(q) = \nabla_q \Pi_r(q),\]<p>那么使用正权重：</p>
+\[\xi_e\]<p>对单元能量加权后仍然可以构造：</p>
+\[\tilde\Pi_r(q) = \sum_{e\in S} \xi_e\Pi_e(V_eq).\]<p>于是：</p>
+\[\tilde f_r(q) = \nabla_q\tilde\Pi_r(q).\]<p>所以：</p>
+\[\boxed{ \text{hyper-reduced force 仍然来自一个 hyper-reduced energy} }\]<p>。</p>
+<p>这就是所谓：</p>
+\[\boxed{\text{structure preserving}}\]<p>。</p>
+<p>2015 年 ECSW 理论工作证明了其对 Lagrangian structure 和相应数值稳定性质的保持，并报告在完整汽车发动机 nonlinear transient structural simulation 中获得超过四个数量级的 CPU 加速，同时维持较好准确度。</p>
+<hr>
+<h1 id="13-deim-与-ecsw-最值得记住的区别">13. DEIM 与 ECSW 最值得记住的区别
+</h1><p>可以这样理解：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th></th>
+					<th>DEIM</th>
+					<th>ECSW</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>近似对象</td>
+					<td>nonlinear vector \(f(u)\)</td>
+					<td>projected FE element contributions</td>
+			</tr>
+			<tr>
+					<td>采样对象</td>
+					<td>vector entries / DOFs</td>
+					<td>finite elements</td>
+			</tr>
+			<tr>
+					<td>核心结构</td>
+					<td>interpolation</td>
+					<td>sampled quadrature</td>
+			</tr>
+			<tr>
+					<td>主要优势</td>
+					<td>通用、简单、适合一般 nonlinear operator</td>
+					<td>特别适合 FE mechanics</td>
+			</tr>
+			<tr>
+					<td>物理结构</td>
+					<td>不自动保持</td>
+					<td>可保持能量/Lagrangian结构</td>
+			</tr>
+			<tr>
+					<td>在线成本</td>
+					<td>与选中 DOF 数相关</td>
+					<td>与选中单元数相关</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>所以对一般 nonlinear PDE：</p>
+\[\boxed{\text{DEIM 是非常自然的入口}}\]<p>而对 nonlinear FEM / structural dynamics：</p>
+\[\boxed{\text{ECSW 往往具有更强的物理结构优势}}\]<p>。</p>
+<hr>
+<h1 id="14-hyper-reduction-和普通网格粗化不是一回事">14. Hyper-reduction 和普通“网格粗化”不是一回事
+</h1><p>假设原模型：</p>
+\[100000\]<p>个单元。</p>
+<p>直接做 coarse mesh：</p>
+\[1000\]<p>个单元。</p>
+<p>这会改变：</p>
+<ul>
+<li>geometry；</li>
+<li>discretization；</li>
+<li>local constitutive resolution；</li>
+<li>mode shapes。</li>
+</ul>
+<p>Hyper-reduction 则可能仍然使用：</p>
+\[\boxed{\text{原始 fine-mesh basis 和 fine-mesh physics}}\]<p>，只是在每次 online evaluation 中跳过绝大多数单元。</p>
+<p>所以：</p>
+\[\boxed{ \text{coarsening：改变离散模型} }\]<p>而：</p>
+\[\boxed{ \text{hyper-reduction：稀疏评估原模型的投影贡献} }\]<p>。</p>
+<p>这是很重要的区别。</p>
+<hr>
+<h1 id="15-为什么它与代理模型有本质区别">15. 为什么它与代理模型有本质区别？
+</h1><p><span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span> / <span class="term-anchor" data-term="neural-operator" tabindex="0">Neural Operator</span> 通常直接学习：</p>
+\[\mu \rightarrow y\]<p>或者：</p>
+\[\mu \rightarrow u.\]<p>Hyper-reduced ROM 仍然显式保留：</p>
+\[\boxed{ \text{reduced equations of motion} }\]<p>例如：</p>
+\[M_r\ddot q+\tilde f_r(q)=f_r.\]<p>所以：</p>
+<ul>
+<li>conservation law 仍可能存在；</li>
+<li>boundary condition 仍进入方程；</li>
+<li>time integration 仍由物理 solver 执行；</li>
+<li>新外力可以直接作用于模型。</li>
+</ul>
+<p>因此它属于：</p>
+\[\boxed{\text{physics-based surrogate}}\]<p>，而不是纯粹 response fitting。</p>
+<p>这使它在动力学、控制和反问题中非常有价值。</p>
+<hr>
+<h1 id="16-但-hyper-reduction-仍然有一个非常明显的训练域问题">16. 但 Hyper-reduction 仍然有一个非常明显的“训练域”问题
+</h1><p>假设 ECSW 只在：</p>
+\[\text{small deformation}\]<p>数据上训练。</p>
+<p>然后在线进入：</p>
+\[\text{large bending + contact}.\]<p>原来选择的：</p>
+\[\mathcal S\]<p>可能已经无法代表新的 nonlinear force field。</p>
+<p>DEIM 同样如此：</p>
+\[U_f\]<p>来自 training snapshots。</p>
+<p>如果新的 nonlinear state 超出了：</p>
+\[\operatorname{span}(U_f),\]<p>误差就会明显增大。</p>
+<p>所以：</p>
+\[\boxed{ \text{Hyper-reduction 并没有消灭 extrapolation problem。} }\]<p>它只是把问题从：</p>
+\[\text{response surrogate}\]<p>转移到了：</p>
+\[\text{operator surrogate}.\]<p>Localized DEIM 之所以出现，就是因为一个 global nonlinear subspace 可能无法覆盖具有多个不同局部行为区域的系统，因此改用多个 local subspaces。</p>
+<hr>
+<h1 id="17-这和你的软体动力学尤其有一个值得注意的冲突接触高度局部且会移动">17. 这和你的软体动力学尤其有一个值得注意的冲突：接触高度局部且会移动
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设软体落地。</p>
+<p>时间：</p>
+\[t_1\]<p>接触区域是底部左边；</p>
+<p>时间：</p>
+\[t_2\]<p>滚动后变成右边；</p>
+<p>时间：</p>
+\[t_3\]<p>又产生新的 self-contact。</p>
+<p>如果 Hyper-reduction 固定只采：</p>
+\[500\]<p>个单元，</p>
+<p>而真正重要的 contact zone 没在：</p>
+\[\mathcal S\]<p>里，就可能完全漏掉关键局部事件。</p>
+<p>这说明 nonlinear structural ROM 中存在一个很深的张力：</p>
+\[\boxed{ \text{Hyper-reduction 喜欢空间稀疏} }\]<p>但：</p>
+\[\boxed{ \text{contact 喜欢动态移动的局部激活区域。} }\]<p>因此接触问题更可能需要：</p>
+<ul>
+<li>adaptive sampling；</li>
+<li>local ROM；</li>
+<li>state-dependent sampling；</li>
+<li>contact region always-on；</li>
+<li>ROM + full-order local correction。</li>
+</ul>
+<p>这与固定 ECSW mesh 是不同的难度层级。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="18-一个特别值得迁移到物理引擎的思想不要降整个系统降最贵的算子调用次数">18. 一个特别值得迁移到物理引擎的思想：不要降整个系统，降“最贵的算子调用次数”
+</h1><p>Hyper-reduction 给物理引擎开发最大的启发，甚至不一定要真正做 ROM。</p>
+<p>假设一个 solver 每帧最贵的是：</p>
+\[\boxed{\text{100 万个 tet constitutive evaluations}}\]<p>。</p>
+<p>传统优化会问：</p>
+<blockquote>
+<p>怎样让每个 tet 算得更快？</p>
+</blockquote>
+<p>Hyper-reduction 的思考方式会问：</p>
+<blockquote>
+<p><strong>真的每个 tet 每一帧都值得重新算吗？</strong></p>
+</blockquote>
+<p>如果大量区域：</p>
+<ul>
+<li>应变变化很小；</li>
+<li>远离接触；</li>
+<li>对当前低频形变贡献有限；</li>
+</ul>
+<p>也许真正应该优化的是：</p>
+\[\boxed{\text{evaluation sparsity}}\]<p>而不只是：</p>
+\[\text{evaluation FLOPS}.\]<p>这与：</p>
+<ul>
+<li>sleeping；</li>
+<li>island activation；</li>
+<li>adaptive substepping；</li>
+<li>sparse collision detection；</li>
+</ul>
+<p>属于同一种更高级的工程思想：</p>
+\[\boxed{ \text{最便宜的一次计算，是根本没有执行的那次计算。} }\]<hr>
+<h1 id="19-它对代理模型还有一个很强的启发可以代理算子不一定代理最终输出">19. 它对代理模型还有一个很强的启发：可以代理“算子”，不一定代理最终输出
+</h1><p>通常代理模型研究：</p>
+\[x\rightarrow y.\]<p>但 DEIM 实际做的是：</p>
+\[\boxed{ \text{学习 nonlinear operator }f(u)\text{ 的低维表示} }\]<p>。</p>
+<p>ECSW 更进一步：</p>
+\[\boxed{ \text{学习哪些局部 operator contributions 值得计算} }\]<p>。</p>
+<p>所以代理建模其实可以分成三层：</p>
+\[\text{output surrogate}\]\[y\approx\hat y(x)\]<hr>
+\[\text{state surrogate}\]\[u\approx Vq\]<hr>
+\[\boxed{\text{operator surrogate}}\]\[F(u)\approx\tilde F(u).\]<p>第三层通常保留最多物理结构。</p>
+<p>这对未来做：</p>
+<ul>
+<li>learned constitutive operators；</li>
+<li>neural preconditioner；</li>
+<li>learned coarse solver；</li>
+<li>operator compression；</li>
+</ul>
+<p>都非常有迁移价值。</p>
+<hr>
+<h1 id="20-一个特别适合亲手做的最小实验">20. 一个特别适合亲手做的最小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>可以做一个 nonlinear spring chain：</p>
+\[m\ddot x_i + k(x_i-x_{i-1}) + \beta(x_i-x_{i-1})^3 +\cdots =0.\]<p>取：</p>
+\[N=1000.\]<p>首先收集 full-order snapshots：</p>
+\[X=[x(t_1),\ldots,x(t_M)].\]<p>做 POD：</p>
+\[X\approx VQ, \qquad r=10.\]<p>然后比较三种模型。</p>
+<h3 id="a-纯-pod">A. 纯 POD
+</h3><p>每一步仍计算全部：</p>
+\[N\]<p>个 cubic spring forces。</p>
+<h3 id="b-pod--deim">B. POD + DEIM
+</h3><p>另外收集：</p>
+\[F= [f_{\rm nl}(x(t_1)),\ldots].\]<p>对它做 POD：</p>
+\[F\approx U_fC.\]<p>选：</p>
+\[m=20\]<p>个 DEIM points。</p>
+<h3 id="c-full-model">C. Full model
+</h3><p>作为基准。</p>
+<p>记录：</p>
+\[\boxed{\text{state error}}\]<p>和：</p>
+\[\boxed{\text{wall-clock time}}\]<p>。</p>
+<p>最重要的观察很可能是：</p>
+\[\boxed{ \text{POD 已经把 1000 DOF 降到 10， 但真正的明显加速要等 DEIM 加进去才出现。} }\]<p>这个实验能够非常直接地理解为什么 Hyper-reduction 是 nonlinear ROM 不可缺少的第二步。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Hyper-reduction 最重要的公式并不是：</p>
+\[f \approx U(P^TU)^{-1}P^Tf.\]<p>真正值得记住的是：</p>
+\[\boxed{ \text{减少未知量，并不自动减少构造方程的成本。} }\]<p>所以 nonlinear model reduction 真正完整的知识结构是：</p>
+\[\text{Full nonlinear FEM}\]\[\downarrow\]\[\boxed{ u\approx Vq }\]<p><strong>State reduction</strong></p>
+\[\downarrow\]\[\boxed{ F(Vq) \text{只在少数 DOF / elements 上计算} }\]<p><strong>Hyper-reduction</strong></p>
+\[\downarrow\]\[\boxed{\text{Online cost 真正与 }N\text{ 脱钩}}\]<p>。</p>
+<p>而 DEIM 与 ECSW 的区别又揭示了一个更深的原则：</p>
+\[\boxed{ \text{“近似得准”只是第一层要求； 对于物理求解器，还要问近似以后保留了什么结构。} }\]<p>对非线性有限元、软体动力学乃至代理模型而言，这都是非常重要的分界线：</p>
+\[\boxed{ \text{你究竟是在压缩状态， 压缩输出， 还是压缩物理算子的计算本身？} }\]<p>Hyper-reduction 正好卡在第三层。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p><strong>Chaturantabut &amp; Sorensen, <em>Nonlinear Model Reduction via Discrete Empirical Interpolation</em>, SIAM Journal on Scientific Computing, 2010</strong>。DEIM 原始论文。重点看 nonlinear POD 为什么仍然保留 \(N\)-dependent cost，以及 \(U(P^TU)^{-1}P^Tf\) 如何解决这个问题。<br>
+<a class="link" href="https://epubs.siam.org/doi/10.1137/090766498"  target="_blank" rel="noopener"
+    >SIAM 论文页</a></p>
+</li>
+<li>
+<p><strong>Farhat, Avery, Chapman &amp; Cortial, <em>Dimensional reduction of nonlinear finite element dynamic models with finite rotations and energy-based mesh sampling and weighting for computational efficiency</em>, IJNME, 2014</strong>。ECSW 的核心工程论文，非常适合结构/软体方向；基于 mesh sampling 和 virtual work，并报告实际 nonlinear structural dynamics 中最高约四个数量级的 CPU 加速。</p>
+</li>
+<li>
+<p><strong>Farhat, Chapman &amp; Avery, <em>Structure-preserving, stability, and accuracy properties of the Energy-Conserving Sampling and Weighting method</em>, IJNME, 2015</strong>。如果只读一篇深入 ECSW，我更推荐这篇。重点是为什么 energy/Lagrangian structure preservation 会直接影响 nonlinear ROM 的稳定性。</p>
+</li>
+<li>
+<p><strong>Benner, Gugercin &amp; Willcox, <em>A Survey of Projection-Based Model Reduction Methods for Parametric Dynamical Systems</em>, SIAM Review, 2015</strong>。用于建立全局知识框架：POD、Reduced Basis、offline-online decomposition、parametric model reduction 都在一个体系里。</p>
+</li>
+<li>
+<p><strong>pyMOR</strong>。如果想实际实验 DEIM/EIM，这是成熟且仍在维护的开源入口；官方提供 POD、DEIM、empirical interpolation 和外部 PDE solver 接口。<br>
+<a class="link" href="https://pymor.org/"  target="_blank" rel="noopener"
+    >pyMOR 官网</a></p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+            <a href="/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/">软体动力学</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-25<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge" title="次要分型">权衡对比</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/08-certified-reduced-basis/">Certified Reduced Basis：代理模型最缺的，往往不是更高精度，而是“知道自己什么时候不可信”<span class="dep-radar-meta"> · card-08</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-25<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/21-fas/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">FAS：非线性问题的“粗网格”不该只修正误差，而应该直接解一个粗尺度的完整非线性状态</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/17-dual-weighted-residual/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/13-neural-operator/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/12-imex/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/11-hourglass-modes/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Hourglass Modes：有限元里最危险的一类“假柔软”</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
