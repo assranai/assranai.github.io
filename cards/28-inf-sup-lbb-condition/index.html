@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元 主题：Inf-Sup Condition / Ladyzhenskaya–Babuška–Brezzi 条件\n领域：有限元 × 流体 × 软体动力学 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天选 Inf-Sup 条件，因为它解决的是有限元里一个很反直觉的问题：\n\\[\\boxed{ \\ ext{两个变量各自都有合理的有限元空间，并不意味着它们组合起来就是稳定的。} }\\]这在近不可压材料、Stokes 流、压力—位移混合有限元、Lagrange multiplier 约束里极其重要。\n经典混合有限元理论由 Babuška、Brezzi、Fortin 等建立。Brezzi 1974 年关于 saddle-point problems 的工作给出了这类问题存在性、唯一性和离散稳定性的核心条件；后来的 Boffi–Brezzi–Fortin 专著已经把它发展成完整的 mixed FEM 理论框架。\n真正值得记住的不是那个看起来很抽象的：\n\\[\\inf\\sup\\]公式，而是：\n\\[\\boxed{ \\ ext{约束变量必须拥有足够强、但又不过强的“控制能力”。} }\\] 1. 为什么普通位移有限元到了近不可压材料会出问题？ 考虑线弹性：\n\\[\\sigma = 2\\mu\\varepsilon(u) + \\lambda\\operatorname{tr}(\\varepsilon(u))I.\\]其中：\n\\[\\lambda = \\frac{E\\ u} {(1+\\ u)(1-2\\ u)}.\\]当：\n\\[\\ u\\rightarrow0.5,\\]有：\n\\[\\lambda\\rightarrow\\infty.\\]物理上意味着材料趋向：\n\\[\\boxed{ \\ abla\\cdot u=0 }\\]即几乎不能改变体积。\n">
+<title>Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/28-inf-sup-lbb-condition/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元">
+<meta property='og:description' content="Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元 主题：Inf-Sup Condition / Ladyzhenskaya–Babuška–Brezzi 条件\n领域：有限元 × 流体 × 软体动力学 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天选 Inf-Sup 条件，因为它解决的是有限元里一个很反直觉的问题：\n\\[\\boxed{ \\ ext{两个变量各自都有合理的有限元空间，并不意味着它们组合起来就是稳定的。} }\\]这在近不可压材料、Stokes 流、压力—位移混合有限元、Lagrange multiplier 约束里极其重要。\n经典混合有限元理论由 Babuška、Brezzi、Fortin 等建立。Brezzi 1974 年关于 saddle-point problems 的工作给出了这类问题存在性、唯一性和离散稳定性的核心条件；后来的 Boffi–Brezzi–Fortin 专著已经把它发展成完整的 mixed FEM 理论框架。\n真正值得记住的不是那个看起来很抽象的：\n\\[\\inf\\sup\\]公式，而是：\n\\[\\boxed{ \\ ext{约束变量必须拥有足够强、但又不过强的“控制能力”。} }\\] 1. 为什么普通位移有限元到了近不可压材料会出问题？ 考虑线弹性：\n\\[\\sigma = 2\\mu\\varepsilon(u) + \\lambda\\operatorname{tr}(\\varepsilon(u))I.\\]其中：\n\\[\\lambda = \\frac{E\\ u} {(1+\\ u)(1-2\\ u)}.\\]当：\n\\[\\ u\\rightarrow0.5,\\]有：\n\\[\\lambda\\rightarrow\\infty.\\]物理上意味着材料趋向：\n\\[\\boxed{ \\ abla\\cdot u=0 }\\]即几乎不能改变体积。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/28-inf-sup-lbb-condition/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='流体' /><meta property='article:tag' content='软体动力学' /><meta property='article:tag' content='数值方法' /><meta property='article:published_time' content='2026-09-10T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-10T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元">
+<meta name="twitter:description" content="Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元 主题：Inf-Sup Condition / Ladyzhenskaya–Babuška–Brezzi 条件\n领域：有限元 × 流体 × 软体动力学 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天选 Inf-Sup 条件，因为它解决的是有限元里一个很反直觉的问题：\n\\[\\boxed{ \\ ext{两个变量各自都有合理的有限元空间，并不意味着它们组合起来就是稳定的。} }\\]这在近不可压材料、Stokes 流、压力—位移混合有限元、Lagrange multiplier 约束里极其重要。\n经典混合有限元理论由 Babuška、Brezzi、Fortin 等建立。Brezzi 1974 年关于 saddle-point problems 的工作给出了这类问题存在性、唯一性和离散稳定性的核心条件；后来的 Boffi–Brezzi–Fortin 专著已经把它发展成完整的 mixed FEM 理论框架。\n真正值得记住的不是那个看起来很抽象的：\n\\[\\inf\\sup\\]公式，而是：\n\\[\\boxed{ \\ ext{约束变量必须拥有足够强、但又不过强的“控制能力”。} }\\] 1. 为什么普通位移有限元到了近不可压材料会出问题？ 考虑线弹性：\n\\[\\sigma = 2\\mu\\varepsilon(u) + \\lambda\\operatorname{tr}(\\varepsilon(u))I.\\]其中：\n\\[\\lambda = \\frac{E\\ u} {(1+\\ u)(1-2\\ u)}.\\]当：\n\\[\\ u\\rightarrow0.5,\\]有：\n\\[\\lambda\\rightarrow\\infty.\\]物理上意味着材料趋向：\n\\[\\boxed{ \\ abla\\cdot u=0 }\\]即几乎不能改变体积。\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-为什么普通位移有限元到了近不可压材料会出问题">1. 为什么普通位移有限元到了近不可压材料会出问题？</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/28-inf-sup-lbb-condition/">Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-10T00:00:00Z'>Sep 10, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 6 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="inf-sup--lbb-条件为什么位移和压力都插值正确仍可能得到一个完全错误的有限元">Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元
+</h1><p><strong>主题：Inf-Sup Condition / Ladyzhenskaya–Babuška–Brezzi 条件</strong><br>
+<strong>领域：有限元 × 流体 × 软体动力学 × 数值方法</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong><br>
+今天选 <strong>Inf-Sup 条件</strong>，因为它解决的是有限元里一个很反直觉的问题：</p>
+\[\boxed{ \ ext{两个变量各自都有合理的有限元空间，并不意味着它们组合起来就是稳定的。} }\]<p>这在近不可压材料、Stokes 流、压力—位移混合有限元、Lagrange multiplier 约束里极其重要。</p>
+<p>经典混合有限元理论由 Babuška、Brezzi、Fortin 等建立。Brezzi 1974 年关于 saddle-point problems 的工作给出了这类问题存在性、唯一性和离散稳定性的核心条件；后来的 Boffi–Brezzi–Fortin 专著已经把它发展成完整的 mixed FEM 理论框架。</p>
+<p>真正值得记住的不是那个看起来很抽象的：</p>
+\[\inf\sup\]<p>公式，而是：</p>
+\[\boxed{ \ ext{约束变量必须拥有足够强、但又不过强的“控制能力”。} }\]<hr>
+<h2 id="1-为什么普通位移有限元到了近不可压材料会出问题">1. 为什么普通位移有限元到了近不可压材料会出问题？
+</h2><p>考虑线弹性：</p>
+\[\sigma = 2\mu\varepsilon(u) + \lambda\operatorname{tr}(\varepsilon(u))I.\]<p>其中：</p>
+\[\lambda = \frac{E\ u} {(1+\ u)(1-2\ u)}.\]<p>当：</p>
+\[\ u\rightarrow0.5,\]<p>有：</p>
+\[\lambda\rightarrow\infty.\]<p>物理上意味着材料趋向：</p>
+\[\boxed{ \ abla\cdot u=0 }\]<p>即几乎不能改变体积。</p>
+<p>如果继续用纯 displacement FEM，相当于能量里出现一个极强的体积惩罚：</p>
+\[\Pi_{\rm vol} \sim \frac{\lambda}{2} (\ abla\cdot u)^2.\]<p>当 \(\lambda\) 极大时，离散位移空间必须非常精确地满足：</p>
+\[\ abla\cdot u\approx0.\]<p>但低阶位移单元通常没有足够自由度做到。</p>
+<p>结果就是：</p>
+\[\boxed{\ ext{volumetric locking}}\]<p>——结构数值上变得异常僵硬。</p>
+<p>近不可压弹性文献通常因此转向 displacement–pressure mixed formulation，以避免锁死。</p>
+<hr>
+<h1 id="2-混合形式把体积约束变成一个独立变量">2. 混合形式：把“体积约束”变成一个独立变量
+</h1><p>引入压力：</p>
+\[p=-\lambda\ abla\cdot u.\]<p>原问题可以写成：</p>
+\[-2\mu\ abla\cdot\varepsilon(u) -\ abla p=f,\]<p>以及：</p>
+\[\ abla\cdot u+\frac{1}{\lambda}p=0.\]<p>当：</p>
+\[\lambda\rightarrow\infty,\]<p>第二式趋近：</p>
+\[\boxed{ \ abla\cdot u=0. }\]<p>这时候：</p>
+\[u\]<p>和：</p>
+\[p\]<p>成为两个独立未知量。</p>
+<p>有限元离散后：</p>
+\[u_h\in V_h, \qquad p_h\in Q_h.\]<p>得到经典 saddle-point system：</p>
+\[\boxed{ \begin{bmatrix} A&B^T\\ B&-\frac1\lambda M_p \end{bmatrix} \begin{bmatrix} u\\p \end{bmatrix} = \begin{bmatrix} f\\0 \end{bmatrix}. }\]<p>在完全不可压极限：</p>
+\[\lambda=\infty,\]<p>就变成：</p>
+\[\begin{bmatrix} A&B^T\\ B&0 \end{bmatrix}.\]<p>这里开始出现真正的问题。</p>
+<hr>
+<h1 id="3-为什么不能随便选--和-">3. 为什么不能随便选 \(V_h\) 和 \(Q_h\)？
+</h1><p>直觉上你可能会想：</p>
+<blockquote>
+<p>位移用线性单元 \(P_1\)，压力也用线性单元 \(P_1\)，多自然。</p>
+</blockquote>
+<p>也就是：</p>
+\[P_1-P_1.\]<p>但这种 equal-order pairing 对标准 Stokes/不可压混合问题通常<strong>不满足 LBB 条件</strong>，未经稳定化会产生不稳定压力模式。近不可压固体文献也明确指出，equal-order linear pairs 需要额外 stabilization；Taylor–Hood 等则属于经典稳定组合。</p>
+<p>所以：</p>
+\[\boxed{ \ ext{每个空间单独“看起来合理”，并不能保证组合合理。} }\]<p>这是理解 mixed FEM 最关键的一步。</p>
+<hr>
+<h1 id="4-inf-sup-条件到底在测什么">4. Inf-Sup 条件到底在测什么？
+</h1><p>典型条件写成：</p>
+\[\boxed{ \inf_{q_h\in Q_h} \sup_{v_h\in V_h} \frac{b(v_h,q_h)} {\|v_h\|_V\|q_h\|_Q} \ge \beta>0. }\]<p>并要求：</p>
+\[\beta\]<p>在：</p>
+\[h\rightarrow0\]<p>时不趋近零。</p>
+<p>对于不可压问题：</p>
+\[b(v,q) = \int_\Omega q\,\ abla\cdot v\,d\Omega.\]<p>所以公式实际上在问：</p>
+<blockquote>
+<p>对任意一个压力模式 \(q_h\)，能不能找到某个位移模式 \(v_h\)，使其散度对这个压力模式产生足够强的响应？</p>
+</blockquote>
+<p>即：</p>
+\[\boxed{ \ ext{每一个离散压力自由度，都必须能被某种位移体积变化“看见”。} }\]<p>如果存在一个压力模式：</p>
+\[q_h\ eq0\]<p>却对所有：</p>
+\[v_h\]<p>都近似有：</p>
+\[b(v_h,q_h)\approx0,\]<p>那么这个压力模式就是：</p>
+\[\boxed{\ ext{几乎不受控制的 spurious mode}}\]<p>。</p>
+<p>此时：</p>
+\[\beta_h\rightarrow0.\]<p>系统便失去稳定性。</p>
+<hr>
+<h1 id="5-一个非常直观的-checkerboard-pressure">5. 一个非常直观的 checkerboard pressure
+</h1><p>二维网格中可能出现：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">+1  -1  +1  -1
+</span></span><span class="line"><span class="cl">-1  +1  -1  +1
+</span></span><span class="line"><span class="cl">+1  -1  +1  -1
+</span></span><span class="line"><span class="cl">-1  +1  -1  +1
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这种棋盘格压力。</p>
+<p>压力在单元间剧烈变化。</p>
+<p>但某些位移离散下：</p>
+\[B^T p\]<p>可能几乎为零。</p>
+<p>也就是说：</p>
+\[\boxed{ \ ext{压力发生巨大振荡， 动量方程却几乎感觉不到它。} }\]<p>于是：</p>
+\[p\]<p>可以乱跳，而几乎不影响残差。</p>
+<p>这就是典型的：</p>
+\[\boxed{\ ext{spurious pressure mode}}\]<p>。</p>
+<p>它不是 mesh 太粗这么简单。</p>
+<p>即使不断细化：</p>
+\[h\rightarrow0,\]<p>如果离散空间搭配不满足 inf-sup，</p>
+<p>问题仍然可能存在。</p>
+<hr>
+<h1 id="6-所以-inf-sup-条件本质上是一个离散可观测性条件">6. 所以 Inf-Sup 条件本质上是一个“离散可观测性”条件
+</h1><p>可以把：</p>
+\[B:V_h\rightarrow Q_h^*\]<p>理解成：</p>
+\[\boxed{ \ ext{位移/速度变化} \rightarrow \ ext{约束响应} }\]<p>。</p>
+<p>那么 inf-sup 要求：</p>
+\[B\]<p>不能在某些压力方向上失去控制。</p>
+<p>用线性代数语言，\(\beta_h\) 与合适缩放后的：</p>
+\[B\]<p>最小奇异值密切相关。</p>
+<p>如果：</p>
+\[\sigma_{\min}\rightarrow0,\]<p>意味着存在某些：</p>
+\[q_h\]<p>几乎落在：</p>
+\[B^T\]<p>的零空间中。</p>
+<p>于是整个问题可以理解成：</p>
+\[\boxed{ \ ext{constraint Jacobian 是否拥有足够好的数值秩？} }\]<p>这和你做物理引擎时检查约束：</p>
+\[J M^{-1}J^T\]<p>是否奇异，其实是同一种思维。</p>
+<hr>
+<h1 id="7-为什么-taylorhood-很经典">7. 为什么 Taylor–Hood 很经典？
+</h1><p>Taylor–Hood 通常采用：</p>
+\[\boxed{ P_2\ ext{ velocity/displacement} - P_1\ ext{ pressure} }\]<p>。</p>
+<p>即：</p>
+\[u_h\]<p>用二次插值，</p>
+\[p_h\]<p>用一次插值。</p>
+<p>FEniCS 当前教程仍直接把 Taylor–Hood 作为 mixed Stokes 问题的标准示例；其 mixed-element API 也是按这种不同变量使用不同空间的方式构建。</p>
+<p>为什么位移阶次通常更高？</p>
+<p>因为 incompressibility 约束作用的是：</p>
+\[\ abla\cdot u.\]<p>如果：</p>
+\[u\in P_2,\]<p>那么：</p>
+\[\ abla\cdot u\]<p>大致落在：</p>
+\[P_1\]<p>级空间。</p>
+<p>所以：</p>
+\[P_2-P_1\]<p>在函数空间结构上更加匹配。</p>
+<p>可以粗略理解成：</p>
+\[\boxed{ \ ext{压力空间不应该比位移散度能够表达的空间更丰富。} }\]<p>这是很重要的直觉。</p>
+<hr>
+<h1 id="8-为什么压力自由度越多反而可能越糟">8. 为什么“压力自由度越多”反而可能越糟？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这也是 mixed FEM 最反直觉的地方之一。</p>
+<p>普通拟合问题里常觉得：</p>
+\[\boxed{\ ext{自由度越多 → 表达能力越强}}\]<p>。</p>
+<p>但约束问题中：</p>
+<p>如果压力空间：</p>
+\[Q_h\]<p>过于丰富，而位移空间：</p>
+\[V_h\]<p>不足以回应这些压力模式，</p>
+<p>就产生：</p>
+\[\boxed{\ ext{constraint over-resolution}}\]<p>。</p>
+<p>也就是说：</p>
+\[\ ext{pressure asks questions}\]<p>比：</p>
+\[\ ext{displacement can answer}\]<p>还多。</p>
+<p>于是额外 pressure DOFs 不是增加精度，而是在制造：</p>
+\[\boxed{\ ext{不可观测约束模态。}}\]<p>这也是为什么 mixed discretization 的设计不是：</p>
+\[\boxed{\ ext{每个变量各自选最强单元}}\]<p>而是：</p>
+\[\boxed{\ ext{整个变量对必须兼容。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="9-这和-locking-又是什么关系">9. 这和 locking 又是什么关系？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这里有两个看似相反的问题。</p>
+<h3 id="位移空间过于受约束">位移空间过于受约束
+</h3><p>纯 displacement 近不可压 formulation：</p>
+\[\ abla\cdot u\approx0\]<p>被 penalty-like volumetric stiffness 极强地施加。</p>
+<p>结果：</p>
+\[\boxed{\ ext{locking}}\]<p>。</p>
+<h3 id="压力空间过于自由">压力空间过于自由
+</h3><p>mixed formulation 中，如果：</p>
+\[V_h,Q_h\]<p>不匹配：</p>
+\[\boxed{\ ext{spurious pressure}}\]<p>。</p>
+<p>所以 mixed FEM 真正要在两者之间找平衡：</p>
+\[\boxed{ \ ext{约束不能太硬， 也不能太自由。} }\]<p>Inf-sup 条件就是这个平衡的数学表达。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="10-为什么这对-neo-hookean-软体尤其重要">10. 为什么这对 Neo-Hookean 软体尤其重要？
+</h1><p>很多软体使用：</p>
+\[\Psi(F) = \frac{\mu}{2}(I_1-d) - \mu\ln J + \frac{\lambda}{2}(\ln J)^2.\]<p>如果想做接近橡胶的材料：</p>
+\[\ u=0.49\]<p>甚至：</p>
+\[0.499.\]<p>那么：</p>
+\[\lambda\gg\mu.\]<p>此时低阶 displacement-only tet 很容易出现 volumetric locking：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">真实材料：
+</span></span><span class="line"><span class="cl">很容易剪切/弯曲
+</span></span><span class="line"><span class="cl">但几乎保持体积
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">数值模型：
+</span></span><span class="line"><span class="cl">像变成了一块异常坚硬的石头
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>一个自然解决方案就是 mixed displacement-pressure formulation：</p>
+\[(u,p).\]<p>对于大变形、近不可压超弹性，目前工程文献仍广泛使用稳定 mixed pairs 或 stabilized equal-order formulations，以避免 locking。</p>
+<p>因此：</p>
+\[\boxed{ \ ext{如果以后做高质量软体 FEM， LBB 条件几乎绕不过去。} }\]<hr>
+<h1 id="11-为什么很多商业有限元里会出现mixed--hybrid-element">11. 为什么很多商业有限元里会出现“mixed / hybrid element”？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>例如近不可压橡胶、塑性材料里，经常会看到：</p>
+<ul>
+<li>hybrid elements；</li>
+<li>mixed \(u-p\) elements；</li>
+<li>enhanced strain；</li>
+<li>selective/reduced integration；</li>
+<li>pressure stabilization。</li>
+</ul>
+<p>这些方法看起来很杂。</p>
+<p>它们往往都在处理同一个核心问题：</p>
+\[\boxed{ \ ext{体积约束与离散位移自由度不兼容。} }\]<p>Mixed \(u-p\) 方法直接引入压力。</p>
+<p>Reduced/selective integration 通过降低某些体积约束积分的强度来缓解 locking。</p>
+<p>Stabilized methods 则允许使用原本不满足 inf-sup 的空间，例如：</p>
+\[P_1-P_1,\]<p>再加入一个稳定化项抑制 spurious pressure。2019 年关于近/完全不可压固体的工作就系统比较了 stable mixed pairs 与 pressure-projection stabilized equal-order methods。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="12-stabilization-本质上是在修复失败的-inf-sup">12. Stabilization 本质上是在“修复”失败的 Inf-Sup
+</h1><p>假设：</p>
+\[P_1-P_1\]<p>原本不稳定。</p>
+<p>一种方式是改变空间：</p>
+\[\boxed{ P_2-P_1 }\]<p>。</p>
+<p>另一种方式是保留：</p>
+\[P_1-P_1\]<p>但修改变分形式：</p>
+\[a(u,v) + b(v,p) + b(u,q) + \boxed{s(p,q)}.\]<p>其中：</p>
+\[s(p,q)\]<p>专门惩罚那些不受 \(B\) 控制的压力模式。</p>
+<p>于是：</p>
+\[\boxed{ \ ext{稳定化项本质上是在填补离散算子的“盲区”。} }\]<p>这和物理引擎中的 regularization 很相似。</p>
+<p>不过 stabilized FEM 的关键是：</p>
+\[\boxed{ s(p,q)\]<p>需要尽可能保持 consistency。</p>
+<p>不能简单：</p>
+\[p^Tp\ imes10^6\]<p>粗暴惩罚。</p>
+<hr>
+<h1 id="13-mini-element-是另一个很漂亮的解决办法">13. MINI element 是另一个很漂亮的解决办法
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>MINI element 通常是：</p>
+\[\boxed{ (P_1+\ ext{bubble})-P_1. }\]<p>也就是说位移仍主要用线性 shape functions，</p>
+<p>但每个 element 内增加一个：</p>
+\[\boxed{\ ext{bubble mode}}\]<p>。</p>
+<p>这个 bubble：</p>
+<ul>
+<li>在单元内部非零；</li>
+<li>在边界为零；</li>
+<li>不增加跨单元 global continuity 复杂度。</li>
+</ul>
+<p>它的意义就是：</p>
+\[\boxed{ \ ext{给位移空间增加额外局部自由度， 让它有能力回应压力约束。} }\]<p>FEniCS 当前 UFL 教程也把 MINI 和 Taylor–Hood 并列作为经典 mixed-element 示例。</p>
+<p>这个思路特别值得记：</p>
+<blockquote>
+<p>有时系统不稳定，不需要全面提高单元阶次，只要增加那些<strong>正好填补约束盲区</strong>的模式。</p>
+</blockquote>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="14-这其实和-hourglass-mode-是镜像问题">14. 这其实和 Hourglass mode 是“镜像问题”
+</h1><p>之前卡片讲过 reduced integration 的 hourglass mode。</p>
+<p>那里发生的是：</p>
+\[\boxed{ \ ext{某些位移模式没有被能量看见。} }\]<p>于是存在：</p>
+\[u_h\ eq0\]<p>却：</p>
+\[E(u_h)\approx0.\]<p>Inf-sup 失败时则是：</p>
+\[\boxed{ \ ext{某些压力模式没有被位移空间看见。} }\]<p>存在：</p>
+\[p_h\ eq0\]<p>却：</p>
+\[B^Tp_h\approx0.\]<p>两者都是：</p>
+\[\boxed{\ ext{离散算子出现非物理零空间。}}\]<p>区别只是：</p>
+<ul>
+<li><span class="term-anchor" data-term="hourglass" tabindex="0">Hourglass</span>：primal 位移空间中出现盲区；</li>
+<li>LBB failure：dual/constraint 空间中出现盲区。</li>
+</ul>
+<p>这是一个很有价值的统一视角。</p>
+<hr>
+<h1 id="15-它和-schur-complement-也正好接上">15. 它和 Schur complement 也正好接上
+</h1><p>上一张卡片中：</p>
+\[\begin{bmatrix} A&B^T\\ B&0 \end{bmatrix}\]<p>消掉 \(u\) 后得到 pressure Schur complement：</p>
+\[S_p = BA^{-1}B^T.\]<p>现在 inf-sup 条件又告诉你：</p>
+\[\boxed{ S_p \ ext{ 必须在压力空间上足够非退化。} }\]<p>如果存在：</p>
+\[p\ eq0\]<p>满足：</p>
+\[B^Tp\approx0,\]<p>那么：</p>
+\[p^TBA^{-1}B^Tp \approx0.\]<p>于是：</p>
+\[\boxed{ S_p }\]<p>就出现接近零的特征值。</p>
+<p>因此可以把 inf-sup 理解成：</p>
+\[\boxed{ \ ext{pressure Schur complement 必须具有良好的谱下界。} }\]<p>这就把抽象函数分析和实际求解器 conditioning 连起来了。</p>
+<hr>
+<h1 id="16-一个特别重要的区别连续问题稳定不代表离散问题稳定">16. 一个特别重要的区别：连续问题稳定，不代表离散问题稳定
+</h1><p>连续 Stokes/不可压弹性问题本身可能完全 well-posed：</p>
+\[\beta>0.\]<p>但是有限元离散后：</p>
+\[\beta_h\]<p>可能：</p>
+\[\beta_h\rightarrow0.\]<p>这意味着：</p>
+\[\boxed{ \ ext{PDE 本身没有问题， 是你的离散空间创造了一个不存在的病态。} }\]<p>这是 numerical PDE 中非常值得建立的意识。</p>
+<p>很多仿真异常：</p>
+<ul>
+<li>压力振荡；</li>
+<li>locking；</li>
+<li>约束力异常；</li>
+<li>mesh refinement 不收敛；</li>
+</ul>
+<p>不一定来自：</p>
+\[\boxed{\ ext{材料参数、求解器容差或时间步}}\]<p>。</p>
+<p>有时问题已经发生在：</p>
+\[\boxed{\ ext{离散空间设计}}\]<p>这一层。</p>
+<hr>
+<h1 id="17-这对-xpbd--constraint-solver-也有一个非常强的迁移启发">17. 这对 XPBD / constraint solver 也有一个非常强的迁移启发
+</h1><p>假设约束：</p>
+\[C(x)=0.\]<p>线性化：</p>
+\[J\Delta x=-C.\]<p>约束空间求解：</p>
+\[JM^{-1}J^T\lambda=b.\]<p>如果某些约束：</p>
+<ul>
+<li>重复；</li>
+<li>几乎线性相关；</li>
+<li>过密；</li>
+<li>与当前自由度不兼容；</li>
+</ul>
+<p>就会让：</p>
+\[JM^{-1}J^T\]<p>接近奇异。</p>
+<p>这和 mixed FEM 的：</p>
+\[\boxed{\beta_h\rightarrow0}\]<p>本质上非常接近。</p>
+<p>因此 Inf-Sup 给物理引擎一个很深的启发：</p>
+\[\boxed{ \ ext{“约束数量多”不等于“约束质量高”。} }\]<p>真正应该关心的是：</p>
+\[\boxed{ \ ext{constraint space 与 state space 是否兼容。} }\]<p>这比简单地讨论 compliance、iteration count 或 solver tolerance 更底层。</p>
+<hr>
+<h1 id="18-为什么这对-pbd-体积约束也值得警惕">18. 为什么这对 PBD 体积约束也值得警惕？
+</h1><p>假设每个 tet 都有：</p>
+\[C_e(x) = V_e(x)-V_e^0=0.\]<p>如果近不可压材料中给大量 tet 强施加体积约束，</p>
+<p>从离散结构角度，其实就是建立了一个非常丰富的：</p>
+\[\boxed{\ ext{constraint space}}\]<p>。</p>
+<p>但 vertex positions：</p>
+\[x\]<p>能否独立满足所有这些局部体积模式？</p>
+<p>如果约束之间高度相关：</p>
+\[\boxed{ J\]<p>就可能有很差的谱性质。</p>
+<p>于是可能看到：</p>
+<ul>
+<li>λ 很大；</li>
+<li>convergence 慢；</li>
+<li>alternating corrections；</li>
+<li>rigid-like behavior；</li>
+<li>sensitivity to ordering。</li>
+</ul>
+<p>这虽然不是严格意义上 FEM LBB theorem 的直接套用，但思想完全值得迁移：</p>
+\[\boxed{ \ ext{状态离散和约束离散必须一起设计。} }\]<hr>
+<h1 id="19-inf-sup-甚至给增加物理约束这件事一个反直觉警告">19. Inf-Sup 甚至给“增加物理约束”这件事一个反直觉警告
+</h1><p>通常工程上遇到不稳定会想：</p>
+<blockquote>
+<p>再加几个约束。</p>
+</blockquote>
+<p>但 mixed theory 告诉我们：</p>
+\[\boxed{ \ ext{添加 constraint DOFs 可能让系统更差。} }\]<p>因为每增加一个：</p>
+\[q_h\]<p>方向，</p>
+<p>你都要求 primal space：</p>
+\[V_h\]<p>能够对它产生足够独立的 response。</p>
+<p>否则就是给系统增加：</p>
+\[\boxed{\ ext{新的接近零特征值。}}\]<p>因此约束系统真正需要的不是：</p>
+\[\ ext{maximum constraints}\]<p>而是：</p>
+\[\boxed{\ ext{compatible constraints}.}\]<p>这对：</p>
+<ul>
+<li>接触点选取；</li>
+<li>joint constraints；</li>
+<li>incompressibility；</li>
+<li>multiphysics coupling；</li>
+</ul>
+<p>都有迁移意义。</p>
+<hr>
+<h1 id="20-一个最值得自己做的实验">20. 一个最值得自己做的实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>做二维 Stokes：</p>
+\[-\Delta u+\ abla p=f,\]\[\ abla\cdot u=0.\]<p>在同一个网格上比较：</p>
+<h3 id="a">A. \(P_1-P_1\)
+</h3>\[u:P_1,\qquad p:P_1.\]<h3 id="b-taylorhood">B. Taylor–Hood
+</h3>\[u:P_2,\qquad p:P_1.\]<p>分别画：</p>
+\[p_h(x,y).\]<p>很可能 A 出现明显 checkerboard / oscillatory pressure，</p>
+<p>B 则平滑稳定。</p>
+<p>然后继续细化 mesh。</p>
+<p>最关键的观察是：</p>
+\[\boxed{ \ ext{A 的问题不一定因为 mesh 更细而消失。} }\]<p>再进一步计算离散 inf-sup constant。</p>
+<p>一种数值方法是构造广义特征值问题，大致检查：</p>
+\[BA^{-1}B^Tq = \lambda M_q q.\]<p>最小非零特征值满足：</p>
+\[\boxed{ \beta_h^2\sim\lambda_{\min}. }\]<p>观察：</p>
+\[h\downarrow\]<p>时：</p>
+<ul>
+<li>稳定 pair：\(\beta_h\) 保持有界；</li>
+<li>不稳定 pair：\(\beta_h\rightarrow0\)。</li>
+</ul>
+<p>这个实验会把抽象的：</p>
+\[\inf\sup\]<p>直接变成一个你能看到的谱问题。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="21-对近不可压软体一个很实用的设计路线">21. 对近不可压软体，一个很实用的设计路线
+</h1><p>如果未来实现 mixed tet solver，不要从：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">P1 displacement + P1 pressure
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>直接开始，然后靠调 stabilization 参数救火。</p>
+<p>更合理的顺序是：</p>
+<ol>
+<li>
+<p>明确 continuum formulation 是：
+</p>
+\[(u,p)\]<p>
+还是 displacement-only；</p>
+</li>
+<li>
+<p>如果是 mixed formulation，先选一个理论上稳定的 pair，例如 Taylor–Hood 或 MINI；</p>
+</li>
+<li>
+<p>用 manufactured solution / patch test 检查：
+</p>
+\[u,p\]<p>
+的收敛；</p>
+</li>
+<li>
+<p>再测试：
+</p>
+\[\ u=0.49,\ 0.499,\ 0.4999\]</li>
+<li>
+<p>检查 displacement error 是否随着：
+</p>
+\[\lambda\rightarrow\infty\]<p>
+爆炸；</p>
+</li>
+<li>
+<p>最后才考虑 equal-order + stabilization 来换取 GPU/工程便利性。</p>
+</li>
+</ol>
+<p>这样能区分：</p>
+\[\boxed{ \ ext{基础离散问题} }\]<p>和：</p>
+\[\boxed{ \ ext{工程优化问题}. }\]<p>近不可压弹性中的稳定 mixed pair、stabilized equal-order 和 gradient-robust variants 正是在这条脉络上发展的。</p>
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Inf-Sup 条件最值得记住的并不是：</p>
+\[\inf_{q_h} \sup_{v_h} \frac{b(v_h,q_h)} {\|v_h\|\|q_h\|} \ge\beta.\]<p>真正应该留下的是：</p>
+\[\boxed{ \ ext{一个约束变量只有在 primal variable 能“感觉到它”时，才是合法的离散自由度。} }\]<p>它在知识体系中的位置可以这样看：</p>
+\[\ ext{ordinary Galerkin FEM}\]\[\downarrow\]\[\ ext{mixed / saddle-point formulation}\]\[\downarrow\]\[\boxed{\ ext{Inf-Sup compatibility}}\]\[\downarrow\]\[\ ext{stable pressure / multiplier / constraint discretization}.\]<p>它对物理求解器最大的启发则更普遍：</p>
+\[\boxed{ \ ext{数值稳定性不只由“方程写得对不对”决定， 还取决于不同变量空间之间是否拥有正确的相对自由度。} }\]<p>因此下次看到：</p>
+<ul>
+<li>近不可压软体异常僵硬；</li>
+<li>pressure checkerboard；</li>
+<li>multiplier oscillation；</li>
+<li>constraint matrix 几乎奇异；</li>
+<li>增加约束反而更难收敛；</li>
+</ul>
+<p>可以把诊断层级向上提一层：</p>
+\[\boxed{ \ ext{先检查空间兼容性， 再去调 solver 参数。} }\]<p>这就是 LBB 条件真正值得学的原因。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p><strong>Franco Brezzi, <em>On the Existence, Uniqueness and Approximation of Saddle-Point Problems Arising from Lagrangian Multipliers</em>, 1974</strong>。Inf-Sup/Brezzi 理论的奠基工作之一。适合在理解直觉之后回头看严格 formulation。<br>
+<a class="link" href="https://www.numdam.org/item/PSMIR_1974___S4_A1_0/"  target="_blank" rel="noopener"
+    >NUMDAM 原文页面</a></p>
+</li>
+<li>
+<p><strong>Boffi, Brezzi &amp; Fortin, <em>Mixed Finite Element Methods and Applications</em>, Springer, 2013</strong>。如果想系统掌握 mixed FEM，这是最标准的教材之一，覆盖 saddle-point theory、inf-sup、stabilization、不可压流动、弹性以及 \(H(\mathrm{div})/H(\mathrm{curl})\) 元。</p>
+</li>
+<li>
+<p><strong>Karabelas et al., <em>Versatile stabilized finite element formulations for nearly and fully incompressible solid mechanics</em>, Computational Mechanics, 2020</strong>。如果重点是软体/近不可压固体，这篇非常直接：比较稳定 mixed element pair 与 stabilized \(P_1-P_1\)，并明确讨论 locking 与 LBB 条件。<br>
+<a class="link" href="https://link.springer.com/article/10.1007/s00466-019-01760-w"  target="_blank" rel="noopener"
+    >Springer 开放论文</a></p>
+</li>
+<li>
+<p><strong>Basava &amp; Wollner, <em>Gradient Robust Mixed Methods for Nearly Incompressible Elasticity</em>, Journal of Scientific Computing, 2023</strong>。适合进一步看一个更现代的问题：即使 element pair 满足 inf-sup，压力仍可能污染 displacement error；gradient robustness 进一步提高近不可压极限下的质量。</p>
+</li>
+<li>
+<p><strong>FEniCSx Mixed Finite Element Tutorial</strong>。适合直接实现 Taylor–Hood / MINI。当前教程明确展示了 mixed spaces、Taylor–Hood 和 MINI 的构建方式。<br>
+<a class="link" href="https://jsdokken.com/FEniCS-workshop/src/deep_dive/mixed_problems.html"  target="_blank" rel="noopener"
+    >FEniCS mixed problem 教程</a></p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E6%B5%81%E4%BD%93/">流体</a>
+        
+            <a href="/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/">软体动力学</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-28<span class="card-badge card-badge--role" title="认知分型">概念基石</span><span class="card-badge" title="次要分型">权衡对比</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/11-hourglass-modes/">Hourglass Modes：有限元里最危险的一类“假柔软”<span class="dep-radar-meta"> · card-11</span></a><a class="dep-radar-node" href="/cards/27-schur-complement-static-condensation/">Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉<span class="dep-radar-meta"> · card-27</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-28<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/27-schur-complement-static-condensation/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/25-hyper-reduction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/21-fas/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">FAS：非线性问题的“粗网格”不该只修正误差，而应该直接解一个粗尺度的完整非线性状态</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/12-imex/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/11-hourglass-modes/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Hourglass Modes：有限元里最危险的一类“假柔软”</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

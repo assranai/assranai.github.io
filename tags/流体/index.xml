@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Wed, 19 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%B5%81%E4%BD%93/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 10 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%B5%81%E4%BD%93/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”</title>
         <link>https://assranai.github.io/cards/06-apic/</link>
         <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
@@ -369,6 +369,1105 @@
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;如果继续追最近的 MPM 数值结构，可以看 &lt;strong&gt;CK-MPM: A Compact-Kernel Material Point Method&lt;/strong&gt;：它把问题进一步推进到 interpolation kernel、cell-crossing stability、numerical diffusion 与 GPU 成本之间的权衡。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉</title>
+        <link>https://assranai.github.io/cards/27-schur-complement-static-condensation/</link>
+        <pubDate>Wed, 09 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/27-schur-complement-static-condensation/</guid>
+        <description>&lt;h1 id=&#34;schur-补与静态凝聚真正高效的大型求解器经常不是更快地解全部未知量而是先把不重要的自由度消掉&#34;&gt;Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 数值方法 × 数值优化 × 流体&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
+今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：&lt;/p&gt;
+\[\boxed{ \ ext{一个大系统里的不同未知量，并不一定值得被同等对待。} }\]&lt;p&gt;很多有限元、多物理场和约束问题最终都会得到块矩阵：&lt;/p&gt;
+\[\begin{bmatrix} A &amp; B\\ C &amp; D \end{bmatrix} \begin{bmatrix} x\\ y \end{bmatrix} = \begin{bmatrix} f\\ g \end{bmatrix}.\]&lt;p&gt;Schur 补做的事情很直接：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;如果 \(x\) 相对容易求，那么先把 \(x\) 消掉，只留下一个关于 \(y\) 的有效系统。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;得到：&lt;/p&gt;
+\[\boxed{ S=D-CA^{-1}B }\]&lt;p&gt;这就是 Schur complement。&lt;/p&gt;
+&lt;p&gt;看起来只是一条线性代数公式，但它实际上同时出现在：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;高阶有限元的 static condensation；&lt;/li&gt;
+&lt;li&gt;FETI/BDDC 等 domain decomposition；&lt;/li&gt;
+&lt;li&gt;Stokes/Navier–Stokes pressure solve；&lt;/li&gt;
+&lt;li&gt;incompressibility；&lt;/li&gt;
+&lt;li&gt;contact multiplier systems；&lt;/li&gt;
+&lt;li&gt;多物理场 block preconditioning；&lt;/li&gt;
+&lt;li&gt;hybridized FEM；&lt;/li&gt;
+&lt;li&gt;图优化和高斯消元。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;PETSc 当前的 &lt;code&gt;PCFIELDSPLIT&lt;/code&gt; 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。&lt;/p&gt;
+&lt;p&gt;真正值得学的不是公式本身，而是：&lt;/p&gt;
+\[\boxed{ \ ext{消元以后，剩下的变量究竟代表了什么“有效物理”。} }\]&lt;hr&gt;
+&lt;h2 id=&#34;1-schur-补其实就是一次精确消元&#34;&gt;1. Schur 补其实就是一次精确消元
+&lt;/h2&gt;&lt;p&gt;从：&lt;/p&gt;
+\[Ax+By=f\]\[Cx+Dy=g\]&lt;p&gt;开始。&lt;/p&gt;
+&lt;p&gt;假设 \(A\) 可逆。&lt;/p&gt;
+&lt;p&gt;第一式：&lt;/p&gt;
+\[x=A^{-1}(f-By).\]&lt;p&gt;代入第二式：&lt;/p&gt;
+\[CA^{-1}(f-By)+Dy=g.\]&lt;p&gt;整理：&lt;/p&gt;
+\[\boxed{ (D-CA^{-1}B)y = g-CA^{-1}f. }\]&lt;p&gt;所以：&lt;/p&gt;
+\[S=D-CA^{-1}B.\]&lt;p&gt;先解：&lt;/p&gt;
+\[Sy=\ ilde g,\]&lt;p&gt;然后回代：&lt;/p&gt;
+\[x=A^{-1}(f-By).\]&lt;p&gt;这并不是近似。&lt;/p&gt;
+&lt;p&gt;如果 \(A^{-1}\) 精确计算，Schur 系统与原系统：&lt;/p&gt;
+\[\boxed{\ ext{数学上完全等价。}}\]&lt;p&gt;因此 Schur 补的本质不是“降阶模型”。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\ ext{通过变量消元重新组织同一个问题。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;2-为什么消掉变量以后系统反而可能更难&#34;&gt;2. 为什么消掉变量以后，系统反而可能更难？
+&lt;/h1&gt;&lt;p&gt;这里有个很重要的反直觉点。&lt;/p&gt;
+&lt;p&gt;原矩阵可能很稀疏：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;A B
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;C D
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;但：&lt;/p&gt;
+\[CA^{-1}B\]&lt;p&gt;通常是稠密的。&lt;/p&gt;
+&lt;p&gt;因为：&lt;/p&gt;
+\[A^{-1}\]&lt;p&gt;一般不是稀疏矩阵。&lt;/p&gt;
+&lt;p&gt;所以 Schur complement：&lt;/p&gt;
+\[S\]&lt;p&gt;经常比原来的 \(D\) 更“全局”。&lt;/p&gt;
+&lt;p&gt;这不是坏事，而是它的物理含义：&lt;/p&gt;
+\[\boxed{ \ ext{被消掉的局部自由度，通过 }A^{-1}\ ext{ 把远处变量耦合起来了。} }\]&lt;p&gt;也就是说，Schur complement 其实是一种：&lt;/p&gt;
+\[\boxed{\ ext{effective interaction operator}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;被消掉的变量虽然不再显式出现，但它们的影响全部被编码进：&lt;/p&gt;
+\[S.\]&lt;hr&gt;
+&lt;h1 id=&#34;3-一个非常直观的弹簧例子&#34;&gt;3. 一个非常直观的弹簧例子
+&lt;/h1&gt;&lt;p&gt;考虑三个节点：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;boundary —— interior —— boundary
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;   x1          xi           x2
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;中间节点没有外部兴趣，只承担弹簧传力。&lt;/p&gt;
+&lt;p&gt;完整系统写成：&lt;/p&gt;
+\[\begin{bmatrix} K_{ii} &amp; K_{ib}\\ K_{bi} &amp; K_{bb} \end{bmatrix} \begin{bmatrix} u_i\\ u_b \end{bmatrix} = \begin{bmatrix} f_i\\ f_b \end{bmatrix}.\]&lt;p&gt;消掉内部位移：&lt;/p&gt;
+\[u_i = K_{ii}^{-1} (f_i-K_{ib}u_b).\]&lt;p&gt;边界系统变成：&lt;/p&gt;
+\[\boxed{ S_bu_b = f_b-K_{bi}K_{ii}^{-1}f_i }\]&lt;p&gt;其中：&lt;/p&gt;
+\[S_b = K_{bb} - K_{bi}K_{ii}^{-1}K_{ib}.\]&lt;p&gt;从外面看，这个含内部自由度的弹簧结构被替换成了：&lt;/p&gt;
+\[\boxed{\ ext{边界节点之间的等效刚度}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;内部节点消失了，&lt;/p&gt;
+&lt;p&gt;但它们对端点关系的所有影响仍然存在。&lt;/p&gt;
+&lt;p&gt;这就是 Schur complement 最好的物理直觉：&lt;/p&gt;
+\[\boxed{ \ ext{把内部物理“压缩”成边界上的等效响应。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;4-static-condensation-就是有限元里的-schur-补&#34;&gt;4. Static Condensation 就是有限元里的 Schur 补
+&lt;/h1&gt;&lt;p&gt;这在高阶有限元中特别重要。&lt;/p&gt;
+&lt;p&gt;一个高阶单元内部可能有很多 DOF：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;┌──────────────┐
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;│ · · · · · ·  │
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;│ · interior · │
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;│ · · · · · ·  │
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;└──────────────┘
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;boundary DOFs
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;其中一部分自由度只属于当前 element：&lt;/p&gt;
+\[u_I.\]&lt;p&gt;另一部分位于：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;edge；&lt;/li&gt;
+&lt;li&gt;face；&lt;/li&gt;
+&lt;li&gt;vertex；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;需要和邻居共享：&lt;/p&gt;
+\[u_\Gamma.\]&lt;p&gt;于是单元矩阵可以写：&lt;/p&gt;
+\[\begin{bmatrix} K_{II} &amp; K_{I\Gamma}\\ K_{\Gamma I} &amp; K_{\Gamma\Gamma} \end{bmatrix}.\]&lt;p&gt;关键来了：&lt;/p&gt;
+\[K_{II}\]&lt;p&gt;只对应&lt;strong&gt;单元内部 DOF&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;所以不同单元的内部块互相不直接耦合。&lt;/p&gt;
+&lt;p&gt;这意味着：&lt;/p&gt;
+\[\boxed{ K_{II}^{-1} }\]&lt;p&gt;可以完全在每个 element 内局部计算。&lt;/p&gt;
+&lt;p&gt;然后只组装：&lt;/p&gt;
+\[\boxed{ S_\Gamma = K_{\Gamma\Gamma} - K_{\Gamma I}K_{II}^{-1}K_{I\Gamma}. }\]&lt;p&gt;MFEM 官方 &lt;code&gt;StaticCondensation&lt;/code&gt; 正是这么定义的：先消去 element-interior DOFs，只构造并求解 interface DOFs 的 Schur system，之后再局部恢复内部未知量。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么高阶-fem-尤其喜欢-static-condensation&#34;&gt;5. 为什么高阶 FEM 尤其喜欢 static condensation？
+&lt;/h1&gt;&lt;p&gt;假设三维 \(p\)-order element。&lt;/p&gt;
+&lt;p&gt;单元内部 DOF 数大致会快速随：&lt;/p&gt;
+\[p\]&lt;p&gt;增长。&lt;/p&gt;
+&lt;p&gt;但真正跨 element 通信的只是在：&lt;/p&gt;
+\[\boxed{\ ext{faces / edges}}\]&lt;p&gt;上的自由度。&lt;/p&gt;
+&lt;p&gt;如果把所有 interior DOFs 都直接放进 global solve：&lt;/p&gt;
+\[N_{\rm global}\]&lt;p&gt;会非常大。&lt;/p&gt;
+&lt;p&gt;Static condensation 让：&lt;/p&gt;
+\[\boxed{ \ ext{大量局部未知量永远不进入全局 Krylov system。} }\]&lt;p&gt;于是问题变成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;local work:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    element interior solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;global work:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    interface solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;local work:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    recover interior
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这和 HPC 中一个非常普遍的原则完全一致：&lt;/p&gt;
+\[\boxed{ \ ext{尽量把计算留在本地，把真正需要全局通信的部分压到最小。} }\]&lt;p&gt;所以 static condensation 不只是减少 DOF。&lt;/p&gt;
+&lt;p&gt;它减少的是：&lt;/p&gt;
+\[\boxed{\ ext{global coupling dimension}.}\]&lt;p&gt;这在并行求解里往往比单纯减少 FLOPs 更重要。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-内部变量与接口变量的分离其实就是-domain-decomposition-的核心&#34;&gt;6. “内部变量”与“接口变量”的分离，其实就是 domain decomposition 的核心
+&lt;/h1&gt;&lt;p&gt;假设把一个大有限元区域切成：&lt;/p&gt;
+\[\Omega_1,\Omega_2,\ldots,\Omega_m.\]&lt;p&gt;每个子域有：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;interior DOFs；&lt;/li&gt;
+&lt;li&gt;interface DOFs。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;对子域内部自由度全部消元后，&lt;/p&gt;
+&lt;p&gt;整个 PDE 问题变成：&lt;/p&gt;
+\[\boxed{ S_\Gamma u_\Gamma=f_\Gamma }\]&lt;p&gt;只存在于子域边界上。&lt;/p&gt;
+&lt;p&gt;这就是经典 &lt;strong&gt;substructuring&lt;/strong&gt; 思路。&lt;/p&gt;
+&lt;p&gt;Toselli 与 Widlund 的 domain decomposition 专著把这类 Schur complement/substructuring formulation 作为 FETI、BDD/BDDC 等非重叠域分解方法的重要基础：每个子域内部可以局部求解，全局问题主要转化为接口自由度协调。&lt;/p&gt;
+&lt;p&gt;所以可以把两种方法看成同一个思想在不同尺度的应用：&lt;/p&gt;
+\[\boxed{ \ ext{element-level elimination} \rightarrow \ ext{static condensation} }\]\[\boxed{ \ ext{subdomain-level elimination} \rightarrow \ ext{substructuring / domain decomposition} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-这解释了一个很深的求解器原则全局问题本质上是接口协调问题&#34;&gt;7. 这解释了一个很深的求解器原则：全局问题本质上是“接口协调问题”
+&lt;/h1&gt;&lt;p&gt;很多 PDE 在每一个局部区域内部其实都很好解。&lt;/p&gt;
+&lt;p&gt;真正困难的是：&lt;/p&gt;
+\[\boxed{\ ext{不同区域怎么彼此一致。}}\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;位移连续；&lt;/li&gt;
+&lt;li&gt;traction 平衡；&lt;/li&gt;
+&lt;li&gt;压力/速度协调；&lt;/li&gt;
+&lt;li&gt;接触界面；&lt;/li&gt;
+&lt;li&gt;多物理变量耦合。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Schur complement 把内部变量全部消去以后，&lt;/p&gt;
+&lt;p&gt;剩下的往往恰恰就是：&lt;/p&gt;
+\[\boxed{\ ext{这些全局协调变量。}}\]&lt;p&gt;所以一个很有价值的观察是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;大规模 PDE 求解器的真正核心，有时不是解每个局部 PDE，而是高效解决接口上的协调问题。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这正是 domain decomposition 为什么如此适合大规模并行计算。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-schur-补在不可压流体里又变成了什么&#34;&gt;8. Schur 补在不可压流体里又变成了什么？
+&lt;/h1&gt;&lt;p&gt;考虑 Stokes：&lt;/p&gt;
+\[-\mu\ abla^2u+\ abla p=f\]\[\ abla\cdot u=0.\]&lt;p&gt;离散后常得到 saddle-point system：&lt;/p&gt;
+\[\begin{bmatrix} A &amp; B^T\\ B &amp; 0 \end{bmatrix} \begin{bmatrix} u\\ p \end{bmatrix} = \begin{bmatrix} f\\ 0 \end{bmatrix}.\]&lt;p&gt;消掉速度：&lt;/p&gt;
+\[u = A^{-1}(f-B^Tp).\]&lt;p&gt;代入 incompressibility：&lt;/p&gt;
+\[BA^{-1}(f-B^Tp)=0.\]&lt;p&gt;于是压力满足：&lt;/p&gt;
+\[\boxed{ -BA^{-1}B^Tp = -BA^{-1}f. }\]&lt;p&gt;所以 pressure Schur complement：&lt;/p&gt;
+\[\boxed{ S_p=-BA^{-1}B^T. }\]&lt;p&gt;它代表：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;一个压力场通过动量方程激发速度，再通过散度方程反馈出的有效作用。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这就是为什么 incompressible solver 中：&lt;/p&gt;
+\[\boxed{\ ext{pressure solve}}\]&lt;p&gt;如此核心。&lt;/p&gt;
+&lt;p&gt;PETSc 当前专门为 saddle-point/field-split 系统提供 Schur-complement preconditioning；例如其 LSC preconditioner 就针对这类 Schur 系统，并指出在 incompressible flow 中相关 \(A_{10}A_{01}\) 结构对应 Laplacian 型算子。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-所以-projection-method-和-schur-complement-其实很近&#34;&gt;9. 所以 projection method 和 Schur complement 其实很近
+&lt;/h1&gt;&lt;p&gt;在流体里常见：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;先算 provisional velocity；&lt;/li&gt;
+&lt;li&gt;解 pressure Poisson；&lt;/li&gt;
+&lt;li&gt;pressure correction；&lt;/li&gt;
+&lt;li&gt;得到 divergence-free velocity。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;从线性代数角度看，&lt;/p&gt;
+&lt;p&gt;pressure projection 很大程度上就是在近似处理：&lt;/p&gt;
+\[\boxed{ BA^{-1}B^T }\]&lt;p&gt;这一 pressure Schur complement。&lt;/p&gt;
+&lt;p&gt;所以很多“物理算法”和“块矩阵求解器”其实只是：&lt;/p&gt;
+\[\boxed{\ ext{同一结构的不同表达。}}\]&lt;p&gt;这个联系非常值得记住。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-接触和约束问题里也会出现同样结构&#34;&gt;10. 接触和约束问题里也会出现同样结构
+&lt;/h1&gt;&lt;p&gt;考虑约束动力学：&lt;/p&gt;
+\[M\Delta v = f+J^T\lambda\]&lt;p&gt;以及速度约束：&lt;/p&gt;
+\[J(v+\Delta v)=b.\]&lt;p&gt;消掉：&lt;/p&gt;
+\[\Delta v = M^{-1}(f+J^T\lambda).\]&lt;p&gt;代入：&lt;/p&gt;
+\[JM^{-1}(f+J^T\lambda)=b.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ JM^{-1}J^T\lambda = b-JM^{-1}f. }\]&lt;p&gt;这里：&lt;/p&gt;
+\[\boxed{ W=JM^{-1}J^T }\]&lt;p&gt;就是约束空间里的 Schur complement。&lt;/p&gt;
+&lt;p&gt;在刚体物理里它经常叫：&lt;/p&gt;
+\[\boxed{\ ext{Delassus operator}}\]&lt;p&gt;或有效质量矩阵。&lt;/p&gt;
+&lt;p&gt;这条公式非常重要：&lt;/p&gt;
+\[W = JM^{-1}J^T.\]&lt;p&gt;它回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;给约束施加一个单位 impulse，约束速度会改变多少？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;于是可以直接看出：&lt;/p&gt;
+\[\boxed{ \ ext{LCP / contact solver 实际是在 constraint space 中求 Schur system。} }\]&lt;p&gt;这和有限元 static condensation 竟然是同一个数学母结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-一个销轴孔接触的直观理解&#34;&gt;11. 一个销轴—孔接触的直观理解
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设整个柔性机构有：&lt;/p&gt;
+\[10^6\]&lt;p&gt;个 displacement DOFs。&lt;/p&gt;
+&lt;p&gt;但当前真正 active contacts 只有：&lt;/p&gt;
+\[100.\]&lt;p&gt;理论上你可能希望：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;消掉结构内部位移响应；&lt;/li&gt;
+&lt;li&gt;只在 100 个 contact constraints 上求 contact forces；&lt;/li&gt;
+&lt;li&gt;再恢复结构 displacement。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;得到：&lt;/p&gt;
+\[S_c\lambda=b.\]&lt;p&gt;其中：&lt;/p&gt;
+\[S_c\]&lt;p&gt;编码：&lt;/p&gt;
+\[\boxed{ \ ext{一个接触点施力以后，所有其他接触点会发生多大位移响应。} }\]&lt;p&gt;这其实就是：&lt;/p&gt;
+\[\boxed{\ ext{interface compliance matrix}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以 Schur complement 有一个特别清晰的物理解释：&lt;/p&gt;
+\[\boxed{ \ ext{它把整个内部结构压缩成边界/接触点之间的等效柔度或刚度关系。} }\]&lt;p&gt;这也是 boundary element、substructuring、component mode synthesis 等方法背后共有的思维之一。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-但为什么实际中通常不显式形成-&#34;&gt;12. 但为什么实际中通常不显式形成 \(S\)？
+&lt;/h1&gt;&lt;p&gt;因为：&lt;/p&gt;
+\[S=D-CA^{-1}B.\]&lt;p&gt;如果真的计算：&lt;/p&gt;
+\[A^{-1}\]&lt;p&gt;通常非常贵。&lt;/p&gt;
+&lt;p&gt;更糟的是：&lt;/p&gt;
+\[S\]&lt;p&gt;可能非常稠密。&lt;/p&gt;
+&lt;p&gt;所以大型系统里通常不会：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute inv(A)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;form S explicitly
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;而是实现：&lt;/p&gt;
+\[y\mapsto Sy.\]&lt;p&gt;也就是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;given y:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    t = B y
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    solve A z = t
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    result = D y - C z
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \ ext{应用一次 Schur operator} }\]&lt;p&gt;内部实际上包含一次：&lt;/p&gt;
+\[A^{-1}\]&lt;p&gt;子问题求解。&lt;/p&gt;
+&lt;p&gt;这就是所谓：&lt;/p&gt;
+\[\boxed{\ ext{matrix-free Schur complement}}\]&lt;p&gt;思想。&lt;/p&gt;
+&lt;p&gt;PETSc 的 Schur machinery 也支持符号 Schur operator，而不是要求始终显式组装完整 Schur matrix。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-于是新的问题出现schur-complement-本身怎么预条件&#34;&gt;13. 于是新的问题出现：Schur complement 本身怎么预条件？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这是真正的工程核心。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[S\]&lt;p&gt;很难解，&lt;/p&gt;
+&lt;p&gt;只是把原问题改写成 Schur system 并没有魔法般解决它。&lt;/p&gt;
+&lt;p&gt;所以实际方法通常寻找：&lt;/p&gt;
+\[\boxed{ \hat S\approx S }\]&lt;p&gt;且：&lt;/p&gt;
+\[\hat S^{-1}\]&lt;p&gt;便宜。&lt;/p&gt;
+&lt;p&gt;例如 PETSc 允许：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;使用 \(A_{11}\)；&lt;/li&gt;
+&lt;li&gt;使用用户提供的 approximation；&lt;/li&gt;
+&lt;li&gt;使用 symbolic Schur；&lt;/li&gt;
+&lt;li&gt;用
+
+\[A_{11}-A_{10}\operatorname{diag}(A_{00})^{-1}A_{01}\]
+这样的显式近似；&lt;/li&gt;
+&lt;li&gt;对 saddle-point 系统使用 LSC 等专门预条件器。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这揭示了一个很重要的现实：&lt;/p&gt;
+\[\boxed{ \ ext{Schur complement 的威力，通常来自“好的近似”，而不是显式精确构造。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-为什么这又和前面讲过的-multigrid-不重复&#34;&gt;14. 为什么这又和前面讲过的 Multigrid 不重复？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;multigrid&#34; tabindex=&#34;0&#34;&gt;Multigrid&lt;/span&gt; 解决的是：&lt;/p&gt;
+\[\boxed{\ ext{不同空间尺度的误差}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Schur complement 解决的是：&lt;/p&gt;
+\[\boxed{\ ext{不同变量/拓扑角色的耦合}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以它们经常组合，而不是互相替代。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;outer block solver
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Schur complement
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;A-block solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Multigrid
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;或者：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;interface Schur solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;BDDC / AMG
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \ ext{Schur：变量消元 / interface reduction} }\]\[\boxed{ \ ext{Multigrid：scale reduction} }\]&lt;p&gt;这是两个完全不同的求解器轴。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-它和-hyper-reduction-也有一个很重要的区别&#34;&gt;15. 它和 Hyper-reduction 也有一个很重要的区别
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;上一期 Hyper-reduction：&lt;/p&gt;
+\[u\approx Vq\]&lt;p&gt;会产生：&lt;/p&gt;
+\[\boxed{\ ext{近似模型}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Schur elimination：&lt;/p&gt;
+\[S=D-CA^{-1}B\]&lt;p&gt;如果精确执行，则：&lt;/p&gt;
+\[\boxed{\ ext{不损失任何信息。}}\]&lt;p&gt;所以：&lt;/p&gt;
+&lt;h3 id=&#34;model-reduction&#34;&gt;Model reduction
+&lt;/h3&gt;&lt;p&gt;减少：&lt;/p&gt;
+\[\boxed{\ ext{物理状态空间}}\]&lt;p&gt;可能引入 approximation error。&lt;/p&gt;
+&lt;h3 id=&#34;schur-reduction&#34;&gt;Schur reduction
+&lt;/h3&gt;&lt;p&gt;减少：&lt;/p&gt;
+\[\boxed{\ ext{显式未知量}}\]&lt;p&gt;但被消掉的信息以 effective operator 形式保留。&lt;/p&gt;
+&lt;p&gt;这是“降维”这个词下两种完全不同的数学操作。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-对软体物理引擎最值得迁移的不是公式而是local-solve--interface-solve架构&#34;&gt;16. 对软体物理引擎，最值得迁移的不是公式，而是“local solve + interface solve”架构
+&lt;/h1&gt;&lt;p&gt;假设一个软体由多个区域组成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[soft body A] — interface — [soft body B]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每块内部可能有：&lt;/p&gt;
+\[10^5\]&lt;p&gt;个 DOF。&lt;/p&gt;
+&lt;p&gt;但接口只有：&lt;/p&gt;
+\[10^3.\]&lt;p&gt;一种思路是全局一起跑：&lt;/p&gt;
+\[201000\]&lt;p&gt;自由度的大迭代。&lt;/p&gt;
+&lt;p&gt;另一种是：&lt;/p&gt;
+\[\boxed{ \ ext{每个 body 内部局部求解} + \ ext{只在 interface 上协调} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这特别适合：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;destructible objects；&lt;/li&gt;
+&lt;li&gt;component-based deformables；&lt;/li&gt;
+&lt;li&gt;soft-rigid coupling；&lt;/li&gt;
+&lt;li&gt;distributed simulation；&lt;/li&gt;
+&lt;li&gt;multi-GPU physics。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;从系统角度：&lt;/p&gt;
+\[\boxed{ \ ext{Schur complement 把“局部计算”和“全局通信”分开。} }\]&lt;p&gt;这和 GPU/分布式求解器的硬件结构非常契合。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-对组件级数字样机它还有一个很现实的价值&#34;&gt;17. 对组件级数字样机，它还有一个很现实的价值
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设一台机构有：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;杆件；&lt;/li&gt;
+&lt;li&gt;支座；&lt;/li&gt;
+&lt;li&gt;耳片；&lt;/li&gt;
+&lt;li&gt;销轴区域；&lt;/li&gt;
+&lt;li&gt;柔性壳体。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;你可能不需要在整个系统装配以后仍保留每个组件的所有内部自由度。&lt;/p&gt;
+&lt;p&gt;可以先为组件构造：&lt;/p&gt;
+\[\boxed{\ ext{boundary/interface operator}}\]&lt;p&gt;然后系统级只耦合：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;接口位移；&lt;/li&gt;
+&lt;li&gt;接口力；&lt;/li&gt;
+&lt;li&gt;连接 DOFs。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这正是 substructuring 与 component reduction 思想的自然基础。&lt;/p&gt;
+&lt;p&gt;如果以后要做：&lt;/p&gt;
+\[\boxed{\ ext{模块化高保真数字样机}}\]&lt;p&gt;Schur complement 几乎是绕不开的数学语言。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;18-对代理模型也有一个非常值得迁移的启发&#34;&gt;18. 对代理模型也有一个非常值得迁移的启发
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;通常我们想直接代理：&lt;/p&gt;
+\[x\rightarrow y.\]&lt;p&gt;但如果复杂系统天然由：&lt;/p&gt;
+\[\ ext{internal state} + \ ext{interface state}\]&lt;p&gt;组成，&lt;/p&gt;
+&lt;p&gt;可能更好的学习目标是：&lt;/p&gt;
+\[\boxed{ \ ext{interface input} \rightarrow \ ext{interface response} }\]&lt;p&gt;也就是学习一个近似：&lt;/p&gt;
+\[\boxed{\hat S}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[\ ext{边界位移} \rightarrow \ ext{边界力}.\]&lt;p&gt;这是一种：&lt;/p&gt;
+\[\boxed{\ ext{learned Schur operator}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;它相比直接学习整个内部 displacement field 有几个天然优势：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;输出维数更小；&lt;/li&gt;
+&lt;li&gt;与模块耦合直接兼容；&lt;/li&gt;
+&lt;li&gt;可替换一个昂贵子结构；&lt;/li&gt;
+&lt;li&gt;内部细节可以隐藏。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这其实是非常自然的 physics-module surrogate。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;19-一个非常值得自己实现的最小实验&#34;&gt;19. 一个非常值得自己实现的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;做一个二维 Poisson FEM。&lt;/p&gt;
+&lt;p&gt;把 mesh 中 DOF 分成：&lt;/p&gt;
+\[u_I\]&lt;p&gt;内部节点，&lt;/p&gt;
+&lt;p&gt;和：&lt;/p&gt;
+\[u_\Gamma\]&lt;p&gt;边界/接口节点。&lt;/p&gt;
+&lt;p&gt;原系统：&lt;/p&gt;
+\[\begin{bmatrix} K_{II} &amp; K_{I\Gamma}\\ K_{\Gamma I} &amp; K_{\Gamma\Gamma} \end{bmatrix} \begin{bmatrix} u_I\\ u_\Gamma \end{bmatrix} = \begin{bmatrix} f_I\\ f_\Gamma \end{bmatrix}.\]&lt;p&gt;实现：&lt;/p&gt;
+\[S= K_{\Gamma\Gamma} - K_{\Gamma I} K_{II}^{-1} K_{I\Gamma}.\]&lt;p&gt;然后：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;直接解原系统；&lt;/li&gt;
+&lt;li&gt;解 Schur system；&lt;/li&gt;
+&lt;li&gt;回代内部自由度。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;比较：&lt;/p&gt;
+\[\|u_{\rm full}-u_{\rm Schur}\|.\]&lt;p&gt;应该接近机器误差。&lt;/p&gt;
+&lt;p&gt;然后不要显式计算：&lt;/p&gt;
+\[K_{II}^{-1}.\]&lt;p&gt;改为：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;function apply_S(x):
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    z = solve(K_II, K_IΓ x)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    return K_ΓΓ x - K_ΓI z
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这一步一旦实现，你就真正跨过了：&lt;/p&gt;
+\[\boxed{ \ ext{“知道 Schur 补公式” \rightarrow “理解大型求解器怎么用它”} }\]&lt;p&gt;这条线。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个尤其值得保留的诊断视角&#34;&gt;20. 一个尤其值得保留的诊断视角
+&lt;/h1&gt;&lt;p&gt;以后遇到块系统：&lt;/p&gt;
+\[\begin{bmatrix} A &amp; B\\ C &amp; D \end{bmatrix},\]&lt;p&gt;第一反应可以不只是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;用 GMRES 还是 CG？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;而先问：&lt;/p&gt;
+\[\boxed{ \ ext{哪些变量局部、便宜、适合消掉？} }\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{ \ ext{哪些变量真正承担全局耦合？} }\]&lt;p&gt;如果找到后者，&lt;/p&gt;
+&lt;p&gt;它们往往正是最值得构造 Schur complement 的变量。&lt;/p&gt;
+&lt;p&gt;这个问题比单纯选 Krylov solver 更接近系统结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Schur complement 最值得记住的不是：&lt;/p&gt;
+\[S=D-CA^{-1}B.\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \ ext{被消掉的自由度并没有消失； 它们被压缩成了剩余自由度之间的有效耦合。} }\]&lt;p&gt;所以它在知识体系里的位置可以理解成：&lt;/p&gt;
+\[\ ext{Full coupled system}\]\[\downarrow\]\[\boxed{\ ext{eliminate local/internal variables}}\]\[\downarrow\]\[\boxed{\ ext{effective interface operator / Schur complement}}\]\[\downarrow\]\[\ ext{interface solve + local recovery}.\]&lt;p&gt;而从工程角度看，它教会我们的一个极其重要的原则是：&lt;/p&gt;
+\[\boxed{ \ ext{真正昂贵的不是系统里有多少变量， 而是多少变量必须参与全局协调。} }\]&lt;p&gt;Static condensation、domain decomposition、pressure projection、constraint-space contact solve 看起来属于完全不同的领域，但它们背后实际上都在利用同一个结构：&lt;/p&gt;
+\[\boxed{ \ ext{先解决局部响应， 再集中解决少量全局耦合变量。} }\]&lt;p&gt;一旦看懂这一点，很多大型物理求解器的架构会突然变得非常统一。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Toselli &amp;amp; Widlund, &lt;em&gt;Domain Decomposition Methods — Algorithms and Theory&lt;/em&gt;, Springer, 2005&lt;/strong&gt;。理解 substructuring、interface Schur complement、FETI/BDDC 等方法最经典的系统资料之一。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://link.springer.com/book/10.1007/b137868&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Springer 图书页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;MFEM &lt;code&gt;StaticCondensation&lt;/code&gt; 官方文档&lt;/strong&gt;。非常推荐直接对着公式和代码看：element-interior DOFs 如何被局部消元，Schur system 如何只保留 element-boundary DOFs，以及最终如何恢复内部解。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://docs.mfem.org/html/classmfem_1_1StaticCondensation.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;MFEM StaticCondensation&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;PETSc &lt;code&gt;PCFIELDSPLIT&lt;/code&gt; / Schur complement 文档&lt;/strong&gt;。这是观察 Schur 思想如何进入工业级 HPC solver 的很好入口；尤其值得看 &lt;code&gt;schur&lt;/code&gt; field split、Schur factorization 以及不同的 Schur preconditioning strategies。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://petsc.org/main/manualpages/PC/PCFIELDSPLIT/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;PETSc PCFIELDSPLIT&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;PETSc &lt;code&gt;PCLSC&lt;/code&gt;&lt;/strong&gt;。如果想理解为什么不可压流体里“近似 Schur complement”本身就是一个完整研究方向，可以从 Least-Squares Commutator preconditioner 入手。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Mathew, &lt;em&gt;Domain Decomposition Methods for the Numerical Solution of Partial Differential Equations&lt;/em&gt;, Springer, 2008&lt;/strong&gt;。偏矩阵视角，覆盖 substructuring、Lagrange multiplier、saddle-point systems 和 nonmatching grids，适合继续把线性代数结构与 PDE 求解对应起来。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元</title>
+        <link>https://assranai.github.io/cards/28-inf-sup-lbb-condition/</link>
+        <pubDate>Thu, 10 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/28-inf-sup-lbb-condition/</guid>
+        <description>&lt;h1 id=&#34;inf-sup--lbb-条件为什么位移和压力都插值正确仍可能得到一个完全错误的有限元&#34;&gt;Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Inf-Sup Condition / Ladyzhenskaya–Babuška–Brezzi 条件&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 流体 × 软体动力学 × 数值方法&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
+今天选 &lt;strong&gt;Inf-Sup 条件&lt;/strong&gt;，因为它解决的是有限元里一个很反直觉的问题：&lt;/p&gt;
+\[\boxed{ \ ext{两个变量各自都有合理的有限元空间，并不意味着它们组合起来就是稳定的。} }\]&lt;p&gt;这在近不可压材料、Stokes 流、压力—位移混合有限元、Lagrange multiplier 约束里极其重要。&lt;/p&gt;
+&lt;p&gt;经典混合有限元理论由 Babuška、Brezzi、Fortin 等建立。Brezzi 1974 年关于 saddle-point problems 的工作给出了这类问题存在性、唯一性和离散稳定性的核心条件；后来的 Boffi–Brezzi–Fortin 专著已经把它发展成完整的 mixed FEM 理论框架。&lt;/p&gt;
+&lt;p&gt;真正值得记住的不是那个看起来很抽象的：&lt;/p&gt;
+\[\inf\sup\]&lt;p&gt;公式，而是：&lt;/p&gt;
+\[\boxed{ \ ext{约束变量必须拥有足够强、但又不过强的“控制能力”。} }\]&lt;hr&gt;
+&lt;h2 id=&#34;1-为什么普通位移有限元到了近不可压材料会出问题&#34;&gt;1. 为什么普通位移有限元到了近不可压材料会出问题？
+&lt;/h2&gt;&lt;p&gt;考虑线弹性：&lt;/p&gt;
+\[\sigma = 2\mu\varepsilon(u) + \lambda\operatorname{tr}(\varepsilon(u))I.\]&lt;p&gt;其中：&lt;/p&gt;
+\[\lambda = \frac{E\ u} {(1+\ u)(1-2\ u)}.\]&lt;p&gt;当：&lt;/p&gt;
+\[\ u\rightarrow0.5,\]&lt;p&gt;有：&lt;/p&gt;
+\[\lambda\rightarrow\infty.\]&lt;p&gt;物理上意味着材料趋向：&lt;/p&gt;
+\[\boxed{ \ abla\cdot u=0 }\]&lt;p&gt;即几乎不能改变体积。&lt;/p&gt;
+&lt;p&gt;如果继续用纯 displacement FEM，相当于能量里出现一个极强的体积惩罚：&lt;/p&gt;
+\[\Pi_{\rm vol} \sim \frac{\lambda}{2} (\ abla\cdot u)^2.\]&lt;p&gt;当 \(\lambda\) 极大时，离散位移空间必须非常精确地满足：&lt;/p&gt;
+\[\ abla\cdot u\approx0.\]&lt;p&gt;但低阶位移单元通常没有足够自由度做到。&lt;/p&gt;
+&lt;p&gt;结果就是：&lt;/p&gt;
+\[\boxed{\ ext{volumetric locking}}\]&lt;p&gt;——结构数值上变得异常僵硬。&lt;/p&gt;
+&lt;p&gt;近不可压弹性文献通常因此转向 displacement–pressure mixed formulation，以避免锁死。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-混合形式把体积约束变成一个独立变量&#34;&gt;2. 混合形式：把“体积约束”变成一个独立变量
+&lt;/h1&gt;&lt;p&gt;引入压力：&lt;/p&gt;
+\[p=-\lambda\ abla\cdot u.\]&lt;p&gt;原问题可以写成：&lt;/p&gt;
+\[-2\mu\ abla\cdot\varepsilon(u) -\ abla p=f,\]&lt;p&gt;以及：&lt;/p&gt;
+\[\ abla\cdot u+\frac{1}{\lambda}p=0.\]&lt;p&gt;当：&lt;/p&gt;
+\[\lambda\rightarrow\infty,\]&lt;p&gt;第二式趋近：&lt;/p&gt;
+\[\boxed{ \ abla\cdot u=0. }\]&lt;p&gt;这时候：&lt;/p&gt;
+\[u\]&lt;p&gt;和：&lt;/p&gt;
+\[p\]&lt;p&gt;成为两个独立未知量。&lt;/p&gt;
+&lt;p&gt;有限元离散后：&lt;/p&gt;
+\[u_h\in V_h, \qquad p_h\in Q_h.\]&lt;p&gt;得到经典 saddle-point system：&lt;/p&gt;
+\[\boxed{ \begin{bmatrix} A&amp;B^T\\ B&amp;-\frac1\lambda M_p \end{bmatrix} \begin{bmatrix} u\\p \end{bmatrix} = \begin{bmatrix} f\\0 \end{bmatrix}. }\]&lt;p&gt;在完全不可压极限：&lt;/p&gt;
+\[\lambda=\infty,\]&lt;p&gt;就变成：&lt;/p&gt;
+\[\begin{bmatrix} A&amp;B^T\\ B&amp;0 \end{bmatrix}.\]&lt;p&gt;这里开始出现真正的问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-为什么不能随便选--和-&#34;&gt;3. 为什么不能随便选 \(V_h\) 和 \(Q_h\)？
+&lt;/h1&gt;&lt;p&gt;直觉上你可能会想：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;位移用线性单元 \(P_1\)，压力也用线性单元 \(P_1\)，多自然。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;也就是：&lt;/p&gt;
+\[P_1-P_1.\]&lt;p&gt;但这种 equal-order pairing 对标准 Stokes/不可压混合问题通常&lt;strong&gt;不满足 LBB 条件&lt;/strong&gt;，未经稳定化会产生不稳定压力模式。近不可压固体文献也明确指出，equal-order linear pairs 需要额外 stabilization；Taylor–Hood 等则属于经典稳定组合。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \ ext{每个空间单独“看起来合理”，并不能保证组合合理。} }\]&lt;p&gt;这是理解 mixed FEM 最关键的一步。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-inf-sup-条件到底在测什么&#34;&gt;4. Inf-Sup 条件到底在测什么？
+&lt;/h1&gt;&lt;p&gt;典型条件写成：&lt;/p&gt;
+\[\boxed{ \inf_{q_h\in Q_h} \sup_{v_h\in V_h} \frac{b(v_h,q_h)} {\|v_h\|_V\|q_h\|_Q} \ge \beta&gt;0. }\]&lt;p&gt;并要求：&lt;/p&gt;
+\[\beta\]&lt;p&gt;在：&lt;/p&gt;
+\[h\rightarrow0\]&lt;p&gt;时不趋近零。&lt;/p&gt;
+&lt;p&gt;对于不可压问题：&lt;/p&gt;
+\[b(v,q) = \int_\Omega q\,\ abla\cdot v\,d\Omega.\]&lt;p&gt;所以公式实际上在问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;对任意一个压力模式 \(q_h\)，能不能找到某个位移模式 \(v_h\)，使其散度对这个压力模式产生足够强的响应？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{ \ ext{每一个离散压力自由度，都必须能被某种位移体积变化“看见”。} }\]&lt;p&gt;如果存在一个压力模式：&lt;/p&gt;
+\[q_h\ eq0\]&lt;p&gt;却对所有：&lt;/p&gt;
+\[v_h\]&lt;p&gt;都近似有：&lt;/p&gt;
+\[b(v_h,q_h)\approx0,\]&lt;p&gt;那么这个压力模式就是：&lt;/p&gt;
+\[\boxed{\ ext{几乎不受控制的 spurious mode}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;此时：&lt;/p&gt;
+\[\beta_h\rightarrow0.\]&lt;p&gt;系统便失去稳定性。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-一个非常直观的-checkerboard-pressure&#34;&gt;5. 一个非常直观的 checkerboard pressure
+&lt;/h1&gt;&lt;p&gt;二维网格中可能出现：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+1  -1  +1  -1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;-1  +1  -1  +1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;+1  -1  +1  -1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;-1  +1  -1  +1
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这种棋盘格压力。&lt;/p&gt;
+&lt;p&gt;压力在单元间剧烈变化。&lt;/p&gt;
+&lt;p&gt;但某些位移离散下：&lt;/p&gt;
+\[B^T p\]&lt;p&gt;可能几乎为零。&lt;/p&gt;
+&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \ ext{压力发生巨大振荡， 动量方程却几乎感觉不到它。} }\]&lt;p&gt;于是：&lt;/p&gt;
+\[p\]&lt;p&gt;可以乱跳，而几乎不影响残差。&lt;/p&gt;
+&lt;p&gt;这就是典型的：&lt;/p&gt;
+\[\boxed{\ ext{spurious pressure mode}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;它不是 mesh 太粗这么简单。&lt;/p&gt;
+&lt;p&gt;即使不断细化：&lt;/p&gt;
+\[h\rightarrow0,\]&lt;p&gt;如果离散空间搭配不满足 inf-sup，&lt;/p&gt;
+&lt;p&gt;问题仍然可能存在。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-所以-inf-sup-条件本质上是一个离散可观测性条件&#34;&gt;6. 所以 Inf-Sup 条件本质上是一个“离散可观测性”条件
+&lt;/h1&gt;&lt;p&gt;可以把：&lt;/p&gt;
+\[B:V_h\rightarrow Q_h^*\]&lt;p&gt;理解成：&lt;/p&gt;
+\[\boxed{ \ ext{位移/速度变化} \rightarrow \ ext{约束响应} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;那么 inf-sup 要求：&lt;/p&gt;
+\[B\]&lt;p&gt;不能在某些压力方向上失去控制。&lt;/p&gt;
+&lt;p&gt;用线性代数语言，\(\beta_h\) 与合适缩放后的：&lt;/p&gt;
+\[B\]&lt;p&gt;最小奇异值密切相关。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[\sigma_{\min}\rightarrow0,\]&lt;p&gt;意味着存在某些：&lt;/p&gt;
+\[q_h\]&lt;p&gt;几乎落在：&lt;/p&gt;
+\[B^T\]&lt;p&gt;的零空间中。&lt;/p&gt;
+&lt;p&gt;于是整个问题可以理解成：&lt;/p&gt;
+\[\boxed{ \ ext{constraint Jacobian 是否拥有足够好的数值秩？} }\]&lt;p&gt;这和你做物理引擎时检查约束：&lt;/p&gt;
+\[J M^{-1}J^T\]&lt;p&gt;是否奇异，其实是同一种思维。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么-taylorhood-很经典&#34;&gt;7. 为什么 Taylor–Hood 很经典？
+&lt;/h1&gt;&lt;p&gt;Taylor–Hood 通常采用：&lt;/p&gt;
+\[\boxed{ P_2\ ext{ velocity/displacement} - P_1\ ext{ pressure} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;即：&lt;/p&gt;
+\[u_h\]&lt;p&gt;用二次插值，&lt;/p&gt;
+\[p_h\]&lt;p&gt;用一次插值。&lt;/p&gt;
+&lt;p&gt;FEniCS 当前教程仍直接把 Taylor–Hood 作为 mixed Stokes 问题的标准示例；其 mixed-element API 也是按这种不同变量使用不同空间的方式构建。&lt;/p&gt;
+&lt;p&gt;为什么位移阶次通常更高？&lt;/p&gt;
+&lt;p&gt;因为 incompressibility 约束作用的是：&lt;/p&gt;
+\[\ abla\cdot u.\]&lt;p&gt;如果：&lt;/p&gt;
+\[u\in P_2,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\ abla\cdot u\]&lt;p&gt;大致落在：&lt;/p&gt;
+\[P_1\]&lt;p&gt;级空间。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[P_2-P_1\]&lt;p&gt;在函数空间结构上更加匹配。&lt;/p&gt;
+&lt;p&gt;可以粗略理解成：&lt;/p&gt;
+\[\boxed{ \ ext{压力空间不应该比位移散度能够表达的空间更丰富。} }\]&lt;p&gt;这是很重要的直觉。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-为什么压力自由度越多反而可能越糟&#34;&gt;8. 为什么“压力自由度越多”反而可能越糟？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这也是 mixed FEM 最反直觉的地方之一。&lt;/p&gt;
+&lt;p&gt;普通拟合问题里常觉得：&lt;/p&gt;
+\[\boxed{\ ext{自由度越多 → 表达能力越强}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;但约束问题中：&lt;/p&gt;
+&lt;p&gt;如果压力空间：&lt;/p&gt;
+\[Q_h\]&lt;p&gt;过于丰富，而位移空间：&lt;/p&gt;
+\[V_h\]&lt;p&gt;不足以回应这些压力模式，&lt;/p&gt;
+&lt;p&gt;就产生：&lt;/p&gt;
+\[\boxed{\ ext{constraint over-resolution}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;也就是说：&lt;/p&gt;
+\[\ ext{pressure asks questions}\]&lt;p&gt;比：&lt;/p&gt;
+\[\ ext{displacement can answer}\]&lt;p&gt;还多。&lt;/p&gt;
+&lt;p&gt;于是额外 pressure DOFs 不是增加精度，而是在制造：&lt;/p&gt;
+\[\boxed{\ ext{不可观测约束模态。}}\]&lt;p&gt;这也是为什么 mixed discretization 的设计不是：&lt;/p&gt;
+\[\boxed{\ ext{每个变量各自选最强单元}}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\ ext{整个变量对必须兼容。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-这和-locking-又是什么关系&#34;&gt;9. 这和 locking 又是什么关系？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这里有两个看似相反的问题。&lt;/p&gt;
+&lt;h3 id=&#34;位移空间过于受约束&#34;&gt;位移空间过于受约束
+&lt;/h3&gt;&lt;p&gt;纯 displacement 近不可压 formulation：&lt;/p&gt;
+\[\ abla\cdot u\approx0\]&lt;p&gt;被 penalty-like volumetric stiffness 极强地施加。&lt;/p&gt;
+&lt;p&gt;结果：&lt;/p&gt;
+\[\boxed{\ ext{locking}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;压力空间过于自由&#34;&gt;压力空间过于自由
+&lt;/h3&gt;&lt;p&gt;mixed formulation 中，如果：&lt;/p&gt;
+\[V_h,Q_h\]&lt;p&gt;不匹配：&lt;/p&gt;
+\[\boxed{\ ext{spurious pressure}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以 mixed FEM 真正要在两者之间找平衡：&lt;/p&gt;
+\[\boxed{ \ ext{约束不能太硬， 也不能太自由。} }\]&lt;p&gt;Inf-sup 条件就是这个平衡的数学表达。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-为什么这对-neo-hookean-软体尤其重要&#34;&gt;10. 为什么这对 Neo-Hookean 软体尤其重要？
+&lt;/h1&gt;&lt;p&gt;很多软体使用：&lt;/p&gt;
+\[\Psi(F) = \frac{\mu}{2}(I_1-d) - \mu\ln J + \frac{\lambda}{2}(\ln J)^2.\]&lt;p&gt;如果想做接近橡胶的材料：&lt;/p&gt;
+\[\ u=0.49\]&lt;p&gt;甚至：&lt;/p&gt;
+\[0.499.\]&lt;p&gt;那么：&lt;/p&gt;
+\[\lambda\gg\mu.\]&lt;p&gt;此时低阶 displacement-only tet 很容易出现 volumetric locking：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;真实材料：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;很容易剪切/弯曲
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;但几乎保持体积
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;数值模型：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;像变成了一块异常坚硬的石头
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;一个自然解决方案就是 mixed displacement-pressure formulation：&lt;/p&gt;
+\[(u,p).\]&lt;p&gt;对于大变形、近不可压超弹性，目前工程文献仍广泛使用稳定 mixed pairs 或 stabilized equal-order formulations，以避免 locking。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \ ext{如果以后做高质量软体 FEM， LBB 条件几乎绕不过去。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么很多商业有限元里会出现mixed--hybrid-element&#34;&gt;11. 为什么很多商业有限元里会出现“mixed / hybrid element”？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;例如近不可压橡胶、塑性材料里，经常会看到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;hybrid elements；&lt;/li&gt;
+&lt;li&gt;mixed \(u-p\) elements；&lt;/li&gt;
+&lt;li&gt;enhanced strain；&lt;/li&gt;
+&lt;li&gt;selective/reduced integration；&lt;/li&gt;
+&lt;li&gt;pressure stabilization。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些方法看起来很杂。&lt;/p&gt;
+&lt;p&gt;它们往往都在处理同一个核心问题：&lt;/p&gt;
+\[\boxed{ \ ext{体积约束与离散位移自由度不兼容。} }\]&lt;p&gt;Mixed \(u-p\) 方法直接引入压力。&lt;/p&gt;
+&lt;p&gt;Reduced/selective integration 通过降低某些体积约束积分的强度来缓解 locking。&lt;/p&gt;
+&lt;p&gt;Stabilized methods 则允许使用原本不满足 inf-sup 的空间，例如：&lt;/p&gt;
+\[P_1-P_1,\]&lt;p&gt;再加入一个稳定化项抑制 spurious pressure。2019 年关于近/完全不可压固体的工作就系统比较了 stable mixed pairs 与 pressure-projection stabilized equal-order methods。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-stabilization-本质上是在修复失败的-inf-sup&#34;&gt;12. Stabilization 本质上是在“修复”失败的 Inf-Sup
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[P_1-P_1\]&lt;p&gt;原本不稳定。&lt;/p&gt;
+&lt;p&gt;一种方式是改变空间：&lt;/p&gt;
+\[\boxed{ P_2-P_1 }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;另一种方式是保留：&lt;/p&gt;
+\[P_1-P_1\]&lt;p&gt;但修改变分形式：&lt;/p&gt;
+\[a(u,v) + b(v,p) + b(u,q) + \boxed{s(p,q)}.\]&lt;p&gt;其中：&lt;/p&gt;
+\[s(p,q)\]&lt;p&gt;专门惩罚那些不受 \(B\) 控制的压力模式。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \ ext{稳定化项本质上是在填补离散算子的“盲区”。} }\]&lt;p&gt;这和物理引擎中的 regularization 很相似。&lt;/p&gt;
+&lt;p&gt;不过 stabilized FEM 的关键是：&lt;/p&gt;
+\[\boxed{ s(p,q)\]&lt;p&gt;需要尽可能保持 consistency。&lt;/p&gt;
+&lt;p&gt;不能简单：&lt;/p&gt;
+\[p^Tp\ imes10^6\]&lt;p&gt;粗暴惩罚。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-mini-element-是另一个很漂亮的解决办法&#34;&gt;13. MINI element 是另一个很漂亮的解决办法
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;MINI element 通常是：&lt;/p&gt;
+\[\boxed{ (P_1+\ ext{bubble})-P_1. }\]&lt;p&gt;也就是说位移仍主要用线性 shape functions，&lt;/p&gt;
+&lt;p&gt;但每个 element 内增加一个：&lt;/p&gt;
+\[\boxed{\ ext{bubble mode}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这个 bubble：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;在单元内部非零；&lt;/li&gt;
+&lt;li&gt;在边界为零；&lt;/li&gt;
+&lt;li&gt;不增加跨单元 global continuity 复杂度。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;它的意义就是：&lt;/p&gt;
+\[\boxed{ \ ext{给位移空间增加额外局部自由度， 让它有能力回应压力约束。} }\]&lt;p&gt;FEniCS 当前 UFL 教程也把 MINI 和 Taylor–Hood 并列作为经典 mixed-element 示例。&lt;/p&gt;
+&lt;p&gt;这个思路特别值得记：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;有时系统不稳定，不需要全面提高单元阶次，只要增加那些&lt;strong&gt;正好填补约束盲区&lt;/strong&gt;的模式。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-这其实和-hourglass-mode-是镜像问题&#34;&gt;14. 这其实和 Hourglass mode 是“镜像问题”
+&lt;/h1&gt;&lt;p&gt;之前卡片讲过 reduced integration 的 hourglass mode。&lt;/p&gt;
+&lt;p&gt;那里发生的是：&lt;/p&gt;
+\[\boxed{ \ ext{某些位移模式没有被能量看见。} }\]&lt;p&gt;于是存在：&lt;/p&gt;
+\[u_h\ eq0\]&lt;p&gt;却：&lt;/p&gt;
+\[E(u_h)\approx0.\]&lt;p&gt;Inf-sup 失败时则是：&lt;/p&gt;
+\[\boxed{ \ ext{某些压力模式没有被位移空间看见。} }\]&lt;p&gt;存在：&lt;/p&gt;
+\[p_h\ eq0\]&lt;p&gt;却：&lt;/p&gt;
+\[B^Tp_h\approx0.\]&lt;p&gt;两者都是：&lt;/p&gt;
+\[\boxed{\ ext{离散算子出现非物理零空间。}}\]&lt;p&gt;区别只是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;hourglass&#34; tabindex=&#34;0&#34;&gt;Hourglass&lt;/span&gt;：primal 位移空间中出现盲区；&lt;/li&gt;
+&lt;li&gt;LBB failure：dual/constraint 空间中出现盲区。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这是一个很有价值的统一视角。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;15-它和-schur-complement-也正好接上&#34;&gt;15. 它和 Schur complement 也正好接上
+&lt;/h1&gt;&lt;p&gt;上一张卡片中：&lt;/p&gt;
+\[\begin{bmatrix} A&amp;B^T\\ B&amp;0 \end{bmatrix}\]&lt;p&gt;消掉 \(u\) 后得到 pressure Schur complement：&lt;/p&gt;
+\[S_p = BA^{-1}B^T.\]&lt;p&gt;现在 inf-sup 条件又告诉你：&lt;/p&gt;
+\[\boxed{ S_p \ ext{ 必须在压力空间上足够非退化。} }\]&lt;p&gt;如果存在：&lt;/p&gt;
+\[p\ eq0\]&lt;p&gt;满足：&lt;/p&gt;
+\[B^Tp\approx0,\]&lt;p&gt;那么：&lt;/p&gt;
+\[p^TBA^{-1}B^Tp \approx0.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ S_p }\]&lt;p&gt;就出现接近零的特征值。&lt;/p&gt;
+&lt;p&gt;因此可以把 inf-sup 理解成：&lt;/p&gt;
+\[\boxed{ \ ext{pressure Schur complement 必须具有良好的谱下界。} }\]&lt;p&gt;这就把抽象函数分析和实际求解器 conditioning 连起来了。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-一个特别重要的区别连续问题稳定不代表离散问题稳定&#34;&gt;16. 一个特别重要的区别：连续问题稳定，不代表离散问题稳定
+&lt;/h1&gt;&lt;p&gt;连续 Stokes/不可压弹性问题本身可能完全 well-posed：&lt;/p&gt;
+\[\beta&gt;0.\]&lt;p&gt;但是有限元离散后：&lt;/p&gt;
+\[\beta_h\]&lt;p&gt;可能：&lt;/p&gt;
+\[\beta_h\rightarrow0.\]&lt;p&gt;这意味着：&lt;/p&gt;
+\[\boxed{ \ ext{PDE 本身没有问题， 是你的离散空间创造了一个不存在的病态。} }\]&lt;p&gt;这是 numerical PDE 中非常值得建立的意识。&lt;/p&gt;
+&lt;p&gt;很多仿真异常：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;压力振荡；&lt;/li&gt;
+&lt;li&gt;locking；&lt;/li&gt;
+&lt;li&gt;约束力异常；&lt;/li&gt;
+&lt;li&gt;mesh refinement 不收敛；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;不一定来自：&lt;/p&gt;
+\[\boxed{\ ext{材料参数、求解器容差或时间步}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;有时问题已经发生在：&lt;/p&gt;
+\[\boxed{\ ext{离散空间设计}}\]&lt;p&gt;这一层。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-这对-xpbd--constraint-solver-也有一个非常强的迁移启发&#34;&gt;17. 这对 XPBD / constraint solver 也有一个非常强的迁移启发
+&lt;/h1&gt;&lt;p&gt;假设约束：&lt;/p&gt;
+\[C(x)=0.\]&lt;p&gt;线性化：&lt;/p&gt;
+\[J\Delta x=-C.\]&lt;p&gt;约束空间求解：&lt;/p&gt;
+\[JM^{-1}J^T\lambda=b.\]&lt;p&gt;如果某些约束：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;重复；&lt;/li&gt;
+&lt;li&gt;几乎线性相关；&lt;/li&gt;
+&lt;li&gt;过密；&lt;/li&gt;
+&lt;li&gt;与当前自由度不兼容；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;就会让：&lt;/p&gt;
+\[JM^{-1}J^T\]&lt;p&gt;接近奇异。&lt;/p&gt;
+&lt;p&gt;这和 mixed FEM 的：&lt;/p&gt;
+\[\boxed{\beta_h\rightarrow0}\]&lt;p&gt;本质上非常接近。&lt;/p&gt;
+&lt;p&gt;因此 Inf-Sup 给物理引擎一个很深的启发：&lt;/p&gt;
+\[\boxed{ \ ext{“约束数量多”不等于“约束质量高”。} }\]&lt;p&gt;真正应该关心的是：&lt;/p&gt;
+\[\boxed{ \ ext{constraint space 与 state space 是否兼容。} }\]&lt;p&gt;这比简单地讨论 compliance、iteration count 或 solver tolerance 更底层。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-为什么这对-pbd-体积约束也值得警惕&#34;&gt;18. 为什么这对 PBD 体积约束也值得警惕？
+&lt;/h1&gt;&lt;p&gt;假设每个 tet 都有：&lt;/p&gt;
+\[C_e(x) = V_e(x)-V_e^0=0.\]&lt;p&gt;如果近不可压材料中给大量 tet 强施加体积约束，&lt;/p&gt;
+&lt;p&gt;从离散结构角度，其实就是建立了一个非常丰富的：&lt;/p&gt;
+\[\boxed{\ ext{constraint space}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;但 vertex positions：&lt;/p&gt;
+\[x\]&lt;p&gt;能否独立满足所有这些局部体积模式？&lt;/p&gt;
+&lt;p&gt;如果约束之间高度相关：&lt;/p&gt;
+\[\boxed{ J\]&lt;p&gt;就可能有很差的谱性质。&lt;/p&gt;
+&lt;p&gt;于是可能看到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;λ 很大；&lt;/li&gt;
+&lt;li&gt;convergence 慢；&lt;/li&gt;
+&lt;li&gt;alternating corrections；&lt;/li&gt;
+&lt;li&gt;rigid-like behavior；&lt;/li&gt;
+&lt;li&gt;sensitivity to ordering。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这虽然不是严格意义上 FEM LBB theorem 的直接套用，但思想完全值得迁移：&lt;/p&gt;
+\[\boxed{ \ ext{状态离散和约束离散必须一起设计。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;19-inf-sup-甚至给增加物理约束这件事一个反直觉警告&#34;&gt;19. Inf-Sup 甚至给“增加物理约束”这件事一个反直觉警告
+&lt;/h1&gt;&lt;p&gt;通常工程上遇到不稳定会想：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;再加几个约束。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;但 mixed theory 告诉我们：&lt;/p&gt;
+\[\boxed{ \ ext{添加 constraint DOFs 可能让系统更差。} }\]&lt;p&gt;因为每增加一个：&lt;/p&gt;
+\[q_h\]&lt;p&gt;方向，&lt;/p&gt;
+&lt;p&gt;你都要求 primal space：&lt;/p&gt;
+\[V_h\]&lt;p&gt;能够对它产生足够独立的 response。&lt;/p&gt;
+&lt;p&gt;否则就是给系统增加：&lt;/p&gt;
+\[\boxed{\ ext{新的接近零特征值。}}\]&lt;p&gt;因此约束系统真正需要的不是：&lt;/p&gt;
+\[\ ext{maximum constraints}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\ ext{compatible constraints}.}\]&lt;p&gt;这对：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;接触点选取；&lt;/li&gt;
+&lt;li&gt;joint constraints；&lt;/li&gt;
+&lt;li&gt;incompressibility；&lt;/li&gt;
+&lt;li&gt;multiphysics coupling；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;都有迁移意义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个最值得自己做的实验&#34;&gt;20. 一个最值得自己做的实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;做二维 Stokes：&lt;/p&gt;
+\[-\Delta u+\ abla p=f,\]\[\ abla\cdot u=0.\]&lt;p&gt;在同一个网格上比较：&lt;/p&gt;
+&lt;h3 id=&#34;a&#34;&gt;A. \(P_1-P_1\)
+&lt;/h3&gt;\[u:P_1,\qquad p:P_1.\]&lt;h3 id=&#34;b-taylorhood&#34;&gt;B. Taylor–Hood
+&lt;/h3&gt;\[u:P_2,\qquad p:P_1.\]&lt;p&gt;分别画：&lt;/p&gt;
+\[p_h(x,y).\]&lt;p&gt;很可能 A 出现明显 checkerboard / oscillatory pressure，&lt;/p&gt;
+&lt;p&gt;B 则平滑稳定。&lt;/p&gt;
+&lt;p&gt;然后继续细化 mesh。&lt;/p&gt;
+&lt;p&gt;最关键的观察是：&lt;/p&gt;
+\[\boxed{ \ ext{A 的问题不一定因为 mesh 更细而消失。} }\]&lt;p&gt;再进一步计算离散 inf-sup constant。&lt;/p&gt;
+&lt;p&gt;一种数值方法是构造广义特征值问题，大致检查：&lt;/p&gt;
+\[BA^{-1}B^Tq = \lambda M_q q.\]&lt;p&gt;最小非零特征值满足：&lt;/p&gt;
+\[\boxed{ \beta_h^2\sim\lambda_{\min}. }\]&lt;p&gt;观察：&lt;/p&gt;
+\[h\downarrow\]&lt;p&gt;时：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;稳定 pair：\(\beta_h\) 保持有界；&lt;/li&gt;
+&lt;li&gt;不稳定 pair：\(\beta_h\rightarrow0\)。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这个实验会把抽象的：&lt;/p&gt;
+\[\inf\sup\]&lt;p&gt;直接变成一个你能看到的谱问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;21-对近不可压软体一个很实用的设计路线&#34;&gt;21. 对近不可压软体，一个很实用的设计路线
+&lt;/h1&gt;&lt;p&gt;如果未来实现 mixed tet solver，不要从：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;P1 displacement + P1 pressure
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;直接开始，然后靠调 stabilization 参数救火。&lt;/p&gt;
+&lt;p&gt;更合理的顺序是：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;明确 continuum formulation 是：
+&lt;/p&gt;
+\[(u,p)\]&lt;p&gt;
+还是 displacement-only；&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果是 mixed formulation，先选一个理论上稳定的 pair，例如 Taylor–Hood 或 MINI；&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;用 manufactured solution / patch test 检查：
+&lt;/p&gt;
+\[u,p\]&lt;p&gt;
+的收敛；&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;再测试：
+&lt;/p&gt;
+\[\ u=0.49,\ 0.499,\ 0.4999\]&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;检查 displacement error 是否随着：
+&lt;/p&gt;
+\[\lambda\rightarrow\infty\]&lt;p&gt;
+爆炸；&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;最后才考虑 equal-order + stabilization 来换取 GPU/工程便利性。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这样能区分：&lt;/p&gt;
+\[\boxed{ \ ext{基础离散问题} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \ ext{工程优化问题}. }\]&lt;p&gt;近不可压弹性中的稳定 mixed pair、stabilized equal-order 和 gradient-robust variants 正是在这条脉络上发展的。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Inf-Sup 条件最值得记住的并不是：&lt;/p&gt;
+\[\inf_{q_h} \sup_{v_h} \frac{b(v_h,q_h)} {\|v_h\|\|q_h\|} \ge\beta.\]&lt;p&gt;真正应该留下的是：&lt;/p&gt;
+\[\boxed{ \ ext{一个约束变量只有在 primal variable 能“感觉到它”时，才是合法的离散自由度。} }\]&lt;p&gt;它在知识体系中的位置可以这样看：&lt;/p&gt;
+\[\ ext{ordinary Galerkin FEM}\]\[\downarrow\]\[\ ext{mixed / saddle-point formulation}\]\[\downarrow\]\[\boxed{\ ext{Inf-Sup compatibility}}\]\[\downarrow\]\[\ ext{stable pressure / multiplier / constraint discretization}.\]&lt;p&gt;它对物理求解器最大的启发则更普遍：&lt;/p&gt;
+\[\boxed{ \ ext{数值稳定性不只由“方程写得对不对”决定， 还取决于不同变量空间之间是否拥有正确的相对自由度。} }\]&lt;p&gt;因此下次看到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;近不可压软体异常僵硬；&lt;/li&gt;
+&lt;li&gt;pressure checkerboard；&lt;/li&gt;
+&lt;li&gt;multiplier oscillation；&lt;/li&gt;
+&lt;li&gt;constraint matrix 几乎奇异；&lt;/li&gt;
+&lt;li&gt;增加约束反而更难收敛；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;可以把诊断层级向上提一层：&lt;/p&gt;
+\[\boxed{ \ ext{先检查空间兼容性， 再去调 solver 参数。} }\]&lt;p&gt;这就是 LBB 条件真正值得学的原因。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Franco Brezzi, &lt;em&gt;On the Existence, Uniqueness and Approximation of Saddle-Point Problems Arising from Lagrangian Multipliers&lt;/em&gt;, 1974&lt;/strong&gt;。Inf-Sup/Brezzi 理论的奠基工作之一。适合在理解直觉之后回头看严格 formulation。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://www.numdam.org/item/PSMIR_1974___S4_A1_0/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;NUMDAM 原文页面&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Boffi, Brezzi &amp;amp; Fortin, &lt;em&gt;Mixed Finite Element Methods and Applications&lt;/em&gt;, Springer, 2013&lt;/strong&gt;。如果想系统掌握 mixed FEM，这是最标准的教材之一，覆盖 saddle-point theory、inf-sup、stabilization、不可压流动、弹性以及 \(H(\mathrm{div})/H(\mathrm{curl})\) 元。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Karabelas et al., &lt;em&gt;Versatile stabilized finite element formulations for nearly and fully incompressible solid mechanics&lt;/em&gt;, Computational Mechanics, 2020&lt;/strong&gt;。如果重点是软体/近不可压固体，这篇非常直接：比较稳定 mixed element pair 与 stabilized \(P_1-P_1\)，并明确讨论 locking 与 LBB 条件。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://link.springer.com/article/10.1007/s00466-019-01760-w&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Springer 开放论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Basava &amp;amp; Wollner, &lt;em&gt;Gradient Robust Mixed Methods for Nearly Incompressible Elasticity&lt;/em&gt;, Journal of Scientific Computing, 2023&lt;/strong&gt;。适合进一步看一个更现代的问题：即使 element pair 满足 inf-sup，压力仍可能污染 displacement error；gradient robustness 进一步提高近不可压极限下的质量。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;FEniCSx Mixed Finite Element Tutorial&lt;/strong&gt;。适合直接实现 Taylor–Hood / MINI。当前教程明确展示了 mixed spaces、Taylor–Hood 和 MINI 的构建方式。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://jsdokken.com/FEniCS-workshop/src/deep_dive/mixed_problems.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;FEniCS mixed problem 教程&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

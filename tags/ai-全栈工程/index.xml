@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Sun, 06 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sat, 12 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</title>
         <link>https://assranai.github.io/cards/13-neural-operator/</link>
         <pubDate>Wed, 26 Aug 2026 00:00:00 +0000</pubDate>
@@ -2509,6 +2509,1303 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Zhang et al., &lt;em&gt;LoRA-FA: Memory-efficient Low-rank Adaptation for Large Language Models Fine-tuning&lt;/em&gt;, 2023&lt;/strong&gt;。适合从“参数效率”继续走到“完整训练系统效率”，尤其是 activation memory 为什么仍可能成为瓶颈。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Continuous Batching：大模型推理真正的“批处理单位”，为什么不是请求，而是一次 token 迭代</title>
+        <link>https://assranai.github.io/cards/29-continuous-batching/</link>
+        <pubDate>Fri, 11 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/29-continuous-batching/</guid>
+        <description>&lt;h1 id=&#34;continuous-batching大模型推理真正的批处理单位为什么不是请求而是一次-token-迭代&#34;&gt;Continuous Batching：大模型推理真正的“批处理单位”，为什么不是请求，而是一次 token 迭代
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Continuous Batching / Iteration-Level Scheduling（连续批处理 / 迭代级调度）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × GPU 系统 × 高性能计算&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
+这期转到 AI 推理基础设施。Continuous Batching 值得学，因为它揭示了 LLM serving 和普通神经网络 inference 的一个根本区别：&lt;/p&gt;
+\[\boxed{ \ ext{LLM 请求不是一次 forward pass，而是一串长度未知的 forward passes。} }\]&lt;p&gt;如果还沿用传统“收集一批请求 → 整批跑完 → 再接下一批”的 batching 思路，会造成非常严重的 GPU 空转。&lt;/p&gt;
+&lt;p&gt;2022 年 OSDI 的 &lt;strong&gt;Orca&lt;/strong&gt; 把调度粒度从 request level 降到 &lt;strong&gt;iteration level&lt;/strong&gt;：每生成一轮 token 后，已经完成的请求立即退出，新请求立即加入。论文在其 GPT-3 175B 实验中报告，相同延迟水平下相比 FasterTransformer 可达到最高约 36.9× 的吞吐提升。今天 Hugging Face Transformers、vLLM、SGLang 等推理体系都采用或建立在类似 continuous batching 思路之上。&lt;/p&gt;
+&lt;p&gt;真正值得理解的不是“动态加请求”这句话，而是：&lt;/p&gt;
+\[\boxed{ \ ext{调度器开始控制 token，而不只是控制 request。} }\]&lt;hr&gt;
+&lt;h2 id=&#34;1-为什么普通-static-batching-在-llm-上特别浪费&#34;&gt;1. 为什么普通 static batching 在 LLM 上特别浪费？
+&lt;/h2&gt;&lt;p&gt;传统图像模型一次请求可能就是：&lt;/p&gt;
+\[x\rightarrow f_\ heta(x)\rightarrow y.\]&lt;p&gt;所以四个请求组成 batch：&lt;/p&gt;
+\[[x_1,x_2,x_3,x_4]\]&lt;p&gt;一起 forward 一次，然后全部结束。&lt;/p&gt;
+&lt;p&gt;LLM 完全不同。&lt;/p&gt;
+&lt;p&gt;一个请求可能生成：&lt;/p&gt;
+\[8\]&lt;p&gt;个 token，&lt;/p&gt;
+&lt;p&gt;另一个：&lt;/p&gt;
+\[500\]&lt;p&gt;个 token，&lt;/p&gt;
+&lt;p&gt;第三个：&lt;/p&gt;
+\[2000.\]&lt;p&gt;自回归生成意味着：&lt;/p&gt;
+\[x_{t+1} = f_\ heta(x_{\le t}).\]&lt;p&gt;所以每生成一个新 token，都要再次执行模型。&lt;/p&gt;
+&lt;p&gt;假设一个 batch：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;A:  20 tokens
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;B: 200 tokens
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;C: 500 tokens
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;D:  50 tokens
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果采用传统 request-level batching，运行到：&lt;/p&gt;
+\[t=20\]&lt;p&gt;以后 A 已经结束。&lt;/p&gt;
+&lt;p&gt;batch 实际变成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;A: empty
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;B: active
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;C: active
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;D: active
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;到 \(t=50\)：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;A: empty
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;B: active
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;C: active
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;D: empty
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;最终 GPU 实际上在等 C。&lt;/p&gt;
+&lt;p&gt;问题可以概括为：&lt;/p&gt;
+\[\boxed{ \ ext{batch occupancy 随生成过程不断下降。} }\]&lt;p&gt;而刚结束的槽位却不能立即给排队的新请求使用。&lt;/p&gt;
+&lt;p&gt;Orca 论文正是针对这种 generative workload 的 multi-iteration 特性提出 iteration-level scheduling。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-continuous-batching-的核心操作其实非常简单&#34;&gt;2. Continuous Batching 的核心操作其实非常简单
+&lt;/h1&gt;&lt;p&gt;假设 GPU 最大允许：&lt;/p&gt;
+\[B_{\max}=4.\]&lt;p&gt;初始：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration 1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[A][B][C][D]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;若第二轮之后 B 生成 EOS：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration 2
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[A][ ][C][D]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;调度器立即从等待队列拿 E：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration 3
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[A][E][C][D]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;再过几轮 A 和 D 完成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[A done][E][C][D done]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;马上加入：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[F][E][C][G]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此 batch 不再是一个固定对象。&lt;/p&gt;
+&lt;p&gt;它变成：&lt;/p&gt;
+\[\boxed{ B_t= \{\ ext{第 }t\ ext{ 次迭代被调度的活跃 sequences}\} }\]&lt;p&gt;并且：&lt;/p&gt;
+\[B_t\ eq B_{t+1}.\]&lt;p&gt;Hugging Face 当前 ContinuousBatchingManager 的行为就是每轮检查已完成请求，并立即用队列中的请求补充 GPU 容量。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-为什么一次-token-iteration才是自然的调度单位&#34;&gt;3. 为什么“一次 token iteration”才是自然的调度单位？
+&lt;/h1&gt;&lt;p&gt;因为 autoregressive decode 的最小同步计算单位就是：&lt;/p&gt;
+\[\boxed{\ ext{每个活跃 sequence 生成一个 token}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;假设当前有：&lt;/p&gt;
+\[B\]&lt;p&gt;个 sequence。&lt;/p&gt;
+&lt;p&gt;一次 decode iteration：&lt;/p&gt;
+\[\{x_1,\ldots,x_B\} \rightarrow \{t_1,\ldots,t_B\}.\]&lt;p&gt;GPU 并不特别关心：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;sequence 1 是三分钟前进来的；&lt;/li&gt;
+&lt;li&gt;sequence 2 是刚进来的；&lt;/li&gt;
+&lt;li&gt;sequence 3 还剩 500 token。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;只要它们当前都需要：&lt;/p&gt;
+\[\boxed{\ ext{执行下一次 forward}}\]&lt;p&gt;就可以组成计算 batch。&lt;/p&gt;
+&lt;p&gt;所以 Orca 的关键变化并不是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;batching 更聪明了。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;而是重新定义：&lt;/p&gt;
+\[\boxed{ \ ext{scheduler 的工作单位。} }\]&lt;p&gt;传统：&lt;/p&gt;
+\[\ ext{request}\]&lt;p&gt;Orca：&lt;/p&gt;
+\[\boxed{\ ext{iteration}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这是一个很典型的系统设计原则：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;调度粒度应该匹配工作负载真正可以被抢占和重组的粒度。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-但问题随即出现不同-sequence-的长度根本不一样&#34;&gt;4. 但问题随即出现：不同 sequence 的长度根本不一样
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[A\]&lt;p&gt;已经生成到 1000 token，&lt;/p&gt;
+&lt;p&gt;而：&lt;/p&gt;
+\[B\]&lt;p&gt;才 50 token。&lt;/p&gt;
+&lt;p&gt;Attention 对 A 需要读取：&lt;/p&gt;
+\[KV_A[1:1000],\]&lt;p&gt;对 B 读取：&lt;/p&gt;
+\[KV_B[1:50].\]&lt;p&gt;因此不像普通 GEMM 那样简单：&lt;/p&gt;
+\[X\in\mathbb R^{B\ imes d}\]&lt;p&gt;就可以全部整齐打包。&lt;/p&gt;
+&lt;p&gt;早期 Orca 为此提出 &lt;strong&gt;selective batching&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;对线性层等天然适合 batch 的操作一起执行；&lt;/li&gt;
+&lt;li&gt;对依赖各 sequence 不同历史长度的 attention 部分进行更有针对性的处理。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这也是为什么 Orca 不只是“写一个队列”——真正困难的是让变长 sequence 在 Transformer execution engine 里能够高效共存。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-这正好解释了-pagedattention-为什么后来如此重要&#34;&gt;5. 这正好解释了 PagedAttention 为什么后来如此重要
+&lt;/h1&gt;&lt;p&gt;前面知识卡片讲过 &lt;span class=&#34;term-anchor&#34; data-term=&#34;paged-attention&#34; tabindex=&#34;0&#34;&gt;PagedAttention&lt;/span&gt;。&lt;/p&gt;
+&lt;p&gt;Continuous Batching 解决：&lt;/p&gt;
+\[\boxed{\ ext{谁什么时候进入 GPU 计算}}\]&lt;p&gt;PagedAttention 解决：&lt;/p&gt;
+\[\boxed{\ ext{这些不断加入/退出的请求，其 KV Cache 放在哪里}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Continuous batching 会让：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;sequence 动态加入；&lt;/li&gt;
+&lt;li&gt;sequence 随时结束；&lt;/li&gt;
+&lt;li&gt;每个 sequence 长度不断增长；&lt;/li&gt;
+&lt;li&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;kv-cache&#34; tabindex=&#34;0&#34;&gt;KV cache&lt;/span&gt; 生命周期完全不同。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果 KV cache 必须连续分配：&lt;/p&gt;
+\[[---------A---------] [---B---] [--------------C--------------]\]&lt;p&gt;那么动态换入换出请求很容易产生：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;fragmentation；&lt;/li&gt;
+&lt;li&gt;over-allocation；&lt;/li&gt;
+&lt;li&gt;batch size 受限。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;vLLM 的 PagedAttention 把 KV cache 做成类似虚拟内存页的 fixed-size blocks，并报告其系统相较 Orca 等基线在相同延迟下可得到约 2–4× 的吞吐提升。&lt;/p&gt;
+&lt;p&gt;所以两者的关系可以非常清楚地写成：&lt;/p&gt;
+\[\boxed{ \ ext{Continuous Batching = computation scheduling} }\]\[\boxed{ \ ext{PagedAttention = state-memory virtualization} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;二者共同组成现代 LLM serving 的基础。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-continuous-batching-真正困难的地方在-prefill-和-decode-混在了一起&#34;&gt;6. Continuous Batching 真正困难的地方，在 Prefill 和 Decode 混在了一起
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;一个 LLM 请求有两个性质完全不同的阶段。&lt;/p&gt;
+&lt;h3 id=&#34;prefill&#34;&gt;Prefill
+&lt;/h3&gt;&lt;p&gt;输入：&lt;/p&gt;
+\[L_p\]&lt;p&gt;个 prompt tokens。&lt;/p&gt;
+&lt;p&gt;整个 prompt 可以并行处理。&lt;/p&gt;
+&lt;p&gt;因此有大量矩阵计算：&lt;/p&gt;
+\[\boxed{\ ext{compute intensive}}\]&lt;p&gt;GPU 利用率很高。&lt;/p&gt;
+&lt;p&gt;它直接影响：&lt;/p&gt;
+\[\boxed{\ ext{TTFT — Time To First Token}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;decode&#34;&gt;Decode
+&lt;/h3&gt;&lt;p&gt;每次只增加：&lt;/p&gt;
+\[1\]&lt;p&gt;个 token。&lt;/p&gt;
+&lt;p&gt;需要反复读取 KV cache。&lt;/p&gt;
+&lt;p&gt;单个 request 的计算规模相对小，常更偏 memory-bandwidth bound。&lt;/p&gt;
+&lt;p&gt;它影响：&lt;/p&gt;
+\[\boxed{\ ext{ITL/TBT — Inter-Token Latency}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Sarathi 的工作明确指出，这两种 phase 的计算特征非常不同：prefill 很容易把 GPU 算力吃满，而单次 decode 的计算利用率相对较低，因此 decode 特别依赖 batching。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;7-一个长-prefill-可以把所有正在聊天的人卡住&#34;&gt;7. 一个长 Prefill 可以把所有正在聊天的人“卡住”
+&lt;/h1&gt;&lt;p&gt;假设 GPU 当前正在给 32 个用户 decode：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;D D D D D D D D ...
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每次 iteration 比较短。&lt;/p&gt;
+&lt;p&gt;突然进来一个：&lt;/p&gt;
+\[10000\ ext{-token prompt}.\]&lt;p&gt;如果直接把整个 prefill 一次做完：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;████████████████████████ long prefill
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;那么原先 32 个 decode 请求可能在这段时间完全得不到执行。&lt;/p&gt;
+&lt;p&gt;用户看到的就是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;模型正在输出……
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;突然停住
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;……
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;又继续输出
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{\ ext{inter-token latency spike}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以“continuous batching”并不自动等于低延迟。&lt;/p&gt;
+&lt;p&gt;你还必须决定：&lt;/p&gt;
+\[\boxed{ \ ext{prefill 与 decode 如何共享 GPU 时间} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这就是现代 LLM scheduler 的真正核心。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-chunked-prefill把一个大任务切碎让-decode-穿插进去&#34;&gt;8. Chunked Prefill：把一个大任务切碎，让 decode 穿插进去
+&lt;/h1&gt;&lt;p&gt;Sarathi 提出的关键方法之一是：&lt;/p&gt;
+\[\boxed{\ ext{chunked prefill}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;例如原 prompt：&lt;/p&gt;
+\[8192\ ext{ tokens}\]&lt;p&gt;不要一次运行：&lt;/p&gt;
+\[8192,\]&lt;p&gt;而拆成：&lt;/p&gt;
+\[1024+1024+\cdots+1024.\]&lt;p&gt;于是执行可以从：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Prefill(8192)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Decode
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Decode
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Decode
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;变成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;PrefillChunk(1024) + decodes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;PrefillChunk(1024) + decodes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;PrefillChunk(1024) + decodes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;...
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Sarathi 称其中一种策略为：&lt;/p&gt;
+\[\boxed{\ ext{decode-maximal batching}}\]&lt;p&gt;——尽量保留大量 decode，再用 prefill chunk 填充 GPU 的计算能力。&lt;/p&gt;
+&lt;p&gt;其论文实验报告，例如 LLaMA-13B/A6000 条件下 decode throughput 最高提升约 10×，端到端吞吐最高提升约 1.33×；后来的 Sarathi-Serve 进一步针对真实 serving 中 throughput-latency tradeoff 优化调度。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么-chunked-prefill-这么巧&#34;&gt;9. 为什么 Chunked Prefill 这么巧？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为 prefill 和 decode 正好存在互补性。&lt;/p&gt;
+&lt;p&gt;Decode：&lt;/p&gt;
+\[\boxed{\ ext{单请求计算量小}}\]&lt;p&gt;所以需要很大的 batch 才能充分利用 GPU。&lt;/p&gt;
+&lt;p&gt;Prefill：&lt;/p&gt;
+\[\boxed{\ ext{单请求计算密度高}}\]&lt;p&gt;很容易利用 GPU。&lt;/p&gt;
+&lt;p&gt;因此可以把它们混合：&lt;/p&gt;
+\[\boxed{ \ ext{prefill 提供 compute intensity} + \ ext{decode 提供并发 token workload} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这是一种很典型的：&lt;/p&gt;
+\[\boxed{\ ext{heterogeneous workload co-scheduling}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;它与简单的 FIFO 队列已经是完全不同层级的问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-所以现代-scheduler-更像一个token-budget-分配器&#34;&gt;10. 所以现代 scheduler 更像一个“token budget 分配器”
+&lt;/h1&gt;&lt;p&gt;传统 batch size：&lt;/p&gt;
+\[B=32.\]&lt;p&gt;但 LLM 中一个 request 在当前 iteration 可能需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;decode：1 个新 token；&lt;/li&gt;
+&lt;li&gt;prefill：2048 个 prompt tokens；&lt;/li&gt;
+&lt;li&gt;chunked prefill：512 个 tokens。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此只限制：&lt;/p&gt;
+\[\ ext{number of sequences}\]&lt;p&gt;并不能很好描述一次 GPU workload。&lt;/p&gt;
+&lt;p&gt;现代 scheduler 更自然的约束是：&lt;/p&gt;
+\[\boxed{ \sum_i n_i^{(\ ext{scheduled})} \le T_{\max} }\]&lt;p&gt;其中：&lt;/p&gt;
+\[T_{\max}\]&lt;p&gt;是一次 iteration 的 token budget。&lt;/p&gt;
+&lt;p&gt;Hugging Face 当前 Continuous Batching 配置已经直接暴露类似的 &lt;code&gt;max_batch_tokens&lt;/code&gt; 概念，并让 scheduler 根据 token budget、KV-cache blocks 和请求状态选择每轮执行内容。&lt;/p&gt;
+&lt;p&gt;这意味着 batching 已经从：&lt;/p&gt;
+\[\boxed{\ ext{“这一批有多少请求？”}}\]&lt;p&gt;进化成：&lt;/p&gt;
+\[\boxed{\ ext{“这一轮 GPU 应该处理多少 token，以及属于哪些请求？”}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么只看-tokenss-会误判-serving-系统&#34;&gt;11. 为什么只看 tokens/s 会误判 serving 系统？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设系统 A：&lt;/p&gt;
+\[10000\ ext{ tokens/s}\]&lt;p&gt;系统 B：&lt;/p&gt;
+\[8000\ ext{ tokens/s}.\]&lt;p&gt;看起来 A 更好。&lt;/p&gt;
+&lt;p&gt;但如果：&lt;/p&gt;
+&lt;h3 id=&#34;a&#34;&gt;A
+&lt;/h3&gt;&lt;p&gt;TTFT：&lt;/p&gt;
+\[4\ ext{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
+\[150\ ext{ms}\]&lt;h3 id=&#34;b&#34;&gt;B
+&lt;/h3&gt;&lt;p&gt;TTFT：&lt;/p&gt;
+\[0.5\ ext{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
+\[35\ ext{ms}\]&lt;p&gt;对于交互式聊天：&lt;/p&gt;
+\[\boxed{B\ ext{ 很可能明显更好。}}\]&lt;p&gt;因此 LLM serving 通常至少要同时观察：&lt;/p&gt;
+\[\boxed{\ ext{Throughput}}\]\[\boxed{\ ext{TTFT}}\]\[\boxed{\ ext{ITL/TBT}}\]&lt;p&gt;以及尾延迟：&lt;/p&gt;
+\[P_{95},P_{99}.\]&lt;p&gt;Sarathi-Serve 的研究重点正是：最大吞吐与低延迟之间并非自然一致，需要显式设计 scheduling policy。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-continuous-batching-其实引入了一个排队论问题&#34;&gt;12. Continuous Batching 其实引入了一个排队论问题
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;设请求到达率：&lt;/p&gt;
+\[\lambda.\]&lt;p&gt;服务能力：&lt;/p&gt;
+\[\mu.\]&lt;p&gt;当：&lt;/p&gt;
+\[\lambda\ll\mu,\]&lt;p&gt;系统很空。&lt;/p&gt;
+&lt;p&gt;这时为了拼大 batch 等待更多请求反而会增加：&lt;/p&gt;
+\[\boxed{\ ext{queueing delay}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;但当：&lt;/p&gt;
+\[\lambda\rightarrow\mu,\]&lt;p&gt;batching 会显著提高 GPU efficiency。&lt;/p&gt;
+&lt;p&gt;所以 scheduler 一直在权衡：&lt;/p&gt;
+\[\boxed{ \ ext{等一等，凑更大的 batch} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \ ext{立即执行，降低当前用户 latency} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这和离线 benchmark 完全不同。&lt;/p&gt;
+&lt;p&gt;离线：&lt;/p&gt;
+\[\boxed{\ ext{永远有任务可算}}\]&lt;p&gt;在线：&lt;/p&gt;
+\[\boxed{\ ext{任务随机到达，而且用户正在等}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以 AI serving 本质上已经进入：&lt;/p&gt;
+\[\boxed{ \ ext{queueing + scheduling + memory management} }\]&lt;p&gt;系统工程领域。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-continuous-batching-和-cuda-graph-又存在天然冲突&#34;&gt;13. Continuous Batching 和 CUDA Graph 又存在天然冲突
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;GPU 喜欢固定形状：&lt;/p&gt;
+\[B=32,\quad L=128.\]&lt;p&gt;这样可以：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;kernel fusion；&lt;/li&gt;
+&lt;li&gt;CUDA Graph capture；&lt;/li&gt;
+&lt;li&gt;提前优化内存；&lt;/li&gt;
+&lt;li&gt;减少 launch overhead。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Continuous batching 却天然制造动态形状：&lt;/p&gt;
+\[B_t= 31,32,29,32,\ldots\]&lt;p&gt;sequence lengths：&lt;/p&gt;
+\[L_i\]&lt;p&gt;也各不相同。&lt;/p&gt;
+&lt;p&gt;因此现代 inference engine 经常会把动态 workload 映射到有限的：&lt;/p&gt;
+\[\boxed{\ ext{shape buckets}}\]&lt;p&gt;或 graph sizes。&lt;/p&gt;
+&lt;p&gt;Hugging Face 当前 continuous batching 配置也包含 CUDA graph、padding intervals、KV-cache block 等硬件相关配置。&lt;/p&gt;
+&lt;p&gt;这是非常典型的系统矛盾：&lt;/p&gt;
+\[\boxed{ \ ext{scheduler 希望动态} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \ ext{GPU kernel 希望静态} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;高性能 serving engine 的工作，就是在这两者之间建立中间层。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-一个容易忽视的问题公平性&#34;&gt;14. 一个容易忽视的问题：公平性
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设队列中有：&lt;/p&gt;
+&lt;h3 id=&#34;请求-a&#34;&gt;请求 A
+&lt;/h3&gt;&lt;p&gt;prompt：&lt;/p&gt;
+\[100\]&lt;p&gt;tokens，&lt;/p&gt;
+&lt;p&gt;预计生成：&lt;/p&gt;
+\[50.\]&lt;h3 id=&#34;请求-b&#34;&gt;请求 B
+&lt;/h3&gt;&lt;p&gt;prompt：&lt;/p&gt;
+\[100000\]&lt;p&gt;tokens。&lt;/p&gt;
+&lt;p&gt;如果 scheduler 一直优先 decode：&lt;/p&gt;
+\[A\]&lt;p&gt;体验很好，&lt;/p&gt;
+&lt;p&gt;但 B 的 prefill 可能一直排不上。&lt;/p&gt;
+&lt;p&gt;反过来，如果一到长 prompt 就立即完整 prefill：&lt;/p&gt;
+\[B\]&lt;p&gt;又会严重阻塞正在 decode 的请求。&lt;/p&gt;
+&lt;p&gt;所以 scheduler 还需要处理：&lt;/p&gt;
+\[\boxed{\ ext{starvation / fairness}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;真实系统因此可能引入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;FCFS；&lt;/li&gt;
+&lt;li&gt;priority；&lt;/li&gt;
+&lt;li&gt;token budget；&lt;/li&gt;
+&lt;li&gt;chunk limits；&lt;/li&gt;
+&lt;li&gt;preemption；&lt;/li&gt;
+&lt;li&gt;aging；&lt;/li&gt;
+&lt;li&gt;latency SLO aware scheduling。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这说明 continuous batching 并不是一个单独算法，而是：&lt;/p&gt;
+\[\boxed{\ ext{一个 scheduler architecture}}\]&lt;p&gt;。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-为什么-reasoning-model-会让这个问题更严重&#34;&gt;15. 为什么 reasoning model 会让这个问题更严重？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;传统聊天可能输出：&lt;/p&gt;
+\[100\sim500\]&lt;p&gt;tokens。&lt;/p&gt;
+&lt;p&gt;推理模型可能输出：&lt;/p&gt;
+\[5000, 10000,\]&lt;p&gt;甚至更多。&lt;/p&gt;
+&lt;p&gt;于是某些请求长期占据：&lt;/p&gt;
+\[\boxed{\ ext{KV cache + decode slot}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这会同时影响：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;memory occupancy；&lt;/li&gt;
+&lt;li&gt;concurrency；&lt;/li&gt;
+&lt;li&gt;queue length；&lt;/li&gt;
+&lt;li&gt;tail latency。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此 2026 年仍有大量研究继续围绕 reasoning workload 的：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;KV compression；&lt;/li&gt;
+&lt;li&gt;scheduling；&lt;/li&gt;
+&lt;li&gt;high concurrency；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;展开。例如 2026 年的 Zipage 就直接把 reasoning 长输出引起的 KV-cache concurrency 限制作为核心 serving 问题。&lt;/p&gt;
+&lt;p&gt;也就是说 Continuous Batching 并没有“解决完” LLM serving。&lt;/p&gt;
+&lt;p&gt;它只是建立了现代调度的基本框架。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-一个很值得自己实现的最小模拟器&#34;&gt;16. 一个很值得自己实现的最小模拟器
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;根本不需要 GPU。&lt;/p&gt;
+&lt;p&gt;只用 Python/Rust 写一个离散事件 simulator。&lt;/p&gt;
+&lt;p&gt;生成 1000 个请求：&lt;/p&gt;
+\[L_i^{out} \sim \ ext{某个长尾分布}.\]&lt;p&gt;假设 GPU 每 iteration 最多服务：&lt;/p&gt;
+\[B=16.\]&lt;h3 id=&#34;static-batching&#34;&gt;Static batching
+&lt;/h3&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;take 16 requests
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;while any unfinished:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    run one decode step
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;then take next 16
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;h3 id=&#34;continuous-batching&#34;&gt;Continuous batching
+&lt;/h3&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;while requests remain:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    remove finished sequences
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    fill free slots from waiting queue
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    run one decode iteration
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;记录：&lt;/p&gt;
+\[\ ext{GPU active slots}\]&lt;p&gt;例如：&lt;/p&gt;
+\[\eta= \frac{ \sum_t B_t }{ B_{\max}T }.\]&lt;p&gt;同时记录：&lt;/p&gt;
+\[\ ext{mean latency}\]&lt;p&gt;和：&lt;/p&gt;
+\[P_{95}.\]&lt;p&gt;只要 output lengths 有明显差异，你就会看到 static batching 中出现大量：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;████████████████
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;██████████
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;████
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;██
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这种 progressively empty batch。&lt;/p&gt;
+&lt;p&gt;Continuous batching 则更接近：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;████████████████
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;████████████████
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;████████████████
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;████████████████
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这个实验十几行代码就能把核心直觉建立起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-对-ai-agent-系统它还有一个更深的意义&#34;&gt;17. 对 AI Agent 系统，它还有一个更深的意义
+&lt;/h1&gt;&lt;p&gt;Agent 请求并不像普通 chat request。&lt;/p&gt;
+&lt;p&gt;它可能：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;9
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;LLM generate
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;tool call
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;等待网页/API
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;LLM resume
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;tool call
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;也就是说 request 会出现：&lt;/p&gt;
+\[\boxed{\ ext{暂停—恢复}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;如果暂停期间仍把完整 KV cache 长期占在 GPU 上：&lt;/p&gt;
+\[\boxed{\ ext{昂贵显存会被闲置状态占满。}}\]&lt;p&gt;如果直接丢掉：&lt;/p&gt;
+&lt;p&gt;恢复时又要重新 prefill。&lt;/p&gt;
+&lt;p&gt;因此 Agent serving 会进一步引出：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;KV swap；&lt;/li&gt;
+&lt;li&gt;intercept-aware scheduling；&lt;/li&gt;
+&lt;li&gt;recomputation；&lt;/li&gt;
+&lt;li&gt;resumed-request priority。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;INFERCEPT 等工作正是针对 augmented LLM 中这种 request interception 问题研究何时保留、丢弃或交换 KV cache。&lt;/p&gt;
+&lt;p&gt;所以 Continuous Batching 也是理解：&lt;/p&gt;
+\[\boxed{\ ext{Agent runtime infrastructure}}\]&lt;p&gt;很好的入口。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-对游戏-ai-部署尤其有现实意义&#34;&gt;18. 对游戏 AI 部署尤其有现实意义
+&lt;/h1&gt;&lt;p&gt;假设游戏服务器同时运行：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;40 个 NPC 对话；&lt;/li&gt;
+&lt;li&gt;5 个任务规划 Agent；&lt;/li&gt;
+&lt;li&gt;10 个行为解释请求。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;每个请求生成长度不同。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[\boxed{\ ext{一个 NPC = 一次独立 model.generate()}}\]&lt;p&gt;GPU 很难获得高利用率。&lt;/p&gt;
+&lt;p&gt;更合理的架构是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;NPC requests
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Quest agents
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Dialogue requests
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;central request queue
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;token-level scheduler
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;continuous batch
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;GPU
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{ \ ext{模型本身可能只是组件； 真正决定服务器容量的是调度层。} }\]&lt;p&gt;这也是为什么现在做 AI 游戏工程，只懂：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;模型 API；&lt;/li&gt;
+&lt;li&gt;prompt；&lt;/li&gt;
+&lt;li&gt;quantization；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;是不够的。&lt;/p&gt;
+&lt;p&gt;一旦进入本地/私有模型部署：&lt;/p&gt;
+\[\boxed{ \ ext{KV memory + batching + scheduling} }\]&lt;p&gt;都会直接决定成本。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;19-它给其他工程领域一个很强的迁移启发重新寻找最小可调度工作单元&#34;&gt;19. 它给其他工程领域一个很强的迁移启发：重新寻找“最小可调度工作单元”
+&lt;/h1&gt;&lt;p&gt;Continuous Batching 最深的地方其实并不限于 LLM。&lt;/p&gt;
+&lt;p&gt;原来系统认为一个不可分割任务是：&lt;/p&gt;
+\[\boxed{\ ext{request}}\]&lt;p&gt;Orca 发现真正可以安全重组的是：&lt;/p&gt;
+\[\boxed{\ ext{iteration}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这是一种很强的系统优化方法：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;当 workload 不均衡时，先检查当前 scheduling granularity 是否太粗。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;例如物理求解器里：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;一个 frame；&lt;/li&gt;
+&lt;li&gt;一个 body；&lt;/li&gt;
+&lt;li&gt;一个 island；&lt;/li&gt;
+&lt;li&gt;一个 constraint batch；&lt;/li&gt;
+&lt;li&gt;一个 Newton iteration；&lt;/li&gt;
+&lt;li&gt;一个 element kernel；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;哪个才是真正合适的工作单位？&lt;/p&gt;
+&lt;p&gt;有时性能问题不是 kernel 太慢，&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\ ext{scheduler 根本看不到足够细的可重组工作。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;20-这和-gpu-物理引擎甚至有一个很直接的类比&#34;&gt;20. 这和 GPU 物理引擎甚至有一个很直接的类比
+&lt;/h1&gt;&lt;p&gt;假设有 100 个 physics islands。&lt;/p&gt;
+&lt;p&gt;传统方式：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;batch 16 islands
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;等最慢 island 完成全部 solver iterations
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;再换下一批
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果不同岛所需迭代数差异很大：&lt;/p&gt;
+\[4,\ 5,\ 30,\ 100,\ldots\]&lt;p&gt;就会遇到类似 static batching 的问题。&lt;/p&gt;
+&lt;p&gt;另一种思路：&lt;/p&gt;
+\[\boxed{ \ ext{以 solver iteration 为粒度重新装填 active islands} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;已经收敛的 island 退出，&lt;/p&gt;
+&lt;p&gt;新 island 加入。&lt;/p&gt;
+&lt;p&gt;虽然具体 GPU 数据布局会复杂很多，但思维与 Orca 几乎一致：&lt;/p&gt;
+\[\boxed{ \ ext{variable-length iterative workloads 需要 iteration-aware scheduling。} }\]&lt;p&gt;这就是这张卡片对物理求解器最值得迁移的一点。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Continuous Batching 最值得记住的不是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“请求完成以后立即补一个新请求。”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \ ext{生成式模型的自然调度单位不是 request， 而是一次生成迭代。} }\]&lt;p&gt;知识体系可以这样定位：&lt;/p&gt;
+\[\ ext{Autoregressive inference}\]\[\downarrow\]\[\boxed{\ ext{Iteration-level / Continuous Batching}}\]\[\downarrow\]\[\ ext{Paged KV memory} + \ ext{Prefill/Decode scheduling}\]\[\downarrow\]\[\ ext{high-throughput LLM serving}.\]&lt;p&gt;而一旦真正进入生产系统，还要继续解决：&lt;/p&gt;
+\[\boxed{ \ ext{吞吐} \leftrightarrow \ ext{TTFT} \leftrightarrow \ ext{inter-token latency} \leftrightarrow \ ext{fairness} }\]&lt;p&gt;之间的多目标权衡。&lt;/p&gt;
+&lt;p&gt;所以 Continuous Batching 的地位有点类似操作系统中的进程调度：它自身不改变模型任何一个权重，却可能让同一块 GPU 的有效服务能力相差数倍乃至更多。&lt;/p&gt;
+&lt;p&gt;这也是 AI 全栈工程里一个很值得长期保留的视角：&lt;/p&gt;
+\[\boxed{ \ ext{模型性能决定“一个请求能做到什么”； 调度系统决定“同一份硬件同时能为多少人做到”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Yu et al., &lt;em&gt;Orca: A Distributed Serving System for Transformer-Based Generative Models&lt;/em&gt;, OSDI 2022&lt;/strong&gt;。continuous/iteration-level batching 的奠基工作。重点看 iteration-level scheduling 与 selective batching，而不只是性能数字。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://friendli.ai/research/orca&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Orca 作者/团队论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Kwon et al., &lt;em&gt;Efficient Memory Management for Large Language Model Serving with PagedAttention&lt;/em&gt;, SOSP 2023&lt;/strong&gt;。理解 continuous batching 下一步为什么必然撞上 KV-memory 管理问题；vLLM 把 paging 与动态 batching 组合成现代 LLM serving 基础架构。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM / PagedAttention 论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Agrawal et al., &lt;em&gt;SARATHI: Efficient LLM Inference by Piggybacking Decodes with Chunked Prefills&lt;/em&gt;&lt;/strong&gt;。非常推荐继续阅读，核心是为什么 prefill 和 decode 性质差异巨大，以及 chunked prefill 如何利用这种互补。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2308.16369&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SARATHI 论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Agrawal et al., &lt;em&gt;Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve&lt;/em&gt;, OSDI 2024&lt;/strong&gt;。从“continuous batching 能跑”进一步进入“生产系统如何同时控制 throughput、TTFT 与 decode latency”。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2403.02310&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Sarathi-Serve 论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hugging Face Transformers — Continuous Batching 官方文档&lt;/strong&gt;。截至当前版本已经直接提供 &lt;code&gt;ContinuousBatchingManager&lt;/code&gt;、token budget、PagedAttention、CUDA Graph、chunked prefill 等完整机制，很适合把论文概念对应到真实 API 与 scheduler。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://huggingface.co/docs/transformers/main/continuous_batching&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Transformers Continuous Batching&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Speculative Decoding：为什么一个“小模型猜答案 &#43; 大模型批量验算”的系统，可以在**不改变目标分布**的前提下加速大模型</title>
+        <link>https://assranai.github.io/cards/30-speculative-decoding/</link>
+        <pubDate>Sat, 12 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/30-speculative-decoding/</guid>
+        <description>&lt;h1 id=&#34;speculative-decoding为什么一个小模型猜答案--大模型批量验算的系统可以在不改变目标分布的前提下加速大模型&#34;&gt;Speculative Decoding：为什么一个“小模型猜答案 + 大模型批量验算”的系统，可以在&lt;strong&gt;不改变目标分布&lt;/strong&gt;的前提下加速大模型
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Speculative Decoding / Speculative Sampling（推测解码）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × 高性能计算&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
+上一张卡片讲 Continuous Batching，解决的是：&lt;/p&gt;
+\[\boxed{\ ext{多个请求之间怎样更高效地共享 GPU}}\]&lt;p&gt;今天的 Speculative Decoding 解决的是另一个更底层的问题：&lt;/p&gt;
+\[\boxed{\ ext{单个请求为什么非得一个 token 一个 token 串行生成？}}\]&lt;p&gt;标准自回归模型：&lt;/p&gt;
+\[p(x_{1:T}) = \prod_{t=1}^{T} p(x_t\mid x_{&lt;t})\]&lt;p&gt;导致生成第 \(t+1\) 个 token 前，必须先知道第 \(t\) 个：&lt;/p&gt;
+\[x_t\rightarrow x_{t+1}\rightarrow x_{t+2}.\]&lt;p&gt;因此生成 100 个 token，原则上需要约 100 次串行 target-model decoding step。&lt;/p&gt;
+&lt;p&gt;Speculative Decoding 的关键突破是：&lt;/p&gt;
+\[\boxed{ \ ext{依赖关系不能消灭， 但可以“猜测未来”，然后并行验证。} }\]&lt;p&gt;让一个便宜的 draft model 一次猜出：&lt;/p&gt;
+\[x_{t+1},x_{t+2},\ldots,x_{t+\gamma},\]&lt;p&gt;再让昂贵的大模型在&lt;strong&gt;一次并行 forward&lt;/strong&gt;中同时检查这些位置。&lt;/p&gt;
+&lt;p&gt;Leviathan、Kalman、Matias 在 ICML 2023 的工作报告 T5-XXL 上约 \(2\!-\!3\ imes\) 加速；几乎同期 DeepMind 的 Chen 等人在 Chinchilla 70B 上报告约 \(2\!-\!2.5\ imes\) decoding speedup。更关键的是，两套工作的经典 speculative sampling 都能保持 target model 的原始采样分布，而非用质量换速度。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-为什么大模型一次验证-5-个-token可能和生成-1-个-token-差不多快&#34;&gt;1. 为什么“大模型一次验证 5 个 token”可能和生成 1 个 token 差不多快？
+&lt;/h2&gt;&lt;p&gt;这件事一开始很反直觉。&lt;/p&gt;
+&lt;p&gt;假设 70B 模型生成一个 token。&lt;/p&gt;
+&lt;p&gt;GPU 需要把大量：&lt;/p&gt;
+\[W_Q,W_K,W_V,W_{\rm FFN},\ldots\]&lt;p&gt;模型权重从 HBM 搬到计算单元。&lt;/p&gt;
+&lt;p&gt;在低 batch 的 decode 阶段，经常存在：&lt;/p&gt;
+\[\boxed{\ ext{memory-bandwidth bound}}\]&lt;p&gt;现象：&lt;/p&gt;
+&lt;p&gt;算力没有吃满，时间主要花在搬模型权重。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+&lt;h3 id=&#34;普通-decode&#34;&gt;普通 decode
+&lt;/h3&gt;&lt;p&gt;一次加载这些庞大权重：&lt;/p&gt;
+\[\rightarrow1\ ext{ 个 token}\]&lt;h3 id=&#34;验证一串候选&#34;&gt;验证一串候选
+&lt;/h3&gt;&lt;p&gt;还是加载相似的模型权重：&lt;/p&gt;
+\[\rightarrow \gamma\ ext{ 个 candidate positions 并行评分}\]&lt;p&gt;后者虽然 FLOPs 更多，却可能没有成比例增加 wall-clock time。&lt;/p&gt;
+&lt;p&gt;Medusa 对这个瓶颈的表述很直接：自回归 decode 的每一步都需要重新把庞大的模型参数从 HBM 带入计算路径，而计算本身往往没有充分利用 accelerator。&lt;/p&gt;
+&lt;p&gt;所以 speculative decoding 利用的是：&lt;/p&gt;
+\[\boxed{\ ext{模型 decode 阶段存在“闲置算力”。}}\]&lt;p&gt;它拿这些闲置算力来验证未来 token。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-基本结构draft--verify&#34;&gt;2. 基本结构：Draft → Verify
+&lt;/h1&gt;&lt;p&gt;设：&lt;/p&gt;
+\[q\]&lt;p&gt;是很小的 draft model，&lt;/p&gt;
+\[p\]&lt;p&gt;是我们真正想采样的大 target model。&lt;/p&gt;
+&lt;p&gt;当前上下文：&lt;/p&gt;
+\[x_{1:t}.\]&lt;p&gt;Draft 先自回归生成：&lt;/p&gt;
+\[\ ilde x_{t+1}, \ ilde x_{t+2}, \ldots, \ ilde x_{t+\gamma}.\]&lt;p&gt;比如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;当前上下文：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&amp;#34;The capital of France&amp;#34;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;draft 猜：
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[is] [Paris] [,] [which] [is]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这一步很便宜。&lt;/p&gt;
+&lt;p&gt;接下来 target model 一次性输入：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&amp;#34;The capital of France is Paris, which is&amp;#34;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;利用 Transformer 对不同位置并行计算的能力，一次得到：&lt;/p&gt;
+\[p(x_{t+1}|x_{\le t}),\]\[p(x_{t+2}|x_{\le t+1}),\]&lt;p&gt;……&lt;/p&gt;
+\[p(x_{t+\gamma}|x_{\le t+\gamma-1}).\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \ ext{原本 }\gamma\ ext{ 次昂贵 target decode} }\]&lt;p&gt;有机会被压缩成：&lt;/p&gt;
+\[\boxed{\ ext{1 次昂贵 target verification}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-但这里有一个核心难题draft-猜错怎么办&#34;&gt;3. 但这里有一个核心难题：Draft 猜错怎么办？
+&lt;/h1&gt;&lt;p&gt;假设 draft 给：&lt;/p&gt;
+\[q(\ ext{Paris})=0.50\]&lt;p&gt;而 target 给：&lt;/p&gt;
+\[p(\ ext{Paris})=0.80.\]&lt;p&gt;很好。&lt;/p&gt;
+&lt;p&gt;但另一个 token：&lt;/p&gt;
+\[q(\ ext{London})=0.30,\]&lt;p&gt;target：&lt;/p&gt;
+\[p(\ ext{London})=0.02.\]&lt;p&gt;显然不能无条件相信 draft。&lt;/p&gt;
+&lt;p&gt;最粗暴的办法是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;target 不同意就丢掉。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这对 greedy decoding 可以做得相对简单。&lt;/p&gt;
+&lt;p&gt;但对于：&lt;/p&gt;
+\[\boxed{\ ext{sampling}}\]&lt;p&gt;会产生更深的问题：&lt;/p&gt;
+&lt;p&gt;你一旦按某种随意规则接受/拒绝 draft token，&lt;/p&gt;
+&lt;p&gt;最终生成分布就可能不再等于：&lt;/p&gt;
+\[p.\]&lt;p&gt;这意味着 temperature、top-p 等采样行为都会被悄悄改变。&lt;/p&gt;
+&lt;p&gt;经典 speculative sampling 真正漂亮的地方就在这里：&lt;/p&gt;
+\[\boxed{ \ ext{它把这件事做成了严格的 rejection sampling。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;4-最值得理解的公式接受概率&#34;&gt;4. 最值得理解的公式：接受概率
+&lt;/h1&gt;&lt;p&gt;Draft 从：&lt;/p&gt;
+\[q(x)\]&lt;p&gt;采样出候选：&lt;/p&gt;
+\[\ ilde x.\]&lt;p&gt;Target 对同一个位置给出：&lt;/p&gt;
+\[p(x).\]&lt;p&gt;候选的接受概率为：&lt;/p&gt;
+\[\boxed{ a(\ ilde x) = \min \left( 1, \frac{p(\ ilde x)}{q(\ ilde x)} \right) }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这条公式非常有意思。&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;如果 draft：&lt;/p&gt;
+\[q(\ ilde x)\le p(\ ilde x),\]&lt;p&gt;那么：&lt;/p&gt;
+\[\frac pq\ge1,\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{a=1}.\]&lt;p&gt;Draft 对这个 token 没有“过度推荐”，直接接受。&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[q(\ ilde x)&gt;p(\ ilde x),\]&lt;p&gt;那么 draft 给这个 token 太多概率。&lt;/p&gt;
+&lt;p&gt;于是只以：&lt;/p&gt;
+\[\frac{p}{q}\]&lt;p&gt;的概率接受。&lt;/p&gt;
+&lt;p&gt;因此 draft 分布中“超出 target 的部分”会被削掉。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-被拒绝以后不能简单重新从--采样&#34;&gt;5. 被拒绝以后，不能简单重新从 \(p\) 采样
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这是整个算法最精妙的一步。&lt;/p&gt;
+&lt;p&gt;假设 candidate 被拒绝。&lt;/p&gt;
+&lt;p&gt;如果直接重新：&lt;/p&gt;
+\[x\sim p,\]&lt;p&gt;实际上会重复计算某些已经通过 acceptance mechanism 获得的概率质量，&lt;/p&gt;
+&lt;p&gt;最终分布会偏掉。&lt;/p&gt;
+&lt;p&gt;正确的 correction distribution 是：&lt;/p&gt;
+\[\boxed{ p&#39;(x) \propto \max(0,p(x)-q(x)) }\]&lt;p&gt;更严格地：&lt;/p&gt;
+\[p&#39;(x) = \frac{[p(x)-q(x)]_+} {\sum_y[p(y)-q(y)]_+}.\]&lt;p&gt;其中：&lt;/p&gt;
+\[[z]_+=\max(z,0).\]&lt;p&gt;直觉上：&lt;/p&gt;
+&lt;p&gt;Draft 已经贡献了一部分：&lt;/p&gt;
+\[\min(p,q)\]&lt;p&gt;概率质量。&lt;/p&gt;
+&lt;p&gt;剩下没有覆盖的恰好是：&lt;/p&gt;
+\[[p-q]_+.\]&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \ ext{接受部分} + \ ext{拒绝后的 correction 部分} = p }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;最终采样分布仍然严格等于 target：&lt;/p&gt;
+\[\boxed{x\sim p.}\]&lt;p&gt;这就是“lossless speculative decoding”中 &lt;strong&gt;lossless&lt;/strong&gt; 的真正含义：不是说浮点执行完全逐位一致，而是算法意义上保持 target sampling distribution。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;6-一个离散小例子&#34;&gt;6. 一个离散小例子
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;设词表只有：&lt;/p&gt;
+\[A,B,C.\]&lt;p&gt;Target：&lt;/p&gt;
+\[p=(0.6,0.3,0.1)\]&lt;p&gt;Draft：&lt;/p&gt;
+\[q=(0.5,0.4,0.1).\]&lt;p&gt;如果 draft 采到 A：&lt;/p&gt;
+\[a(A)= \min(1,0.6/0.5)=1.\]&lt;p&gt;必接收。&lt;/p&gt;
+&lt;p&gt;如果采到 B：&lt;/p&gt;
+\[a(B)= \frac{0.3}{0.4}=0.75.\]&lt;p&gt;如果采到 C：&lt;/p&gt;
+\[a(C)=1.\]&lt;p&gt;所以只有 draft &lt;strong&gt;高估 B&lt;/strong&gt; 的那部分概率质量：&lt;/p&gt;
+\[0.4-0.3=0.1\]&lt;p&gt;需要被拒掉。&lt;/p&gt;
+&lt;p&gt;而：&lt;/p&gt;
+\[p-q = (0.1,-0.1,0).\]&lt;p&gt;正部分：&lt;/p&gt;
+\[[p-q]_+ = (0.1,0,0).\]&lt;p&gt;因此 B 被拒后，correction 必然选择 A。&lt;/p&gt;
+&lt;p&gt;最终你可以验证：&lt;/p&gt;
+\[P(A)=0.6,\quad P(B)=0.3,\quad P(C)=0.1.\]&lt;p&gt;恰好恢复：&lt;/p&gt;
+\[p.\]&lt;p&gt;所以小模型可以“犯错”，只要 target 能正确校正它。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;7-真正决定性能的是-acceptance-rate&#34;&gt;7. 真正决定性能的是 Acceptance Rate
+&lt;/h1&gt;&lt;p&gt;设每轮 draft：&lt;/p&gt;
+\[\gamma=5\]&lt;p&gt;个 token。&lt;/p&gt;
+&lt;p&gt;如果 target 经常接受：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;✓ ✓ ✓ ✓ ✓
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;那么一次 target forward 可能推进约 5 个 token。&lt;/p&gt;
+&lt;p&gt;很好。&lt;/p&gt;
+&lt;p&gt;如果经常：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;✓ ✗
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;那么后面三个 draft token 都失效，因为第二个 token 已经改变了后续上下文。&lt;/p&gt;
+&lt;p&gt;此时一次 target forward 只推进约 1–2 个 token。&lt;/p&gt;
+&lt;p&gt;于是 speculative decoding 的关键性能变量并非 draft model 单独的 perplexity，而是：&lt;/p&gt;
+\[\boxed{\ ext{candidate acceptance rate}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;粗略设每个 candidate 独立具有接受概率：&lt;/p&gt;
+\[\alpha.\]&lt;p&gt;连续接受 token 数的期望约包含：&lt;/p&gt;
+\[\alpha+\alpha^2+\cdots+\alpha^\gamma.\]&lt;p&gt;所以：&lt;/p&gt;
+\[E[N_{\rm accepted}] \approx \frac{\alpha(1-\alpha^\gamma)} {1-\alpha}.\]&lt;p&gt;如果：&lt;/p&gt;
+\[\alpha=0.9,\quad\gamma=5,\]&lt;p&gt;约为：&lt;/p&gt;
+\[3.69.\]&lt;p&gt;如果：&lt;/p&gt;
+\[\alpha=0.5,\]&lt;p&gt;只约：&lt;/p&gt;
+\[0.97.\]&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \ ext{draft 只需要“便宜”是不够的， 还必须与 target 足够一致。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;8-这产生了一个很典型的双重-trade-off&#34;&gt;8. 这产生了一个很典型的双重 trade-off
+&lt;/h1&gt;&lt;p&gt;Draft 越大：&lt;/p&gt;
+\[\boxed{\alpha\uparrow}\]&lt;p&gt;通常预测越准。&lt;/p&gt;
+&lt;p&gt;但：&lt;/p&gt;
+\[\boxed{T_{\rm draft}\uparrow}\]&lt;p&gt;也更贵。&lt;/p&gt;
+&lt;p&gt;Draft 太小：&lt;/p&gt;
+\[T_{\rm draft}\downarrow\]&lt;p&gt;但接受率下降：&lt;/p&gt;
+\[\alpha\downarrow.\]&lt;p&gt;所以真正需要优化：&lt;/p&gt;
+\[\boxed{ \frac{\ ext{每轮有效推进 token 数}} {\ ext{draft cost + verification cost}} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;存在一个最佳 draft capacity。&lt;/p&gt;
+&lt;p&gt;这和很多工程问题类似：&lt;/p&gt;
+\[\boxed{ \ ext{代理模型不是越准越好； 它的精度必须和调用成本一起评价。} }\]&lt;p&gt;这也是 speculative decoding 对 surrogate modeling 特别有迁移价值的一点。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么-speculative-decoding-本质上也是一种-multi-fidelity-方法&#34;&gt;9. 为什么 Speculative Decoding 本质上也是一种 Multi-Fidelity 方法？
+&lt;/h1&gt;&lt;p&gt;把它换一种语言描述：&lt;/p&gt;
+&lt;h3 id=&#34;低保真模型&#34;&gt;低保真模型
+&lt;/h3&gt;\[q(x)\]&lt;p&gt;便宜、近似。&lt;/p&gt;
+&lt;h3 id=&#34;高保真模型&#34;&gt;高保真模型
+&lt;/h3&gt;\[p(x)\]&lt;p&gt;昂贵、权威。&lt;/p&gt;
+&lt;p&gt;传统 multi-fidelity 常做：&lt;/p&gt;
+\[\boxed{ \ ext{低保真筛选} + \ ext{少量高保真校正}. }\]&lt;p&gt;Speculative decoding 则做：&lt;/p&gt;
+\[\boxed{ \ ext{低保真提出未来轨迹} + \ ext{高保真并行验证}. }\]&lt;p&gt;而且非常关键的一点是：&lt;/p&gt;
+\[\boxed{\ ext{低保真模型永远没有最终决定权。}}\]&lt;p&gt;因此它和很多 surrogate 加速策略不同：&lt;/p&gt;
+&lt;p&gt;低保真误差不会直接污染最终输出分布。&lt;/p&gt;
+&lt;p&gt;这是一种非常强的：&lt;/p&gt;
+\[\boxed{\ ext{proposal + exact correction}}\]&lt;p&gt;架构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-这和-mfmc-又有一个重要区别&#34;&gt;10. 这和 MFMC 又有一个重要区别
+&lt;/h1&gt;&lt;p&gt;之前 &lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt; 使用低保真模型的方式是：&lt;/p&gt;
+\[\boxed{ \ ext{利用相关性降低统计估计方差} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Speculative decoding 使用低保真模型：&lt;/p&gt;
+\[\boxed{ \ ext{预测未来高保真计算可能接受的状态} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以两者都利用：&lt;/p&gt;
+\[\ ext{cheap correlated model},\]&lt;p&gt;但用途不同：&lt;/p&gt;
+\[\ ext{MFMC} \rightarrow \ ext{variance reduction}\]\[\boxed{ \ ext{Speculation} \rightarrow \ ext{latency hiding / parallel verification} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这是 multi-fidelity 思想一个非常不同的分支。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-为什么draft-正确率-90仍不足以预测-speedup&#34;&gt;11. 为什么“Draft 正确率 90%”仍不足以预测 speedup？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为 wall-clock 速度还依赖：&lt;/p&gt;
+\[T_{\rm target}(\gamma)\]&lt;p&gt;——target 一次验证 \(\gamma\) 个 token 到底比验证 1 个贵多少。&lt;/p&gt;
+&lt;p&gt;理想情况下：&lt;/p&gt;
+\[T_{\rm target}(5) \approx T_{\rm target}(1),\]&lt;p&gt;那么收益巨大。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[T_{\rm target}(5) \approx 5T_{\rm target}(1),\]&lt;p&gt;那完全没有意义。&lt;/p&gt;
+&lt;p&gt;因此 speculative decoding 的基础条件其实是：&lt;/p&gt;
+\[\boxed{ \ ext{并行验证多个 token 的边际成本远低于串行生成它们。} }\]&lt;p&gt;这高度依赖：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;GPU；&lt;/li&gt;
+&lt;li&gt;batch size；&lt;/li&gt;
+&lt;li&gt;model size；&lt;/li&gt;
+&lt;li&gt;memory bandwidth；&lt;/li&gt;
+&lt;li&gt;attention implementation；&lt;/li&gt;
+&lt;li&gt;draft architecture；&lt;/li&gt;
+&lt;li&gt;serving load。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这也解释了为什么论文中的：&lt;/p&gt;
+\[2\ imes,3\ imes\]&lt;p&gt;不能直接理解成任何环境都会得到同样收益。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-为什么高并发场景反而可能让它不那么划算&#34;&gt;12. 为什么高并发场景反而可能让它不那么划算？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这是 speculative decoding 和上一期 Continuous Batching 最重要的联系。&lt;/p&gt;
+&lt;p&gt;在低并发时，大模型 decode 可能：&lt;/p&gt;
+\[\boxed{\ ext{memory bound + GPU 算力闲置}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;Speculative verification 可以利用闲置算力。&lt;/p&gt;
+&lt;p&gt;但当 Continuous Batching 已经把：&lt;/p&gt;
+\[B\]&lt;p&gt;推得很大时，&lt;/p&gt;
+&lt;p&gt;GPU 本身可能已经非常忙。&lt;/p&gt;
+&lt;p&gt;这时 speculative verification 增加额外计算：&lt;/p&gt;
+\[\boxed{\ ext{可能没有“免费算力”可用了。}}\]&lt;p&gt;于是：&lt;/p&gt;
+\[\ ext{single-request latency}\downarrow\]&lt;p&gt;并不自动意味着：&lt;/p&gt;
+\[\ ext{system throughput}\uparrow.\]&lt;p&gt;当前 vLLM 文档也把 speculative decoding 的主要目标明确定位在&lt;strong&gt;中低 QPS、memory-bound&lt;/strong&gt; 的 serving workload，而不是所有负载条件。&lt;/p&gt;
+&lt;p&gt;这点非常重要：&lt;/p&gt;
+\[\boxed{ \ ext{Speculative Decoding 与 Continuous Batching 既互补，也会争抢同一份 GPU capacity。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-经典双模型方案还有一个现实问题需要多放一个模型&#34;&gt;13. 经典双模型方案还有一个现实问题：需要多放一个模型
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设 target：&lt;/p&gt;
+\[70B.\]&lt;p&gt;再部署 draft：&lt;/p&gt;
+\[7B.\]&lt;p&gt;这意味着额外：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;显存；&lt;/li&gt;
+&lt;li&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;kv-cache&#34; tabindex=&#34;0&#34;&gt;KV cache&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;模型管理；&lt;/li&gt;
+&lt;li&gt;tokenizer compatibility；&lt;/li&gt;
+&lt;li&gt;kernel 调度。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;而且：&lt;/p&gt;
+\[q\]&lt;p&gt;最好与：&lt;/p&gt;
+\[p\]&lt;p&gt;行为高度相关。&lt;/p&gt;
+&lt;p&gt;这促成了一整条后续研究线：&lt;/p&gt;
+\[\boxed{ \ ext{能不能不再单独部署一个完整 draft model？} }\]&lt;p&gt;答案是：可以。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-medusa让大模型自己一次预测多个未来-token&#34;&gt;14. Medusa：让大模型自己一次预测多个未来 token
+&lt;/h1&gt;&lt;p&gt;Medusa 不单独放一个完整小模型。&lt;/p&gt;
+&lt;p&gt;它在模型顶部增加多个轻量 decoding heads。&lt;/p&gt;
+&lt;p&gt;普通 LM head 预测：&lt;/p&gt;
+\[x_{t+1}.\]&lt;p&gt;Medusa heads 进一步尝试预测：&lt;/p&gt;
+\[x_{t+2}, x_{t+3}, \ldots\]&lt;p&gt;形成多个候选。&lt;/p&gt;
+&lt;p&gt;然后用 tree attention 一次验证多条 continuation。&lt;/p&gt;
+&lt;p&gt;结构可以粗略看成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;             → head 1 → t+1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;hidden state → head 2 → t+2
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;             → head 3 → t+3
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;             → head 4 → t+4
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这样避免维护独立 draft LLM。&lt;/p&gt;
+&lt;p&gt;Medusa 在 ICML 2024 发表；论文报告 Medusa-1 可超过约 \(2.2\ imes\) 加速，进一步联合训练的 Medusa-2 报告约 \(2.3\!-\!3.6\ imes\) 的实验加速范围。&lt;/p&gt;
+&lt;p&gt;它体现了另一个重要方向：&lt;/p&gt;
+\[\boxed{ \ ext{未来 token prediction 本身可以成为模型 architecture 的能力。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;15-eagle甚至不一定要在-token-空间里猜&#34;&gt;15. EAGLE：甚至不一定要在 token 空间里猜
+&lt;/h1&gt;&lt;p&gt;EAGLE 提出了一个更有意思的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Token 很离散、很难预测，那么能不能先预测模型内部 feature？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;它观察到高层 hidden feature 的自回归预测可能比直接猜 token 更容易。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[h_t \rightarrow \hat h_{t+1} \rightarrow \hat x_{t+1}.\]&lt;p&gt;EAGLE 使用 lightweight autoregressive head 预测接近顶层的 feature，再由 target model 验证。&lt;/p&gt;
+&lt;p&gt;其 ICML 2024 工作在 LLaMA2-Chat 70B 上报告约 \(2.7\!-\!3.5\ imes\) latency speedup，并保持最终生成分布。&lt;/p&gt;
+&lt;p&gt;这揭示了 speculative decoding 的一个更普遍版本：&lt;/p&gt;
+\[\boxed{ \ ext{“猜未来”不一定发生在输出 token 空间， 也可以发生在内部状态空间。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;16-到-2026-年speculative-decoding-已经从一个算法演化成方法族&#34;&gt;16. 到 2026 年，Speculative Decoding 已经从“一个算法”演化成“方法族”
+&lt;/h1&gt;&lt;p&gt;当前 vLLM 文档已经把 speculation 暴露成统一配置，并支持/覆盖多类 proposer 思路，包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;独立 draft model；&lt;/li&gt;
+&lt;li&gt;n-gram / prompt lookup；&lt;/li&gt;
+&lt;li&gt;suffix-based proposal；&lt;/li&gt;
+&lt;li&gt;MTP（multi-token prediction）；&lt;/li&gt;
+&lt;li&gt;EAGLE 系列等。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;当前接口的核心仍然是：&lt;/p&gt;
+\[\boxed{\ ext{propose several tokens → target verifies}}\]&lt;p&gt;，只是“谁负责 propose”发生变化。&lt;/p&gt;
+&lt;p&gt;Hugging Face 当前 Transformers 同样正式支持 assisted/speculative decoding：辅助模型生成候选，主模型一次验证；其文档同时提醒，经典双模型实现的实际收益依赖 assistant 足够小、candidate agreement 足够好等条件。&lt;/p&gt;
+&lt;p&gt;甚至 2026 年发布的 &lt;strong&gt;Gemma 4 Assistant&lt;/strong&gt; 已专门提供面向 Gemma 4 的 speculative assistant，并通过 KV sharing 复用 target 的 KV cache，从而减少 assistant 自身的 prefill 和 attention 成本。&lt;/p&gt;
+&lt;p&gt;所以今天再理解 speculative decoding，最好不要把它等同于：&lt;/p&gt;
+\[\boxed{\ ext{“一个小 LLM + 一个大 LLM”}}\]&lt;p&gt;而应该理解为：&lt;/p&gt;
+\[\boxed{ \ ext{cheap proposal mechanism} + \ ext{authoritative parallel verification} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-它和-branch-prediction-有什么共同思想&#34;&gt;17. 它和 Branch Prediction 有什么共同思想？
+&lt;/h1&gt;&lt;p&gt;CPU 遇到：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;if (...) {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ...
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;不知道下一条真正执行哪个分支。&lt;/p&gt;
+&lt;p&gt;如果等条件确定以后再取指：&lt;/p&gt;
+\[\boxed{\ ext{流水线会停}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以 CPU：&lt;/p&gt;
+\[\ ext{predict branch} \rightarrow \ ext{speculatively execute} \rightarrow \ ext{verify}\]&lt;p&gt;预测对：&lt;/p&gt;
+\[\ ext{保留工作}.\]&lt;p&gt;预测错：&lt;/p&gt;
+\[\ ext{rollback}.\]&lt;p&gt;Speculative decoding 也是：&lt;/p&gt;
+\[\boxed{ \ ext{predict future computation} \rightarrow \ ext{execute/verify in parallel} \rightarrow \ ext{accept or discard}. }\]&lt;p&gt;共同思想是：&lt;/p&gt;
+\[\boxed{ \ ext{当真正的依赖无法消除时， 可以通过预测跨越依赖。} }\]&lt;p&gt;这是一种非常普遍的计算机体系结构思想。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-对物理求解器它甚至提供了一个很有野心的类比&#34;&gt;18. 对物理求解器，它甚至提供了一个很有野心的类比
+&lt;/h1&gt;&lt;p&gt;假设 nonlinear time stepping：&lt;/p&gt;
+\[x_{n+1} = \Phi(x_n).\]&lt;p&gt;传统严格串行：&lt;/p&gt;
+\[x_n \rightarrow x_{n+1} \rightarrow x_{n+2}.\]&lt;p&gt;现在有一个非常便宜的 approximate solver：&lt;/p&gt;
+\[\ ilde\Phi.\]&lt;p&gt;它先猜：&lt;/p&gt;
+\[\ ilde x_{n+1}, \ ilde x_{n+2}, \ldots\]&lt;p&gt;高保真 solver 再检查这些 predicted states。&lt;/p&gt;
+&lt;p&gt;这和已有的：&lt;/p&gt;
+\[\boxed{\ ext{Parareal / parallel-in-time}}\]&lt;p&gt;思想已经相当接近——用 cheap coarse propagator 预测未来，再由 expensive fine propagator 纠正。&lt;/p&gt;
+&lt;p&gt;所以 speculative decoding 并不是 LLM 特有的魔法。&lt;/p&gt;
+&lt;p&gt;它属于一个更大的算法母题：&lt;/p&gt;
+\[\boxed{ \ ext{cheap prediction of serial dependencies} + \ ext{expensive correction} }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这对物理求解器开发非常值得保留。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;19-对代理模型还有一个更重要的启发代理不必直接取代高保真模型&#34;&gt;19. 对代理模型还有一个更重要的启发：代理不必直接取代高保真模型
+&lt;/h1&gt;&lt;p&gt;通常 surrogate 的目标是：&lt;/p&gt;
+\[f_H(x) \approx \hat f(x)\]&lt;p&gt;然后部署时：&lt;/p&gt;
+\[\boxed{\hat f\ ext{ 替代 }f_H}.\]&lt;p&gt;于是代理误差直接进入最终答案。&lt;/p&gt;
+&lt;p&gt;Speculative decoding 展示了另一种用法：&lt;/p&gt;
+\[\boxed{ \hat f \ ext{ 只负责提出候选， 最终正确性仍由 }f_H\ ext{ 保证。} }\]&lt;p&gt;于是 surrogate 可以：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;很便宜；&lt;/li&gt;
+&lt;li&gt;不需要极高精度；&lt;/li&gt;
+&lt;li&gt;允许犯错；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;只要：&lt;/p&gt;
+\[\boxed{\ ext{它经常猜对就有价值。}}\]&lt;p&gt;这其实是一种非常重要的工程思想。&lt;/p&gt;
+&lt;p&gt;例如可靠性仿真中，低精度代理可以负责提出：&lt;/p&gt;
+\[\boxed{\ ext{可能靠近失效面的 candidate samples}}\]&lt;p&gt;而真正失效标签始终由高保真模型验证。&lt;/p&gt;
+&lt;p&gt;代理不承担最终真值职责，训练目标就可以发生变化：&lt;/p&gt;
+&lt;p&gt;从：&lt;/p&gt;
+\[\min E[(f-\hat f)^2]\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{ \max \ ext{proposal usefulness per unit cost}. }\]&lt;p&gt;这往往是更符合实际系统目标的指标。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个最值得自己实现的最小实验&#34;&gt;20. 一个最值得自己实现的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;无需 LLM。&lt;/p&gt;
+&lt;p&gt;构造一个目标概率分布：&lt;/p&gt;
+\[p=(0.30,0.25,0.20,0.15,0.10)\]&lt;p&gt;和 draft：&lt;/p&gt;
+\[q=(0.28,0.27,0.18,0.17,0.10).\]&lt;p&gt;实现：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;candidate ~ q
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;accept with:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    min(1, p[candidate] / q[candidate])
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;if rejected:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    sample from normalize(max(p-q, 0))
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;运行：&lt;/p&gt;
+\[10^6\]&lt;p&gt;次。&lt;/p&gt;
+&lt;p&gt;统计最终频率。&lt;/p&gt;
+&lt;p&gt;你会发现：&lt;/p&gt;
+\[\hat p \approx p.\]&lt;p&gt;然后故意把 rejection correction 改成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;if rejected:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    sample directly from p
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;再统计。&lt;/p&gt;
+&lt;p&gt;结果就会开始偏离：&lt;/p&gt;
+\[p.\]&lt;p&gt;这个十几行程序会让你真正理解 speculative sampling 最核心的数学保证。&lt;/p&gt;
+&lt;p&gt;第二步再模拟：&lt;/p&gt;
+\[\gamma=1,2,4,8\]&lt;p&gt;以及不同：&lt;/p&gt;
+\[\alpha.\]&lt;p&gt;假设：&lt;/p&gt;
+\[T_{\rm draft}=0.1, \qquad T_{\rm verify}=1.1\]&lt;p&gt;估计每生成一个有效 token 的平均成本。&lt;/p&gt;
+&lt;p&gt;你会很快看到：&lt;/p&gt;
+\[\boxed{ \gamma\ ext{ 并非越大越好。} }\]&lt;p&gt;Candidate 太长以后，后部 token 被整体废弃的概率快速增长。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Speculative Decoding 最值得记住的不是：&lt;/p&gt;
+\[a(x)=\min(1,p(x)/q(x)).\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
+\[\boxed{ \ ext{串行依赖不能被删除时， 仍然可以通过“便宜地猜未来 + 昂贵地批量验证” 把一部分串行工作转化成并行工作。} }\]&lt;p&gt;它在 LLM serving 知识体系中的位置可以理解成：&lt;/p&gt;
+\[\ ext{Autoregressive decoding}\]\[\downarrow\]\[\boxed{\ ext{Speculative proposal}}\]\[+\]\[\boxed{\ ext{Parallel target verification}}\]\[\downarrow\]\[\ ext{fewer expensive serial target steps}.\]&lt;p&gt;它与前两张 AI 工程卡恰好组成三个完全不同的优化轴：&lt;/p&gt;
+\[\boxed{ \ ext{PagedAttention：优化状态内存} }\]\[\boxed{ \ ext{Continuous Batching：优化请求调度} }\]\[\boxed{ \ ext{Speculative Decoding：优化算法关键路径} }\]&lt;p&gt;真正深的一层则是：&lt;/p&gt;
+\[\boxed{ \ ext{低保真模型最大的价值，有时并不是替代高保真模型， 而是预测“高保真模型下一步大概率会做什么”。} }\]&lt;p&gt;一旦低保真预测错误可以被便宜而严格地检测和纠正，你就得到了一种非常强的加速架构：&lt;/p&gt;
+\[\boxed{ \ ext{approximate speculation} + \ ext{exact authority}. }\]&lt;p&gt;这个思想完全可以迁移到 AI 之外。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Leviathan, Kalman &amp;amp; Matias, &lt;em&gt;Fast Inference from Transformers via Speculative Decoding&lt;/em&gt;, ICML 2023&lt;/strong&gt;。理解完整算法最好的原始资料之一，重点看 speculative sampling 为什么能够严格保持目标分布，以及 acceptance rate 如何决定性能。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://proceedings.mlr.press/v202/leviathan23a.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;PMLR 原论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Chen et al., &lt;em&gt;Accelerating Large Language Model Decoding with Speculative Sampling&lt;/em&gt;, 2023&lt;/strong&gt;。DeepMind 几乎同期的经典工作，在 Chinchilla 70B 上报告约 \(2\!-\!2.5\ imes\) 加速，对“为什么一次批量验证可以替代多次 decode”的工程解释尤其好。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2302.01318&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Cai et al., &lt;em&gt;Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads&lt;/em&gt;, ICML 2024&lt;/strong&gt;。适合继续理解“没有独立 draft LLM 能不能 speculation”：多个预测头 + tree attention 是很漂亮的答案。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://proceedings.mlr.press/v235/cai24b.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;PMLR Medusa 论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Li et al., &lt;em&gt;EAGLE: Speculative Sampling Requires Rethinking Feature Uncertainty&lt;/em&gt;, ICML 2024&lt;/strong&gt;。很值得研究型读者看，因为它把 speculation 从 token space 推进到 feature space。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://www.microsoft.com/en-us/research/publication/eagle-speculative-sampling-requires-rethinking-feature-uncertainty/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Microsoft Research EAGLE&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;vLLM Speculative Decoding 官方文档&lt;/strong&gt;。适合把论文映射到 2026 年实际 serving：当前统一支持 draft model、MTP、EAGLE、ngram/suffix 等多类 speculation mechanism，并明确讨论其适用的中低 QPS、memory-bound 场景。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/latest/features/speculative_decoding/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM 最新 Speculative Decoding 文档&lt;/a&gt;&amp;quot;,&amp;ldquo;role&amp;rdquo;,&amp;ldquo;assistant&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

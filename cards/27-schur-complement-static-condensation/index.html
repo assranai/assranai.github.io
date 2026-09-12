@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉 主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）\n领域：有限元 × 数值方法 × 数值优化 × 流体\n推荐阅读时间：约 8–10 分钟\n今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：\n\\[\\boxed{ \\ ext{一个大系统里的不同未知量，并不一定值得被同等对待。} }\\]很多有限元、多物理场和约束问题最终都会得到块矩阵：\n\\[\\begin{bmatrix} A & B\\\\ C & D \\end{bmatrix} \\begin{bmatrix} x\\\\ y \\end{bmatrix} = \\begin{bmatrix} f\\\\ g \\end{bmatrix}.\\]Schur 补做的事情很直接：\n如果 \\(x\\) 相对容易求，那么先把 \\(x\\) 消掉，只留下一个关于 \\(y\\) 的有效系统。\n得到：\n\\[\\boxed{ S=D-CA^{-1}B }\\]这就是 Schur complement。\n看起来只是一条线性代数公式，但它实际上同时出现在：\n高阶有限元的 static condensation； FETI/BDDC 等 domain decomposition； Stokes/Navier–Stokes pressure solve； incompressibility； contact multiplier systems； 多物理场 block preconditioning； hybridized FEM； 图优化和高斯消元。 PETSc 当前的 PCFIELDSPLIT 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。\n">
+<title>Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/27-schur-complement-static-condensation/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉">
+<meta property='og:description' content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉 主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）\n领域：有限元 × 数值方法 × 数值优化 × 流体\n推荐阅读时间：约 8–10 分钟\n今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：\n\\[\\boxed{ \\ ext{一个大系统里的不同未知量，并不一定值得被同等对待。} }\\]很多有限元、多物理场和约束问题最终都会得到块矩阵：\n\\[\\begin{bmatrix} A & B\\\\ C & D \\end{bmatrix} \\begin{bmatrix} x\\\\ y \\end{bmatrix} = \\begin{bmatrix} f\\\\ g \\end{bmatrix}.\\]Schur 补做的事情很直接：\n如果 \\(x\\) 相对容易求，那么先把 \\(x\\) 消掉，只留下一个关于 \\(y\\) 的有效系统。\n得到：\n\\[\\boxed{ S=D-CA^{-1}B }\\]这就是 Schur complement。\n看起来只是一条线性代数公式，但它实际上同时出现在：\n高阶有限元的 static condensation； FETI/BDDC 等 domain decomposition； Stokes/Navier–Stokes pressure solve； incompressibility； contact multiplier systems； 多物理场 block preconditioning； hybridized FEM； 图优化和高斯消元。 PETSc 当前的 PCFIELDSPLIT 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/27-schur-complement-static-condensation/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='数值优化' /><meta property='article:tag' content='流体' /><meta property='article:published_time' content='2026-09-09T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-09T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉">
+<meta name="twitter:description" content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉 主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）\n领域：有限元 × 数值方法 × 数值优化 × 流体\n推荐阅读时间：约 8–10 分钟\n今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：\n\\[\\boxed{ \\ ext{一个大系统里的不同未知量，并不一定值得被同等对待。} }\\]很多有限元、多物理场和约束问题最终都会得到块矩阵：\n\\[\\begin{bmatrix} A & B\\\\ C & D \\end{bmatrix} \\begin{bmatrix} x\\\\ y \\end{bmatrix} = \\begin{bmatrix} f\\\\ g \\end{bmatrix}.\\]Schur 补做的事情很直接：\n如果 \\(x\\) 相对容易求，那么先把 \\(x\\) 消掉，只留下一个关于 \\(y\\) 的有效系统。\n得到：\n\\[\\boxed{ S=D-CA^{-1}B }\\]这就是 Schur complement。\n看起来只是一条线性代数公式，但它实际上同时出现在：\n高阶有限元的 static condensation； FETI/BDDC 等 domain decomposition； Stokes/Navier–Stokes pressure solve； incompressibility； contact multiplier systems； 多物理场 block preconditioning； hybridized FEM； 图优化和高斯消元。 PETSc 当前的 PCFIELDSPLIT 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-schur-补其实就是一次精确消元">1. Schur 补其实就是一次精确消元</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/27-schur-complement-static-condensation/">Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-09T00:00:00Z'>Sep 09, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 6 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="schur-补与静态凝聚真正高效的大型求解器经常不是更快地解全部未知量而是先把不重要的自由度消掉">Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉
+</h1><p><strong>主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）</strong><br>
+<strong>领域：有限元 × 数值方法 × 数值优化 × 流体</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong><br>
+今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：</p>
+\[\boxed{ \ ext{一个大系统里的不同未知量，并不一定值得被同等对待。} }\]<p>很多有限元、多物理场和约束问题最终都会得到块矩阵：</p>
+\[\begin{bmatrix} A & B\\ C & D \end{bmatrix} \begin{bmatrix} x\\ y \end{bmatrix} = \begin{bmatrix} f\\ g \end{bmatrix}.\]<p>Schur 补做的事情很直接：</p>
+<blockquote>
+<p>如果 \(x\) 相对容易求，那么先把 \(x\) 消掉，只留下一个关于 \(y\) 的有效系统。</p>
+</blockquote>
+<p>得到：</p>
+\[\boxed{ S=D-CA^{-1}B }\]<p>这就是 Schur complement。</p>
+<p>看起来只是一条线性代数公式，但它实际上同时出现在：</p>
+<ul>
+<li>高阶有限元的 static condensation；</li>
+<li>FETI/BDDC 等 domain decomposition；</li>
+<li>Stokes/Navier–Stokes pressure solve；</li>
+<li>incompressibility；</li>
+<li>contact multiplier systems；</li>
+<li>多物理场 block preconditioning；</li>
+<li>hybridized FEM；</li>
+<li>图优化和高斯消元。</li>
+</ul>
+<p>PETSc 当前的 <code>PCFIELDSPLIT</code> 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。</p>
+<p>真正值得学的不是公式本身，而是：</p>
+\[\boxed{ \ ext{消元以后，剩下的变量究竟代表了什么“有效物理”。} }\]<hr>
+<h2 id="1-schur-补其实就是一次精确消元">1. Schur 补其实就是一次精确消元
+</h2><p>从：</p>
+\[Ax+By=f\]\[Cx+Dy=g\]<p>开始。</p>
+<p>假设 \(A\) 可逆。</p>
+<p>第一式：</p>
+\[x=A^{-1}(f-By).\]<p>代入第二式：</p>
+\[CA^{-1}(f-By)+Dy=g.\]<p>整理：</p>
+\[\boxed{ (D-CA^{-1}B)y = g-CA^{-1}f. }\]<p>所以：</p>
+\[S=D-CA^{-1}B.\]<p>先解：</p>
+\[Sy=\ ilde g,\]<p>然后回代：</p>
+\[x=A^{-1}(f-By).\]<p>这并不是近似。</p>
+<p>如果 \(A^{-1}\) 精确计算，Schur 系统与原系统：</p>
+\[\boxed{\ ext{数学上完全等价。}}\]<p>因此 Schur 补的本质不是“降阶模型”。</p>
+<p>而是：</p>
+\[\boxed{\ ext{通过变量消元重新组织同一个问题。}}\]<hr>
+<h1 id="2-为什么消掉变量以后系统反而可能更难">2. 为什么消掉变量以后，系统反而可能更难？
+</h1><p>这里有个很重要的反直觉点。</p>
+<p>原矩阵可能很稀疏：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">A B
+</span></span><span class="line"><span class="cl">C D
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>但：</p>
+\[CA^{-1}B\]<p>通常是稠密的。</p>
+<p>因为：</p>
+\[A^{-1}\]<p>一般不是稀疏矩阵。</p>
+<p>所以 Schur complement：</p>
+\[S\]<p>经常比原来的 \(D\) 更“全局”。</p>
+<p>这不是坏事，而是它的物理含义：</p>
+\[\boxed{ \ ext{被消掉的局部自由度，通过 }A^{-1}\ ext{ 把远处变量耦合起来了。} }\]<p>也就是说，Schur complement 其实是一种：</p>
+\[\boxed{\ ext{effective interaction operator}}\]<p>。</p>
+<p>被消掉的变量虽然不再显式出现，但它们的影响全部被编码进：</p>
+\[S.\]<hr>
+<h1 id="3-一个非常直观的弹簧例子">3. 一个非常直观的弹簧例子
+</h1><p>考虑三个节点：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">boundary —— interior —— boundary
+</span></span><span class="line"><span class="cl">   x1          xi           x2
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>中间节点没有外部兴趣，只承担弹簧传力。</p>
+<p>完整系统写成：</p>
+\[\begin{bmatrix} K_{ii} & K_{ib}\\ K_{bi} & K_{bb} \end{bmatrix} \begin{bmatrix} u_i\\ u_b \end{bmatrix} = \begin{bmatrix} f_i\\ f_b \end{bmatrix}.\]<p>消掉内部位移：</p>
+\[u_i = K_{ii}^{-1} (f_i-K_{ib}u_b).\]<p>边界系统变成：</p>
+\[\boxed{ S_bu_b = f_b-K_{bi}K_{ii}^{-1}f_i }\]<p>其中：</p>
+\[S_b = K_{bb} - K_{bi}K_{ii}^{-1}K_{ib}.\]<p>从外面看，这个含内部自由度的弹簧结构被替换成了：</p>
+\[\boxed{\ ext{边界节点之间的等效刚度}}\]<p>。</p>
+<p>内部节点消失了，</p>
+<p>但它们对端点关系的所有影响仍然存在。</p>
+<p>这就是 Schur complement 最好的物理直觉：</p>
+\[\boxed{ \ ext{把内部物理“压缩”成边界上的等效响应。} }\]<hr>
+<h1 id="4-static-condensation-就是有限元里的-schur-补">4. Static Condensation 就是有限元里的 Schur 补
+</h1><p>这在高阶有限元中特别重要。</p>
+<p>一个高阶单元内部可能有很多 DOF：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">┌──────────────┐
+</span></span><span class="line"><span class="cl">│ · · · · · ·  │
+</span></span><span class="line"><span class="cl">│ · interior · │
+</span></span><span class="line"><span class="cl">│ · · · · · ·  │
+</span></span><span class="line"><span class="cl">└──────────────┘
+</span></span><span class="line"><span class="cl">boundary DOFs
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>其中一部分自由度只属于当前 element：</p>
+\[u_I.\]<p>另一部分位于：</p>
+<ul>
+<li>edge；</li>
+<li>face；</li>
+<li>vertex；</li>
+</ul>
+<p>需要和邻居共享：</p>
+\[u_\Gamma.\]<p>于是单元矩阵可以写：</p>
+\[\begin{bmatrix} K_{II} & K_{I\Gamma}\\ K_{\Gamma I} & K_{\Gamma\Gamma} \end{bmatrix}.\]<p>关键来了：</p>
+\[K_{II}\]<p>只对应<strong>单元内部 DOF</strong>。</p>
+<p>所以不同单元的内部块互相不直接耦合。</p>
+<p>这意味着：</p>
+\[\boxed{ K_{II}^{-1} }\]<p>可以完全在每个 element 内局部计算。</p>
+<p>然后只组装：</p>
+\[\boxed{ S_\Gamma = K_{\Gamma\Gamma} - K_{\Gamma I}K_{II}^{-1}K_{I\Gamma}. }\]<p>MFEM 官方 <code>StaticCondensation</code> 正是这么定义的：先消去 element-interior DOFs，只构造并求解 interface DOFs 的 Schur system，之后再局部恢复内部未知量。</p>
+<hr>
+<h1 id="5-为什么高阶-fem-尤其喜欢-static-condensation">5. 为什么高阶 FEM 尤其喜欢 static condensation？
+</h1><p>假设三维 \(p\)-order element。</p>
+<p>单元内部 DOF 数大致会快速随：</p>
+\[p\]<p>增长。</p>
+<p>但真正跨 element 通信的只是在：</p>
+\[\boxed{\ ext{faces / edges}}\]<p>上的自由度。</p>
+<p>如果把所有 interior DOFs 都直接放进 global solve：</p>
+\[N_{\rm global}\]<p>会非常大。</p>
+<p>Static condensation 让：</p>
+\[\boxed{ \ ext{大量局部未知量永远不进入全局 Krylov system。} }\]<p>于是问题变成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">local work:
+</span></span><span class="line"><span class="cl">    element interior solve
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">global work:
+</span></span><span class="line"><span class="cl">    interface solve
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">local work:
+</span></span><span class="line"><span class="cl">    recover interior
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这和 HPC 中一个非常普遍的原则完全一致：</p>
+\[\boxed{ \ ext{尽量把计算留在本地，把真正需要全局通信的部分压到最小。} }\]<p>所以 static condensation 不只是减少 DOF。</p>
+<p>它减少的是：</p>
+\[\boxed{\ ext{global coupling dimension}.}\]<p>这在并行求解里往往比单纯减少 FLOPs 更重要。</p>
+<hr>
+<h1 id="6-内部变量与接口变量的分离其实就是-domain-decomposition-的核心">6. “内部变量”与“接口变量”的分离，其实就是 domain decomposition 的核心
+</h1><p>假设把一个大有限元区域切成：</p>
+\[\Omega_1,\Omega_2,\ldots,\Omega_m.\]<p>每个子域有：</p>
+<ul>
+<li>interior DOFs；</li>
+<li>interface DOFs。</li>
+</ul>
+<p>对子域内部自由度全部消元后，</p>
+<p>整个 PDE 问题变成：</p>
+\[\boxed{ S_\Gamma u_\Gamma=f_\Gamma }\]<p>只存在于子域边界上。</p>
+<p>这就是经典 <strong>substructuring</strong> 思路。</p>
+<p>Toselli 与 Widlund 的 domain decomposition 专著把这类 Schur complement/substructuring formulation 作为 FETI、BDD/BDDC 等非重叠域分解方法的重要基础：每个子域内部可以局部求解，全局问题主要转化为接口自由度协调。</p>
+<p>所以可以把两种方法看成同一个思想在不同尺度的应用：</p>
+\[\boxed{ \ ext{element-level elimination} \rightarrow \ ext{static condensation} }\]\[\boxed{ \ ext{subdomain-level elimination} \rightarrow \ ext{substructuring / domain decomposition} }\]<p>。</p>
+<hr>
+<h1 id="7-这解释了一个很深的求解器原则全局问题本质上是接口协调问题">7. 这解释了一个很深的求解器原则：全局问题本质上是“接口协调问题”
+</h1><p>很多 PDE 在每一个局部区域内部其实都很好解。</p>
+<p>真正困难的是：</p>
+\[\boxed{\ ext{不同区域怎么彼此一致。}}\]<p>例如：</p>
+<ul>
+<li>位移连续；</li>
+<li>traction 平衡；</li>
+<li>压力/速度协调；</li>
+<li>接触界面；</li>
+<li>多物理变量耦合。</li>
+</ul>
+<p>Schur complement 把内部变量全部消去以后，</p>
+<p>剩下的往往恰恰就是：</p>
+\[\boxed{\ ext{这些全局协调变量。}}\]<p>所以一个很有价值的观察是：</p>
+<blockquote>
+<p>大规模 PDE 求解器的真正核心，有时不是解每个局部 PDE，而是高效解决接口上的协调问题。</p>
+</blockquote>
+<p>这正是 domain decomposition 为什么如此适合大规模并行计算。</p>
+<hr>
+<h1 id="8-schur-补在不可压流体里又变成了什么">8. Schur 补在不可压流体里又变成了什么？
+</h1><p>考虑 Stokes：</p>
+\[-\mu\ abla^2u+\ abla p=f\]\[\ abla\cdot u=0.\]<p>离散后常得到 saddle-point system：</p>
+\[\begin{bmatrix} A & B^T\\ B & 0 \end{bmatrix} \begin{bmatrix} u\\ p \end{bmatrix} = \begin{bmatrix} f\\ 0 \end{bmatrix}.\]<p>消掉速度：</p>
+\[u = A^{-1}(f-B^Tp).\]<p>代入 incompressibility：</p>
+\[BA^{-1}(f-B^Tp)=0.\]<p>于是压力满足：</p>
+\[\boxed{ -BA^{-1}B^Tp = -BA^{-1}f. }\]<p>所以 pressure Schur complement：</p>
+\[\boxed{ S_p=-BA^{-1}B^T. }\]<p>它代表：</p>
+<blockquote>
+<p>一个压力场通过动量方程激发速度，再通过散度方程反馈出的有效作用。</p>
+</blockquote>
+<p>这就是为什么 incompressible solver 中：</p>
+\[\boxed{\ ext{pressure solve}}\]<p>如此核心。</p>
+<p>PETSc 当前专门为 saddle-point/field-split 系统提供 Schur-complement preconditioning；例如其 LSC preconditioner 就针对这类 Schur 系统，并指出在 incompressible flow 中相关 \(A_{10}A_{01}\) 结构对应 Laplacian 型算子。</p>
+<hr>
+<h1 id="9-所以-projection-method-和-schur-complement-其实很近">9. 所以 projection method 和 Schur complement 其实很近
+</h1><p>在流体里常见：</p>
+<ol>
+<li>先算 provisional velocity；</li>
+<li>解 pressure Poisson；</li>
+<li>pressure correction；</li>
+<li>得到 divergence-free velocity。</li>
+</ol>
+<p>从线性代数角度看，</p>
+<p>pressure projection 很大程度上就是在近似处理：</p>
+\[\boxed{ BA^{-1}B^T }\]<p>这一 pressure Schur complement。</p>
+<p>所以很多“物理算法”和“块矩阵求解器”其实只是：</p>
+\[\boxed{\ ext{同一结构的不同表达。}}\]<p>这个联系非常值得记住。</p>
+<hr>
+<h1 id="10-接触和约束问题里也会出现同样结构">10. 接触和约束问题里也会出现同样结构
+</h1><p>考虑约束动力学：</p>
+\[M\Delta v = f+J^T\lambda\]<p>以及速度约束：</p>
+\[J(v+\Delta v)=b.\]<p>消掉：</p>
+\[\Delta v = M^{-1}(f+J^T\lambda).\]<p>代入：</p>
+\[JM^{-1}(f+J^T\lambda)=b.\]<p>于是：</p>
+\[\boxed{ JM^{-1}J^T\lambda = b-JM^{-1}f. }\]<p>这里：</p>
+\[\boxed{ W=JM^{-1}J^T }\]<p>就是约束空间里的 Schur complement。</p>
+<p>在刚体物理里它经常叫：</p>
+\[\boxed{\ ext{Delassus operator}}\]<p>或有效质量矩阵。</p>
+<p>这条公式非常重要：</p>
+\[W = JM^{-1}J^T.\]<p>它回答：</p>
+<blockquote>
+<p>给约束施加一个单位 impulse，约束速度会改变多少？</p>
+</blockquote>
+<p>于是可以直接看出：</p>
+\[\boxed{ \ ext{LCP / contact solver 实际是在 constraint space 中求 Schur system。} }\]<p>这和有限元 static condensation 竟然是同一个数学母结构。</p>
+<hr>
+<h1 id="11-一个销轴孔接触的直观理解">11. 一个销轴—孔接触的直观理解
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设整个柔性机构有：</p>
+\[10^6\]<p>个 displacement DOFs。</p>
+<p>但当前真正 active contacts 只有：</p>
+\[100.\]<p>理论上你可能希望：</p>
+<ol>
+<li>消掉结构内部位移响应；</li>
+<li>只在 100 个 contact constraints 上求 contact forces；</li>
+<li>再恢复结构 displacement。</li>
+</ol>
+<p>得到：</p>
+\[S_c\lambda=b.\]<p>其中：</p>
+\[S_c\]<p>编码：</p>
+\[\boxed{ \ ext{一个接触点施力以后，所有其他接触点会发生多大位移响应。} }\]<p>这其实就是：</p>
+\[\boxed{\ ext{interface compliance matrix}}\]<p>。</p>
+<p>所以 Schur complement 有一个特别清晰的物理解释：</p>
+\[\boxed{ \ ext{它把整个内部结构压缩成边界/接触点之间的等效柔度或刚度关系。} }\]<p>这也是 boundary element、substructuring、component mode synthesis 等方法背后共有的思维之一。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="12-但为什么实际中通常不显式形成-">12. 但为什么实际中通常不显式形成 \(S\)？
+</h1><p>因为：</p>
+\[S=D-CA^{-1}B.\]<p>如果真的计算：</p>
+\[A^{-1}\]<p>通常非常贵。</p>
+<p>更糟的是：</p>
+\[S\]<p>可能非常稠密。</p>
+<p>所以大型系统里通常不会：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">compute inv(A)
+</span></span><span class="line"><span class="cl">form S explicitly
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>而是实现：</p>
+\[y\mapsto Sy.\]<p>也就是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">given y:
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    t = B y
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    solve A z = t
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    result = D y - C z
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>因此：</p>
+\[\boxed{ \ ext{应用一次 Schur operator} }\]<p>内部实际上包含一次：</p>
+\[A^{-1}\]<p>子问题求解。</p>
+<p>这就是所谓：</p>
+\[\boxed{\ ext{matrix-free Schur complement}}\]<p>思想。</p>
+<p>PETSc 的 Schur machinery 也支持符号 Schur operator，而不是要求始终显式组装完整 Schur matrix。</p>
+<hr>
+<h1 id="13-于是新的问题出现schur-complement-本身怎么预条件">13. 于是新的问题出现：Schur complement 本身怎么预条件？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这是真正的工程核心。</p>
+<p>如果：</p>
+\[S\]<p>很难解，</p>
+<p>只是把原问题改写成 Schur system 并没有魔法般解决它。</p>
+<p>所以实际方法通常寻找：</p>
+\[\boxed{ \hat S\approx S }\]<p>且：</p>
+\[\hat S^{-1}\]<p>便宜。</p>
+<p>例如 PETSc 允许：</p>
+<ul>
+<li>使用 \(A_{11}\)；</li>
+<li>使用用户提供的 approximation；</li>
+<li>使用 symbolic Schur；</li>
+<li>用
+
+\[A_{11}-A_{10}\operatorname{diag}(A_{00})^{-1}A_{01}\]
+这样的显式近似；</li>
+<li>对 saddle-point 系统使用 LSC 等专门预条件器。</li>
+</ul>
+<p>这揭示了一个很重要的现实：</p>
+\[\boxed{ \ ext{Schur complement 的威力，通常来自“好的近似”，而不是显式精确构造。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="14-为什么这又和前面讲过的-multigrid-不重复">14. 为什么这又和前面讲过的 Multigrid 不重复？
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p><span class="term-anchor" data-term="multigrid" tabindex="0">Multigrid</span> 解决的是：</p>
+\[\boxed{\ ext{不同空间尺度的误差}}\]<p>。</p>
+<p>Schur complement 解决的是：</p>
+\[\boxed{\ ext{不同变量/拓扑角色的耦合}}\]<p>。</p>
+<p>所以它们经常组合，而不是互相替代。</p>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">outer block solver
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">Schur complement
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">A-block solve
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">Multigrid
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>或者：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">interface Schur solve
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">BDDC / AMG
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>因此：</p>
+\[\boxed{ \ ext{Schur：变量消元 / interface reduction} }\]\[\boxed{ \ ext{Multigrid：scale reduction} }\]<p>这是两个完全不同的求解器轴。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="15-它和-hyper-reduction-也有一个很重要的区别">15. 它和 Hyper-reduction 也有一个很重要的区别
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>上一期 Hyper-reduction：</p>
+\[u\approx Vq\]<p>会产生：</p>
+\[\boxed{\ ext{近似模型}}\]<p>。</p>
+<p>Schur elimination：</p>
+\[S=D-CA^{-1}B\]<p>如果精确执行，则：</p>
+\[\boxed{\ ext{不损失任何信息。}}\]<p>所以：</p>
+<h3 id="model-reduction">Model reduction
+</h3><p>减少：</p>
+\[\boxed{\ ext{物理状态空间}}\]<p>可能引入 approximation error。</p>
+<h3 id="schur-reduction">Schur reduction
+</h3><p>减少：</p>
+\[\boxed{\ ext{显式未知量}}\]<p>但被消掉的信息以 effective operator 形式保留。</p>
+<p>这是“降维”这个词下两种完全不同的数学操作。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="16-对软体物理引擎最值得迁移的不是公式而是local-solve--interface-solve架构">16. 对软体物理引擎，最值得迁移的不是公式，而是“local solve + interface solve”架构
+</h1><p>假设一个软体由多个区域组成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">[soft body A] — interface — [soft body B]
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>每块内部可能有：</p>
+\[10^5\]<p>个 DOF。</p>
+<p>但接口只有：</p>
+\[10^3.\]<p>一种思路是全局一起跑：</p>
+\[201000\]<p>自由度的大迭代。</p>
+<p>另一种是：</p>
+\[\boxed{ \ ext{每个 body 内部局部求解} + \ ext{只在 interface 上协调} }\]<p>。</p>
+<p>这特别适合：</p>
+<ul>
+<li>destructible objects；</li>
+<li>component-based deformables；</li>
+<li>soft-rigid coupling；</li>
+<li>distributed simulation；</li>
+<li>multi-GPU physics。</li>
+</ul>
+<p>从系统角度：</p>
+\[\boxed{ \ ext{Schur complement 把“局部计算”和“全局通信”分开。} }\]<p>这和 GPU/分布式求解器的硬件结构非常契合。</p>
+<hr>
+<h1 id="17-对组件级数字样机它还有一个很现实的价值">17. 对组件级数字样机，它还有一个很现实的价值
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设一台机构有：</p>
+<ul>
+<li>杆件；</li>
+<li>支座；</li>
+<li>耳片；</li>
+<li>销轴区域；</li>
+<li>柔性壳体。</li>
+</ul>
+<p>你可能不需要在整个系统装配以后仍保留每个组件的所有内部自由度。</p>
+<p>可以先为组件构造：</p>
+\[\boxed{\ ext{boundary/interface operator}}\]<p>然后系统级只耦合：</p>
+<ul>
+<li>接口位移；</li>
+<li>接口力；</li>
+<li>连接 DOFs。</li>
+</ul>
+<p>这正是 substructuring 与 component reduction 思想的自然基础。</p>
+<p>如果以后要做：</p>
+\[\boxed{\ ext{模块化高保真数字样机}}\]<p>Schur complement 几乎是绕不开的数学语言。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="18-对代理模型也有一个非常值得迁移的启发">18. 对代理模型也有一个非常值得迁移的启发
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>通常我们想直接代理：</p>
+\[x\rightarrow y.\]<p>但如果复杂系统天然由：</p>
+\[\ ext{internal state} + \ ext{interface state}\]<p>组成，</p>
+<p>可能更好的学习目标是：</p>
+\[\boxed{ \ ext{interface input} \rightarrow \ ext{interface response} }\]<p>也就是学习一个近似：</p>
+\[\boxed{\hat S}\]<p>。</p>
+<p>例如：</p>
+\[\ ext{边界位移} \rightarrow \ ext{边界力}.\]<p>这是一种：</p>
+\[\boxed{\ ext{learned Schur operator}}\]<p>。</p>
+<p>它相比直接学习整个内部 displacement field 有几个天然优势：</p>
+<ul>
+<li>输出维数更小；</li>
+<li>与模块耦合直接兼容；</li>
+<li>可替换一个昂贵子结构；</li>
+<li>内部细节可以隐藏。</li>
+</ul>
+<p>这其实是非常自然的 physics-module surrogate。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="19-一个非常值得自己实现的最小实验">19. 一个非常值得自己实现的最小实验
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>做一个二维 Poisson FEM。</p>
+<p>把 mesh 中 DOF 分成：</p>
+\[u_I\]<p>内部节点，</p>
+<p>和：</p>
+\[u_\Gamma\]<p>边界/接口节点。</p>
+<p>原系统：</p>
+\[\begin{bmatrix} K_{II} & K_{I\Gamma}\\ K_{\Gamma I} & K_{\Gamma\Gamma} \end{bmatrix} \begin{bmatrix} u_I\\ u_\Gamma \end{bmatrix} = \begin{bmatrix} f_I\\ f_\Gamma \end{bmatrix}.\]<p>实现：</p>
+\[S= K_{\Gamma\Gamma} - K_{\Gamma I} K_{II}^{-1} K_{I\Gamma}.\]<p>然后：</p>
+<ol>
+<li>直接解原系统；</li>
+<li>解 Schur system；</li>
+<li>回代内部自由度。</li>
+</ol>
+<p>比较：</p>
+\[\|u_{\rm full}-u_{\rm Schur}\|.\]<p>应该接近机器误差。</p>
+<p>然后不要显式计算：</p>
+\[K_{II}^{-1}.\]<p>改为：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">function apply_S(x):
+</span></span><span class="line"><span class="cl">    z = solve(K_II, K_IΓ x)
+</span></span><span class="line"><span class="cl">    return K_ΓΓ x - K_ΓI z
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这一步一旦实现，你就真正跨过了：</p>
+\[\boxed{ \ ext{“知道 Schur 补公式” \rightarrow “理解大型求解器怎么用它”} }\]<p>这条线。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="20-一个尤其值得保留的诊断视角">20. 一个尤其值得保留的诊断视角
+</h1><p>以后遇到块系统：</p>
+\[\begin{bmatrix} A & B\\ C & D \end{bmatrix},\]<p>第一反应可以不只是：</p>
+<blockquote>
+<p>用 GMRES 还是 CG？</p>
+</blockquote>
+<p>而先问：</p>
+\[\boxed{ \ ext{哪些变量局部、便宜、适合消掉？} }\]<p>以及：</p>
+\[\boxed{ \ ext{哪些变量真正承担全局耦合？} }\]<p>如果找到后者，</p>
+<p>它们往往正是最值得构造 Schur complement 的变量。</p>
+<p>这个问题比单纯选 Krylov solver 更接近系统结构。</p>
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Schur complement 最值得记住的不是：</p>
+\[S=D-CA^{-1}B.\]<p>而是：</p>
+\[\boxed{ \ ext{被消掉的自由度并没有消失； 它们被压缩成了剩余自由度之间的有效耦合。} }\]<p>所以它在知识体系里的位置可以理解成：</p>
+\[\ ext{Full coupled system}\]\[\downarrow\]\[\boxed{\ ext{eliminate local/internal variables}}\]\[\downarrow\]\[\boxed{\ ext{effective interface operator / Schur complement}}\]\[\downarrow\]\[\ ext{interface solve + local recovery}.\]<p>而从工程角度看，它教会我们的一个极其重要的原则是：</p>
+\[\boxed{ \ ext{真正昂贵的不是系统里有多少变量， 而是多少变量必须参与全局协调。} }\]<p>Static condensation、domain decomposition、pressure projection、constraint-space contact solve 看起来属于完全不同的领域，但它们背后实际上都在利用同一个结构：</p>
+\[\boxed{ \ ext{先解决局部响应， 再集中解决少量全局耦合变量。} }\]<p>一旦看懂这一点，很多大型物理求解器的架构会突然变得非常统一。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p><strong>Toselli &amp; Widlund, <em>Domain Decomposition Methods — Algorithms and Theory</em>, Springer, 2005</strong>。理解 substructuring、interface Schur complement、FETI/BDDC 等方法最经典的系统资料之一。<br>
+<a class="link" href="https://link.springer.com/book/10.1007/b137868"  target="_blank" rel="noopener"
+    >Springer 图书页</a></p>
+</li>
+<li>
+<p><strong>MFEM <code>StaticCondensation</code> 官方文档</strong>。非常推荐直接对着公式和代码看：element-interior DOFs 如何被局部消元，Schur system 如何只保留 element-boundary DOFs，以及最终如何恢复内部解。<br>
+<a class="link" href="https://docs.mfem.org/html/classmfem_1_1StaticCondensation.html"  target="_blank" rel="noopener"
+    >MFEM StaticCondensation</a></p>
+</li>
+<li>
+<p><strong>PETSc <code>PCFIELDSPLIT</code> / Schur complement 文档</strong>。这是观察 Schur 思想如何进入工业级 HPC solver 的很好入口；尤其值得看 <code>schur</code> field split、Schur factorization 以及不同的 Schur preconditioning strategies。<br>
+<a class="link" href="https://petsc.org/main/manualpages/PC/PCFIELDSPLIT/"  target="_blank" rel="noopener"
+    >PETSc PCFIELDSPLIT</a></p>
+</li>
+<li>
+<p><strong>PETSc <code>PCLSC</code></strong>。如果想理解为什么不可压流体里“近似 Schur complement”本身就是一个完整研究方向，可以从 Least-Squares Commutator preconditioner 入手。</p>
+</li>
+<li>
+<p><strong>Mathew, <em>Domain Decomposition Methods for the Numerical Solution of Partial Differential Equations</em>, Springer, 2008</strong>。偏矩阵视角，覆盖 substructuring、Lagrange multiplier、saddle-point systems 和 nonmatching grids，适合继续把线性代数结构与 PDE 求解对应起来。</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/">数值优化</a>
+        
+            <a href="/tags/%E6%B5%81%E4%BD%93/">流体</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-27<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge" title="次要分型">概念基石</span><span class="card-badge card-badge--diff" title="难度 2/3">◆◆◇</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/20-multigrid/">Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉<span class="dep-radar-meta"> · card-20</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-27<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div><span class="dep-radar-arrow">→</span><div class="dep-radar-col dep-radar-col--suc">
+            <div class="dep-radar-colhead">后继延伸</div><a class="dep-radar-node" href="/cards/28-inf-sup-lbb-condition/">Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元<span class="dep-radar-meta"> · card-28</span></a></div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/28-inf-sup-lbb-condition/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/17-dual-weighted-residual/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/26-nitsche-method/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/25-hyper-reduction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/22-implicit-differentiation/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
