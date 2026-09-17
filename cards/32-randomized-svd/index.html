@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间 主题：Randomized SVD / Randomized Numerical Linear Algebra（随机化奇异值分解 / 随机数值线性代数）\n领域：代理模型 × 有限元 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n这次选 Randomized SVD，因为它体现了一种很值得迁移的计算思想：\n\\[\\boxed{ \\ ext{如果你只需要一个巨大系统最重要的低维结构， 就没有必要精确理解整个巨大系统。} }\\]标准 SVD：\n\\[A=U\\Sigma V^T\\]是数值线性代数最重要的工具之一，但当：\n\\[A\\in\\mathbb R^{10^6\\ imes10^4}\\]时，精确 SVD 本身就可能成为瓶颈。\nRandomized SVD 的做法非常反直觉：\n随机生成少量方向，让大矩阵作用在这些方向上，再根据这些响应反推出矩阵的主导子空间。\n典型结构只有：\n\\[\\boxed{ Y=A\\Omega }\\]其中：\n\\[\\Omega\\in\\mathbb R^{n\\ imes(k+p)}\\]是一组随机向量。\n然后对：\n\\[Y\\]正交化：\n\\[Y=QR,\\]就能得到：\n\\[Q\\]作为 \\(A\\) 主导列空间的近似。\nHalko、Martinsson、Tropp 2011 年的 SIAM Review 论文把这一框架系统化；Martinsson 与 Tropp 2020 年的 Acta Numerica 综述进一步将其扩展到低秩近似、回归、核矩阵、流式算法和线性系统等多个方向。\n真正值得学的不是“随机算法会更快”，而是：\n\\[\\boxed{ \\ ext{随机探测为什么足以发现确定性的低维结构？} }\\] 1. 先明确问题：很多时候我们根本不需要完整 SVD 假设有限元跑出：\n">
+<title>Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/32-randomized-svd/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间">
+<meta property='og:description' content="Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间 主题：Randomized SVD / Randomized Numerical Linear Algebra（随机化奇异值分解 / 随机数值线性代数）\n领域：代理模型 × 有限元 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n这次选 Randomized SVD，因为它体现了一种很值得迁移的计算思想：\n\\[\\boxed{ \\ ext{如果你只需要一个巨大系统最重要的低维结构， 就没有必要精确理解整个巨大系统。} }\\]标准 SVD：\n\\[A=U\\Sigma V^T\\]是数值线性代数最重要的工具之一，但当：\n\\[A\\in\\mathbb R^{10^6\\ imes10^4}\\]时，精确 SVD 本身就可能成为瓶颈。\nRandomized SVD 的做法非常反直觉：\n随机生成少量方向，让大矩阵作用在这些方向上，再根据这些响应反推出矩阵的主导子空间。\n典型结构只有：\n\\[\\boxed{ Y=A\\Omega }\\]其中：\n\\[\\Omega\\in\\mathbb R^{n\\ imes(k+p)}\\]是一组随机向量。\n然后对：\n\\[Y\\]正交化：\n\\[Y=QR,\\]就能得到：\n\\[Q\\]作为 \\(A\\) 主导列空间的近似。\nHalko、Martinsson、Tropp 2011 年的 SIAM Review 论文把这一框架系统化；Martinsson 与 Tropp 2020 年的 Acta Numerica 综述进一步将其扩展到低秩近似、回归、核矩阵、流式算法和线性系统等多个方向。\n真正值得学的不是“随机算法会更快”，而是：\n\\[\\boxed{ \\ ext{随机探测为什么足以发现确定性的低维结构？} }\\] 1. 先明确问题：很多时候我们根本不需要完整 SVD 假设有限元跑出：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/32-randomized-svd/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='科学机器学习' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:published_time' content='2026-09-14T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-14T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间">
+<meta name="twitter:description" content="Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间 主题：Randomized SVD / Randomized Numerical Linear Algebra（随机化奇异值分解 / 随机数值线性代数）\n领域：代理模型 × 有限元 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n这次选 Randomized SVD，因为它体现了一种很值得迁移的计算思想：\n\\[\\boxed{ \\ ext{如果你只需要一个巨大系统最重要的低维结构， 就没有必要精确理解整个巨大系统。} }\\]标准 SVD：\n\\[A=U\\Sigma V^T\\]是数值线性代数最重要的工具之一，但当：\n\\[A\\in\\mathbb R^{10^6\\ imes10^4}\\]时，精确 SVD 本身就可能成为瓶颈。\nRandomized SVD 的做法非常反直觉：\n随机生成少量方向，让大矩阵作用在这些方向上，再根据这些响应反推出矩阵的主导子空间。\n典型结构只有：\n\\[\\boxed{ Y=A\\Omega }\\]其中：\n\\[\\Omega\\in\\mathbb R^{n\\ imes(k+p)}\\]是一组随机向量。\n然后对：\n\\[Y\\]正交化：\n\\[Y=QR,\\]就能得到：\n\\[Q\\]作为 \\(A\\) 主导列空间的近似。\nHalko、Martinsson、Tropp 2011 年的 SIAM Review 论文把这一框架系统化；Martinsson 与 Tropp 2020 年的 Acta Numerica 综述进一步将其扩展到低秩近似、回归、核矩阵、流式算法和线性系统等多个方向。\n真正值得学的不是“随机算法会更快”，而是：\n\\[\\boxed{ \\ ext{随机探测为什么足以发现确定性的低维结构？} }\\] 1. 先明确问题：很多时候我们根本不需要完整 SVD 假设有限元跑出：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先明确问题很多时候我们根本不需要完整-svd">1. 先明确问题：很多时候我们根本不需要完整 SVD</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/32-randomized-svd/">Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-14T00:00:00Z'>Sep 14, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 7 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="randomized-svd为什么随机乘几个向量就能抓住一个百万维矩阵最重要的子空间">Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间
+</h1><p><strong>主题：Randomized SVD / Randomized Numerical Linear Algebra（随机化奇异值分解 / 随机数值线性代数）</strong><br>
+<strong>领域：代理模型 × 有限元 × 科学机器学习 × AI 全栈工程</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong><br>
+这次选 Randomized SVD，因为它体现了一种很值得迁移的计算思想：</p>
+\[\boxed{ \ ext{如果你只需要一个巨大系统最重要的低维结构， 就没有必要精确理解整个巨大系统。} }\]<p>标准 SVD：</p>
+\[A=U\Sigma V^T\]<p>是数值线性代数最重要的工具之一，但当：</p>
+\[A\in\mathbb R^{10^6\ imes10^4}\]<p>时，精确 SVD 本身就可能成为瓶颈。</p>
+<p>Randomized SVD 的做法非常反直觉：</p>
+<blockquote>
+<p>随机生成少量方向，让大矩阵作用在这些方向上，再根据这些响应反推出矩阵的主导子空间。</p>
+</blockquote>
+<p>典型结构只有：</p>
+\[\boxed{ Y=A\Omega }\]<p>其中：</p>
+\[\Omega\in\mathbb R^{n\ imes(k+p)}\]<p>是一组随机向量。</p>
+<p>然后对：</p>
+\[Y\]<p>正交化：</p>
+\[Y=QR,\]<p>就能得到：</p>
+\[Q\]<p>作为 \(A\) 主导列空间的近似。</p>
+<p>Halko、Martinsson、Tropp 2011 年的 SIAM Review 论文把这一框架系统化；Martinsson 与 Tropp 2020 年的 <em>Acta Numerica</em> 综述进一步将其扩展到低秩近似、回归、核矩阵、流式算法和线性系统等多个方向。</p>
+<p>真正值得学的不是“随机算法会更快”，而是：</p>
+\[\boxed{ \ ext{随机探测为什么足以发现确定性的低维结构？} }\]<hr>
+<h2 id="1-先明确问题很多时候我们根本不需要完整-svd">1. 先明确问题：很多时候我们根本不需要完整 SVD
+</h2><p>假设有限元跑出：</p>
+\[m=10000\]<p>个快照，</p>
+<p>每个快照有：</p>
+\[N=10^6\]<p>个自由度。</p>
+<p>组成 snapshot matrix：</p>
+\[X= [u(t_1),u(t_2),\ldots,u(t_m)] \in\mathbb R^{10^6\ imes10^4}.\]<p><span class="term-anchor" data-term="pod" tabindex="0">POD</span> 通常通过 SVD：</p>
+\[X=U\Sigma V^T\]<p>取前：</p>
+\[r=50\]<p>个模态：</p>
+\[U_r.\]<p>真正需要的是：</p>
+\[\boxed{\ ext{前 50 个主方向}}\]<p>而不是后面：</p>
+\[9950\]<p>个奇异向量。</p>
+<p>这就是 truncated SVD：</p>
+\[X \approx U_r\Sigma_rV_r^T.\]<p>理论上最优的 rank-\(r\) 近似由 Eckart–Young 定理给出：</p>
+\[\|A-A_r\|_2=\sigma_{r+1}.\]<p>问题在于：</p>
+\[\boxed{ \ ext{为了得到 50 个方向， 传统算法有时仍需要对整个巨大矩阵做大量工作。} }\]<p>Randomized SVD 就专门针对这种：</p>
+\[r\ll\min(m,n)\]<p>的场景。Scikit-learn 当前的官方 <code>randomized_svd</code> 也明确将其定位为：当矩阵很大、而只需要少量 singular components 时，随机化 truncated SVD 往往非常高效。</p>
+<hr>
+<h1 id="2-最核心的思想不要直接分解-先找到它的-range">2. 最核心的思想：不要直接分解 \(A\)，先找到它的 range
+</h1><p>假设：</p>
+\[A\]<p>实际上近似 rank-\(k\)：</p>
+\[A \approx U_k\Sigma_kV_k^T.\]<p>那么任意向量：</p>
+\[\omega\]<p>经过：</p>
+\[y=A\omega\]<p>后：</p>
+\[y \approx U_k\Sigma_kV_k^T\omega.\]<p>无论随机输入：</p>
+\[\omega\]<p>是什么，</p>
+<p>输出：</p>
+\[y\]<p>都会落到或接近：</p>
+\[\boxed{\operatorname{span}(U_k)}\]<p>。</p>
+<p>所以如果连续随机生成：</p>
+\[\omega_1,\omega_2,\ldots,\omega_l\]<p>并计算：</p>
+\[y_i=A\omega_i,\]<p>这些：</p>
+\[y_i\]<p>自然会“照亮” \(A\) 的主导列空间。</p>
+<p>写成矩阵：</p>
+\[\boxed{ Y=A\Omega }\]<p>其中：</p>
+\[\Omega= [\omega_1,\ldots,\omega_l].\]<p>然后：</p>
+\[Q=\operatorname{orth}(Y).\]<p>于是：</p>
+\[\boxed{ A \approx QQ^TA. }\]<p>这一步叫：</p>
+\[\boxed{\ ext{randomized range finder}}\]<p>，也是 Randomized SVD 的核心。</p>
+<p>Halko 等把大量随机化矩阵分解统一成“两阶段”框架：先用随机采样找到近似 range，再在这个低维空间里做传统确定性线性代数。</p>
+<hr>
+<h1 id="3-为什么随机方向不会刚好错过重要子空间">3. 为什么随机方向不会刚好错过重要子空间？
+</h1><p>这是最关键的问题。</p>
+<p>假设真实主导右奇异空间：</p>
+\[V_k = [v_1,\ldots,v_k].\]<p>随机高斯向量：</p>
+\[\omega\sim N(0,I)\]<p>在任何固定方向：</p>
+\[v_i\]<p>上的投影：</p>
+\[v_i^T\omega\]<p>几乎不可能严格为零。</p>
+<p>因此：</p>
+\[A\omega = \sum_i \sigma_i u_i(v_i^T\omega).\]<p>主导奇异值：</p>
+\[\sigma_1,\sigma_2,\ldots,\sigma_k\]<p>会放大相应方向。</p>
+<p>如果：</p>
+\[\sigma_1\gg\sigma_{100},\]<p>那么：</p>
+\[A\omega\]<p>天然被前几个：</p>
+\[u_i\]<p>支配。</p>
+<p>所以：</p>
+\[\boxed{ \ ext{矩阵本身在替你过滤随机噪声， 把随机输入变成主导结构的混合。} }\]<p>多取几个随机向量，就能把整个 dominant subspace 展开出来。</p>
+<p>这其实和 power iteration 的思想非常接近。</p>
+<hr>
+<h1 id="4-标准-randomized-svd-算法只有几步">4. 标准 Randomized SVD 算法只有几步
+</h1><p>假设想要 rank：</p>
+\[k.\]<p>通常再增加：</p>
+\[p\]<p>个 oversampling directions：</p>
+\[l=k+p.\]<p>常见：</p>
+\[p\approx5\sim20.\]<p>算法：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Ω = random Gaussian matrix, shape (n, k+p)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Y = A Ω
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Q = orth(Y)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">B = Qᵀ A
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">[Ũ, Σ, Vᵀ] = SVD(B)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">U = Q Ũ
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>最终：</p>
+\[\boxed{ A \approx U\Sigma V^T. }\]<p>关键在：</p>
+\[B=Q^TA.\]<p>如果：</p>
+\[Q\in\mathbb R^{m\ imes50},\]<p>那么：</p>
+\[B\]<p>只有：</p>
+\[50\ imes n.\]<p>真正昂贵的 SVD 已经从巨大矩阵：</p>
+\[A\]<p>转移到了一个小得多的：</p>
+\[B.\]<hr>
+<h1 id="5-这其实是先压缩再精确计算">5. 这其实是“先压缩，再精确计算”
+</h1><p>Randomized SVD 并不是完全随机地给答案。</p>
+<p>随机性只用于：</p>
+\[\boxed{\ ext{发现一个好的低维子空间}}\]<p>。</p>
+<p>找到：</p>
+\[Q\]<p>之后，</p>
+<p>后面的：</p>
+\[B=Q^TA\]<p>和：</p>
+\[B=\ ilde U\Sigma V^T\]<p>仍然是标准确定性 SVD。</p>
+<p>所以它的结构是：</p>
+\[\ ext{Huge deterministic problem}\]\[\downarrow\]\[\boxed{\ ext{Random sketch}}\]\[\downarrow\]\[\ ext{Small deterministic problem}.\]<p>这是 Randomized Numerical Linear Algebra 一个非常典型的架构。</p>
+<hr>
+<h1 id="6-为什么-oversampling-很重要">6. 为什么 oversampling 很重要？
+</h1><p>假设真正要：</p>
+\[k=20\]<p>个 modes。</p>
+<p>理论上可以只取：</p>
+\[20\]<p>个随机向量。</p>
+<p>但如果刚好某些随机组合对第 20 个方向响应很弱，</p>
+<p>子空间质量就可能下降。</p>
+<p>所以常取：</p>
+\[l=k+p\]<p>例如：</p>
+\[k=20,\quad p=10.\]<p>相当于给算法一些：</p>
+\[\boxed{\ ext{冗余观察方向}}\]<p>。</p>
+<p>然后最终仍只保留：</p>
+\[20\]<p>个 singular vectors。</p>
+<p>Scikit-learn 当前默认：</p>
+\[n_{\rm oversamples}=10,\]<p>并明确指出：对于高噪声、有效秩较大或 singular spectrum 衰减缓慢的问题，可以增加 oversampling 来改善近似质量。</p>
+<hr>
+<h1 id="7-真正麻烦的是奇异值衰减慢">7. 真正麻烦的是奇异值衰减慢
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设：</p>
+\[\sigma_1=1000, \quad \sigma_2=500, \quad \sigma_{50}=1, \quad \sigma_{51}=0.001.\]<p>主导子空间非常清楚。</p>
+<p>Randomized range finder 很容易抓住。</p>
+<p>但如果：</p>
+\[\sigma_i\sim\frac1i,\]<p>那么：</p>
+\[\sigma_{50}\]<p>和：</p>
+\[\sigma_{100}\]<p>差别不大。</p>
+<p>这时随机采样得到的：</p>
+\[Y=A\Omega\]<p>中，尾部方向仍占有明显能量。</p>
+<p>于是：</p>
+\[\boxed{ \ ext{dominant subspace 不够突出。} }\]<p>Randomized SVD 最常用的解决方法就是：</p>
+\[\boxed{\ ext{Power Iteration}.}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="8-power-iteration-为什么有效">8. Power Iteration 为什么有效？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>改成计算：</p>
+\[Y=(AA^T)^qA\Omega.\]<p>利用 SVD：</p>
+\[A=U\Sigma V^T,\]<p>得到：</p>
+\[(AA^T)^qA = U\Sigma^{2q+1}V^T.\]<p>所以奇异值变成：</p>
+\[\boxed{ \sigma_i \rightarrow \sigma_i^{2q+1}. }\]<p>假设：</p>
+\[\frac{\sigma_k}{\sigma_{k+1}} = 2.\]<p>当：</p>
+\[q=0\]<p>差距：</p>
+\[2.\]<p>当：</p>
+\[q=2\]<p>差距变成：</p>
+\[2^5=32.\]<p>主导子空间一下变得非常明显。</p>
+<p>所以 power iteration 的本质是：</p>
+\[\boxed{ \ ext{人为把 singular spectrum 拉开。} }\]<p>Scikit-learn 也把 <code>n_iter</code> 暴露为 Randomized SVD 的核心参数，特别用于噪声较大或谱衰减较慢的问题。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="9-但-power-iteration-不是免费的">9. 但 Power Iteration 不是免费的
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>每次：</p>
+\[AA^T\]<p>都意味着再次访问大矩阵。</p>
+<p>如果：</p>
+\[A\]<p>非常巨大，</p>
+<p>真正昂贵的可能不是 FLOPs，</p>
+<p>而是：</p>
+\[\boxed{\ ext{内存带宽 / 数据读取}}\]<p>。</p>
+<p>所以实际 Randomized Linear Algebra 很关心：</p>
+\[\boxed{\ ext{passes over the matrix}}\]<p>。</p>
+<p>例如：</p>
+<ul>
+<li>1-pass algorithm；</li>
+<li>2-pass algorithm；</li>
+<li>streaming algorithm；</li>
+</ul>
+<p>本身就是重要研究方向。</p>
+<p>Martinsson 与 Tropp 的综述专门讨论 single-view / streaming randomized algorithms，因为很多大数据环境中：</p>
+\[\boxed{ \ ext{把矩阵从磁盘或分布式存储读第二遍， 可能比额外算几亿次乘法更贵。} }\]<p>这和现代 AI 系统非常相似：</p>
+\[\boxed{ \ ext{数据移动经常比计算本身更贵。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="10-randomized-svd-和普通随机采样行列并不是一回事">10. Randomized SVD 和普通随机采样行/列并不是一回事
+</h1><p>容易产生误解：</p>
+<blockquote>
+<p>随机方法是不是从 \(A\) 里随便抽几行、几列？</p>
+</blockquote>
+<p>经典 Gaussian range finder 并不是这样。</p>
+<p>它计算：</p>
+\[A\Omega.\]<p>每一个随机 probe：</p>
+\[\omega_j\]<p>都是所有列的随机线性组合。</p>
+<p>所以每个：</p>
+\[A\omega_j\]<p>都包含：</p>
+\[\boxed{\ ext{整个矩阵的全局信息}}\]<p>。</p>
+<p>相比直接随机挑列，这通常更稳定。</p>
+<p>当然 Randomized Numerical Linear Algebra 也包括：</p>
+<ul>
+<li>row/column sampling；</li>
+<li>CUR；</li>
+<li>Nyström；</li>
+<li>leverage-score sampling；</li>
+</ul>
+<p>但这是另一条方法线。Martinsson–Tropp 的综述正是把这些技术放进同一个 randomized matrix computation 框架中。</p>
+<hr>
+<h1 id="11-它与-johnsonlindenstrauss-思想有同一个根">11. 它与 Johnson–Lindenstrauss 思想有同一个根
+</h1><p>Random projection 中有一个著名事实：</p>
+<p>高维点：</p>
+\[x_i\in\mathbb R^N\]<p>投影到：</p>
+\[r\ll N\]<p>维随机空间后，</p>
+<p>只要：</p>
+\[r\]<p>足够大，</p>
+<p>点之间的距离：</p>
+\[\|x_i-x_j\|\]<p>可以近似保持。</p>
+<p>背后的核心思想是：</p>
+\[\boxed{ \ ext{随机低维投影通常不会系统性破坏所有重要方向。} }\]<p>Randomized SVD 用的是类似直觉：</p>
+\[\boxed{ \ ext{随机 probe 很难同时避开一个固定的重要低维子空间。} }\]<p>所以随机性在这里不是：</p>
+\[\boxed{\ ext{用随机误差换速度}}\]<p>这么简单。</p>
+<p>它更像：</p>
+\[\boxed{ \ ext{利用高维空间的几何集中性质， 廉价获得对全局结构的观测。} }\]<hr>
+<h1 id="12-为什么它和-pod-天然结合">12. 为什么它和 POD 天然结合？
+</h1><p>POD snapshot matrix：</p>
+\[X= [u_1,\ldots,u_m].\]<p>标准 POD：</p>
+\[X=U\Sigma V^T.\]<p>取：</p>
+\[U_r.\]<p>所以 POD 本质就是 truncated SVD。</p>
+<p>如果：</p>
+\[N=10^7, \quad m=10^5,\]<p>POD 的 offline SVD 本身就可能极其昂贵。</p>
+<p>这时可以直接：</p>
+\[\boxed{ X \overset{\ ext{randomized SVD}} {\longrightarrow} U_r. }\]<p>已有 randomized POD 工作正是针对 PDE 离散后产生的大型 snapshot systems，通过随机投影/随机采样减少生成 dominant modes 所需的成本。</p>
+<p>最近的 ROM 工作也继续使用 randomized SVD、randomized DMD 等方式降低大规模降阶建模中 basis construction 的成本。</p>
+<hr>
+<h1 id="13-这和上一张-hyper-reduction-卡片正好位于不同阶段">13. 这和上一张 Hyper-reduction 卡片正好位于不同阶段
+</h1><p>Hyper-reduction 主要解决：</p>
+\[\boxed{\ ext{ROM online evaluation 太贵}}\]<p>例如：</p>
+\[f(Vq)\]<p>仍然需要全部有限元单元。</p>
+<p>Randomized SVD 解决：</p>
+\[\boxed{\ ext{ROM offline basis construction 太贵}}\]<p>。</p>
+<p>完整流程可以写成：</p>
+\[\ ext{Full simulations}\]\[\downarrow\]\[\ ext{huge snapshot matrix}\]\[\downarrow\]\[\boxed{\ ext{Randomized SVD}}\]\[\downarrow\]\[\ ext{Reduced basis}\]\[\downarrow\]\[\boxed{\ ext{DEIM/ECSW Hyper-reduction}}\]\[\downarrow\]\[\ ext{fast online ROM}.\]<p>两者解决的是 completely different bottleneck。</p>
+<hr>
+<h1 id="14-一个有限元中的具体量级">14. 一个有限元中的具体量级
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设软体模型：</p>
+\[N=3\ imes10^6\]<p>DOF。</p>
+<p>记录：</p>
+\[50000\]<p>帧。</p>
+<p>Snapshot matrix：</p>
+\[X\in \mathbb R^{3\ imes10^6\ imes50000}.\]<p>如果用 float64，光存储：</p>
+\[3\ imes10^6\ imes50000\ imes8\]<p>约等于：</p>
+\[1.2\ ext{ TB}.\]<p>这时问题已经不再是：</p>
+<blockquote>
+<p>LAPACK SVD 快不快？</p>
+</blockquote>
+<p>而是：</p>
+\[\boxed{ \ ext{矩阵甚至放不进普通内存。} }\]<p>Randomized/streaming algorithm 可以：</p>
+<ol>
+<li>分块读取 snapshots；</li>
+<li>计算：
+
+\[X\Omega;\]</li>
+<li>累积一个小得多的 sketch；</li>
+<li>不再长期保存完整矩阵。</li>
+</ol>
+<p>所以 Randomized Linear Algebra 在这里不只是：</p>
+\[\boxed{\ ext{算法提速}}\]<p>而可能改变：</p>
+\[\boxed{\ ext{这个计算是否可做。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="15-这对可靠性分析也有非常直接的价值">15. 这对可靠性分析也有非常直接的价值
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设你有：</p>
+\[10^6\]<p>个蒙特卡洛样本，</p>
+<p>每个样本输出：</p>
+\[5000\]<p>个时序/空间响应量。</p>
+<p>于是响应矩阵：</p>
+\[Y\in\mathbb R^{10^6\ imes5000}.\]<p>你可能想分析：</p>
+<ul>
+<li>dominant response modes；</li>
+<li>sensitivity directions；</li>
+<li>failure-response correlations；</li>
+<li>covariance structure。</li>
+</ul>
+<p>如果直接形成：</p>
+\[Y^TY\]<p>或完整 PCA，</p>
+<p>成本可能很高。</p>
+<p>Randomized SVD 可以直接提取：</p>
+\[\boxed{\ ext{主导随机响应子空间}}\]<p>而无需完整 covariance decomposition。</p>
+<p>这与之前 <span class="term-anchor" data-term="active-subspace" tabindex="0">Active Subspaces</span> 的区别也很清楚：</p>
+<h3 id="active-subspaces">Active Subspaces
+</h3><p>分析：</p>
+\[\boxed{\ ext{输入空间中哪些方向最影响输出}}\]<p>通常依赖梯度信息。</p>
+<h3 id="randomized-svdpca">Randomized SVD/PCA
+</h3><p>分析：</p>
+\[\boxed{\ ext{观测数据本身主要落在哪些线性方向}}\]<p>。</p>
+<p>二者都降维，但问题完全不同。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="16-它还可以加速-kriging--gaussian-process-的另一部分瓶颈">16. 它还可以加速 Kriging / Gaussian Process 的另一部分瓶颈
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>Gaussian Process 通常需要处理：</p>
+\[K\in\mathbb R^{N\ imes N}.\]<p>标准训练和推理涉及：</p>
+\[K^{-1}\]<p>或 Cholesky：</p>
+\[K=LL^T.\]<p>经典复杂度：</p>
+\[O(N^3).\]<p>如果 kernel matrix 具有：</p>
+\[\boxed{\ ext{低有效秩}}\]<p>可以近似：</p>
+\[K \approx QQ^TK\]<p>或使用：</p>
+\[\boxed{\ ext{Nyström approximation}}\]<p>构造低秩表示。</p>
+<p>Randomized numerical linear algebra 的成熟体系也专门包含：</p>
+<ul>
+<li>Nyström；</li>
+<li>randomized kernel approximation；</li>
+<li>low-rank positive-semidefinite approximation。</li>
+</ul>
+<p>Martinsson–Tropp 的综述明确将 kernel matrices from machine learning/scientific computing 列为典型应用。</p>
+<p>所以 Randomized Linear Algebra 实际位于：</p>
+\[\boxed{ \ ext{数值线性代数} \cap \ ext{代理模型} \cap \ ext{机器学习} }\]<p>的交界处。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="17-对-ai-全栈工程它为什么也值得学">17. 对 AI 全栈工程，它为什么也值得学？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>大型 AI 系统里到处存在：</p>
+\[\boxed{\ ext{低秩结构}}\]<p>：</p>
+<ul>
+<li>embedding covariance；</li>
+<li>activation matrix；</li>
+<li>gradient matrix；</li>
+<li>Hessian approximation；</li>
+<li>LoRA weight updates；</li>
+<li>attention matrices；</li>
+<li>dataset features。</li>
+</ul>
+<p>假设：</p>
+\[X\in\mathbb R^{10^7\ imes4096}.\]<p>想做 PCA。</p>
+<p>直接：</p>
+\[X^TX\]<p>或 full SVD 可能非常贵。</p>
+<p>Randomized projection 可以首先构造：</p>
+\[Y=X\Omega\]<p>把：</p>
+\[4096\]<p>维压到：</p>
+\[100\]<p>左右。</p>
+<p>然后大部分后续分析都在小空间完成。</p>
+<p>这也是 randomized SVD 已经成为成熟数据科学软件中的标准工具的原因之一，而不是停留在研究论文里。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="18-它和-lora-有一个非常漂亮的联系">18. 它和 LoRA 有一个非常漂亮的联系
+</h1><p>之前 LoRA 的核心假设：</p>
+\[\Delta W\]<p>具有低秩结构。</p>
+<p>Randomized SVD 则回答另一个问题：</p>
+\[\boxed{ \ ext{如果一个巨大矩阵确实近似低秩， 怎样便宜地找到那个低秩子空间？} }\]<p>因此在分析 LoRA training dynamics 时，如果想研究：</p>
+\[\Delta W\]<p>到底有多少有效奇异方向，</p>
+<p>无需一定做完整：</p>
+\[4096\ imes4096\]<p>SVD。</p>
+<p>可以直接 randomized SVD。</p>
+<p>更一般地：</p>
+\[\boxed{ \ ext{Low-rank modeling} }\]<p>和：</p>
+\[\boxed{ \ ext{Randomized low-rank discovery} }\]<p>天然是一对。</p>
+<hr>
+<h1 id="19-但它不是万能的真正低秩才是前提">19. 但它不是万能的：真正低秩才是前提
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>考虑：</p>
+\[\sigma_1,\sigma_2,\ldots\]<p>几乎不衰减。</p>
+<p>比如：</p>
+\[\sigma_i\approx1\]<p>直到数千维。</p>
+<p>那么：</p>
+\[\boxed{ \ ext{矩阵本身就没有明显低维结构。} }\]<p>这时 randomized SVD 无法凭空制造：</p>
+\[k=20\]<p>的高质量近似。</p>
+<p>它最多更快地告诉你：</p>
+\[\boxed{\ ext{rank-20 近似本身很差。}}\]<p>这是一条非常重要的原则：</p>
+<blockquote>
+<p>随机化可以降低发现结构的成本，但不能创造不存在的结构。</p>
+</blockquote>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="20-第二个局限低能量方向可能恰恰是最重要的方向">20. 第二个局限：低能量方向可能恰恰是最重要的方向
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这对可靠性尤其重要。</p>
+<p>POD/SVD 优先保留：</p>
+\[\boxed{\ ext{最大方差 / 最大能量方向}}\]<p>。</p>
+<p>假设 99.99% 的正常样本沿：</p>
+\[u_1\]<p>波动。</p>
+<p>但真正决定失效的微小模式：</p>
+\[u_{37}\]<p>只占：</p>
+\[0.01\%\]<p>能量。</p>
+<p>如果直接截断：</p>
+\[r=10,\]<p>这个 failure-sensitive mode 会被完全删除。</p>
+<p>Randomized SVD 仍然会很好地逼近标准 SVD，</p>
+<p>但：</p>
+\[\boxed{ \ ext{标准 SVD 的任务目标本身就错了。} }\]<p>所以：</p>
+\[\boxed{ \ ext{Randomized SVD 解决的是计算问题， 不解决“哪个子空间对任务最重要”的建模问题。} }\]<p>这是和 <span class="term-anchor" data-term="dwr" tabindex="0">DWR</span>、Active Subspaces、goal-oriented reduction 的根本区别。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="21-一个很值得记住的误区随机算法并不意味着结果不可靠">21. 一个很值得记住的误区：随机算法并不意味着结果“不可靠”
+</h1><p>Randomized SVD 经常给人一种感觉：</p>
+<blockquote>
+<p>每次结果随机，会不会不靠谱？</p>
+</blockquote>
+<p>实际上现代 randomized numerical linear algebra 通常有严格的：</p>
+\[\boxed{\ ext{probabilistic error bounds}}\]<p>。</p>
+<p>比如对 range finder，可以控制：</p>
+\[\|(I-QQ^T)A\|\]<p>与：</p>
+\[\sigma_{k+1}\]<p>之间的关系，并且失败概率可以通过 oversampling 快速降低。</p>
+<p>所以这里的随机性更像 Monte Carlo：</p>
+\[\boxed{ \ ext{允许极小概率失败， 换取显著计算优势。} }\]<p>但 Randomized SVD 和普通 Monte Carlo 又有所不同：</p>
+<p>最终误差通常与：</p>
+\[\boxed{\ ext{矩阵本身的 singular spectrum}}\]<p>强相关。</p>
+<p>矩阵越接近低秩，它越容易成功。Halko–Martinsson–Tropp 的经典工作正是系统建立了这类概率误差分析。</p>
+<hr>
+<h1 id="22-一个非常适合亲手做的最小实验">22. 一个非常适合亲手做的最小实验
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>构造：</p>
+\[A=U\Sigma V^T\]<p>其中：</p>
+\[A\in\mathbb R^{10000\ imes2000}.\]<p>设置：</p>
+\[\sigma_i=e^{-i/10}.\]<p>只想要：</p>
+\[k=20.\]<p>实现：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">k = 20
+</span></span><span class="line"><span class="cl">p = 10
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Ω = randn(n, k+p)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Y = A @ Ω
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Q = qr(Y)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">B = Q.T @ A
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Ũ, Σ, Vt = svd(B)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">U = Q @ Ũ
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>比较：</p>
+\[\|A-U_k\Sigma_kV_k^T\|_F\]<p>和标准 truncated SVD。</p>
+<p>然后把 spectrum 改成：</p>
+\[\sigma_i=\frac1i.\]<p>你会看到误差明显变差。</p>
+<p>再加入：</p>
+\[q=1,2\]<p>次 power iteration：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Y = A @ Ω
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">for _ in range(q):
+</span></span><span class="line"><span class="cl">    Y = A @ (A.T @ Y)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>重新测试。</p>
+<p>你会非常直观地看到：</p>
+\[\boxed{ \ ext{Randomized SVD 的表现， 主要由 singular-spectrum separation 决定。} }\]<p>这比直接调用 <code>randomized_svd()</code> 更有学习价值。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="23-对你后续有限元软体方向一个实际可迁移场景">23. 对你后续有限元/软体方向，一个实际可迁移场景
+</h1><p>假设未来做大规模软体 simulation dataset：</p>
+\[u(\ heta,t)\]<p>参数包括：</p>
+<ul>
+<li>Young&rsquo;s modulus；</li>
+<li>Poisson ratio；</li>
+<li>loading；</li>
+<li>contact configuration；</li>
+<li>geometry。</li>
+</ul>
+<p>很快就可能积累：</p>
+\[10^4\sim10^5\]<p>个大型 deformation fields。</p>
+<p>你想研究：</p>
+\[\boxed{ \ ext{这些百万维形变场真正占据多少维 manifold？} }\]<p>第一步通常就是 PCA/POD/SVD。</p>
+<p>如果 full SVD 太贵，</p>
+<p>Randomized SVD 可以直接成为：</p>
+\[\boxed{ \ ext{数据诊断工具} }\]<p>，而不必立即把它理解成最终 ROM 方法。</p>
+<p>比如你可能发现：</p>
+\[r=30\]<p>已经解释：</p>
+\[99.9\%\]<p>snapshot energy。</p>
+<p>这就告诉你：</p>
+\[\boxed{ \ ext{虽然每帧有百万 DOF， 真实运动数据可能只访问了几十维子空间。} }\]<p>这个结论会直接影响后续是否值得研究：</p>
+<ul>
+<li>ROM；</li>
+<li>reduced coordinates；</li>
+<li>neural latent state；</li>
+<li>LoRA-style low-rank adaptation；</li>
+<li>learned physics manifold。</li>
+</ul>
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Randomized SVD 最值得记住的不是：</p>
+\[Y=A\Omega.\]<p>真正重要的是：</p>
+\[\boxed{ \ ext{如果一个巨大系统只有少数真正重要的方向， 你无需完整检查系统的每一个方向， 只要用少量随机探针让这些重要方向自己显现出来。} }\]<p>它在知识体系中的位置可以这样理解：</p>
+\[\ ext{Large matrix / dataset}\]\[\downarrow\]\[\boxed{\ ext{Random sketch}}\]\[\downarrow\]\[\boxed{\ ext{Approximate dominant subspace}}\]\[\downarrow\]\[\ ext{small deterministic linear algebra}.\]<p>与最近几张卡片相比，它代表的是一个新的优化轴：</p>
+\[\boxed{\ ext{Hyper-reduction：少计算算子}}\]\[\boxed{\ ext{Schur complement：少参与全局协调}}\]\[\boxed{\ ext{Randomized SVD：少观察无关方向}}\]<p>。</p>
+<p>更普遍的工程启发则是：</p>
+\[\boxed{ \ ext{面对百万维问题时， 第一反应不一定应该是“怎样更快地把所有东西算完”， 而应该先问：“我真正需要知道的结构有多少维？”} }\]<p>如果答案是：</p>
+\[50\]<p>那么精确分析：</p>
+\[10^6\]<p>个方向，本身可能就是错误的计算目标。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p><strong>Halko, Martinsson &amp; Tropp, <em>Finding Structure with Randomness: Probabilistic Algorithms for Constructing Approximate Matrix Decompositions</em>, SIAM Review, 2011</strong>。Randomized SVD/随机低秩近似的经典入口；最值得看 randomized range finder、oversampling、power iteration 和误差界。<br>
+<a class="link" href="https://epubs.siam.org/doi/10.1137/090771806"  target="_blank" rel="noopener"
+    >SIAM 论文页</a></p>
+</li>
+<li>
+<p><strong>Martinsson &amp; Tropp, <em>Randomized Numerical Linear Algebra: Foundations and Algorithms</em>, Acta Numerica, 2020</strong>。更完整的现代体系，覆盖 low-rank approximation、streaming、regression、Nyström、kernel matrices 和 randomized linear solvers。<br>
+<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/randomized-numerical-linear-algebra-foundations-and-algorithms/4486926746CFF4547F42A2996C7DC09C"  target="_blank" rel="noopener"
+    >Cambridge 综述页</a></p>
+</li>
+<li>
+<p><strong>Scikit-learn <code>randomized_svd</code> 官方文档</strong>。适合直接做工程实验，重点观察 <code>n_oversamples</code> 与 <code>n_iter</code> 如何对应理论里的 oversampling 和 power iteration。<br>
+<a class="link" href="https://scikit-learn.org/stable/modules/generated/sklearn.utils.extmath.randomized_svd.html"  target="_blank" rel="noopener"
+    >randomized_svd 官方文档</a></p>
+</li>
+<li>
+<p><strong>Gräßle, Hinze &amp; Volkwein, <em>Model Order Reduction by Proper Orthogonal Decomposition</em></strong>。用于把 Randomized SVD 放回 POD/有限元降阶体系中：POD basis、snapshot SVD、非线性 ROM 与误差估计的关系。<br>
+<a class="link" href="https://arxiv.org/abs/1906.05188"  target="_blank" rel="noopener"
+    >POD-MOR 论文</a></p>
+</li>
+<li>
+<p><strong>Yu &amp; Chakravorty, <em>A Randomized Proper Orthogonal Decomposition Technique</em></strong>。直接连接 randomized projection 与 PDE model reduction，适合继续看随机线性代数怎样进入大规模动力系统降阶。<br>
+<a class="link" href="https://arxiv.org/abs/1312.3976"  target="_blank" rel="noopener"
+    >Randomized POD 论文</a></p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+            <a href="/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/">AI 全栈工程</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-32<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge" title="次要分型">概念基石</span><span class="card-badge card-badge--diff" title="难度 2/3">◆◆◇</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/25-hyper-reduction/">Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快<span class="dep-radar-meta"> · card-25</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-32<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/13-neural-operator/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/33-probabilistic-numerics/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/22-implicit-differentiation/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/34-certified-reduced-order-modeling/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Certified Reduced-Order Modeling：代理模型除了“预测值”，能不能同时给出一个数学上保证不会错过真值的误差界？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/25-hyper-reduction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程” 主题：Backward Error Analysis（后向误差分析）与 Shadow Hamiltonian（影子哈密顿量）\n领域：数值方法 × 有限元 × 物理引擎 × 非线性动力学\n推荐阅读时间：约 8–10 分钟\n今天选这个主题，是因为它解释了一个非常重要、又容易被误解的现象：\n为什么某些二阶积分器运行几百万步后，能量仍然只是在一个范围内振荡；另一些局部误差看起来同样很小的方法，却会出现持续的能量漂移？\n只比较：\n\\[\\|x_{n+1}-x(t_{n+1})\\|\\]通常解释不了这件事。\nBackward Error Analysis（BEA）换了一个问题：\n\\[\\boxed{ \\ ext{不要问“数值解离原方程的精确解多远”， 而问“这个数值轨迹究竟是哪一个微分方程的精确轨迹？”} }\\]这个视角是 geometric numerical integration 的核心工具之一。Hairer、Lubich、Wanner 的经典专著正是用 modified equations / backward error analysis 来解释辛积分器和对称积分器优异的长期行为。\n1. 先看普通误差分析在问什么 考虑：\n\\[\\dot y=f(y).\\]数值积分器给：\n\\[y_{n+1}=\\Phi_h(y_n).\\]传统 forward error analysis 比较：\n\\[y_n\\]和原方程的精确解：\n\\[y(t_n).\\]例如某二阶方法：\n\\[\\|y_n-y(t_n)\\|=O(h^2).\\]这告诉你：\n\\[\\boxed{\\ ext{在有限时间内，轨迹位置有多准。}}\\]但动力系统还有另一个问题：\n\\[\\boxed{\\ ext{轨迹的几何性质是否正确？}}\\]例如：\n能量是否长期漂移； 相空间体积是否保持； 周期轨道是否逐渐螺旋出去； 角动量是否保持； 高频模态是否产生人工耗散。 这些并不能仅靠“每一步局部误差是 \\(O(h^3)\\)”回答。\n2. BEA 的核心反转 假设积分器：\n">
+<title>Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程”</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/31-backward-error-analysis/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程”">
+<meta property='og:description' content="Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程” 主题：Backward Error Analysis（后向误差分析）与 Shadow Hamiltonian（影子哈密顿量）\n领域：数值方法 × 有限元 × 物理引擎 × 非线性动力学\n推荐阅读时间：约 8–10 分钟\n今天选这个主题，是因为它解释了一个非常重要、又容易被误解的现象：\n为什么某些二阶积分器运行几百万步后，能量仍然只是在一个范围内振荡；另一些局部误差看起来同样很小的方法，却会出现持续的能量漂移？\n只比较：\n\\[\\|x_{n+1}-x(t_{n+1})\\|\\]通常解释不了这件事。\nBackward Error Analysis（BEA）换了一个问题：\n\\[\\boxed{ \\ ext{不要问“数值解离原方程的精确解多远”， 而问“这个数值轨迹究竟是哪一个微分方程的精确轨迹？”} }\\]这个视角是 geometric numerical integration 的核心工具之一。Hairer、Lubich、Wanner 的经典专著正是用 modified equations / backward error analysis 来解释辛积分器和对称积分器优异的长期行为。\n1. 先看普通误差分析在问什么 考虑：\n\\[\\dot y=f(y).\\]数值积分器给：\n\\[y_{n+1}=\\Phi_h(y_n).\\]传统 forward error analysis 比较：\n\\[y_n\\]和原方程的精确解：\n\\[y(t_n).\\]例如某二阶方法：\n\\[\\|y_n-y(t_n)\\|=O(h^2).\\]这告诉你：\n\\[\\boxed{\\ ext{在有限时间内，轨迹位置有多准。}}\\]但动力系统还有另一个问题：\n\\[\\boxed{\\ ext{轨迹的几何性质是否正确？}}\\]例如：\n能量是否长期漂移； 相空间体积是否保持； 周期轨道是否逐渐螺旋出去； 角动量是否保持； 高频模态是否产生人工耗散。 这些并不能仅靠“每一步局部误差是 \\(O(h^3)\\)”回答。\n2. BEA 的核心反转 假设积分器：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/31-backward-error-analysis/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='非线性动力学' /><meta property='article:published_time' content='2026-09-13T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-13T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程”">
+<meta name="twitter:description" content="Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程” 主题：Backward Error Analysis（后向误差分析）与 Shadow Hamiltonian（影子哈密顿量）\n领域：数值方法 × 有限元 × 物理引擎 × 非线性动力学\n推荐阅读时间：约 8–10 分钟\n今天选这个主题，是因为它解释了一个非常重要、又容易被误解的现象：\n为什么某些二阶积分器运行几百万步后，能量仍然只是在一个范围内振荡；另一些局部误差看起来同样很小的方法，却会出现持续的能量漂移？\n只比较：\n\\[\\|x_{n+1}-x(t_{n+1})\\|\\]通常解释不了这件事。\nBackward Error Analysis（BEA）换了一个问题：\n\\[\\boxed{ \\ ext{不要问“数值解离原方程的精确解多远”， 而问“这个数值轨迹究竟是哪一个微分方程的精确轨迹？”} }\\]这个视角是 geometric numerical integration 的核心工具之一。Hairer、Lubich、Wanner 的经典专著正是用 modified equations / backward error analysis 来解释辛积分器和对称积分器优异的长期行为。\n1. 先看普通误差分析在问什么 考虑：\n\\[\\dot y=f(y).\\]数值积分器给：\n\\[y_{n+1}=\\Phi_h(y_n).\\]传统 forward error analysis 比较：\n\\[y_n\\]和原方程的精确解：\n\\[y(t_n).\\]例如某二阶方法：\n\\[\\|y_n-y(t_n)\\|=O(h^2).\\]这告诉你：\n\\[\\boxed{\\ ext{在有限时间内，轨迹位置有多准。}}\\]但动力系统还有另一个问题：\n\\[\\boxed{\\ ext{轨迹的几何性质是否正确？}}\\]例如：\n能量是否长期漂移； 相空间体积是否保持； 周期轨道是否逐渐螺旋出去； 角动量是否保持； 高频模态是否产生人工耗散。 这些并不能仅靠“每一步局部误差是 \\(O(h^3)\\)”回答。\n2. BEA 的核心反转 假设积分器：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先看普通误差分析在问什么">1. 先看普通误差分析在问什么</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#explicit-euler">Explicit Euler</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#精确能量守恒">精确能量守恒</a></li>
+        <li><a href="#symplectic--shadow-energy-preservation">Symplectic / shadow-energy preservation</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/31-backward-error-analysis/">Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程”</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-13T00:00:00Z'>Sep 13, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 6 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="backward-error-analysis数值积分器真正求解的往往不是原方程而是一个附近的精确方程">Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程”
+</h1><p><strong>主题：Backward Error Analysis（后向误差分析）与 Shadow Hamiltonian（影子哈密顿量）</strong><br>
+<strong>领域：数值方法 × 有限元 × 物理引擎 × 非线性动力学</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong><br>
+今天选这个主题，是因为它解释了一个非常重要、又容易被误解的现象：</p>
+<blockquote>
+<p>为什么某些二阶积分器运行几百万步后，能量仍然只是在一个范围内振荡；另一些局部误差看起来同样很小的方法，却会出现持续的能量漂移？</p>
+</blockquote>
+<p>只比较：</p>
+\[\|x_{n+1}-x(t_{n+1})\|\]<p>通常解释不了这件事。</p>
+<p>Backward Error Analysis（BEA）换了一个问题：</p>
+\[\boxed{ \ ext{不要问“数值解离原方程的精确解多远”， 而问“这个数值轨迹究竟是哪一个微分方程的精确轨迹？”} }\]<p>这个视角是 geometric numerical integration 的核心工具之一。Hairer、Lubich、Wanner 的经典专著正是用 modified equations / backward error analysis 来解释辛积分器和对称积分器优异的长期行为。</p>
+<hr>
+<h2 id="1-先看普通误差分析在问什么">1. 先看普通误差分析在问什么
+</h2><p>考虑：</p>
+\[\dot y=f(y).\]<p>数值积分器给：</p>
+\[y_{n+1}=\Phi_h(y_n).\]<p>传统 forward error analysis 比较：</p>
+\[y_n\]<p>和原方程的精确解：</p>
+\[y(t_n).\]<p>例如某二阶方法：</p>
+\[\|y_n-y(t_n)\|=O(h^2).\]<p>这告诉你：</p>
+\[\boxed{\ ext{在有限时间内，轨迹位置有多准。}}\]<p>但动力系统还有另一个问题：</p>
+\[\boxed{\ ext{轨迹的几何性质是否正确？}}\]<p>例如：</p>
+<ul>
+<li>能量是否长期漂移；</li>
+<li>相空间体积是否保持；</li>
+<li>周期轨道是否逐渐螺旋出去；</li>
+<li>角动量是否保持；</li>
+<li>高频模态是否产生人工耗散。</li>
+</ul>
+<p>这些并不能仅靠“每一步局部误差是 \(O(h^3)\)”回答。</p>
+<hr>
+<h1 id="2-bea-的核心反转">2. BEA 的核心反转
+</h1><p>假设积分器：</p>
+\[y_{n+1}=\Phi_h(y_n).\]<p>Backward error analysis 尝试寻找一个 <strong>modified differential equation</strong>：</p>
+\[\boxed{ \dot y = f_h(y) }\]<p>其中：</p>
+\[f_h = f + h f_1 + h^2f_2 + h^3f_3+\cdots\]<p>使得数值映射：</p>
+\[\Phi_h\]<p>可以被看作这个修正方程在一个时间步 \(h\) 上的精确流，至少在截断到足够高阶时高度近似。</p>
+<p>于是：</p>
+\[\boxed{ \ ext{Numerical trajectory} \approx \ ext{exact trajectory of a nearby system}. }\]<p>这个“nearby”是整个思想的关键。</p>
+<p>数值积分器每一步确实有误差，</p>
+<p>但它可能不是在随机地偏离原动力学，而是在非常忠实地跟随<strong>另一个略微变形后的动力系统</strong>。这就是 modified differential equations 的基本出发点。</p>
+<hr>
+<h1 id="3-一个非常简单的例子显式-euler-到底精确求解了什么">3. 一个非常简单的例子：显式 Euler 到底精确求解了什么？
+</h1><p>原方程：</p>
+\[\dot y=f(y).\]<p>Explicit Euler：</p>
+\[y_{n+1} = y_n+h f(y_n).\]<p>我们寻找：</p>
+\[\dot y = f(y)+h g(y)+O(h^2)\]<p>使它的精确一步解与 Euler 匹配。</p>
+<p>精确解 Taylor 展开：</p>
+\[y(h) = y_0 + h f_h(y_0) + \frac{h^2}{2}f_h'(y_0)f_h(y_0) + O(h^3).\]<p>代入：</p>
+\[f_h=f+hg+\cdots\]<p>得到：</p>
+\[y(h) = y_0 + hf + h^2 \left[ g+\frac12f'f \right] +O(h^3).\]<p>而 Euler 只有：</p>
+\[y_0+hf.\]<p>所以要求：</p>
+\[g = -\frac12f'f.\]<p>于是 Euler 对应的 modified equation 开头是：</p>
+\[\boxed{ \dot y = f(y) - \frac h2 f'(y)f(y) + O(h^2). }\]<p>这条式子的意义很大：</p>
+<p>Euler 的误差可以解释为：</p>
+\[\boxed{ \ ext{你实际上给原物理方程偷偷加入了一些 }O(h)\ ext{ 的额外动力学。} }\]<p>于是可以开始问一个比 truncation error 更物理的问题：</p>
+<blockquote>
+<p>这些额外项是什么性质？</p>
+</blockquote>
+<p>它们是耗散？</p>
+<p>反耗散？</p>
+<p>频率修正？</p>
+<p>刚度修正？</p>
+<hr>
+<h1 id="4-在谐振子上区别立即变得明显">4. 在谐振子上，区别立即变得明显
+</h1><p>考虑：</p>
+\[\dot q=p,\]\[\dot p=-q.\]<p>Hamiltonian：</p>
+\[H(q,p) = \frac12(p^2+q^2).\]<p>真实轨迹是相平面里的圆：</p>
+\[H=\ ext{const}.\]<hr>
+<h3 id="explicit-euler">Explicit Euler
+</h3>\[q_{n+1}=q_n+h p_n,\]\[p_{n+1}=p_n-hq_n.\]<p>计算能量：</p>
+\[q_{n+1}^2+p_{n+1}^2 = (1+h^2)(q_n^2+p_n^2).\]<p>所以：</p>
+\[\boxed{ H_{n+1} = (1+h^2)H_n. }\]<p>每一步都人工增加能量。</p>
+<p>轨迹变成：</p>
+\[\boxed{\ ext{不断向外扩张的螺旋。}}\]<p>无论 \(h\) 多小，只要运行足够久，这种系统性偏差都会积累。</p>
+<hr>
+<h1 id="5-换成-symplectic-euler事情完全不同">5. 换成 Symplectic Euler，事情完全不同
+</h1><p>一种 symplectic Euler：</p>
+\[p_{n+1} = p_n-hq_n,\]\[q_{n+1} = q_n+h p_{n+1}.\]<p>它同样只有：</p>
+\[\boxed{\ ext{一阶精度}}\]<p>。</p>
+<p>如果只看 local truncation order：</p>
+\[\ ext{Explicit Euler}\]<p>与：</p>
+\[\ ext{Symplectic Euler}\]<p>似乎差不多。</p>
+<p>但长期行为完全不同。</p>
+<p>Symplectic Euler 的能量通常不会持续单调增长，</p>
+<p>而是在真实能量附近：</p>
+\[\boxed{\ ext{有界振荡。}}\]<p>为什么？</p>
+<p>并不是因为它神奇地精确保持原始：</p>
+\[H(q,p).\]<p>实际上通常没有。</p>
+<p>真正发生的是：</p>
+\[\boxed{ \ ext{它近似精确保持了另一个非常接近 }H\ ext{ 的 Hamiltonian。} }\]<p>这就是：</p>
+\[\boxed{\ ext{Shadow / Modified Hamiltonian}.}\]<p>辛积分器的长期近能量守恒正是 backward error analysis 的经典结果之一；在适当条件下，这种小幅能量误差可以维持极长时间。</p>
+<hr>
+<h1 id="6-shadow-hamiltonian-到底是什么">6. Shadow Hamiltonian 到底是什么？
+</h1><p>对于 Hamiltonian 系统：</p>
+\[\dot z = J^{-1}\ abla H(z),\]<p>如果使用一个 symplectic integrator，</p>
+<p>其 modified equation 仍然可以形式上写成 Hamiltonian 系统：</p>
+\[\boxed{ \dot z = J^{-1} \ abla\ ilde H(z) }\]<p>其中：</p>
+\[\ ilde H = H + hH_1 + h^2H_2+\cdots.\]<p>如果方法还具有对称性，例如 Störmer–<span class="term-anchor" data-term="verlet" tabindex="0">Verlet</span>，</p>
+<p>通常 odd/even 修正结构会进一步受到限制，例如常出现：</p>
+\[\ ilde H = H+h^2H_2+h^4H_4+\cdots.\]<p>数值轨迹于是近似满足：</p>
+\[\boxed{ \ ilde H(z_n) \approx \ ext{constant}. }\]<p>而因为：</p>
+\[\ ilde H-H=O(h^p),\]<p>原始能量：</p>
+\[H(z_n)\]<p>就会围绕真实值产生小幅、有界变化，</p>
+<p>而不是长期单向漂移。</p>
+<p>这就是：</p>
+\[\boxed{ \ ext{辛积分器“能量表现好”的真正原因， 通常并不是它逐步精确守恒原能量。} }\]<p>Hairer、Lubich、Wanner 的 Störmer–Verlet 综述专门用这一方法说明几何结构保持为何带来更好的 long-time behaviour。</p>
+<hr>
+<h1 id="7-这点非常容易和energy-conserving-method混淆">7. 这点非常容易和“Energy-conserving method”混淆
+</h1><p>有两种完全不同的目标。</p>
+<h3 id="精确能量守恒">精确能量守恒
+</h3><p>某些算法构造：</p>
+\[H(z_{n+1})=H(z_n)\]<p>逐步精确成立。</p>
+<h3 id="symplectic--shadow-energy-preservation">Symplectic / shadow-energy preservation
+</h3><p>通常：</p>
+\[H(z_{n+1})\ eq H(z_n),\]<p>但存在：</p>
+\[\ ilde H\]<p>使：</p>
+\[\ ilde H(z_n)\approx\ ext{const}.\]<p>因此原始能量：</p>
+\[H(z_n)\]<p>在附近振荡。</p>
+<p>这两者不能简单画等号。</p>
+<p>Geometric numerical integration 更关心的是：</p>
+\[\boxed{\ ext{整个 Hamiltonian phase-space geometry}}\]<p>而不只是某一个标量 invariant。辛积分器的定义本身就是保持 Hamiltonian flow 的 symplectic structure。</p>
+<hr>
+<h1 id="8-为什么这比高阶更深一层">8. 为什么这比“高阶”更深一层？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设有：</p>
+<h3 id="方法-a">方法 A
+</h3><p>四阶，但非 symplectic。</p>
+<h3 id="方法-b">方法 B
+</h3><p>二阶 Störmer–Verlet，但 symplectic。</p>
+<p>短时间：</p>
+\[A\]<p>很可能位置误差更小。</p>
+<p>但运行：</p>
+\[10^6\]<p>甚至：</p>
+\[10^9\]<p>个周期，</p>
+<p>B 可能在轨道结构和长期能量上更可信。</p>
+<p>因此 numerical integration 至少有两个评价轴：</p>
+\[\boxed{\ ext{local/global approximation order}}\]<p>以及：</p>
+\[\boxed{\ ext{geometric fidelity}}\]<p>。</p>
+<p>这两者相关，却完全不是一回事。</p>
+<p>这也是 geometric numerical integration 作为独立理论体系存在的原因。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="9-一个非常有价值的理解数值误差可以被看作模型误差">9. 一个非常有价值的理解：数值误差可以被看作“模型误差”
+</h1><p>传统视角：</p>
+\[\boxed{ \ ext{离散化} \rightarrow \ ext{误差} }\]<p>。</p>
+<p>Backward error 视角：</p>
+\[\boxed{ \ ext{离散化} \rightarrow \ ext{modified physics} }\]<p>。</p>
+<p>例如：</p>
+\[\dot y=f(y)\]<p>通过某积分器以后，</p>
+<p>实际上变成：</p>
+\[\dot y= f(y) + h^p g(y)+\cdots.\]<p>于是：</p>
+\[g(y)\]<p>就是离散化引入的“虚拟物理”。</p>
+<p>这可能是：</p>
+<ul>
+<li>artificial damping；</li>
+<li>artificial antidamping；</li>
+<li>frequency shift；</li>
+<li>modified stiffness；</li>
+<li>modified inertia；</li>
+<li>nonlinear coupling。</li>
+</ul>
+<p>所以一个积分器并不是简单地：</p>
+<blockquote>
+<p>“每步误差 0.01%。”</p>
+</blockquote>
+<p>它更像：</p>
+<blockquote>
+<p><strong>“你把真实系统替换成了一个参数依赖于时间步的附近系统。”</strong></p>
+</blockquote>
+<p>这个视角对物理引擎尤其重要。</p>
+<hr>
+<h1 id="10-为什么游戏物理里的稳定不等于物理正确">10. 为什么游戏物理里的“稳定”不等于“物理正确”？
+</h1><p>例如 implicit Euler 对弹簧系统非常稳定。</p>
+<p>即使：</p>
+\[h\]<p>较大，它通常不会爆炸。</p>
+<p>但它会引入明显 numerical damping。</p>
+<p>也就是说：</p>
+\[\boxed{ \ ext{稳定性来自它实际模拟了一个更耗散的 modified system。} }\]<p>因此你看到：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">真实系统：
+</span></span><span class="line"><span class="cl">振动很久
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Implicit Euler：
+</span></span><span class="line"><span class="cl">几步以后振没了
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>从传统数值稳定性角度：</p>
+\[\boxed{\ ext{非常稳定。}}\]<p>从动力学 fidelity 角度：</p>
+\[\boxed{\ ext{modified physics 很强。}}\]<p>这解释了一个求解器开发里极其重要的区别：</p>
+\[\boxed{ \ ext{不爆炸} \ eq \ ext{动力学正确}. }\]<hr>
+<h1 id="11-xpbd-也可以用这个视角重新理解">11. XPBD 也可以用这个视角重新理解
+</h1><p><span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 常被写成 constraint correction：</p>
+\[\Delta\lambda = \frac{-C-\ ilde\alpha\lambda} {\ abla C^TM^{-1}\ abla C+\ ilde\alpha}.\]<p>工程上容易把注意力集中到：</p>
+<ul>
+<li>compliance；</li>
+<li>iteration count；</li>
+<li>substeps；</li>
+<li>damping；</li>
+<li>velocity update。</li>
+</ul>
+<p>但从 modified-equation 思维看，可以再问：</p>
+\[\boxed{ \ ext{这些离散操作组合起来， 究竟对应什么连续动力学？} }\]<p>特别是：</p>
+<ul>
+<li>position projection；</li>
+<li>velocity reconstruction；</li>
+<li>constraint damping；</li>
+<li>collision projection；</li>
+</ul>
+<p>都会引入隐含的：</p>
+\[\boxed{\ ext{effective stiffness / damping / impulse law}}\]<p>。</p>
+<p>当 soft body 接触后出现：</p>
+<ul>
+<li>能量持续注入；</li>
+<li>过度耗散；</li>
+<li>高频抖动；</li>
+<li>volume oscillation；</li>
+</ul>
+<p>一个非常有价值的诊断问题就是：</p>
+<blockquote>
+<p>这是不是某个离散步骤系统性地引入了错误符号的 modified-energy term？</p>
+</blockquote>
+<p>这比单纯追：</p>
+\[\ ext{NaN}\]<p>或某帧：</p>
+\[\Delta x\]<p>异常更接近机制。</p>
+<hr>
+<h1 id="12-为什么-substepping-有时神奇地治好了物理">12. 为什么 Substepping 有时“神奇地治好了物理”？
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>如果 modified equation 是：</p>
+\[\dot y = f(y) + h^p g_p(y) + O(h^{p+1}),\]<p>时间步从：</p>
+\[h\]<p>改成：</p>
+\[h/2,\]<p>人工动力学的幅度会变成大约：</p>
+\[\frac{1}{2^p}.\]<p>所以 substepping 不只是：</p>
+\[\boxed{\ ext{提高轨迹精度}}\]<p>。</p>
+<p>它同时在：</p>
+\[\boxed{\ ext{减弱离散化引入的虚拟物理。}}\]<p>这解释了为什么某些系统：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">1 substep:
+</span></span><span class="line"><span class="cl">明显人工阻尼/爆能
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">4 substeps:
+</span></span><span class="line"><span class="cl">突然“像真的”
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>背后可能不是 solver iteration 单纯变多，而是：</p>
+\[\boxed{ h\ ext{-dependent modified dynamics 显著变弱。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="13-störmerverlet-为什么成为物理模拟中的经典方法">13. Störmer–Verlet 为什么成为物理模拟中的经典方法？
+</h1><p>对于可分 Hamiltonian：</p>
+\[H(q,p)=T(p)+V(q),\]<p>Störmer–Verlet 可以写成：</p>
+\[p_{n+\frac12} = p_n - \frac h2\ abla V(q_n),\]\[q_{n+1} = q_n + h\ abla_pT(p_{n+\frac12}),\]\[p_{n+1} = p_{n+\frac12} - \frac h2\ abla V(q_{n+1}).\]<p>它同时具有：</p>
+\[\boxed{\ ext{二阶}}\]\[\boxed{\ ext{对称 / time reversible}}\]\[\boxed{\ ext{symplectic}}\]<p>几个非常关键的结构。</p>
+<p>Hairer、Lubich、Wanner 甚至以 Störmer–Verlet 为核心写过一篇完整的 Acta Numerica 综述，因为它几乎是理解 geometric numerical integration 的最佳样板。</p>
+<hr>
+<h1 id="14-为什么对称性也特别重要">14. 为什么“对称性”也特别重要？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>如果一个积分器满足：</p>
+\[\Phi_{-h} = \Phi_h^{-1},\]<p>称为 symmetric / time-reversible。</p>
+<p>直觉上：</p>
+<p>向前一步：</p>
+\[h\]<p>再向后一步：</p>
+\[-h\]<p>能回到原状态。</p>
+<p>对于这类方法，modified equation 也具有特殊的奇偶结构。</p>
+<p>例如二阶 symmetric method 的 modified vector field 通常形如：</p>
+\[f_h = f+h^2f_2+h^4f_4+\cdots,\]<p>没有：</p>
+\[h,\ h^3,\ldots\]<p>这样的项。</p>
+<p>所以很多 systematic drift 项天然消失。</p>
+<p>这也是为什么：</p>
+\[\boxed{ \ ext{symmetry} }\]<p>常与优秀的长期行为联系在一起；在可积 Hamiltonian 系统上，相关理论也能得到长时间的小能量误差性质。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="15-bea-也解释了相位误差和能量误差为什么不是同一个东西">15. BEA 也解释了“相位误差”和“能量误差为什么不是同一个东西”
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>考虑振子。</p>
+<p>数值积分器可能模拟一个 modified oscillator：</p>
+\[\ddot q+\ ilde\omega^2q=0\]<p>其中：</p>
+\[\ ilde\omega = \omega + c h^2+\cdots.\]<p>那么它的能量结构可以非常好，</p>
+<p>但频率略有误差。</p>
+<p>运行很久以后：</p>
+\[\boxed{\ ext{phase error 可以非常大}}\]<p>——数值振子可能和真实振子差了很多个周期相位。</p>
+<p>与此同时：</p>
+\[\boxed{\ ext{energy error 仍然很小。}}\]<p>所以：</p>
+\[\boxed{ \ ext{长期能量稳定} \ eq \ ext{长期轨迹点逐点准确}. }\]<p>这是理解 Hamiltonian numerical simulation 必须接受的一件事。</p>
+<p>长期模拟通常更现实的目标是保持：</p>
+<ul>
+<li>qualitative phase portrait；</li>
+<li>invariants；</li>
+<li>statistical properties；</li>
+<li>orbital behaviour；</li>
+</ul>
+<p>而不是要求 \(t=10^9\) 时位置仍逐点相同。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="16-这对混沌系统尤其重要">16. 这对混沌系统尤其重要
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>在 chaotic system 中：</p>
+\[\|\delta x(t)\| \sim e^{\lambda t}\|\delta x(0)\|.\]<p>任何浮点误差、离散误差都会指数放大。</p>
+<p>所以长期要求：</p>
+\[x_{\rm numerical}(t) \approx x_{\rm exact}(t)\]<p>本身可能就没有现实意义。</p>
+<p>Backward-error / geometric viewpoint 提供了另一套评价：</p>
+\[\boxed{ \ ext{数值系统是不是仍然属于正确的附近动力系统类别？} }\]<p>例如：</p>
+<ul>
+<li>保持 symplectic geometry；</li>
+<li>能量长期有界；</li>
+<li>invariants 近似保持；</li>
+<li>相空间统计行为正确。</li>
+</ul>
+<p>这比“第 100 万步的位置误差是多少”往往更有物理意义。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="17-对有限元动力学它提供了一个非常重要的算法选择标准">17. 对有限元动力学，它提供了一个非常重要的算法选择标准
+</h1><p>半离散 FEM 常得到：</p>
+\[M\ddot q+\ abla V(q)=0.\]<p>这本身已经是有限维 Hamiltonian / Lagrangian system。</p>
+<p>此时还有第二次离散：</p>
+\[\boxed{\ ext{time discretization}.}\]<p>所以最终误差有两层：</p>
+\[\ ext{continuum} \rightarrow \ ext{spatial FEM} \rightarrow \ ext{time integrator}.\]<p>即使空间 FEM 很准确，</p>
+<p>如果时间积分持续制造 artificial energy drift，</p>
+<p>长期 dynamics 仍然会错。</p>
+<p>因此 transient structural FEM 选算法时不应该只看：</p>
+\[\boxed{\ ext{A-stable?}}\]<p>还应看：</p>
+<ul>
+<li>是否需要 physical/numerical damping；</li>
+<li>高频模态是否应被过滤；</li>
+<li>是否要求长期 conservative dynamics；</li>
+<li>是否需要 reversibility；</li>
+<li>是否存在 Hamiltonian structure。</li>
+</ul>
+<p>Hairer 等对 geometric integration 的系统理论正是围绕这些结构保持问题展开。</p>
+<hr>
+<h1 id="18-这也解释了为什么数值耗散有时反而是设计目标">18. 这也解释了为什么“数值耗散”有时反而是设计目标
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>并不是所有问题都应该 symplectic。</p>
+<p>结构 FEM 里常有很多高频 mesh modes：</p>
+\[\omega_{\rm high}\]<p>其实并不是你关心的物理。</p>
+<p>此时 generalized-\(\alpha\) 一类方法有意给高频加入数值耗散：</p>
+\[\boxed{ \ ext{抑制非物理高频， 保留低频工程响应。} }\]<p>从 BEA 的角度：</p>
+<p>这相当于<strong>有意识地设计 modified dynamics</strong>。</p>
+<p>因此真正成熟的问题不是：</p>
+<blockquote>
+<p>有没有 numerical damping？</p>
+</blockquote>
+<p>而是：</p>
+\[\boxed{ \ ext{离散算法引入了什么 damping， 它作用在哪些频率， 是不是我想要的？} }\]<p>这比单纯追求“绝对无耗散”更接近工程。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="19-对可靠性分析它还有一个经常被忽略的意义">19. 对可靠性分析，它还有一个经常被忽略的意义
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设极限状态依赖动态峰值：</p>
+\[g(\ heta) = F_{\rm limit} - \max_t F(t;\ heta).\]<p>如果 time integrator 带来 artificial damping，</p>
+<p>那么：</p>
+\[F_{\max}\]<p>可能系统性偏小。</p>
+<p>于是：</p>
+\[P_f\]<p>也可能被系统性低估。</p>
+<p>这种误差并不是：</p>
+\[\boxed{\ ext{随机 surrogate error}}\]<p>而是：</p>
+\[\boxed{\ ext{numerical-model bias}.}\]<p>更危险的是：</p>
+<p>时间步减半时代理模型本身可能仍然拥有：</p>
+\[R^2=0.99,\]<p>但它拟合的是两个不同 modified physical systems。</p>
+<p>所以动态可靠性中非常值得进行：</p>
+\[\boxed{ h \rightarrow g_h(\ heta) }\]<p>的时间步收敛分析。</p>
+<p>真正需要确认的是：</p>
+\[g_h \rightarrow g.\]<p>不是只确认：</p>
+\[\hat g_h \approx g_h.\]<p>这区分了：</p>
+\[\boxed{\ ext{代理模型误差}}\]<p>和：</p>
+\[\boxed{\ ext{底层数值物理误差}.}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="20-一个非常适合自己做的实验">20. 一个非常适合自己做的实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>只需要模拟：</p>
+\[\ddot q+q=0.\]<p>初始：</p>
+\[q(0)=1,\qquad p(0)=0.\]<p>真实能量：</p>
+\[H=\frac12.\]<p>分别使用：</p>
+<ol>
+<li>Explicit Euler；</li>
+<li>Implicit Euler；</li>
+<li>Symplectic Euler；</li>
+<li>Störmer–Verlet；</li>
+<li>RK4。</li>
+</ol>
+<p>统一：</p>
+\[h=0.1\]<p>运行：</p>
+\[10^5\]<p>步。</p>
+<p>不要只画：</p>
+\[q(t).\]<p>同时画：</p>
+\[\boxed{ H_n-H_0 }\]<p>以及 phase portrait：</p>
+\[(q_n,p_n).\]<p>你很可能看到：</p>
+<ul>
+<li>Explicit Euler：不断向外螺旋；</li>
+<li>Implicit Euler：不断向内螺旋；</li>
+<li>Symplectic Euler：围绕某条附近闭轨道运动；</li>
+<li>Verlet：能量在一个很窄的范围内振荡；</li>
+<li>RK4：短期极准，但超长时间行为需要另外观察其系统性漂移。</li>
+</ul>
+<p>然后把：</p>
+\[h=0.1,\ 0.05,\ 0.025\]<p>重复一遍。</p>
+<p>真正值得看的不是某一步误差，</p>
+<p>而是：</p>
+\[\boxed{ \ ext{“人工动力学”如何随 }h\ ext{ 缩小。} }\]<p>这个实验会比背一堆 symplectic 定义更快建立直觉。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="21-对自研求解器一个非常实用的诊断建议">21. 对自研求解器，一个非常实用的诊断建议
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>以后看到动力学异常，不妨把诊断分成三层。</p>
+<p>第一层：</p>
+\[\boxed{\ ext{方程层}}\]<p>连续物理模型本身对不对？</p>
+<p>第二层：</p>
+\[\boxed{\ ext{空间离散层}}\]<p>FEM/<span class="term-anchor" data-term="pbd" tabindex="0">PBD</span> constraints 有没有 locking、hourglass、inversion 等问题？</p>
+<p>第三层：</p>
+\[\boxed{\ ext{时间离散层}}\]<p>积分器正在给系统增加什么 modified physics？</p>
+<p>尤其可以做：</p>
+\[h,\quad h/2,\quad h/4\]<p>对照，记录：</p>
+<ul>
+<li>总能量；</li>
+<li>动能；</li>
+<li>势能；</li>
+<li>约束功；</li>
+<li>接触冲量；</li>
+<li>COM；</li>
+<li>主频；</li>
+<li>峰值 \(J\)。</li>
+</ul>
+<p>如果异常量按：</p>
+\[h^p\]<p>稳定下降，</p>
+<p>它很可能就是离散时间产生的 modified-equation effect。</p>
+<p>如果不下降，</p>
+<p>再继续寻找空间离散或物理模型问题。</p>
+<p>这会比单纯“把 substep 再调大一点看看”更有解释力。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Backward Error Analysis 最值得记住的不是 modified equation 的展开式。</p>
+<p>真正重要的是这个视角：</p>
+\[\boxed{ \ ext{数值算法不是简单地“带误差求解原物理”； 它往往是在非常准确地求解一个略微被修改的物理系统。} }\]<p>于是评价一个积分器时，问题就从：</p>
+\[\ ext{这一步误差是多少？}\]<p>升级为：</p>
+\[\boxed{ \ ext{它把我的物理系统修改成了什么？} }\]<p>这也解释了为什么：</p>
+\[\boxed{\ ext{稳定性、精度、守恒性、长期真实性}}\]<p>是四个相关却不同的维度。</p>
+<p>在整个知识体系中，它处在：</p>
+\[\ ext{ODE / semi-discrete mechanics}\]\[\downarrow\]\[\ ext{time discretization}\]\[\downarrow\]\[\boxed{\ ext{Backward Error Analysis / Modified Equation}}\]\[\downarrow\]\[\ ext{Geometric Numerical Integration}\]\[\downarrow\]\[\ ext{long-time physical fidelity}.\]<p>对于物理引擎开发，我认为它最有迁移价值的一点尤其简单：</p>
+\[\boxed{ \ ext{当一个算法“稳定但看起来不物理”时， 不要只问参数该怎么调； 试着问：它究竟在模拟哪个 modified system？} }\]<p>这往往能把调参问题提升成一个可以分析的数值模型问题。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p><strong>Hairer, Lubich &amp; Wanner, <em>Geometric Numerical Integration: Structure-Preserving Algorithms for Ordinary Differential Equations</em></strong>。这一领域最系统的经典教材，完整讨论 symplectic、symmetric integrators、modified equations、backward error analysis 和长期行为。<br>
+<a class="link" href="https://link.springer.com/book/10.1007/3-540-30666-8"  target="_blank" rel="noopener"
+    >Springer 图书页</a></p>
+</li>
+<li>
+<p><strong>Hairer, Lubich &amp; Wanner, <em>Geometric numerical integration illustrated by the Störmer–Verlet method</em>, Acta Numerica, 2003</strong>。如果只读一篇，我更推荐这一篇；它用 Verlet 把 symplecticity、backward error analysis 和长期能量行为串成一个完整故事。<br>
+<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/geometric-numerical-integration-illustrated-by-the-stormerverlet-method/E55395D5DD7A4E0526D10EA74DA6C46B"  target="_blank" rel="noopener"
+    >Cambridge 论文页</a></p>
+</li>
+<li>
+<p><strong>Sanz-Serna, <em>Symplectic Integrators for Hamiltonian Problems: An Overview</em>, Acta Numerica</strong>。经典综述，适合理解 symplectic integrator 在 Hamiltonian 数值计算中的理论定位。</p>
+</li>
+<li>
+<p><strong>Chartier, Hairer &amp; Vilmart, <em>Modified Differential Equations</em>, 2007</strong>。篇幅很短，适合作为 backward-error / modified-equation 的快速数学入口。<br>
+<a class="link" href="https://archive-ouverte.unige.ch/unige:12055"  target="_blank" rel="noopener"
+    >Université de Genève 开放页面</a></p>
+</li>
+<li>
+<p><strong>Hairer, <em>Important Aspects of Geometric Numerical Integration</em>, Journal of Scientific Computing, 2005</strong>。进一步讨论 Hamiltonian systems、reversibility、backward error analysis、energy conservation 与高度振荡系统。</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+        
+            <a href="/tags/%E9%9D%9E%E7%BA%BF%E6%80%A7%E5%8A%A8%E5%8A%9B%E5%AD%A6/">非线性动力学</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-31<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge" title="次要分型">概念基石</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/04-variational-integrators/">Variational Integrators：时间积分器也可以“从力学原理里推出来”<span class="dep-radar-meta"> · card-04</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-31<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div><span class="dep-radar-arrow">→</span><div class="dep-radar-col dep-radar-col--suc">
+            <div class="dep-radar-colhead">后继延伸</div><a class="dep-radar-node" href="/cards/33-probabilistic-numerics/">Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？<span class="dep-radar-meta"> · card-33</span></a></div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/35-anderson-acceleration-2/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/20-multigrid/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/12-imex/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/04-variational-integrators/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Variational Integrators：时间积分器也可以“从力学原理里推出来”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/01-ipc/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IPC：把“碰撞处理”改写成一个优化问题</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

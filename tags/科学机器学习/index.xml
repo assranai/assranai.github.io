@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Sun, 06 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Tue, 15 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
         <link>https://assranai.github.io/cards/02-ak-mcs/</link>
         <pubDate>Sat, 15 Aug 2026 00:00:00 +0000</pubDate>
@@ -1795,6 +1795,1202 @@
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Zhang et al., &lt;em&gt;LoRA-FA: Memory-efficient Low-rank Adaptation for Large Language Models Fine-tuning&lt;/em&gt;, 2023&lt;/strong&gt;。适合从“参数效率”继续走到“完整训练系统效率”，尤其是 activation memory 为什么仍可能成为瓶颈。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间</title>
+        <link>https://assranai.github.io/cards/32-randomized-svd/</link>
+        <pubDate>Mon, 14 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/32-randomized-svd/</guid>
+        <description>&lt;h1 id=&#34;randomized-svd为什么随机乘几个向量就能抓住一个百万维矩阵最重要的子空间&#34;&gt;Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Randomized SVD / Randomized Numerical Linear Algebra（随机化奇异值分解 / 随机数值线性代数）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：代理模型 × 有限元 × 科学机器学习 × AI 全栈工程&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
+这次选 Randomized SVD，因为它体现了一种很值得迁移的计算思想：&lt;/p&gt;
+\[\boxed{ \ ext{如果你只需要一个巨大系统最重要的低维结构， 就没有必要精确理解整个巨大系统。} }\]&lt;p&gt;标准 SVD：&lt;/p&gt;
+\[A=U\Sigma V^T\]&lt;p&gt;是数值线性代数最重要的工具之一，但当：&lt;/p&gt;
+\[A\in\mathbb R^{10^6\ imes10^4}\]&lt;p&gt;时，精确 SVD 本身就可能成为瓶颈。&lt;/p&gt;
+&lt;p&gt;Randomized SVD 的做法非常反直觉：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;随机生成少量方向，让大矩阵作用在这些方向上，再根据这些响应反推出矩阵的主导子空间。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;典型结构只有：&lt;/p&gt;
+\[\boxed{ Y=A\Omega }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\Omega\in\mathbb R^{n\ imes(k+p)}\]&lt;p&gt;是一组随机向量。&lt;/p&gt;
+&lt;p&gt;然后对：&lt;/p&gt;
+\[Y\]&lt;p&gt;正交化：&lt;/p&gt;
+\[Y=QR,\]&lt;p&gt;就能得到：&lt;/p&gt;
+\[Q\]&lt;p&gt;作为 \(A\) 主导列空间的近似。&lt;/p&gt;
+&lt;p&gt;Halko、Martinsson、Tropp 2011 年的 SIAM Review 论文把这一框架系统化；Martinsson 与 Tropp 2020 年的 &lt;em&gt;Acta Numerica&lt;/em&gt; 综述进一步将其扩展到低秩近似、回归、核矩阵、流式算法和线性系统等多个方向。&lt;/p&gt;
+&lt;p&gt;真正值得学的不是“随机算法会更快”，而是：&lt;/p&gt;
+\[\boxed{ \ ext{随机探测为什么足以发现确定性的低维结构？} }\]&lt;hr&gt;
+&lt;h2 id=&#34;1-先明确问题很多时候我们根本不需要完整-svd&#34;&gt;1. 先明确问题：很多时候我们根本不需要完整 SVD
+&lt;/h2&gt;&lt;p&gt;假设有限元跑出：&lt;/p&gt;
+\[m=10000\]&lt;p&gt;个快照，&lt;/p&gt;
+&lt;p&gt;每个快照有：&lt;/p&gt;
+\[N=10^6\]&lt;p&gt;个自由度。&lt;/p&gt;
+&lt;p&gt;组成 snapshot matrix：&lt;/p&gt;
+\[X= [u(t_1),u(t_2),\ldots,u(t_m)] \in\mathbb R^{10^6\ imes10^4}.\]&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt; 通常通过 SVD：&lt;/p&gt;
+\[X=U\Sigma V^T\]&lt;p&gt;取前：&lt;/p&gt;
+\[r=50\]&lt;p&gt;个模态：&lt;/p&gt;
+\[U_r.\]&lt;p&gt;真正需要的是：&lt;/p&gt;
+\[\boxed{\ ext{前 50 个主方向}}\]&lt;p&gt;而不是后面：&lt;/p&gt;
+\[9950\]&lt;p&gt;个奇异向量。&lt;/p&gt;
+&lt;p&gt;这就是 truncated SVD：&lt;/p&gt;
+\[X \approx U_r\Sigma_rV_r^T.\]&lt;p&gt;理论上最优的 rank-\(r\) 近似由 Eckart–Young 定理给出：&lt;/p&gt;
+\[\|A-A_r\|_2=\sigma_{r+1}.\]&lt;p&gt;问题在于：&lt;/p&gt;
+\[\boxed{ \ ext{为了得到 50 个方向， 传统算法有时仍需要对整个巨大矩阵做大量工作。} }\]&lt;p&gt;Randomized SVD 就专门针对这种：&lt;/p&gt;
+\[r\ll\min(m,n)\]&lt;p&gt;的场景。Scikit-learn 当前的官方 &lt;code&gt;randomized_svd&lt;/code&gt; 也明确将其定位为：当矩阵很大、而只需要少量 singular components 时，随机化 truncated SVD 往往非常高效。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-最核心的思想不要直接分解-先找到它的-range&#34;&gt;2. 最核心的思想：不要直接分解 \(A\)，先找到它的 range
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[A\]&lt;p&gt;实际上近似 rank-\(k\)：&lt;/p&gt;
+\[A \approx U_k\Sigma_kV_k^T.\]&lt;p&gt;那么任意向量：&lt;/p&gt;
+\[\omega\]&lt;p&gt;经过：&lt;/p&gt;
+\[y=A\omega\]&lt;p&gt;后：&lt;/p&gt;
+\[y \approx U_k\Sigma_kV_k^T\omega.\]&lt;p&gt;无论随机输入：&lt;/p&gt;
+\[\omega\]&lt;p&gt;是什么，&lt;/p&gt;
+&lt;p&gt;输出：&lt;/p&gt;
+\[y\]&lt;p&gt;都会落到或接近：&lt;/p&gt;
+\[\boxed{\operatorname{span}(U_k)}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以如果连续随机生成：&lt;/p&gt;
+\[\omega_1,\omega_2,\ldots,\omega_l\]&lt;p&gt;并计算：&lt;/p&gt;
+\[y_i=A\omega_i,\]&lt;p&gt;这些：&lt;/p&gt;
+\[y_i\]&lt;p&gt;自然会“照亮” \(A\) 的主导列空间。&lt;/p&gt;
+&lt;p&gt;写成矩阵：&lt;/p&gt;
+\[\boxed{ Y=A\Omega }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\Omega= [\omega_1,\ldots,\omega_l].\]&lt;p&gt;然后：&lt;/p&gt;
+\[Q=\operatorname{orth}(Y).\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ A \approx QQ^TA. }\]&lt;p&gt;这一步叫：&lt;/p&gt;
+\[\boxed{\ ext{randomized range finder}}\]&lt;p&gt;，也是 Randomized SVD 的核心。&lt;/p&gt;
+&lt;p&gt;Halko 等把大量随机化矩阵分解统一成“两阶段”框架：先用随机采样找到近似 range，再在这个低维空间里做传统确定性线性代数。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-为什么随机方向不会刚好错过重要子空间&#34;&gt;3. 为什么随机方向不会刚好错过重要子空间？
+&lt;/h1&gt;&lt;p&gt;这是最关键的问题。&lt;/p&gt;
+&lt;p&gt;假设真实主导右奇异空间：&lt;/p&gt;
+\[V_k = [v_1,\ldots,v_k].\]&lt;p&gt;随机高斯向量：&lt;/p&gt;
+\[\omega\sim N(0,I)\]&lt;p&gt;在任何固定方向：&lt;/p&gt;
+\[v_i\]&lt;p&gt;上的投影：&lt;/p&gt;
+\[v_i^T\omega\]&lt;p&gt;几乎不可能严格为零。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[A\omega = \sum_i \sigma_i u_i(v_i^T\omega).\]&lt;p&gt;主导奇异值：&lt;/p&gt;
+\[\sigma_1,\sigma_2,\ldots,\sigma_k\]&lt;p&gt;会放大相应方向。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[\sigma_1\gg\sigma_{100},\]&lt;p&gt;那么：&lt;/p&gt;
+\[A\omega\]&lt;p&gt;天然被前几个：&lt;/p&gt;
+\[u_i\]&lt;p&gt;支配。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \ ext{矩阵本身在替你过滤随机噪声， 把随机输入变成主导结构的混合。} }\]&lt;p&gt;多取几个随机向量，就能把整个 dominant subspace 展开出来。&lt;/p&gt;
+&lt;p&gt;这其实和 power iteration 的思想非常接近。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-标准-randomized-svd-算法只有几步&#34;&gt;4. 标准 Randomized SVD 算法只有几步
+&lt;/h1&gt;&lt;p&gt;假设想要 rank：&lt;/p&gt;
+\[k.\]&lt;p&gt;通常再增加：&lt;/p&gt;
+\[p\]&lt;p&gt;个 oversampling directions：&lt;/p&gt;
+\[l=k+p.\]&lt;p&gt;常见：&lt;/p&gt;
+\[p\approx5\sim20.\]&lt;p&gt;算法：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Ω = random Gaussian matrix, shape (n, k+p)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Y = A Ω
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Q = orth(Y)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;B = Qᵀ A
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[Ũ, Σ, Vᵀ] = SVD(B)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;U = Q Ũ
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;最终：&lt;/p&gt;
+\[\boxed{ A \approx U\Sigma V^T. }\]&lt;p&gt;关键在：&lt;/p&gt;
+\[B=Q^TA.\]&lt;p&gt;如果：&lt;/p&gt;
+\[Q\in\mathbb R^{m\ imes50},\]&lt;p&gt;那么：&lt;/p&gt;
+\[B\]&lt;p&gt;只有：&lt;/p&gt;
+\[50\ imes n.\]&lt;p&gt;真正昂贵的 SVD 已经从巨大矩阵：&lt;/p&gt;
+\[A\]&lt;p&gt;转移到了一个小得多的：&lt;/p&gt;
+\[B.\]&lt;hr&gt;
+&lt;h1 id=&#34;5-这其实是先压缩再精确计算&#34;&gt;5. 这其实是“先压缩，再精确计算”
+&lt;/h1&gt;&lt;p&gt;Randomized SVD 并不是完全随机地给答案。&lt;/p&gt;
+&lt;p&gt;随机性只用于：&lt;/p&gt;
+\[\boxed{\ ext{发现一个好的低维子空间}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;找到：&lt;/p&gt;
+\[Q\]&lt;p&gt;之后，&lt;/p&gt;
+&lt;p&gt;后面的：&lt;/p&gt;
+\[B=Q^TA\]&lt;p&gt;和：&lt;/p&gt;
+\[B=\ ilde U\Sigma V^T\]&lt;p&gt;仍然是标准确定性 SVD。&lt;/p&gt;
+&lt;p&gt;所以它的结构是：&lt;/p&gt;
+\[\ ext{Huge deterministic problem}\]\[\downarrow\]\[\boxed{\ ext{Random sketch}}\]\[\downarrow\]\[\ ext{Small deterministic problem}.\]&lt;p&gt;这是 Randomized Numerical Linear Algebra 一个非常典型的架构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么-oversampling-很重要&#34;&gt;6. 为什么 oversampling 很重要？
+&lt;/h1&gt;&lt;p&gt;假设真正要：&lt;/p&gt;
+\[k=20\]&lt;p&gt;个 modes。&lt;/p&gt;
+&lt;p&gt;理论上可以只取：&lt;/p&gt;
+\[20\]&lt;p&gt;个随机向量。&lt;/p&gt;
+&lt;p&gt;但如果刚好某些随机组合对第 20 个方向响应很弱，&lt;/p&gt;
+&lt;p&gt;子空间质量就可能下降。&lt;/p&gt;
+&lt;p&gt;所以常取：&lt;/p&gt;
+\[l=k+p\]&lt;p&gt;例如：&lt;/p&gt;
+\[k=20,\quad p=10.\]&lt;p&gt;相当于给算法一些：&lt;/p&gt;
+\[\boxed{\ ext{冗余观察方向}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;然后最终仍只保留：&lt;/p&gt;
+\[20\]&lt;p&gt;个 singular vectors。&lt;/p&gt;
+&lt;p&gt;Scikit-learn 当前默认：&lt;/p&gt;
+\[n_{\rm oversamples}=10,\]&lt;p&gt;并明确指出：对于高噪声、有效秩较大或 singular spectrum 衰减缓慢的问题，可以增加 oversampling 来改善近似质量。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-真正麻烦的是奇异值衰减慢&#34;&gt;7. 真正麻烦的是奇异值衰减慢
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[\sigma_1=1000, \quad \sigma_2=500, \quad \sigma_{50}=1, \quad \sigma_{51}=0.001.\]&lt;p&gt;主导子空间非常清楚。&lt;/p&gt;
+&lt;p&gt;Randomized range finder 很容易抓住。&lt;/p&gt;
+&lt;p&gt;但如果：&lt;/p&gt;
+\[\sigma_i\sim\frac1i,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\sigma_{50}\]&lt;p&gt;和：&lt;/p&gt;
+\[\sigma_{100}\]&lt;p&gt;差别不大。&lt;/p&gt;
+&lt;p&gt;这时随机采样得到的：&lt;/p&gt;
+\[Y=A\Omega\]&lt;p&gt;中，尾部方向仍占有明显能量。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \ ext{dominant subspace 不够突出。} }\]&lt;p&gt;Randomized SVD 最常用的解决方法就是：&lt;/p&gt;
+\[\boxed{\ ext{Power Iteration}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;8-power-iteration-为什么有效&#34;&gt;8. Power Iteration 为什么有效？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;改成计算：&lt;/p&gt;
+\[Y=(AA^T)^qA\Omega.\]&lt;p&gt;利用 SVD：&lt;/p&gt;
+\[A=U\Sigma V^T,\]&lt;p&gt;得到：&lt;/p&gt;
+\[(AA^T)^qA = U\Sigma^{2q+1}V^T.\]&lt;p&gt;所以奇异值变成：&lt;/p&gt;
+\[\boxed{ \sigma_i \rightarrow \sigma_i^{2q+1}. }\]&lt;p&gt;假设：&lt;/p&gt;
+\[\frac{\sigma_k}{\sigma_{k+1}} = 2.\]&lt;p&gt;当：&lt;/p&gt;
+\[q=0\]&lt;p&gt;差距：&lt;/p&gt;
+\[2.\]&lt;p&gt;当：&lt;/p&gt;
+\[q=2\]&lt;p&gt;差距变成：&lt;/p&gt;
+\[2^5=32.\]&lt;p&gt;主导子空间一下变得非常明显。&lt;/p&gt;
+&lt;p&gt;所以 power iteration 的本质是：&lt;/p&gt;
+\[\boxed{ \ ext{人为把 singular spectrum 拉开。} }\]&lt;p&gt;Scikit-learn 也把 &lt;code&gt;n_iter&lt;/code&gt; 暴露为 Randomized SVD 的核心参数，特别用于噪声较大或谱衰减较慢的问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-但-power-iteration-不是免费的&#34;&gt;9. 但 Power Iteration 不是免费的
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;每次：&lt;/p&gt;
+\[AA^T\]&lt;p&gt;都意味着再次访问大矩阵。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[A\]&lt;p&gt;非常巨大，&lt;/p&gt;
+&lt;p&gt;真正昂贵的可能不是 FLOPs，&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\ ext{内存带宽 / 数据读取}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;所以实际 Randomized Linear Algebra 很关心：&lt;/p&gt;
+\[\boxed{\ ext{passes over the matrix}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;1-pass algorithm；&lt;/li&gt;
+&lt;li&gt;2-pass algorithm；&lt;/li&gt;
+&lt;li&gt;streaming algorithm；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;本身就是重要研究方向。&lt;/p&gt;
+&lt;p&gt;Martinsson 与 Tropp 的综述专门讨论 single-view / streaming randomized algorithms，因为很多大数据环境中：&lt;/p&gt;
+\[\boxed{ \ ext{把矩阵从磁盘或分布式存储读第二遍， 可能比额外算几亿次乘法更贵。} }\]&lt;p&gt;这和现代 AI 系统非常相似：&lt;/p&gt;
+\[\boxed{ \ ext{数据移动经常比计算本身更贵。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-randomized-svd-和普通随机采样行列并不是一回事&#34;&gt;10. Randomized SVD 和普通随机采样行/列并不是一回事
+&lt;/h1&gt;&lt;p&gt;容易产生误解：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;随机方法是不是从 \(A\) 里随便抽几行、几列？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;经典 Gaussian range finder 并不是这样。&lt;/p&gt;
+&lt;p&gt;它计算：&lt;/p&gt;
+\[A\Omega.\]&lt;p&gt;每一个随机 probe：&lt;/p&gt;
+\[\omega_j\]&lt;p&gt;都是所有列的随机线性组合。&lt;/p&gt;
+&lt;p&gt;所以每个：&lt;/p&gt;
+\[A\omega_j\]&lt;p&gt;都包含：&lt;/p&gt;
+\[\boxed{\ ext{整个矩阵的全局信息}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;相比直接随机挑列，这通常更稳定。&lt;/p&gt;
+&lt;p&gt;当然 Randomized Numerical Linear Algebra 也包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;row/column sampling；&lt;/li&gt;
+&lt;li&gt;CUR；&lt;/li&gt;
+&lt;li&gt;Nyström；&lt;/li&gt;
+&lt;li&gt;leverage-score sampling；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但这是另一条方法线。Martinsson–Tropp 的综述正是把这些技术放进同一个 randomized matrix computation 框架中。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-它与-johnsonlindenstrauss-思想有同一个根&#34;&gt;11. 它与 Johnson–Lindenstrauss 思想有同一个根
+&lt;/h1&gt;&lt;p&gt;Random projection 中有一个著名事实：&lt;/p&gt;
+&lt;p&gt;高维点：&lt;/p&gt;
+\[x_i\in\mathbb R^N\]&lt;p&gt;投影到：&lt;/p&gt;
+\[r\ll N\]&lt;p&gt;维随机空间后，&lt;/p&gt;
+&lt;p&gt;只要：&lt;/p&gt;
+\[r\]&lt;p&gt;足够大，&lt;/p&gt;
+&lt;p&gt;点之间的距离：&lt;/p&gt;
+\[\|x_i-x_j\|\]&lt;p&gt;可以近似保持。&lt;/p&gt;
+&lt;p&gt;背后的核心思想是：&lt;/p&gt;
+\[\boxed{ \ ext{随机低维投影通常不会系统性破坏所有重要方向。} }\]&lt;p&gt;Randomized SVD 用的是类似直觉：&lt;/p&gt;
+\[\boxed{ \ ext{随机 probe 很难同时避开一个固定的重要低维子空间。} }\]&lt;p&gt;所以随机性在这里不是：&lt;/p&gt;
+\[\boxed{\ ext{用随机误差换速度}}\]&lt;p&gt;这么简单。&lt;/p&gt;
+&lt;p&gt;它更像：&lt;/p&gt;
+\[\boxed{ \ ext{利用高维空间的几何集中性质， 廉价获得对全局结构的观测。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;12-为什么它和-pod-天然结合&#34;&gt;12. 为什么它和 POD 天然结合？
+&lt;/h1&gt;&lt;p&gt;POD snapshot matrix：&lt;/p&gt;
+\[X= [u_1,\ldots,u_m].\]&lt;p&gt;标准 POD：&lt;/p&gt;
+\[X=U\Sigma V^T.\]&lt;p&gt;取：&lt;/p&gt;
+\[U_r.\]&lt;p&gt;所以 POD 本质就是 truncated SVD。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[N=10^7, \quad m=10^5,\]&lt;p&gt;POD 的 offline SVD 本身就可能极其昂贵。&lt;/p&gt;
+&lt;p&gt;这时可以直接：&lt;/p&gt;
+\[\boxed{ X \overset{\ ext{randomized SVD}} {\longrightarrow} U_r. }\]&lt;p&gt;已有 randomized POD 工作正是针对 PDE 离散后产生的大型 snapshot systems，通过随机投影/随机采样减少生成 dominant modes 所需的成本。&lt;/p&gt;
+&lt;p&gt;最近的 ROM 工作也继续使用 randomized SVD、randomized DMD 等方式降低大规模降阶建模中 basis construction 的成本。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这和上一张-hyper-reduction-卡片正好位于不同阶段&#34;&gt;13. 这和上一张 Hyper-reduction 卡片正好位于不同阶段
+&lt;/h1&gt;&lt;p&gt;Hyper-reduction 主要解决：&lt;/p&gt;
+\[\boxed{\ ext{ROM online evaluation 太贵}}\]&lt;p&gt;例如：&lt;/p&gt;
+\[f(Vq)\]&lt;p&gt;仍然需要全部有限元单元。&lt;/p&gt;
+&lt;p&gt;Randomized SVD 解决：&lt;/p&gt;
+\[\boxed{\ ext{ROM offline basis construction 太贵}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;完整流程可以写成：&lt;/p&gt;
+\[\ ext{Full simulations}\]\[\downarrow\]\[\ ext{huge snapshot matrix}\]\[\downarrow\]\[\boxed{\ ext{Randomized SVD}}\]\[\downarrow\]\[\ ext{Reduced basis}\]\[\downarrow\]\[\boxed{\ ext{DEIM/ECSW Hyper-reduction}}\]\[\downarrow\]\[\ ext{fast online ROM}.\]&lt;p&gt;两者解决的是 completely different bottleneck。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-一个有限元中的具体量级&#34;&gt;14. 一个有限元中的具体量级
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设软体模型：&lt;/p&gt;
+\[N=3\ imes10^6\]&lt;p&gt;DOF。&lt;/p&gt;
+&lt;p&gt;记录：&lt;/p&gt;
+\[50000\]&lt;p&gt;帧。&lt;/p&gt;
+&lt;p&gt;Snapshot matrix：&lt;/p&gt;
+\[X\in \mathbb R^{3\ imes10^6\ imes50000}.\]&lt;p&gt;如果用 float64，光存储：&lt;/p&gt;
+\[3\ imes10^6\ imes50000\ imes8\]&lt;p&gt;约等于：&lt;/p&gt;
+\[1.2\ ext{ TB}.\]&lt;p&gt;这时问题已经不再是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;LAPACK SVD 快不快？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \ ext{矩阵甚至放不进普通内存。} }\]&lt;p&gt;Randomized/streaming algorithm 可以：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;分块读取 snapshots；&lt;/li&gt;
+&lt;li&gt;计算：
+
+\[X\Omega;\]&lt;/li&gt;
+&lt;li&gt;累积一个小得多的 sketch；&lt;/li&gt;
+&lt;li&gt;不再长期保存完整矩阵。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;所以 Randomized Linear Algebra 在这里不只是：&lt;/p&gt;
+\[\boxed{\ ext{算法提速}}\]&lt;p&gt;而可能改变：&lt;/p&gt;
+\[\boxed{\ ext{这个计算是否可做。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-这对可靠性分析也有非常直接的价值&#34;&gt;15. 这对可靠性分析也有非常直接的价值
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设你有：&lt;/p&gt;
+\[10^6\]&lt;p&gt;个蒙特卡洛样本，&lt;/p&gt;
+&lt;p&gt;每个样本输出：&lt;/p&gt;
+\[5000\]&lt;p&gt;个时序/空间响应量。&lt;/p&gt;
+&lt;p&gt;于是响应矩阵：&lt;/p&gt;
+\[Y\in\mathbb R^{10^6\ imes5000}.\]&lt;p&gt;你可能想分析：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;dominant response modes；&lt;/li&gt;
+&lt;li&gt;sensitivity directions；&lt;/li&gt;
+&lt;li&gt;failure-response correlations；&lt;/li&gt;
+&lt;li&gt;covariance structure。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果直接形成：&lt;/p&gt;
+\[Y^TY\]&lt;p&gt;或完整 PCA，&lt;/p&gt;
+&lt;p&gt;成本可能很高。&lt;/p&gt;
+&lt;p&gt;Randomized SVD 可以直接提取：&lt;/p&gt;
+\[\boxed{\ ext{主导随机响应子空间}}\]&lt;p&gt;而无需完整 covariance decomposition。&lt;/p&gt;
+&lt;p&gt;这与之前 &lt;span class=&#34;term-anchor&#34; data-term=&#34;active-subspace&#34; tabindex=&#34;0&#34;&gt;Active Subspaces&lt;/span&gt; 的区别也很清楚：&lt;/p&gt;
+&lt;h3 id=&#34;active-subspaces&#34;&gt;Active Subspaces
+&lt;/h3&gt;&lt;p&gt;分析：&lt;/p&gt;
+\[\boxed{\ ext{输入空间中哪些方向最影响输出}}\]&lt;p&gt;通常依赖梯度信息。&lt;/p&gt;
+&lt;h3 id=&#34;randomized-svdpca&#34;&gt;Randomized SVD/PCA
+&lt;/h3&gt;&lt;p&gt;分析：&lt;/p&gt;
+\[\boxed{\ ext{观测数据本身主要落在哪些线性方向}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;二者都降维，但问题完全不同。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它还可以加速-kriging--gaussian-process-的另一部分瓶颈&#34;&gt;16. 它还可以加速 Kriging / Gaussian Process 的另一部分瓶颈
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Gaussian Process 通常需要处理：&lt;/p&gt;
+\[K\in\mathbb R^{N\ imes N}.\]&lt;p&gt;标准训练和推理涉及：&lt;/p&gt;
+\[K^{-1}\]&lt;p&gt;或 Cholesky：&lt;/p&gt;
+\[K=LL^T.\]&lt;p&gt;经典复杂度：&lt;/p&gt;
+\[O(N^3).\]&lt;p&gt;如果 kernel matrix 具有：&lt;/p&gt;
+\[\boxed{\ ext{低有效秩}}\]&lt;p&gt;可以近似：&lt;/p&gt;
+\[K \approx QQ^TK\]&lt;p&gt;或使用：&lt;/p&gt;
+\[\boxed{\ ext{Nyström approximation}}\]&lt;p&gt;构造低秩表示。&lt;/p&gt;
+&lt;p&gt;Randomized numerical linear algebra 的成熟体系也专门包含：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Nyström；&lt;/li&gt;
+&lt;li&gt;randomized kernel approximation；&lt;/li&gt;
+&lt;li&gt;low-rank positive-semidefinite approximation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Martinsson–Tropp 的综述明确将 kernel matrices from machine learning/scientific computing 列为典型应用。&lt;/p&gt;
+&lt;p&gt;所以 Randomized Linear Algebra 实际位于：&lt;/p&gt;
+\[\boxed{ \ ext{数值线性代数} \cap \ ext{代理模型} \cap \ ext{机器学习} }\]&lt;p&gt;的交界处。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-对-ai-全栈工程它为什么也值得学&#34;&gt;17. 对 AI 全栈工程，它为什么也值得学？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;大型 AI 系统里到处存在：&lt;/p&gt;
+\[\boxed{\ ext{低秩结构}}\]&lt;p&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;embedding covariance；&lt;/li&gt;
+&lt;li&gt;activation matrix；&lt;/li&gt;
+&lt;li&gt;gradient matrix；&lt;/li&gt;
+&lt;li&gt;Hessian approximation；&lt;/li&gt;
+&lt;li&gt;LoRA weight updates；&lt;/li&gt;
+&lt;li&gt;attention matrices；&lt;/li&gt;
+&lt;li&gt;dataset features。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;假设：&lt;/p&gt;
+\[X\in\mathbb R^{10^7\ imes4096}.\]&lt;p&gt;想做 PCA。&lt;/p&gt;
+&lt;p&gt;直接：&lt;/p&gt;
+\[X^TX\]&lt;p&gt;或 full SVD 可能非常贵。&lt;/p&gt;
+&lt;p&gt;Randomized projection 可以首先构造：&lt;/p&gt;
+\[Y=X\Omega\]&lt;p&gt;把：&lt;/p&gt;
+\[4096\]&lt;p&gt;维压到：&lt;/p&gt;
+\[100\]&lt;p&gt;左右。&lt;/p&gt;
+&lt;p&gt;然后大部分后续分析都在小空间完成。&lt;/p&gt;
+&lt;p&gt;这也是 randomized SVD 已经成为成熟数据科学软件中的标准工具的原因之一，而不是停留在研究论文里。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;18-它和-lora-有一个非常漂亮的联系&#34;&gt;18. 它和 LoRA 有一个非常漂亮的联系
+&lt;/h1&gt;&lt;p&gt;之前 LoRA 的核心假设：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;具有低秩结构。&lt;/p&gt;
+&lt;p&gt;Randomized SVD 则回答另一个问题：&lt;/p&gt;
+\[\boxed{ \ ext{如果一个巨大矩阵确实近似低秩， 怎样便宜地找到那个低秩子空间？} }\]&lt;p&gt;因此在分析 LoRA training dynamics 时，如果想研究：&lt;/p&gt;
+\[\Delta W\]&lt;p&gt;到底有多少有效奇异方向，&lt;/p&gt;
+&lt;p&gt;无需一定做完整：&lt;/p&gt;
+\[4096\ imes4096\]&lt;p&gt;SVD。&lt;/p&gt;
+&lt;p&gt;可以直接 randomized SVD。&lt;/p&gt;
+&lt;p&gt;更一般地：&lt;/p&gt;
+\[\boxed{ \ ext{Low-rank modeling} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \ ext{Randomized low-rank discovery} }\]&lt;p&gt;天然是一对。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;19-但它不是万能的真正低秩才是前提&#34;&gt;19. 但它不是万能的：真正低秩才是前提
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑：&lt;/p&gt;
+\[\sigma_1,\sigma_2,\ldots\]&lt;p&gt;几乎不衰减。&lt;/p&gt;
+&lt;p&gt;比如：&lt;/p&gt;
+\[\sigma_i\approx1\]&lt;p&gt;直到数千维。&lt;/p&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[\boxed{ \ ext{矩阵本身就没有明显低维结构。} }\]&lt;p&gt;这时 randomized SVD 无法凭空制造：&lt;/p&gt;
+\[k=20\]&lt;p&gt;的高质量近似。&lt;/p&gt;
+&lt;p&gt;它最多更快地告诉你：&lt;/p&gt;
+\[\boxed{\ ext{rank-20 近似本身很差。}}\]&lt;p&gt;这是一条非常重要的原则：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;随机化可以降低发现结构的成本，但不能创造不存在的结构。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;20-第二个局限低能量方向可能恰恰是最重要的方向&#34;&gt;20. 第二个局限：低能量方向可能恰恰是最重要的方向
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这对可靠性尤其重要。&lt;/p&gt;
+&lt;p&gt;POD/SVD 优先保留：&lt;/p&gt;
+\[\boxed{\ ext{最大方差 / 最大能量方向}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;假设 99.99% 的正常样本沿：&lt;/p&gt;
+\[u_1\]&lt;p&gt;波动。&lt;/p&gt;
+&lt;p&gt;但真正决定失效的微小模式：&lt;/p&gt;
+\[u_{37}\]&lt;p&gt;只占：&lt;/p&gt;
+\[0.01\%\]&lt;p&gt;能量。&lt;/p&gt;
+&lt;p&gt;如果直接截断：&lt;/p&gt;
+\[r=10,\]&lt;p&gt;这个 failure-sensitive mode 会被完全删除。&lt;/p&gt;
+&lt;p&gt;Randomized SVD 仍然会很好地逼近标准 SVD，&lt;/p&gt;
+&lt;p&gt;但：&lt;/p&gt;
+\[\boxed{ \ ext{标准 SVD 的任务目标本身就错了。} }\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \ ext{Randomized SVD 解决的是计算问题， 不解决“哪个子空间对任务最重要”的建模问题。} }\]&lt;p&gt;这是和 &lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt;、Active Subspaces、goal-oriented reduction 的根本区别。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;21-一个很值得记住的误区随机算法并不意味着结果不可靠&#34;&gt;21. 一个很值得记住的误区：随机算法并不意味着结果“不可靠”
+&lt;/h1&gt;&lt;p&gt;Randomized SVD 经常给人一种感觉：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;每次结果随机，会不会不靠谱？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;实际上现代 randomized numerical linear algebra 通常有严格的：&lt;/p&gt;
+\[\boxed{\ ext{probabilistic error bounds}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;比如对 range finder，可以控制：&lt;/p&gt;
+\[\|(I-QQ^T)A\|\]&lt;p&gt;与：&lt;/p&gt;
+\[\sigma_{k+1}\]&lt;p&gt;之间的关系，并且失败概率可以通过 oversampling 快速降低。&lt;/p&gt;
+&lt;p&gt;所以这里的随机性更像 Monte Carlo：&lt;/p&gt;
+\[\boxed{ \ ext{允许极小概率失败， 换取显著计算优势。} }\]&lt;p&gt;但 Randomized SVD 和普通 Monte Carlo 又有所不同：&lt;/p&gt;
+&lt;p&gt;最终误差通常与：&lt;/p&gt;
+\[\boxed{\ ext{矩阵本身的 singular spectrum}}\]&lt;p&gt;强相关。&lt;/p&gt;
+&lt;p&gt;矩阵越接近低秩，它越容易成功。Halko–Martinsson–Tropp 的经典工作正是系统建立了这类概率误差分析。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;22-一个非常适合亲手做的最小实验&#34;&gt;22. 一个非常适合亲手做的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;构造：&lt;/p&gt;
+\[A=U\Sigma V^T\]&lt;p&gt;其中：&lt;/p&gt;
+\[A\in\mathbb R^{10000\ imes2000}.\]&lt;p&gt;设置：&lt;/p&gt;
+\[\sigma_i=e^{-i/10}.\]&lt;p&gt;只想要：&lt;/p&gt;
+\[k=20.\]&lt;p&gt;实现：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;k = 20
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;p = 10
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Ω = randn(n, k+p)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Y = A @ Ω
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Q = qr(Y)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;B = Q.T @ A
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Ũ, Σ, Vt = svd(B)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;U = Q @ Ũ
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;比较：&lt;/p&gt;
+\[\|A-U_k\Sigma_kV_k^T\|_F\]&lt;p&gt;和标准 truncated SVD。&lt;/p&gt;
+&lt;p&gt;然后把 spectrum 改成：&lt;/p&gt;
+\[\sigma_i=\frac1i.\]&lt;p&gt;你会看到误差明显变差。&lt;/p&gt;
+&lt;p&gt;再加入：&lt;/p&gt;
+\[q=1,2\]&lt;p&gt;次 power iteration：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Y = A @ Ω
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;for _ in range(q):
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    Y = A @ (A.T @ Y)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;重新测试。&lt;/p&gt;
+&lt;p&gt;你会非常直观地看到：&lt;/p&gt;
+\[\boxed{ \ ext{Randomized SVD 的表现， 主要由 singular-spectrum separation 决定。} }\]&lt;p&gt;这比直接调用 &lt;code&gt;randomized_svd()&lt;/code&gt; 更有学习价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;23-对你后续有限元软体方向一个实际可迁移场景&#34;&gt;23. 对你后续有限元/软体方向，一个实际可迁移场景
+&lt;/h1&gt;&lt;p&gt;假设未来做大规模软体 simulation dataset：&lt;/p&gt;
+\[u(\ heta,t)\]&lt;p&gt;参数包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Young&amp;rsquo;s modulus；&lt;/li&gt;
+&lt;li&gt;Poisson ratio；&lt;/li&gt;
+&lt;li&gt;loading；&lt;/li&gt;
+&lt;li&gt;contact configuration；&lt;/li&gt;
+&lt;li&gt;geometry。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;很快就可能积累：&lt;/p&gt;
+\[10^4\sim10^5\]&lt;p&gt;个大型 deformation fields。&lt;/p&gt;
+&lt;p&gt;你想研究：&lt;/p&gt;
+\[\boxed{ \ ext{这些百万维形变场真正占据多少维 manifold？} }\]&lt;p&gt;第一步通常就是 PCA/POD/SVD。&lt;/p&gt;
+&lt;p&gt;如果 full SVD 太贵，&lt;/p&gt;
+&lt;p&gt;Randomized SVD 可以直接成为：&lt;/p&gt;
+\[\boxed{ \ ext{数据诊断工具} }\]&lt;p&gt;，而不必立即把它理解成最终 ROM 方法。&lt;/p&gt;
+&lt;p&gt;比如你可能发现：&lt;/p&gt;
+\[r=30\]&lt;p&gt;已经解释：&lt;/p&gt;
+\[99.9\%\]&lt;p&gt;snapshot energy。&lt;/p&gt;
+&lt;p&gt;这就告诉你：&lt;/p&gt;
+\[\boxed{ \ ext{虽然每帧有百万 DOF， 真实运动数据可能只访问了几十维子空间。} }\]&lt;p&gt;这个结论会直接影响后续是否值得研究：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ROM；&lt;/li&gt;
+&lt;li&gt;reduced coordinates；&lt;/li&gt;
+&lt;li&gt;neural latent state；&lt;/li&gt;
+&lt;li&gt;LoRA-style low-rank adaptation；&lt;/li&gt;
+&lt;li&gt;learned physics manifold。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Randomized SVD 最值得记住的不是：&lt;/p&gt;
+\[Y=A\Omega.\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \ ext{如果一个巨大系统只有少数真正重要的方向， 你无需完整检查系统的每一个方向， 只要用少量随机探针让这些重要方向自己显现出来。} }\]&lt;p&gt;它在知识体系中的位置可以这样理解：&lt;/p&gt;
+\[\ ext{Large matrix / dataset}\]\[\downarrow\]\[\boxed{\ ext{Random sketch}}\]\[\downarrow\]\[\boxed{\ ext{Approximate dominant subspace}}\]\[\downarrow\]\[\ ext{small deterministic linear algebra}.\]&lt;p&gt;与最近几张卡片相比，它代表的是一个新的优化轴：&lt;/p&gt;
+\[\boxed{\ ext{Hyper-reduction：少计算算子}}\]\[\boxed{\ ext{Schur complement：少参与全局协调}}\]\[\boxed{\ ext{Randomized SVD：少观察无关方向}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;更普遍的工程启发则是：&lt;/p&gt;
+\[\boxed{ \ ext{面对百万维问题时， 第一反应不一定应该是“怎样更快地把所有东西算完”， 而应该先问：“我真正需要知道的结构有多少维？”} }\]&lt;p&gt;如果答案是：&lt;/p&gt;
+\[50\]&lt;p&gt;那么精确分析：&lt;/p&gt;
+\[10^6\]&lt;p&gt;个方向，本身可能就是错误的计算目标。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Halko, Martinsson &amp;amp; Tropp, &lt;em&gt;Finding Structure with Randomness: Probabilistic Algorithms for Constructing Approximate Matrix Decompositions&lt;/em&gt;, SIAM Review, 2011&lt;/strong&gt;。Randomized SVD/随机低秩近似的经典入口；最值得看 randomized range finder、oversampling、power iteration 和误差界。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/090771806&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Martinsson &amp;amp; Tropp, &lt;em&gt;Randomized Numerical Linear Algebra: Foundations and Algorithms&lt;/em&gt;, Acta Numerica, 2020&lt;/strong&gt;。更完整的现代体系，覆盖 low-rank approximation、streaming、regression、Nyström、kernel matrices 和 randomized linear solvers。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://www.cambridge.org/core/journals/acta-numerica/article/randomized-numerical-linear-algebra-foundations-and-algorithms/4486926746CFF4547F42A2996C7DC09C&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Cambridge 综述页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Scikit-learn &lt;code&gt;randomized_svd&lt;/code&gt; 官方文档&lt;/strong&gt;。适合直接做工程实验，重点观察 &lt;code&gt;n_oversamples&lt;/code&gt; 与 &lt;code&gt;n_iter&lt;/code&gt; 如何对应理论里的 oversampling 和 power iteration。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://scikit-learn.org/stable/modules/generated/sklearn.utils.extmath.randomized_svd.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;randomized_svd 官方文档&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Gräßle, Hinze &amp;amp; Volkwein, &lt;em&gt;Model Order Reduction by Proper Orthogonal Decomposition&lt;/em&gt;&lt;/strong&gt;。用于把 Randomized SVD 放回 POD/有限元降阶体系中：POD basis、snapshot SVD、非线性 ROM 与误差估计的关系。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/1906.05188&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;POD-MOR 论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Yu &amp;amp; Chakravorty, &lt;em&gt;A Randomized Proper Orthogonal Decomposition Technique&lt;/em&gt;&lt;/strong&gt;。直接连接 randomized projection 与 PDE model reduction，适合继续看随机线性代数怎样进入大规模动力系统降阶。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/1312.3976&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Randomized POD 论文&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？</title>
+        <link>https://assranai.github.io/cards/33-probabilistic-numerics/</link>
+        <pubDate>Tue, 15 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/33-probabilistic-numerics/</guid>
+        <description>&lt;h1 id=&#34;probabilistic-numerics如果有限元求解器本身也会犯错为什么它通常只返回一个数字&#34;&gt;Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Probabilistic Numerics（概率数值计算，PN）与 Bayesian Conjugate Gradient&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：数值方法 × 有限元 × 可靠性 × 代理模型 × 科学机器学习&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
+今天讨论一个很容易改变“数值计算观”的概念。&lt;/p&gt;
+&lt;p&gt;假设要求解大型有限元方程&lt;/p&gt;
+\[K u=f.\]&lt;p&gt;迭代求解器跑到第 30 步后给出&lt;/p&gt;
+\[u_{30}.\]&lt;p&gt;传统数值计算通常告诉你：&lt;/p&gt;
+\[\boxed{u\approx u_{30}}\]&lt;p&gt;最多再给一个残差：&lt;/p&gt;
+\[r_{30}=f-Ku_{30}.\]&lt;p&gt;但这里其实存在一个非常自然的问题：&lt;/p&gt;
+\[\boxed{\ ext{我到底还有多不确定？}}\]&lt;p&gt;Probabilistic Numerics 的回答很激进：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;数值计算本身可以被视为一个推断问题。有限计算预算只给了我们关于未知数学对象的部分信息，因此算法可以返回一个&lt;strong&gt;概率分布&lt;/strong&gt;，而不仅是一个点估计。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;于是线性求解器可能返回：&lt;/p&gt;
+\[\boxed{ u\mid\ ext{已完成的计算} \sim \mathcal N(m_k,\Sigma_k) }\]&lt;p&gt;积分器可以返回函数轨迹上的概率分布，数值积分可以返回积分值的 posterior，ODE/PDE solver 也可以显式描述离散计算留下的 epistemic uncertainty。&lt;/p&gt;
+&lt;p&gt;2022 年出版的专著 &lt;em&gt;Probabilistic Numerics: Computation as Machine Learning&lt;/em&gt; 已经把这一思想系统扩展到积分、线性代数、优化和 ODE 等数值问题；其核心定位正是把“数值算法从可计算信息推断不可直接计算量”形式化为机器学习/贝叶斯推断问题。&lt;/p&gt;
+&lt;p&gt;真正值得理解的是：&lt;/p&gt;
+\[\boxed{ \ ext{PN 试图让“计算误差”成为可传播的不确定性， 而不只是事后的一条误差界。} }\]&lt;hr&gt;
+&lt;h2 id=&#34;1-为什么这件事值得专门发展一个领域&#34;&gt;1. 为什么这件事值得专门发展一个领域？
+&lt;/h2&gt;&lt;p&gt;工程计算里至少存在三类完全不同的不确定性。&lt;/p&gt;
+&lt;p&gt;假设：&lt;/p&gt;
+\[y=\mathcal F(\ heta).\]&lt;p&gt;第一类来自输入：&lt;/p&gt;
+\[\ heta\sim p(\ heta),\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;材料参数；&lt;/li&gt;
+&lt;li&gt;加工误差；&lt;/li&gt;
+&lt;li&gt;外载荷；&lt;/li&gt;
+&lt;li&gt;摩擦系数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这是可靠性分析最熟悉的：&lt;/p&gt;
+\[\boxed{\ ext{parameter uncertainty}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;第二类来自模型：&lt;/p&gt;
+&lt;p&gt;真实世界可能并不完全满足：&lt;/p&gt;
+\[\mathcal F.\]&lt;p&gt;例如忽略塑性、温度耦合或接触磨损：&lt;/p&gt;
+\[\boxed{\ ext{model discrepancy}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;第三类却经常被默认忽略：&lt;/p&gt;
+&lt;p&gt;即使 \(\ heta\) 和 \(\mathcal F\) 都确定，我们实际上仍然没有精确算出：&lt;/p&gt;
+\[\mathcal F(\ heta).\]&lt;p&gt;因为只能使用：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;有限网格；&lt;/li&gt;
+&lt;li&gt;有限时间步；&lt;/li&gt;
+&lt;li&gt;有限迭代次数；&lt;/li&gt;
+&lt;li&gt;有限浮点精度。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;于是还存在：&lt;/p&gt;
+\[\boxed{\ ext{numerical uncertainty}.}\]&lt;p&gt;Hennig、Osborne 和 Girolami 在 2015 年 &lt;em&gt;Proceedings of the Royal Society A&lt;/em&gt; 的纲领性论文中提出，有限时间和有限硬件导致的 numerical uncertainty 应当像其他不确定性一样被显式管理。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-最关键的思想转换数值算法其实一直在从信息推断答案&#34;&gt;2. 最关键的思想转换：数值算法其实一直在“从信息推断答案”
+&lt;/h1&gt;&lt;p&gt;考虑积分：&lt;/p&gt;
+\[I=\int_0^1f(x)\,dx.\]&lt;p&gt;你无法观察整个连续函数。&lt;/p&gt;
+&lt;p&gt;只能计算：&lt;/p&gt;
+\[f(x_1),f(x_2),\ldots,f(x_n).\]&lt;p&gt;传统 quadrature 给：&lt;/p&gt;
+\[\hat I=\sum_iw_if(x_i).\]&lt;p&gt;PN 换一种语言：&lt;/p&gt;
+&lt;p&gt;我们真正拥有的数据是&lt;/p&gt;
+\[D= \{(x_i,f(x_i))\}_{i=1}^n.\]&lt;p&gt;未知对象是：&lt;/p&gt;
+\[f.\]&lt;p&gt;目标量是：&lt;/p&gt;
+\[I(f).\]&lt;p&gt;那么这完全可以看成：&lt;/p&gt;
+\[\boxed{ D \rightarrow \ ext{infer }f \rightarrow \ ext{infer }I(f). }\]&lt;p&gt;例如给：&lt;/p&gt;
+\[f\sim GP(m,k),\]&lt;p&gt;观察函数值以后：&lt;/p&gt;
+\[f\mid D\]&lt;p&gt;仍是 Gaussian process。&lt;/p&gt;
+&lt;p&gt;因为积分是线性算子：&lt;/p&gt;
+\[I(f)=\int f(x)dx,\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ I\mid D \sim \mathcal N(\mu_I,\sigma_I^2). }\]&lt;p&gt;传统积分器只返回：&lt;/p&gt;
+\[\mu_I.\]&lt;p&gt;Probabilistic quadrature 还返回：&lt;/p&gt;
+\[\sigma_I.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{\sigma_I\ ext{ 表示现有函数评价对积分值还留下多少不确定性。}}\]&lt;p&gt;这就是 Bayesian quadrature / Bayesian cubature 与 PN 的一个经典入口。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-一个很深的事实kriging-和概率数值计算其实离得非常近&#34;&gt;3. 一个很深的事实：Kriging 和概率数值计算其实离得非常近
+&lt;/h1&gt;&lt;p&gt;你熟悉的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt;：&lt;/p&gt;
+\[f(x)\sim GP(m(x),k(x,x&#39;)).\]&lt;p&gt;拿到设计点：&lt;/p&gt;
+\[X=\{x_1,\ldots,x_n\}\]&lt;p&gt;以后预测：&lt;/p&gt;
+\[f(x_*)\mid D \sim \mathcal N(\mu(x_*),\sigma^2(x_*)).\]&lt;p&gt;通常把：&lt;/p&gt;
+\[f\]&lt;p&gt;理解成昂贵有限元模型。&lt;/p&gt;
+&lt;p&gt;PN 再往下一层：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;为什么只有“有限元模型的代理”可以是概率模型？有限元内部的线性求解、积分、ODE 时间推进本身为什么不能也是概率推断？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;于是层次变成：&lt;/p&gt;
+\[\ ext{physical reality}\]\[\downarrow\]\[\ ext{PDE model}\]\[\downarrow\]\[\boxed{\ ext{numerical solver with uncertainty}}\]\[\downarrow\]\[\boxed{\ ext{surrogate with uncertainty}}\]\[\downarrow\]\[\ ext{reliability inference}.\]&lt;p&gt;这也是 PN 对可靠性/代理模型研究最有迁移价值的地方：&lt;/p&gt;
+\[\boxed{ \ ext{Kriging uncertainty 和 numerical uncertainty 原则上属于不同层次。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;4-用线性方程看会更直观&#34;&gt;4. 用线性方程看会更直观
+&lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
+\[Ax=b.\]&lt;p&gt;假设：&lt;/p&gt;
+\[A\in\mathbb R^{10^7\ imes10^7}.\]&lt;p&gt;精确解：&lt;/p&gt;
+\[x^*=A^{-1}b\]&lt;p&gt;显然不能直接得到。&lt;/p&gt;
+&lt;p&gt;CG 通过 Krylov subspace：&lt;/p&gt;
+\[\mathcal K_k(A,r_0) = \operatorname{span} \{ r_0,Ar_0,A^2r_0,\ldots,A^{k-1}r_0 \}\]&lt;p&gt;逐渐逼近：&lt;/p&gt;
+\[x^*.\]&lt;p&gt;第 \(k\) 步返回：&lt;/p&gt;
+\[x_k.\]&lt;p&gt;传统 CG 的逻辑：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;迭代
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;获得更多矩阵信息
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;更新 x_k
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;直到 residual 足够小
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Bayesian Conjugate Gradient 换成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;9
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;prior over x
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;执行矩阵-向量运算
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;这些运算产生关于 x 的信息
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Bayesian conditioning
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;posterior over x
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;所以最初：&lt;/p&gt;
+\[x\sim\mathcal N(x_0,\Sigma_0).\]&lt;p&gt;迭代之后：&lt;/p&gt;
+\[\boxed{ x\mid D_k \sim \mathcal N(x_k,\Sigma_k). }\]&lt;p&gt;Cockayne、Oates、Ipsen 和 Girolami 的 Bayesian CG 工作证明，在特定 prior 选择下，传统 CG 的迭代解可以作为该概率方法的 posterior mean 恢复出来，因此它可以视为经典 CG 的概率化推广。&lt;/p&gt;
+&lt;p&gt;这非常漂亮：&lt;/p&gt;
+\[\boxed{ \ ext{经典数值算法没有消失； 它成为概率算法的均值。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;5-那么协方差--在说什么&#34;&gt;5. 那么协方差 \(\Sigma_k\) 在说什么？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[x\in\mathbb R^{1000}.\]&lt;p&gt;CG 已经通过若干 Krylov directions 学到了很多信息。&lt;/p&gt;
+&lt;p&gt;某些方向已经确定得很好：&lt;/p&gt;
+\[\operatorname{Var}(v_i^Tx)\approx0.\]&lt;p&gt;另一些方向几乎还没被探测：&lt;/p&gt;
+\[\operatorname{Var}(v_j^Tx)\gg0.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\Sigma_k\]&lt;p&gt;描述：&lt;/p&gt;
+\[\boxed{\ ext{哪些解空间方向仍然缺乏数值信息。}}\]&lt;p&gt;随着迭代：&lt;/p&gt;
+\[\Sigma_0 \rightarrow \Sigma_1 \rightarrow \cdots \rightarrow \Sigma_k.\]&lt;p&gt;理想情况下：&lt;/p&gt;
+\[\boxed{\Sigma_k\rightarrow0.}\]&lt;p&gt;因此迭代求解不再只是：&lt;/p&gt;
+\[x_0\rightarrow x_1\rightarrow x_2\]&lt;p&gt;一串点。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ p_0(x) \rightarrow p_1(x) \rightarrow p_2(x) }\]&lt;p&gt;一个不断收缩的 belief state。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么-residual-norm-不能完全替代这个东西&#34;&gt;6. 为什么 residual norm 不能完全替代这个东西？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;CG 常用：&lt;/p&gt;
+\[\|r_k\| = \|b-Ax_k\|\]&lt;p&gt;判断收敛。&lt;/p&gt;
+&lt;p&gt;但真正关心的可能是：&lt;/p&gt;
+\[\|x_k-x^*\|.\]&lt;p&gt;两者通过：&lt;/p&gt;
+\[x_k-x^* = A^{-1}r_k\]&lt;p&gt;联系。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[A\]&lt;p&gt;condition number 很大，&lt;/p&gt;
+&lt;p&gt;小 residual 并不自动意味着所有解方向都同样准确。&lt;/p&gt;
+&lt;p&gt;例如某个方向对应很小特征值：&lt;/p&gt;
+\[A v_i=\lambda_i v_i, \qquad \lambda_i\ll1.\]&lt;p&gt;那么：&lt;/p&gt;
+\[A^{-1}v_i = \frac1{\lambda_i}v_i.\]&lt;p&gt;一个看似很小的 residual component：&lt;/p&gt;
+\[\epsilon v_i\]&lt;p&gt;对应解误差：&lt;/p&gt;
+\[\frac{\epsilon}{\lambda_i}v_i\]&lt;p&gt;可能并不小。&lt;/p&gt;
+&lt;p&gt;Bayesian CG 的动机之一正是：&lt;/p&gt;
+\[\boxed{ \ ext{给出对 numerical error 更丰富的统计描述， 而不只是一个迭代点估计。} }\]&lt;p&gt;论文也明确指出，在困难线性系统中，即使执行许多迭代仍可能残留显著误差，因此仅有点估计的价值有限。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;7-但这里必须警惕一个很重要的问题posterior-variance-不自动等于真实误差&#34;&gt;7. 但这里必须警惕一个很重要的问题：posterior variance 不自动等于“真实误差”
+&lt;/h1&gt;&lt;p&gt;看到：&lt;/p&gt;
+\[x\mid D_k \sim N(x_k,\Sigma_k)\]&lt;p&gt;很容易产生误解：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;那 \(\Sigma_k\) 就是 solver error 的真实统计分布？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;不能这么简单理解。&lt;/p&gt;
+&lt;p&gt;因为：&lt;/p&gt;
+\[\Sigma_k\]&lt;p&gt;依赖：&lt;/p&gt;
+\[\boxed{\ ext{prior / information model 的选择。}}\]&lt;p&gt;如果 prior 过度自信：&lt;/p&gt;
+\[\Sigma_0\]&lt;p&gt;就可能过小。&lt;/p&gt;
+&lt;p&gt;最终 posterior 同样可能：&lt;/p&gt;
+\[\boxed{\ ext{under-dispersed}.}\]&lt;p&gt;所以 PN 一个核心研究问题就是：&lt;/p&gt;
+\[\boxed{\ ext{calibration}.}\]&lt;p&gt;即：&lt;/p&gt;
+&lt;p&gt;如果算法声称：&lt;/p&gt;
+\[95\%\]&lt;p&gt;credible region，&lt;/p&gt;
+&lt;p&gt;真实数值解是否真的以接近：&lt;/p&gt;
+\[95\%\]&lt;p&gt;的频率落在其中？&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \ ext{“输出概率” 不等于 “概率已经可信”。} }\]&lt;p&gt;这与 Kriging 的 predictive uncertainty 完全一样：方差本身也需要验证。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-这对有限元真正有意思的地方在-pde-离散误差&#34;&gt;8. 这对有限元真正有意思的地方，在 PDE 离散误差
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑：&lt;/p&gt;
+\[\mathcal Lu=f\]&lt;p&gt;以及边界条件：&lt;/p&gt;
+\[\mathcal Bu=g.\]&lt;p&gt;有限元/meshless 方法最终得到：&lt;/p&gt;
+\[u_h.\]&lt;p&gt;传统方法：&lt;/p&gt;
+\[u_h\]&lt;p&gt;就是一个确定函数。&lt;/p&gt;
+&lt;p&gt;但我们知道：&lt;/p&gt;
+\[u_h\ eq u.\]&lt;p&gt;如果后面做参数反演：&lt;/p&gt;
+\[y=\mathcal G(u(\ heta))+\epsilon,\]&lt;p&gt;通常实际上计算：&lt;/p&gt;
+\[y\approx\mathcal G(u_h(\ heta))+\epsilon.\]&lt;p&gt;于是 inverse solver 很可能把：&lt;/p&gt;
+\[\boxed{\ ext{PDE discretization error}}\]&lt;p&gt;错误解释成：&lt;/p&gt;
+\[\boxed{\ ext{参数变化或观测噪声。}}\]&lt;p&gt;Cockayne、Oates、Sullivan 和 Girolami 的概率 PDE 方法正是针对这一问题：给 PDE 解的离散误差建立概率描述，再把它传播到 Bayesian inverse problem 中；其结果之一是，当 forward solver 的数值误差显著时，反演 posterior 会相应更保守。&lt;/p&gt;
+&lt;p&gt;这是一个非常重要的思想：&lt;/p&gt;
+\[\boxed{ \ ext{下游推断不应该比上游数值计算本身更自信。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-可靠性分析里这个问题尤其危险&#34;&gt;9. 可靠性分析里这个问题尤其危险
+&lt;/h1&gt;&lt;p&gt;假设极限状态：&lt;/p&gt;
+\[g(\ heta)=F_{\rm lim}-F_{\max}(\ heta).\]&lt;p&gt;失效：&lt;/p&gt;
+\[g&lt;0.\]&lt;p&gt;真实某个样本：&lt;/p&gt;
+\[g=0.002.\]&lt;p&gt;有限元数值误差：&lt;/p&gt;
+\[\epsilon_{\rm num}\approx\pm0.01.\]&lt;p&gt;如果求解器只返回：&lt;/p&gt;
+\[\hat g=0.006,\]&lt;p&gt;传统可靠性算法会直接判断：&lt;/p&gt;
+\[\boxed{\ ext{safe}.}\]&lt;p&gt;但实际上这个样本就在：&lt;/p&gt;
+\[\boxed{\ ext{numerical uncertainty band}}\]&lt;p&gt;里面。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[g\mid\mathcal D \sim N(0.006,0.01^2),\]&lt;p&gt;那么真正应该关注的是：&lt;/p&gt;
+\[P(g&lt;0\mid\mathcal D),\]&lt;p&gt;而不是简单看：&lt;/p&gt;
+\[\operatorname{sign}(\hat g).\]&lt;p&gt;这对 failure boundary：&lt;/p&gt;
+\[g(\ heta)=0\]&lt;p&gt;附近尤其重要。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-于是可靠性问题可以出现三层概率&#34;&gt;10. 于是可靠性问题可以出现“三层概率”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;设输入：&lt;/p&gt;
+\[\ heta\sim p(\ heta).\]&lt;p&gt;高保真数值模型由于有限计算预算给：&lt;/p&gt;
+\[g(\ heta)\mid\mathcal D_{\rm num}.\]&lt;p&gt;外面再套 Kriging：&lt;/p&gt;
+\[\hat g(\ heta)\mid\mathcal D_{\rm surrogate}.\]&lt;p&gt;于是失效概率原则上不再只是：&lt;/p&gt;
+\[P_\ heta[g(\ heta)&lt;0].\]&lt;p&gt;而需要考虑：&lt;/p&gt;
+\[\boxed{ P( g&lt;0 \mid \ ext{parameter uncertainty}, \ ext{numerical uncertainty}, \ ext{surrogate uncertainty} ). }\]&lt;p&gt;这三种 uncertainty 的来源完全不同：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;层&lt;/th&gt;
+					&lt;th&gt;不确定性的来源&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;参数&lt;/td&gt;
+					&lt;td&gt;世界本身不知道&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;数值&lt;/td&gt;
+					&lt;td&gt;没有投入无限计算&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;代理&lt;/td&gt;
+					&lt;td&gt;没有运行足够多高保真样本&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;如果全部混在一个 Kriging variance 里，&lt;/p&gt;
+&lt;p&gt;解释会非常困难。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这对代理模型还有一个很直接的启发训练标签不一定是真值&#34;&gt;11. 这对代理模型还有一个很直接的启发：训练标签不一定是真值
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;通常代理训练数据写成：&lt;/p&gt;
+\[\mathcal D = \{(\ heta_i,y_i)\}.\]&lt;p&gt;默认：&lt;/p&gt;
+\[y_i=f(\ heta_i)\]&lt;p&gt;是精确标签。&lt;/p&gt;
+&lt;p&gt;但如果标签来自：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;未完全收敛 FEM；&lt;/li&gt;
+&lt;li&gt;contact solver；&lt;/li&gt;
+&lt;li&gt;CFD；&lt;/li&gt;
+&lt;li&gt;nonlinear dynamics；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;更真实的模型可能是：&lt;/p&gt;
+\[\boxed{ y_i = f(\ heta_i) + \epsilon_{{\rm num},i}. }\]&lt;p&gt;而且：&lt;/p&gt;
+\[\epsilon_{{\rm num},i}\]&lt;p&gt;往往还是：&lt;/p&gt;
+\[\boxed{\ ext{heteroscedastic}}\]&lt;p&gt;的。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;p&gt;正常工况：&lt;/p&gt;
+\[\sigma_{\rm num}=10^{-5}.\]&lt;p&gt;接触切换附近：&lt;/p&gt;
+\[\sigma_{\rm num}=10^{-2}.\]&lt;p&gt;那么把所有样本当成 exact interpolation points：&lt;/p&gt;
+\[\boxed{\ ext{并不合理。}}\]&lt;p&gt;Kriging 的 nugget/noise model 在这里就有更物理的解释：&lt;/p&gt;
+\[\boxed{ \ ext{它可以部分表示标签本身的 numerical uncertainty。} }\]&lt;p&gt;这比单纯把 nugget 当“防止矩阵奇异的小参数”更值得理解。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-它甚至改变了高保真模型这个词的含义&#34;&gt;12. 它甚至改变了“高保真模型”这个词的含义
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;工程研究中经常说：&lt;/p&gt;
+\[\boxed{\ ext{HF model = ground truth}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Adams；&lt;/li&gt;
+&lt;li&gt;Ansys；&lt;/li&gt;
+&lt;li&gt;Abaqus；&lt;/li&gt;
+&lt;li&gt;CFD。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但从 PN 的角度：&lt;/p&gt;
+\[\boxed{ \ ext{high fidelity} \ eq \ ext{exact}. }\]&lt;p&gt;一个 FEM evaluation 实际取决于：&lt;/p&gt;
+\[y_{h,\Delta t,\ au}\]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(h\)：mesh resolution；&lt;/li&gt;
+&lt;li&gt;\(\Delta t\)：time step；&lt;/li&gt;
+&lt;li&gt;\(\ au\)：solver tolerance。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以所谓高保真标签其实属于一个计算层级：&lt;/p&gt;
+\[y_{h,\Delta t,\ au} \rightarrow y.\]&lt;p&gt;当：&lt;/p&gt;
+\[h\rightarrow0,\qquad \Delta t\rightarrow0,\qquad \ au\rightarrow0\]&lt;p&gt;才逐渐逼近连续问题。&lt;/p&gt;
+&lt;p&gt;因此 Multi-Fidelity 甚至可以重新解释成：&lt;/p&gt;
+\[\boxed{ \ ext{不同计算预算对应不同 numerical uncertainty level。} }\]&lt;p&gt;这和昨天 Randomized SVD 的“不要精确计算无关方向”又形成了另一种计算哲学：&lt;/p&gt;
+\[\boxed{ \ ext{既然计算预算有限， 就显式承认剩下没有算完的东西。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-一个很强的工程用途自适应决定该不该继续算&#34;&gt;13. 一个很强的工程用途：自适应决定“该不该继续算”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设 CG 第 \(k\) 步以后：&lt;/p&gt;
+\[x\mid D_k \sim N(m_k,\Sigma_k).\]&lt;p&gt;最终真正关心的并不是完整：&lt;/p&gt;
+\[x,\]&lt;p&gt;而是某个工程量：&lt;/p&gt;
+\[Q=c^Tx.\]&lt;p&gt;那么：&lt;/p&gt;
+\[Q\mid D_k \sim N( c^Tm_k, c^T\Sigma_kc ).\]&lt;p&gt;如果：&lt;/p&gt;
+\[\sqrt{c^T\Sigma_kc} &lt; \varepsilon_Q,\]&lt;p&gt;就可以停止。&lt;/p&gt;
+&lt;p&gt;这比：&lt;/p&gt;
+\[\|r_k\|&lt;10^{-8}\]&lt;p&gt;更接近实际目标：&lt;/p&gt;
+\[\boxed{\ ext{我关心的输出已经足够确定了吗？}}\]&lt;p&gt;于是 numerical uncertainty 不再只是“报告误差”。&lt;/p&gt;
+&lt;p&gt;它可以直接控制：&lt;/p&gt;
+\[\boxed{\ ext{computational resource allocation}.}\]&lt;p&gt;这也是 PN 最有工程潜力的一点。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-更进一步计算预算可以被主动分配&#34;&gt;14. 更进一步：计算预算可以被主动分配
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设可靠性计算中有两个样本。&lt;/p&gt;
+&lt;h3 id=&#34;sample-a&#34;&gt;Sample A
+&lt;/h3&gt;\[g_A=3.5.\]&lt;p&gt;离失效面很远。&lt;/p&gt;
+&lt;p&gt;即使 numerical uncertainty：&lt;/p&gt;
+\[\sigma_A=0.1,\]&lt;p&gt;也几乎不会改变分类。&lt;/p&gt;
+&lt;h3 id=&#34;sample-b&#34;&gt;Sample B
+&lt;/h3&gt;\[g_B=0.002.\]&lt;p&gt;numerical uncertainty：&lt;/p&gt;
+\[\sigma_B=0.05.\]&lt;p&gt;显然：&lt;/p&gt;
+\[B\]&lt;p&gt;值得继续：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;refine mesh；&lt;/li&gt;
+&lt;li&gt;减小 timestep；&lt;/li&gt;
+&lt;li&gt;收紧 nonlinear tolerance。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;而 A 没必要。&lt;/p&gt;
+&lt;p&gt;于是 PN 很自然地产生：&lt;/p&gt;
+\[\boxed{\ ext{adaptive fidelity allocation}.}\]&lt;p&gt;计算资源优先投入：&lt;/p&gt;
+\[\boxed{ \ ext{numerical uncertainty 真正会改变决策的地方。} }\]&lt;p&gt;这与 reliability active learning 的思想高度兼容。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-它和-multi-fidelity-monte-carlo-的关系也值得区分&#34;&gt;15. 它和 Multi-Fidelity Monte Carlo 的关系也值得区分
+&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt;：&lt;/p&gt;
+\[\boxed{ \ ext{利用低/高保真模型之间的相关性， 降低统计估计成本。} }\]&lt;p&gt;Probabilistic Numerics：&lt;/p&gt;
+\[\boxed{ \ ext{描述一次有限数值计算本身剩余的认识不确定性。} }\]&lt;p&gt;二者可以组合。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;p&gt;粗网格：&lt;/p&gt;
+\[u_{h_c}\]&lt;p&gt;有较大 numerical uncertainty。&lt;/p&gt;
+&lt;p&gt;细网格：&lt;/p&gt;
+\[u_{h_f}\]&lt;p&gt;较小。&lt;/p&gt;
+&lt;p&gt;理论上可以构建：&lt;/p&gt;
+\[p(u\mid u_{h_c},u_{h_f})\]&lt;p&gt;并让：&lt;/p&gt;
+\[\boxed{ \ ext{fidelity level 与 uncertainty contraction 形成统一描述。} }\]&lt;p&gt;这比简单标记：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;low fidelity
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;medium fidelity
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;high fidelity
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;的信息更丰富。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-和昨天-backward-error-analysis-又有什么区别&#34;&gt;16. 和昨天 Backward Error Analysis 又有什么区别？
+&lt;/h1&gt;&lt;p&gt;这是一个很重要的边界。&lt;/p&gt;
+&lt;p&gt;Backward Error Analysis 问：&lt;/p&gt;
+\[\boxed{ \ ext{这个数值轨迹精确对应哪个附近的 modified system？} }\]&lt;p&gt;它偏向：&lt;/p&gt;
+\[\ ext{deterministic structural explanation}.\]&lt;p&gt;Probabilistic Numerics 问：&lt;/p&gt;
+\[\boxed{ \ ext{有限计算提供了哪些信息， 还有哪些量没有确定？} }\]&lt;p&gt;它偏向：&lt;/p&gt;
+\[\ ext{epistemic uncertainty representation}.\]&lt;p&gt;两者都反对：&lt;/p&gt;
+\[\boxed{\ ext{“solver 输出 = exact truth”}}\]&lt;p&gt;这种过度简化，&lt;/p&gt;
+&lt;p&gt;但方向完全不同：&lt;/p&gt;
+\[\ ext{BEA} \rightarrow \ ext{解释误差结构}\]\[\ ext{PN} \rightarrow \ ext{量化剩余未知}.\]&lt;p&gt;这两种思维其实非常互补。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;17-为什么它现在和-scientific-machine-learning-特别相关&#34;&gt;17. 为什么它现在和 Scientific Machine Learning 特别相关？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为现代 scientific computing 越来越多地形成：&lt;/p&gt;
+\[\ ext{PDE solver} \rightarrow \ ext{dataset} \rightarrow \ ext{neural surrogate} \rightarrow \ ext{Bayesian inference} \rightarrow \ ext{decision}.\]&lt;p&gt;如果第一步给出的训练数据已经有：&lt;/p&gt;
+\[\epsilon_{\rm num},\]&lt;p&gt;但后面的机器学习系统默认：&lt;/p&gt;
+\[\epsilon_{\rm num}=0,\]&lt;p&gt;最终模型就可能：&lt;/p&gt;
+\[\boxed{\ ext{对自己的预测过度自信。}}\]&lt;p&gt;PN 提供了一种统一接口：&lt;/p&gt;
+&lt;p&gt;上游 solver 不只输出：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;value
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;而输出：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;value
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;uncertainty
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;下游算法再决定：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;是否相信；&lt;/li&gt;
+&lt;li&gt;是否 refine；&lt;/li&gt;
+&lt;li&gt;是否追加计算；&lt;/li&gt;
+&lt;li&gt;是否传播 uncertainty。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这其实非常符合现代 AI pipeline：&lt;/p&gt;
+\[\boxed{ \ ext{每个组件都传递 prediction + confidence， 而不是假装自己绝对正确。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;18-但-pn-目前仍然有很现实的局限&#34;&gt;18. 但 PN 目前仍然有很现实的局限
+&lt;/h1&gt;&lt;p&gt;首先是：&lt;/p&gt;
+\[\boxed{\ ext{概率模型本身也需要成本。}}\]&lt;p&gt;如果为了给一个 CG solver 计算完整：&lt;/p&gt;
+\[\Sigma_k\in\mathbb R^{10^7\ imes10^7},\]&lt;p&gt;显然完全不可接受。&lt;/p&gt;
+&lt;p&gt;所以实际方法必须利用：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;low rank；&lt;/li&gt;
+&lt;li&gt;Krylov structure；&lt;/li&gt;
+&lt;li&gt;structured covariance；&lt;/li&gt;
+&lt;li&gt;matrix-free operations。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;其次是：&lt;/p&gt;
+\[\boxed{\ ext{calibration 很难。}}\]&lt;p&gt;一个漂亮的 posterior 如果系统性过窄，&lt;/p&gt;
+&lt;p&gt;反而比没有 uncertainty 更危险。&lt;/p&gt;
+&lt;p&gt;第三：&lt;/p&gt;
+&lt;p&gt;对于工业级：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;nonlinear contact；&lt;/li&gt;
+&lt;li&gt;plasticity；&lt;/li&gt;
+&lt;li&gt;remeshing；&lt;/li&gt;
+&lt;li&gt;topology change；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;建立可信的 probabilistic numerical model 比线性问题困难得多。&lt;/p&gt;
+&lt;p&gt;所以 PN 目前更像：&lt;/p&gt;
+\[\boxed{ \ ext{一套非常成熟的理论方向 + 仍在扩展工程适用范围的方法体系} }\]&lt;p&gt;，而不是可以直接替代所有传统 FEM solver 的技术。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;19-一个特别适合自己做的小实验&#34;&gt;19. 一个特别适合自己做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;构造：&lt;/p&gt;
+\[Ax=b\]&lt;p&gt;其中：&lt;/p&gt;
+\[A\]&lt;p&gt;是 SPD，并让 condition number：&lt;/p&gt;
+\[\kappa(A)=10^6.\]&lt;p&gt;先算高精度参考解：&lt;/p&gt;
+\[x^*.\]&lt;p&gt;然后跑 CG。&lt;/p&gt;
+&lt;p&gt;每一步记录：&lt;/p&gt;
+\[\|r_k\|,\]\[\|x_k-x^*\|,\]&lt;p&gt;以及工程输出：&lt;/p&gt;
+\[Q_k=c^Tx_k.\]&lt;p&gt;你会发现三者的收敛行为并不完全同步。&lt;/p&gt;
+&lt;p&gt;然后进一步尝试 Bayesian CG，观察：&lt;/p&gt;
+\[p(Q\mid D_k).\]&lt;p&gt;真正值得画的图是：&lt;/p&gt;
+\[Q^*\]&lt;p&gt;以及每次迭代：&lt;/p&gt;
+\[\mu_{Q,k} \pm 2\sigma_{Q,k}.\]&lt;p&gt;如果方法 calibration 合理，你应该看到：&lt;/p&gt;
+\[\boxed{ \ ext{随着计算增加， credible interval 逐渐收缩并覆盖真实 }Q^*. }\]&lt;p&gt;这比单独画 residual convergence curve 多了一层非常重要的信息：&lt;/p&gt;
+\[\boxed{ \ ext{计算过程正在“获得知识”。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;20-对可靠性代理模型最值得迁移的一步&#34;&gt;20. 对可靠性/代理模型最值得迁移的一步
+&lt;/h1&gt;&lt;p&gt;以后拿到一个：&lt;/p&gt;
+\[R^2=0.99\]&lt;p&gt;的 Kriging 模型，可以把误差链写完整：&lt;/p&gt;
+\[\boxed{ y_{\rm reality} = y_{\rm model} + \epsilon_{\rm model} }\]\[\boxed{ y_{\rm solver} = y_{\rm model} + \epsilon_{\rm numerical} }\]\[\boxed{ y_{\rm surrogate} = y_{\rm solver} + \epsilon_{\rm surrogate}. }\]&lt;p&gt;你最终观察到：&lt;/p&gt;
+\[y_{\rm surrogate}\]&lt;p&gt;距离现实的误差并不只有：&lt;/p&gt;
+\[\epsilon_{\rm surrogate}.\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \ ext{继续把 Kriging 的 }R^2 \ ext{ 从 }0.99\ ext{ 提到 }0.999 }\]&lt;p&gt;在某些问题里可能毫无意义，&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[|\epsilon_{\rm numerical}| \gg |\epsilon_{\rm surrogate}|.\]&lt;p&gt;这实际上给代理模型研究提供了一个非常好的“停止优化”标准：&lt;/p&gt;
+\[\boxed{ \ ext{代理误差已经低于底层 solver uncertainty 后， 继续提高 surrogate accuracy 的边际价值会迅速下降。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Probabilistic Numerics 最值得记住的并不是：&lt;/p&gt;
+\[x\sim\mathcal N(m,\Sigma).\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \ ext{数值计算本身也是一次有限信息下的推断。} }\]&lt;p&gt;传统数值分析倾向于：&lt;/p&gt;
+\[\ ext{algorithm} \rightarrow \boxed{\ ext{answer}}\]&lt;p&gt;PN 希望得到：&lt;/p&gt;
+\[\ ext{algorithm} \rightarrow \boxed{\ ext{answer + remaining computational uncertainty}}.\]&lt;p&gt;它在整个知识体系中的位置可以理解成：&lt;/p&gt;
+\[\ ext{Numerical Analysis}\]\[\downarrow\]\[\boxed{\ ext{Probabilistic Numerics}}\]\[\downarrow\]\[\ ext{uncertainty-aware computation}\]\[\downarrow\]\[\ ext{surrogate / inverse problem / reliability / decision}.\]&lt;p&gt;对于可靠性和代理建模，它带来的最重要提醒是：&lt;/p&gt;
+\[\boxed{ \ ext{高保真仿真结果也只是计算结果， 不要在进入代理模型的那一刻突然把它升级成“绝对真值”。} }\]&lt;p&gt;一旦开始显式区分：&lt;/p&gt;
+\[\boxed{ \ ext{physical uncertainty}, \quad \ ext{model uncertainty}, \quad \ ext{numerical uncertainty}, \quad \ ext{surrogate uncertainty} }\]&lt;p&gt;很多原本混在“模型精度”里的问题就会变得清晰。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hennig, Osborne &amp;amp; Kersting, &lt;em&gt;Probabilistic Numerics: Computation as Machine Learning&lt;/em&gt;, Cambridge University Press, 2022&lt;/strong&gt;。目前最系统的教材级入口，内容从 Bayesian quadrature 一直延伸到线性代数、优化和 ODE。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://www.cambridge.org/core/books/probabilistic-numerics/0EBFF0B15E2481099F6EED1F62EE1ABE&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Cambridge University Press 图书页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Hennig, Osborne &amp;amp; Girolami, &lt;em&gt;Probabilistic numerics and uncertainty in computations&lt;/em&gt;, Proceedings of the Royal Society A, 2015&lt;/strong&gt;。领域早期非常重要的纲领性论文，适合先理解“为什么数值误差值得概率化”。&lt;br&gt;
+Royal Society 原论文&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Cockayne, Oates, Ipsen &amp;amp; Girolami, &lt;em&gt;A Bayesian Conjugate Gradient Method&lt;/em&gt;, Bayesian Analysis, 2019&lt;/strong&gt;。如果想把抽象思想落实到一个熟悉算法上，推荐从这篇开始；经典 CG 可以在特定 prior 下作为 posterior mean 恢复。&lt;br&gt;
+论文开放页面&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Cockayne, Oates, Sullivan &amp;amp; Girolami, &lt;em&gt;Probabilistic Numerical Methods for PDE-constrained Bayesian Inverse Problems&lt;/em&gt;&lt;/strong&gt;。把 PDE discretisation uncertainty 真正传播进下游 Bayesian inverse problem，是理解 PN 工程价值非常好的案例。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Philipp Hennig 的研究工作长期集中在 probabilistic numerics 与 probabilistic machine learning；Hans Kersting 的 Probabilistic Numerics 图书/研究页面也整理了教材与相关资料。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

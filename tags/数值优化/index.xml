@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Wed, 09 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 17 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Complementarity：为什么刚体接触本质上是一个“二选一”问题</title>
         <link>https://assranai.github.io/cards/10-complementarity/</link>
         <pubDate>Sun, 23 Aug 2026 00:00:00 +0000</pubDate>
@@ -3256,6 +3256,495 @@ $$\boxed{ \text{“只把影响工程结论的那部分算准”。} }$$&lt;p&gt
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Mathew, &lt;em&gt;Domain Decomposition Methods for the Numerical Solution of Partial Differential Equations&lt;/em&gt;, Springer, 2008&lt;/strong&gt;。偏矩阵视角，覆盖 substructuring、Lagrange multiplier、saddle-point systems 和 nonmatching grids，适合继续把线性代数结构与 PDE 求解对应起来。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器</title>
+        <link>https://assranai.github.io/cards/35-anderson-acceleration-2/</link>
+        <pubDate>Thu, 17 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/35-anderson-acceleration-2/</guid>
+        <description>&lt;h1 id=&#34;anderson-acceleration把一个普通固定点迭代器几乎外挂成准牛顿求解器&#34;&gt;Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;anderson&#34; tabindex=&#34;0&#34;&gt;Anderson Acceleration&lt;/span&gt;（AA，安德森加速）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 数值方法 × 数值优化 × 物理引擎&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 7–9 分钟&lt;/strong&gt;&lt;br&gt;
+今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：&lt;/p&gt;
+\[\boxed{\ ext{你已经有一个能工作的迭代器，但它收敛太慢。}}\]&lt;p&gt;这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、&lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;/&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 外层迭代，都可能被写成&lt;/p&gt;
+\[x_{k+1}=G(x_k).\]&lt;p&gt;最朴素的方法就是反复调用 \(G\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。&lt;/p&gt;
+&lt;p&gt;它最值得学的地方在于：&lt;/p&gt;
+\[\boxed{ \ ext{历史迭代数据，本身可以近似局部逆 Jacobian。} }\]&lt;p&gt;这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 &lt;em&gt;Acta Numerica&lt;/em&gt; 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-它首先解决什么问题&#34;&gt;1. 它首先解决什么问题？
+&lt;/h2&gt;&lt;p&gt;考虑非线性方程&lt;/p&gt;
+\[F(x)=0.\]&lt;p&gt;很多时候我们不会直接 Newton：&lt;/p&gt;
+\[x_{k+1} = x_k- J_F(x_k)^{-1}F(x_k),\]&lt;p&gt;而是构造一个更便宜、更稳定的固定点映射：&lt;/p&gt;
+\[x_{k+1}=G(x_k).\]&lt;p&gt;定义固定点残差&lt;/p&gt;
+\[f_k=G(x_k)-x_k.\]&lt;p&gt;目标就是&lt;/p&gt;
+\[f_k\rightarrow0.\]&lt;p&gt;如果 \(G\) 是 contraction，&lt;/p&gt;
+\[\|G(x)-G(y)\| \le q\|x-y\|, \qquad q&lt;1,\]&lt;p&gt;那么迭代会收敛。&lt;/p&gt;
+&lt;p&gt;问题在于，如果&lt;/p&gt;
+\[q=0.99,\]&lt;p&gt;每一步只消掉约 1% 的误差。&lt;/p&gt;
+&lt;p&gt;于是你拥有一个：&lt;/p&gt;
+\[\boxed{\ ext{稳定、便宜、但慢得令人难受的 solver。}}\]&lt;p&gt;这正是 AA 最典型的目标。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-普通固定点迭代其实浪费了大量信息&#34;&gt;2. 普通固定点迭代其实浪费了大量信息
+&lt;/h1&gt;&lt;p&gt;假设已经计算过&lt;/p&gt;
+\[x_{k-3},x_{k-2},x_{k-1},x_k\]&lt;p&gt;以及对应残差&lt;/p&gt;
+\[f_{k-3},f_{k-2},f_{k-1},f_k.\]&lt;p&gt;普通固定点迭代下一步仍然只是：&lt;/p&gt;
+\[x_{k+1}=G(x_k).\]&lt;p&gt;之前三个状态基本被扔掉了。&lt;/p&gt;
+&lt;p&gt;但这些历史其实告诉了你：&lt;/p&gt;
+\[\Delta x_i=x_{i+1}-x_i\]&lt;p&gt;与&lt;/p&gt;
+\[\Delta f_i=f_{i+1}-f_i\]&lt;p&gt;之间的局部关系。&lt;/p&gt;
+&lt;p&gt;如果附近近似线性：&lt;/p&gt;
+\[\Delta f \approx J_f\Delta x,\]&lt;p&gt;那么历史数据实际上已经给了若干条关于 Jacobian \(J_f\) 的 secant information。&lt;/p&gt;
+&lt;p&gt;AA 的核心就是：&lt;/p&gt;
+\[\boxed{\ ext{不要把这些信息扔掉。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;3-anderson-最直观的形式寻找残差最小的历史组合&#34;&gt;3. Anderson 最直观的形式：寻找“残差最小的历史组合”
+&lt;/h1&gt;&lt;p&gt;保留最近 \(m+1\) 个 fixed-point evaluations：&lt;/p&gt;
+\[G(x_{k-m}),\ldots,G(x_k).\]&lt;p&gt;同时有残差：&lt;/p&gt;
+\[f_i=G(x_i)-x_i.\]&lt;p&gt;寻找系数&lt;/p&gt;
+\[\alpha_0,\ldots,\alpha_m\]&lt;p&gt;使组合残差尽可能小：&lt;/p&gt;
+\[\boxed{ \min_{\alpha} \left\| \sum_{i=0}^{m}\alpha_i f_{k-m+i} \right\|_2 }\]&lt;p&gt;满足&lt;/p&gt;
+\[\sum_i\alpha_i=1.\]&lt;p&gt;然后不直接使用&lt;/p&gt;
+\[G(x_k),\]&lt;p&gt;而使用历史 fixed-point outputs 的组合：&lt;/p&gt;
+\[\boxed{ x_{k+1} = \sum_i \alpha_iG(x_{k-m+i}). }\]&lt;p&gt;这已经足以理解 AA 的核心。&lt;/p&gt;
+&lt;p&gt;它在问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;最近几次迭代给了我若干个“候选方向”，怎样线性组合它们，使预测残差最小？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;因此 AA 本质上是一种：&lt;/p&gt;
+\[\boxed{\ ext{history-based extrapolation}.}\]&lt;p&gt;Walker–Ni 对标准 AA 的描述正是保存先前固定点映射与残差，用小型最小二乘问题形成新的组合；AA(0) 则退化为普通 fixed-point iteration。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-一个一维例子马上能看出它在干什么&#34;&gt;4. 一个一维例子马上能看出它在干什么
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设固定点迭代：&lt;/p&gt;
+\[x_{k+1}=G(x_k)\]&lt;p&gt;局部近似：&lt;/p&gt;
+\[G(x)=x^*+0.9(x-x^*).\]&lt;p&gt;普通迭代误差：&lt;/p&gt;
+\[e_{k+1}=0.9e_k.\]&lt;p&gt;所以：&lt;/p&gt;
+\[e_{20}\approx0.9^{20}e_0 \approx0.12e_0.\]&lt;p&gt;20 步后还剩 12%。&lt;/p&gt;
+&lt;p&gt;但观察两步：&lt;/p&gt;
+\[x_k,\quad x_{k+1}.\]&lt;p&gt;如果 AA 从它们推断出这个局部线性趋势：&lt;/p&gt;
+\[e_{k+1}\approx0.9e_k,\]&lt;p&gt;就可以外推那个满足&lt;/p&gt;
+\[e=0\]&lt;p&gt;的位置。&lt;/p&gt;
+&lt;p&gt;一维情况下，这和 Aitken \(\Delta^2\) acceleration 有很近的精神关系。&lt;/p&gt;
+&lt;p&gt;高维 AA 可以粗略理解成：&lt;/p&gt;
+\[\boxed{\ ext{Aitken extrapolation 的多维、最小二乘版本。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;5-更深一层它为什么和-quasi-newton-有关系&#34;&gt;5. 更深一层：它为什么和 quasi-Newton 有关系？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;我们的目标：&lt;/p&gt;
+\[f(x)=G(x)-x=0.\]&lt;p&gt;Newton 会做：&lt;/p&gt;
+\[x_{k+1} = x_k- J_f(x_k)^{-1}f_k.\]&lt;p&gt;难点是：&lt;/p&gt;
+\[J_f^{-1}\]&lt;p&gt;很贵。&lt;/p&gt;
+&lt;p&gt;AA 保存：&lt;/p&gt;
+\[\Delta x_i\]&lt;p&gt;和：&lt;/p&gt;
+\[\Delta f_i.\]&lt;p&gt;这些满足近似 secant relations：&lt;/p&gt;
+\[J_f\Delta x_i \approx \Delta f_i.\]&lt;p&gt;于是可以从历史中构造一个隐式近似：&lt;/p&gt;
+\[H_k\approx J_f^{-1}.\]&lt;p&gt;然后更新类似：&lt;/p&gt;
+\[\boxed{ x_{k+1} = x_k-H_kf_k. }\]&lt;p&gt;所以 AA 的另一种理解是：&lt;/p&gt;
+\[\boxed{\ ext{multisecant quasi-Newton method}.}\]&lt;p&gt;Fang 与 Saad 的工作澄清并推广了 Anderson 与 multisecant/quasi-Newton 方法之间的联系；Walker–Ni 随后进一步系统分析了这种关系。&lt;/p&gt;
+&lt;p&gt;这解释了一个看似神奇的现象：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;明明没有显式计算 Jacobian，为什么它有时会出现类似 Newton 的明显加速？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;因为 Jacobian 信息已经隐含在&lt;/p&gt;
+\[(x_i,f_i)\]&lt;p&gt;的历史变化里。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;6-更漂亮的联系在线性问题上它和-gmres-几乎是同一件事&#34;&gt;6. 更漂亮的联系：在线性问题上，它和 GMRES 几乎是同一件事
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑线性系统：&lt;/p&gt;
+\[Ax=b.\]&lt;p&gt;构造固定点：&lt;/p&gt;
+\[G(x)=x-M^{-1}(Ax-b),\]&lt;p&gt;其中 \(M\) 可以看成预条件器。&lt;/p&gt;
+&lt;p&gt;于是&lt;/p&gt;
+\[f(x) = -M^{-1}(Ax-b).\]&lt;p&gt;这已经是线性的。&lt;/p&gt;
+&lt;p&gt;Walker 与 Ni 证明，在适当条件下，无截断 Anderson acceleration 与 GMRES 存在“essential equivalence”。&lt;/p&gt;
+&lt;p&gt;这非常重要，因为它揭示：&lt;/p&gt;
+\[\boxed{ \ ext{AA 可以看作把 Krylov residual-minimization 思想 推广到了非线性 fixed-point map。} }\]&lt;p&gt;所以可以建立一条很漂亮的知识链：&lt;/p&gt;
+\[\ ext{Fixed-point iteration}\]\[\downarrow\]\[\boxed{\ ext{Anderson Acceleration}}\]\[\begin{array}{cc} \swarrow &amp; \searrow\\ \ ext{Quasi-Newton} &amp; \ ext{GMRES/Krylov} \end{array}\]&lt;p&gt;AA 卡在的正是这个交叉点。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么它对现有工程代码特别友好&#34;&gt;7. 为什么它对现有工程代码特别友好？
+&lt;/h1&gt;&lt;p&gt;假设你已经有：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;x_new = solver_iteration(x)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这个函数可能内部执行：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;一次 PBD constraint sweep；&lt;/li&gt;
+&lt;li&gt;一次 Picard iteration；&lt;/li&gt;
+&lt;li&gt;一次 fluid-solid partitioned solve；&lt;/li&gt;
+&lt;li&gt;一次 nonlinear constitutive update；&lt;/li&gt;
+&lt;li&gt;一次 contact projection。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;AA 不一定需要知道内部发生了什么。&lt;/p&gt;
+&lt;p&gt;外层只需要：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;g = solver_iteration(x)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;f = g - x
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;保存最近 m 个 x 和 f
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;解一个 m×m 左右的 least-squares
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;混合历史结果
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{\ ext{它可以作为 solver wrapper。}}\]&lt;p&gt;这也是它特别值得求解器开发者掌握的原因。&lt;/p&gt;
+&lt;p&gt;Amanzi-ATS 这样的多物理场模拟软件已经直接提供 Anderson acceleration nonlinear solver，并将其描述为 nonlinear GMRES 风格的方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-为什么只保存很短的历史&#34;&gt;8. 为什么只保存很短的历史？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;理论上：&lt;/p&gt;
+\[m\]&lt;p&gt;越大，拥有的信息越多。&lt;/p&gt;
+&lt;p&gt;但实践中通常只保留：&lt;/p&gt;
+\[m=3\sim20\]&lt;p&gt;之类的小窗口。&lt;/p&gt;
+&lt;p&gt;原因之一是历史残差差分可能越来越线性相关：&lt;/p&gt;
+\[\Delta f_1 \approx \Delta f_2 \approx\cdots.\]&lt;p&gt;那么 least-squares matrix 会病态。&lt;/p&gt;
+&lt;p&gt;结果：&lt;/p&gt;
+\[\alpha_i\]&lt;p&gt;可能变得巨大：&lt;/p&gt;
+\[20,\,-35,\,18,\ldots\]&lt;p&gt;虽然它们满足：&lt;/p&gt;
+\[\sum\alpha_i=1,\]&lt;p&gt;却意味着非常激进的 extrapolation。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{\ ext{更多历史 ≠ 更稳定。}}\]&lt;p&gt;这和 GMRES restart、limited-memory BFGS 的思想很相似：&lt;/p&gt;
+\[\boxed{\ ext{有限历史有时反而是一种正则化。}}\]&lt;p&gt;Walker–Ni 也专门讨论了 truncation、conditioning 和实现细节。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-所以工程实现通常还需要-damping&#34;&gt;9. 所以工程实现通常还需要 damping
+&lt;/h1&gt;&lt;p&gt;一种常见形式：&lt;/p&gt;
+\[x_{k+1} = (1-\beta)x_k + \beta x_{k+1}^{AA},\]&lt;p&gt;其中：&lt;/p&gt;
+\[0&lt;\beta\le1.\]\[\beta=1\]&lt;p&gt;完全接受 extrapolation。&lt;/p&gt;
+\[\beta&lt;1\]&lt;p&gt;更加保守。&lt;/p&gt;
+&lt;p&gt;这与 nonlinear solver 里的 line search 有类似目的：&lt;/p&gt;
+\[\boxed{\ ext{避免局部线性模型预测得太远。}}\]&lt;p&gt;在强非线性、非光滑、接触切换问题里，这一点尤其重要。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;10-为什么-aa-对-contact--pbd-类问题很有诱惑力&#34;&gt;10. 为什么 AA 对 contact / PBD 类问题很有诱惑力？
+&lt;/h1&gt;&lt;p&gt;假设每次 constraint sweep 定义：&lt;/p&gt;
+\[x_{k+1}=G(x_k).\]&lt;p&gt;一个 sweep 只局部修正：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;distance constraints；&lt;/li&gt;
+&lt;li&gt;volume constraints；&lt;/li&gt;
+&lt;li&gt;contacts；&lt;/li&gt;
+&lt;li&gt;joints。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Gauss–Seidel 风格传播信息通常需要很多轮：&lt;/p&gt;
+\[\boxed{\ ext{局部修正要慢慢穿过整个 constraint graph。}}\]&lt;p&gt;例如一条长链受到端部约束：&lt;/p&gt;
+&lt;p&gt;第 1 次 sweep：&lt;/p&gt;
+\[\ ext{影响传播一点}.\]&lt;p&gt;第 2 次：&lt;/p&gt;
+\[\ ext{再传播一点}.\]&lt;p&gt;于是低频 global error 收敛很慢。&lt;/p&gt;
+&lt;p&gt;AA 观察最近几轮整个状态的变化趋势，然后尝试：&lt;/p&gt;
+\[\boxed{\ ext{直接外推这个慢模态最终会去哪里。}}\]&lt;p&gt;这与 Krylov 方法快速消除 stationary iteration 的慢误差模态具有相似直觉。&lt;/p&gt;
+&lt;p&gt;因此，如果一个 XPBD 外层迭代表现为：&lt;/p&gt;
+\[\boxed{\ ext{稳定，但 constraint residual 缓慢衰减}}\]&lt;p&gt;AA 是很值得测试的 acceleration layer。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-但这里有一个关键边界aa-不会修复错误的物理模型&#34;&gt;11. 但这里有一个关键边界：AA 不会修复错误的物理模型
+&lt;/h1&gt;&lt;p&gt;假设 XPBD 本身存在：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;错误 constraint gradient；&lt;/li&gt;
+&lt;li&gt;bending 能量符号错误；&lt;/li&gt;
+&lt;li&gt;contact projection 注入能量；&lt;/li&gt;
+&lt;li&gt;tet inversion；&lt;/li&gt;
+&lt;li&gt;discontinuous topology switching。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么 \(G(x)\) 本身就可能不是一个良好的局部 fixed-point map。&lt;/p&gt;
+&lt;p&gt;AA 可能反而：&lt;/p&gt;
+\[\boxed{\ ext{更快地放大错误趋势。}}\]&lt;p&gt;所以它适合：&lt;/p&gt;
+\[\boxed{ \ ext{正确且基本稳定，但收敛太慢的迭代器。} }\]&lt;p&gt;如果 base iteration 本身：&lt;/p&gt;
+\[\rho(J_G)&gt;1,\]&lt;p&gt;或者频繁发生强非光滑切换，直接套 AA 并没有普遍的稳定保证。后续研究也正因为这一问题发展了 safeguard、regularization 和 globally convergent variants；Toth–Kelley 的收敛分析给出了局部条件下的理论基础。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;12-对接触问题还有一个更具体的危险active-set-改变&#34;&gt;12. 对接触问题还有一个更具体的危险：active set 改变
+&lt;/h1&gt;&lt;p&gt;假设第 \(k\) 步接触集合：&lt;/p&gt;
+\[\mathcal C_k.\]&lt;p&gt;下一步：&lt;/p&gt;
+\[\mathcal C_{k+1}\ eq\mathcal C_k.\]&lt;p&gt;那么固定点映射：&lt;/p&gt;
+\[G(x)\]&lt;p&gt;局部可能发生 kink。&lt;/p&gt;
+&lt;p&gt;但 AA 的历史：&lt;/p&gt;
+\[\Delta x_i,\Delta f_i\]&lt;p&gt;可能来自不同 contact regimes。&lt;/p&gt;
+&lt;p&gt;此时用它们共同推断：&lt;/p&gt;
+\[J_f^{-1}\]&lt;p&gt;就不再可靠。&lt;/p&gt;
+&lt;p&gt;所以一个很自然的工程策略是：&lt;/p&gt;
+\[\boxed{ \ ext{active set 大幅变化} \Rightarrow \ ext{清空 Anderson history}. }\]&lt;p&gt;类似情况还包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;tet inversion/recovery；&lt;/li&gt;
+&lt;li&gt;friction stick-slip switching；&lt;/li&gt;
+&lt;li&gt;plastic yielding；&lt;/li&gt;
+&lt;li&gt;topology change。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这不是 AA 特有的问题，本质上是：&lt;/p&gt;
+\[\boxed{\ ext{旧的局部线性信息已经过期。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;13-一个非常实用的实现框架&#34;&gt;13. 一个非常实用的实现框架
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;对于已有 fixed-point solver，可以从这种结构开始：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;21
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;22
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;23
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;24
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;25
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;26
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;27
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;28
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;x = x0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;history = []
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;for k:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    g = G(x)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    f = g - x
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    if ||f|| &amp;lt; tolerance:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        break
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    history.push(x, g, f)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    keep last m entries
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    if history too short:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        x = g
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        continue
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    solve:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        min || Σ α_i f_i ||
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        subject to Σ α_i = 1
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x_AA = Σ α_i g_i
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    if safeguard accepts:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        x = x_AA
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    else:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        x = g
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        reset history if necessary
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;真正做工程版本时，我会优先加入四件东西：&lt;/p&gt;
+\[\boxed{\ ext{small history}}\]\[\boxed{\ ext{QR/SVD least-squares}}\]\[\boxed{\ ext{damping}}\]\[\boxed{\ ext{safeguard + restart}}\]&lt;p&gt;而不是一开始追求最大的 \(m\)。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-一个很值得监控的指标历史矩阵的条件数&#34;&gt;14. 一个很值得监控的指标：历史矩阵的条件数
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;构造：&lt;/p&gt;
+\[F_k= [ \Delta f_{k-m}, \ldots, \Delta f_{k-1} ].\]&lt;p&gt;AA 的 least squares 本质上依赖：&lt;/p&gt;
+\[F_k.\]&lt;p&gt;如果：&lt;/p&gt;
+\[\kappa(F_k)\gg1,\]&lt;p&gt;说明历史方向接近冗余。&lt;/p&gt;
+&lt;p&gt;这时可以：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;drop oldest vector；&lt;/li&gt;
+&lt;li&gt;restart；&lt;/li&gt;
+&lt;li&gt;regularize；&lt;/li&gt;
+&lt;li&gt;truncated SVD；&lt;/li&gt;
+&lt;li&gt;QR filtering。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以 AA 本身又和前几张 Randomized SVD / conditioning 卡片发生联系：&lt;/p&gt;
+\[\boxed{ \ ext{加速器的质量取决于历史信息是否真正提供独立方向。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-为什么它对黑箱多物理耦合特别有价值&#34;&gt;15. 为什么它对“黑箱多物理耦合”特别有价值？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑 partitioned fluid-structure interaction：&lt;/p&gt;
+\[\ ext{fluid} \rightarrow \ ext{interface load} \rightarrow \ ext{structure} \rightarrow \ ext{interface displacement} \rightarrow \ ext{fluid}.\]&lt;p&gt;整个循环就是：&lt;/p&gt;
+\[x_{k+1}=G(x_k).\]&lt;p&gt;如果不能方便地获得完整 coupled Jacobian：&lt;/p&gt;
+\[J= \begin{bmatrix} J_{ff}&amp;J_{fs}\\ J_{sf}&amp;J_{ss} \end{bmatrix},\]&lt;p&gt;Newton coupling 很困难。&lt;/p&gt;
+&lt;p&gt;AA 却只需要观察：&lt;/p&gt;
+\[\boxed{\ ext{interface input/output history}.}\]&lt;p&gt;因此它特别适合：&lt;/p&gt;
+\[\boxed{\ ext{partitioned / legacy / black-box solvers}.}\]&lt;p&gt;已有多物理场和多孔介质工作正是把 AA 作为 fixed-stress / splitting iteration 的后处理加速器，而无需改变底层分裂求解结构。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-这里其实隐藏着一个很普遍的-ai工程思想&#34;&gt;16. 这里其实隐藏着一个很普遍的 AI/工程思想
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;设一个昂贵组件：&lt;/p&gt;
+\[G\]&lt;p&gt;每次只能告诉你：&lt;/p&gt;
+\[x\mapsto G(x).\]&lt;p&gt;你不知道内部 Jacobian。&lt;/p&gt;
+&lt;p&gt;但运行过程中不断产生：&lt;/p&gt;
+\[(x_i,G(x_i)).\]&lt;p&gt;那么这些历史本身就是：&lt;/p&gt;
+\[\boxed{\ ext{免费的在线训练数据。}}\]&lt;p&gt;AA 做的事情很像：&lt;/p&gt;
+\[\boxed{ \ ext{online local system identification} + \ ext{prediction}. }\]&lt;p&gt;它并没有训练一个永久 surrogate，&lt;/p&gt;
+&lt;p&gt;而是在求解过程中不断建立一个：&lt;/p&gt;
+\[\boxed{\ ext{短寿命局部代理}}\]&lt;p&gt;来预测“固定点在哪里”。&lt;/p&gt;
+&lt;p&gt;这种思想在很多系统都可以迁移：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;optimizer acceleration；&lt;/li&gt;
+&lt;li&gt;iterative inference；&lt;/li&gt;
+&lt;li&gt;self-consistent field；&lt;/li&gt;
+&lt;li&gt;implicit neural layers；&lt;/li&gt;
+&lt;li&gt;coupled simulation。&lt;/li&gt;
+&lt;/ul&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-它和-kriging-的区别反而很有启发&#34;&gt;17. 它和 Kriging 的区别反而很有启发
+&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; 通常学习：&lt;/p&gt;
+\[\mu\mapsto y(\mu)\]&lt;p&gt;——一个跨参数空间长期存在的全局/半全局 surrogate。&lt;/p&gt;
+&lt;p&gt;AA 学的是：&lt;/p&gt;
+\[\boxed{ \ ext{当前这一次 nonlinear solve 附近， residual 和 state increment 的局部关系。} }\]&lt;p&gt;它的模型：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;极小；&lt;/li&gt;
+&lt;li&gt;在线建立；&lt;/li&gt;
+&lt;li&gt;用几十步后立即丢弃；&lt;/li&gt;
+&lt;li&gt;目标不是预测输出，而是减少迭代次数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这是一种很不同的 surrogate philosophy：&lt;/p&gt;
+\[\boxed{ \ ext{代理模型不一定需要保存下来； 有些代理只需要活几十毫秒。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;18-对可靠性计算也有直接迁移价值&#34;&gt;18. 对可靠性计算也有直接迁移价值
+&lt;/h1&gt;&lt;p&gt;可靠性往往需要重复求：&lt;/p&gt;
+\[F(x;\mu_i)=0.\]&lt;p&gt;对于相邻 Monte Carlo / adaptive samples：&lt;/p&gt;
+\[\mu_i\approx\mu_{i+1},\]&lt;p&gt;通常会 warm start：&lt;/p&gt;
+\[x_0(\mu_{i+1}) \leftarrow x^*(\mu_i).\]&lt;p&gt;更进一步，还可以思考：&lt;/p&gt;
+\[\boxed{\ ext{是否复用局部 secant / subspace information？}}\]&lt;p&gt;这就开始进入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;subspace recycling；&lt;/li&gt;
+&lt;li&gt;nonlinear recycling；&lt;/li&gt;
+&lt;li&gt;continuation；&lt;/li&gt;
+&lt;li&gt;warm-started Anderson；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;等更高级的 repeated-solve 方法。&lt;/p&gt;
+&lt;p&gt;因此对于百万次参数仿真，优化：&lt;/p&gt;
+\[\boxed{\ ext{每一次 nonlinear solve 的迭代次数}}\]&lt;p&gt;可能和训练外部 surrogate 一样重要。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;19-一个特别适合你自己做的实验&#34;&gt;19. 一个特别适合你自己做的实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;不用复杂 FEM。&lt;/p&gt;
+&lt;p&gt;构造二维非线性系统：&lt;/p&gt;
+\[x=G(x)\]&lt;p&gt;例如：&lt;/p&gt;
+\[G \begin{pmatrix}x\\y\end{pmatrix} = \begin{pmatrix} \cos y\\ 0.8\sin x \end{pmatrix}.\]&lt;p&gt;比较：&lt;/p&gt;
+\[\ ext{Fixed Point}, \quad AA(1), \quad AA(3), \quad AA(5).\]&lt;p&gt;每步记录：&lt;/p&gt;
+\[\|f_k\|.\]&lt;p&gt;然后第二个实验更有价值：&lt;/p&gt;
+&lt;p&gt;故意构造一个线性 fixed point：&lt;/p&gt;
+\[x_{k+1}=Bx_k+c\]&lt;p&gt;使：&lt;/p&gt;
+\[\rho(B)=0.99.\]&lt;p&gt;普通 fixed point 会极慢。&lt;/p&gt;
+&lt;p&gt;再跑 AA。&lt;/p&gt;
+&lt;p&gt;你会非常清楚地看到：&lt;/p&gt;
+\[\boxed{\ ext{AA 专门杀“慢收敛模态”的能力。}}\]&lt;p&gt;最后再给 \(G\) 加一个 piecewise contact-like kink，观察 aggressive AA 什么时候 overshoot；加入 damping/restart 后再比较。&lt;/p&gt;
+&lt;p&gt;这三个实验基本就把 AA 的优点和边界都摸清了。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;20-对软体求解器我认为最值得尝试的位置&#34;&gt;20. 对软体求解器，我认为最值得尝试的位置
+&lt;/h1&gt;&lt;p&gt;如果未来在 XPBD/非线性 FEM 中测试 AA，我不会首先把它塞进每一个 constraint 内部。&lt;/p&gt;
+&lt;p&gt;更自然的是把：&lt;/p&gt;
+\[\boxed{\ ext{完整 constraint sweep}}\]&lt;p&gt;看成：&lt;/p&gt;
+\[G(x).\]&lt;p&gt;即：&lt;/p&gt;
+\[x^{(k)} \overset{\ ext{one GS sweep}} {\longrightarrow} G(x^{(k)}).\]&lt;p&gt;AA 位于 sweep 之间：&lt;/p&gt;
+\[G \rightarrow AA \rightarrow G \rightarrow AA.\]&lt;p&gt;这样：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;不破坏单个 constraint kernel；&lt;/li&gt;
+&lt;li&gt;容易消融；&lt;/li&gt;
+&lt;li&gt;可以随时 fallback；&lt;/li&gt;
+&lt;li&gt;GPU kernel 基本不用重写。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;尤其适合诊断这种现象：&lt;/p&gt;
+\[\boxed{ \ ext{每轮都稳定下降， 但需要 50–100 个 iterations 才收敛。} }\]&lt;p&gt;如果当前问题属于“前几轮之后突然反转、爆能、NaN”，AA 优先级反而很低，因为那首先说明 base map 的稳定性/物理结构存在问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Anderson Acceleration 最值得记住的不是它那个 constrained least-squares 公式，而是：&lt;/p&gt;
+\[\boxed{ \ ext{一个迭代器过去走过的轨迹， 本身就在透露这个非线性系统局部 Jacobian 的信息。} }\]&lt;p&gt;普通 fixed-point iteration：&lt;/p&gt;
+\[x_k \rightarrow G(x_k)\]&lt;p&gt;每一步都近乎失忆。&lt;/p&gt;
+&lt;p&gt;AA：&lt;/p&gt;
+\[\{x_{k-m},\ldots,x_k\}\]\[\downarrow\]\[\boxed{\ ext{extract local secant information}}\]\[\downarrow\]\[\boxed{\ ext{residual-minimizing extrapolation}}\]\[\downarrow\]\[x_{k+1}.\]&lt;p&gt;它在知识体系中的位置尤其漂亮：&lt;/p&gt;
+\[\ ext{Fixed Point}\]\[\downarrow\]\[\boxed{\ ext{Anderson Acceleration}}\]\[\begin{array}{ccc} \ ext{GMRES/Krylov} &amp; \leftrightarrow &amp; \ ext{Quasi-Newton} \end{array}\]\[\downarrow\]\[\ ext{nonlinear FEM / multiphysics / physics solvers}.\]&lt;p&gt;对于求解器开发，最有迁移价值的原则可以压缩成一句：&lt;/p&gt;
+\[\boxed{ \ ext{在重写整个 solver 之前，先检查它是不是一个“稳定但缓慢”的固定点迭代； 如果是，历史迭代信息可能就是现成的加速器。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Homer F. Walker &amp;amp; Peng Ni, &lt;strong&gt;&lt;em&gt;Anderson Acceleration for Fixed-Point Iterations&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Numerical Analysis&lt;/em&gt;, 2011。最推荐的入口：算法、实现细节、quasi-Newton 联系以及与 GMRES 的等价关系都在这里。&lt;br&gt;
+SIAM 原论文&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Alex Toth &amp;amp; C. T. Kelley, &lt;strong&gt;&lt;em&gt;Convergence Analysis for Anderson Acceleration&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Numerical Analysis&lt;/em&gt;, 2015。适合继续理解“为什么 AA 有时加速、有时不稳定”，重点是局部收敛理论。&lt;br&gt;
+SIAM 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Yousef Saad, &lt;strong&gt;&lt;em&gt;Acceleration Methods for Fixed-Point Iterations&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Acta Numerica&lt;/em&gt;, 2025。这是一篇很新的教材级综述，适合把 Anderson 放进 vector extrapolation、minimal polynomial、Krylov 与其他固定点加速技术的完整体系。&lt;br&gt;
+Cambridge Acta Numerica 综述&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Walker–Ni 论文还明确追溯到 D. G. Anderson 1965 年的原始方法；如果关注工程实现，Amanzi-ATS nonlinear solver 文档展示了 AA 已怎样进入真实多物理场软件。&amp;quot;,&amp;ldquo;role&amp;rdquo;,&amp;ldquo;assistant&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

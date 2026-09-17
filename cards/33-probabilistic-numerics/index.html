@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？ 主题：Probabilistic Numerics（概率数值计算，PN）与 Bayesian Conjugate Gradient\n领域：数值方法 × 有限元 × 可靠性 × 代理模型 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\n今天讨论一个很容易改变“数值计算观”的概念。\n假设要求解大型有限元方程\n\\[K u=f.\\]迭代求解器跑到第 30 步后给出\n\\[u_{30}.\\]传统数值计算通常告诉你：\n\\[\\boxed{u\\approx u_{30}}\\]最多再给一个残差：\n\\[r_{30}=f-Ku_{30}.\\]但这里其实存在一个非常自然的问题：\n\\[\\boxed{\\ ext{我到底还有多不确定？}}\\]Probabilistic Numerics 的回答很激进：\n数值计算本身可以被视为一个推断问题。有限计算预算只给了我们关于未知数学对象的部分信息，因此算法可以返回一个概率分布，而不仅是一个点估计。\n于是线性求解器可能返回：\n\\[\\boxed{ u\\mid\\ ext{已完成的计算} \\sim \\mathcal N(m_k,\\Sigma_k) }\\]积分器可以返回函数轨迹上的概率分布，数值积分可以返回积分值的 posterior，ODE/PDE solver 也可以显式描述离散计算留下的 epistemic uncertainty。\n2022 年出版的专著 Probabilistic Numerics: Computation as Machine Learning 已经把这一思想系统扩展到积分、线性代数、优化和 ODE 等数值问题；其核心定位正是把“数值算法从可计算信息推断不可直接计算量”形式化为机器学习/贝叶斯推断问题。\n真正值得理解的是：\n\\[\\boxed{ \\ ext{PN 试图让“计算误差”成为可传播的不确定性， 而不只是事后的一条误差界。} }\\] 1. 为什么这件事值得专门发展一个领域？ 工程计算里至少存在三类完全不同的不确定性。\n假设：\n\\[y=\\mathcal F(\\ heta).\\]第一类来自输入：\n">
+<title>Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/33-probabilistic-numerics/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？">
+<meta property='og:description' content="Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？ 主题：Probabilistic Numerics（概率数值计算，PN）与 Bayesian Conjugate Gradient\n领域：数值方法 × 有限元 × 可靠性 × 代理模型 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\n今天讨论一个很容易改变“数值计算观”的概念。\n假设要求解大型有限元方程\n\\[K u=f.\\]迭代求解器跑到第 30 步后给出\n\\[u_{30}.\\]传统数值计算通常告诉你：\n\\[\\boxed{u\\approx u_{30}}\\]最多再给一个残差：\n\\[r_{30}=f-Ku_{30}.\\]但这里其实存在一个非常自然的问题：\n\\[\\boxed{\\ ext{我到底还有多不确定？}}\\]Probabilistic Numerics 的回答很激进：\n数值计算本身可以被视为一个推断问题。有限计算预算只给了我们关于未知数学对象的部分信息，因此算法可以返回一个概率分布，而不仅是一个点估计。\n于是线性求解器可能返回：\n\\[\\boxed{ u\\mid\\ ext{已完成的计算} \\sim \\mathcal N(m_k,\\Sigma_k) }\\]积分器可以返回函数轨迹上的概率分布，数值积分可以返回积分值的 posterior，ODE/PDE solver 也可以显式描述离散计算留下的 epistemic uncertainty。\n2022 年出版的专著 Probabilistic Numerics: Computation as Machine Learning 已经把这一思想系统扩展到积分、线性代数、优化和 ODE 等数值问题；其核心定位正是把“数值算法从可计算信息推断不可直接计算量”形式化为机器学习/贝叶斯推断问题。\n真正值得理解的是：\n\\[\\boxed{ \\ ext{PN 试图让“计算误差”成为可传播的不确定性， 而不只是事后的一条误差界。} }\\] 1. 为什么这件事值得专门发展一个领域？ 工程计算里至少存在三类完全不同的不确定性。\n假设：\n\\[y=\\mathcal F(\\ heta).\\]第一类来自输入：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/33-probabilistic-numerics/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='科学机器学习' /><meta property='article:published_time' content='2026-09-15T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-15T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？">
+<meta name="twitter:description" content="Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？ 主题：Probabilistic Numerics（概率数值计算，PN）与 Bayesian Conjugate Gradient\n领域：数值方法 × 有限元 × 可靠性 × 代理模型 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\n今天讨论一个很容易改变“数值计算观”的概念。\n假设要求解大型有限元方程\n\\[K u=f.\\]迭代求解器跑到第 30 步后给出\n\\[u_{30}.\\]传统数值计算通常告诉你：\n\\[\\boxed{u\\approx u_{30}}\\]最多再给一个残差：\n\\[r_{30}=f-Ku_{30}.\\]但这里其实存在一个非常自然的问题：\n\\[\\boxed{\\ ext{我到底还有多不确定？}}\\]Probabilistic Numerics 的回答很激进：\n数值计算本身可以被视为一个推断问题。有限计算预算只给了我们关于未知数学对象的部分信息，因此算法可以返回一个概率分布，而不仅是一个点估计。\n于是线性求解器可能返回：\n\\[\\boxed{ u\\mid\\ ext{已完成的计算} \\sim \\mathcal N(m_k,\\Sigma_k) }\\]积分器可以返回函数轨迹上的概率分布，数值积分可以返回积分值的 posterior，ODE/PDE solver 也可以显式描述离散计算留下的 epistemic uncertainty。\n2022 年出版的专著 Probabilistic Numerics: Computation as Machine Learning 已经把这一思想系统扩展到积分、线性代数、优化和 ODE 等数值问题；其核心定位正是把“数值算法从可计算信息推断不可直接计算量”形式化为机器学习/贝叶斯推断问题。\n真正值得理解的是：\n\\[\\boxed{ \\ ext{PN 试图让“计算误差”成为可传播的不确定性， 而不只是事后的一条误差界。} }\\] 1. 为什么这件事值得专门发展一个领域？ 工程计算里至少存在三类完全不同的不确定性。\n假设：\n\\[y=\\mathcal F(\\ heta).\\]第一类来自输入：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-为什么这件事值得专门发展一个领域">1. 为什么这件事值得专门发展一个领域？</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/33-probabilistic-numerics/">Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-15T00:00:00Z'>Sep 15, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 7 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="probabilistic-numerics如果有限元求解器本身也会犯错为什么它通常只返回一个数字">Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？
+</h1><p><strong>主题：Probabilistic Numerics（概率数值计算，PN）与 Bayesian Conjugate Gradient</strong><br>
+<strong>领域：数值方法 × 有限元 × 可靠性 × 代理模型 × 科学机器学习</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong><br>
+今天讨论一个很容易改变“数值计算观”的概念。</p>
+<p>假设要求解大型有限元方程</p>
+\[K u=f.\]<p>迭代求解器跑到第 30 步后给出</p>
+\[u_{30}.\]<p>传统数值计算通常告诉你：</p>
+\[\boxed{u\approx u_{30}}\]<p>最多再给一个残差：</p>
+\[r_{30}=f-Ku_{30}.\]<p>但这里其实存在一个非常自然的问题：</p>
+\[\boxed{\ ext{我到底还有多不确定？}}\]<p>Probabilistic Numerics 的回答很激进：</p>
+<blockquote>
+<p>数值计算本身可以被视为一个推断问题。有限计算预算只给了我们关于未知数学对象的部分信息，因此算法可以返回一个<strong>概率分布</strong>，而不仅是一个点估计。</p>
+</blockquote>
+<p>于是线性求解器可能返回：</p>
+\[\boxed{ u\mid\ ext{已完成的计算} \sim \mathcal N(m_k,\Sigma_k) }\]<p>积分器可以返回函数轨迹上的概率分布，数值积分可以返回积分值的 posterior，ODE/PDE solver 也可以显式描述离散计算留下的 epistemic uncertainty。</p>
+<p>2022 年出版的专著 <em>Probabilistic Numerics: Computation as Machine Learning</em> 已经把这一思想系统扩展到积分、线性代数、优化和 ODE 等数值问题；其核心定位正是把“数值算法从可计算信息推断不可直接计算量”形式化为机器学习/贝叶斯推断问题。</p>
+<p>真正值得理解的是：</p>
+\[\boxed{ \ ext{PN 试图让“计算误差”成为可传播的不确定性， 而不只是事后的一条误差界。} }\]<hr>
+<h2 id="1-为什么这件事值得专门发展一个领域">1. 为什么这件事值得专门发展一个领域？
+</h2><p>工程计算里至少存在三类完全不同的不确定性。</p>
+<p>假设：</p>
+\[y=\mathcal F(\ heta).\]<p>第一类来自输入：</p>
+\[\ heta\sim p(\ heta),\]<p>例如：</p>
+<ul>
+<li>材料参数；</li>
+<li>加工误差；</li>
+<li>外载荷；</li>
+<li>摩擦系数。</li>
+</ul>
+<p>这是可靠性分析最熟悉的：</p>
+\[\boxed{\ ext{parameter uncertainty}}\]<p>。</p>
+<p>第二类来自模型：</p>
+<p>真实世界可能并不完全满足：</p>
+\[\mathcal F.\]<p>例如忽略塑性、温度耦合或接触磨损：</p>
+\[\boxed{\ ext{model discrepancy}}\]<p>。</p>
+<p>第三类却经常被默认忽略：</p>
+<p>即使 \(\ heta\) 和 \(\mathcal F\) 都确定，我们实际上仍然没有精确算出：</p>
+\[\mathcal F(\ heta).\]<p>因为只能使用：</p>
+<ul>
+<li>有限网格；</li>
+<li>有限时间步；</li>
+<li>有限迭代次数；</li>
+<li>有限浮点精度。</li>
+</ul>
+<p>于是还存在：</p>
+\[\boxed{\ ext{numerical uncertainty}.}\]<p>Hennig、Osborne 和 Girolami 在 2015 年 <em>Proceedings of the Royal Society A</em> 的纲领性论文中提出，有限时间和有限硬件导致的 numerical uncertainty 应当像其他不确定性一样被显式管理。</p>
+<hr>
+<h1 id="2-最关键的思想转换数值算法其实一直在从信息推断答案">2. 最关键的思想转换：数值算法其实一直在“从信息推断答案”
+</h1><p>考虑积分：</p>
+\[I=\int_0^1f(x)\,dx.\]<p>你无法观察整个连续函数。</p>
+<p>只能计算：</p>
+\[f(x_1),f(x_2),\ldots,f(x_n).\]<p>传统 quadrature 给：</p>
+\[\hat I=\sum_iw_if(x_i).\]<p>PN 换一种语言：</p>
+<p>我们真正拥有的数据是</p>
+\[D= \{(x_i,f(x_i))\}_{i=1}^n.\]<p>未知对象是：</p>
+\[f.\]<p>目标量是：</p>
+\[I(f).\]<p>那么这完全可以看成：</p>
+\[\boxed{ D \rightarrow \ ext{infer }f \rightarrow \ ext{infer }I(f). }\]<p>例如给：</p>
+\[f\sim GP(m,k),\]<p>观察函数值以后：</p>
+\[f\mid D\]<p>仍是 Gaussian process。</p>
+<p>因为积分是线性算子：</p>
+\[I(f)=\int f(x)dx,\]<p>所以：</p>
+\[\boxed{ I\mid D \sim \mathcal N(\mu_I,\sigma_I^2). }\]<p>传统积分器只返回：</p>
+\[\mu_I.\]<p>Probabilistic quadrature 还返回：</p>
+\[\sigma_I.\]<p>于是：</p>
+\[\boxed{\sigma_I\ ext{ 表示现有函数评价对积分值还留下多少不确定性。}}\]<p>这就是 Bayesian quadrature / Bayesian cubature 与 PN 的一个经典入口。</p>
+<hr>
+<h1 id="3-一个很深的事实kriging-和概率数值计算其实离得非常近">3. 一个很深的事实：Kriging 和概率数值计算其实离得非常近
+</h1><p>你熟悉的 <span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span>：</p>
+\[f(x)\sim GP(m(x),k(x,x')).\]<p>拿到设计点：</p>
+\[X=\{x_1,\ldots,x_n\}\]<p>以后预测：</p>
+\[f(x_*)\mid D \sim \mathcal N(\mu(x_*),\sigma^2(x_*)).\]<p>通常把：</p>
+\[f\]<p>理解成昂贵有限元模型。</p>
+<p>PN 再往下一层：</p>
+<blockquote>
+<p>为什么只有“有限元模型的代理”可以是概率模型？有限元内部的线性求解、积分、ODE 时间推进本身为什么不能也是概率推断？</p>
+</blockquote>
+<p>于是层次变成：</p>
+\[\ ext{physical reality}\]\[\downarrow\]\[\ ext{PDE model}\]\[\downarrow\]\[\boxed{\ ext{numerical solver with uncertainty}}\]\[\downarrow\]\[\boxed{\ ext{surrogate with uncertainty}}\]\[\downarrow\]\[\ ext{reliability inference}.\]<p>这也是 PN 对可靠性/代理模型研究最有迁移价值的地方：</p>
+\[\boxed{ \ ext{Kriging uncertainty 和 numerical uncertainty 原则上属于不同层次。} }\]<hr>
+<h1 id="4-用线性方程看会更直观">4. 用线性方程看会更直观
+</h1><p>考虑：</p>
+\[Ax=b.\]<p>假设：</p>
+\[A\in\mathbb R^{10^7\ imes10^7}.\]<p>精确解：</p>
+\[x^*=A^{-1}b\]<p>显然不能直接得到。</p>
+<p>CG 通过 Krylov subspace：</p>
+\[\mathcal K_k(A,r_0) = \operatorname{span} \{ r_0,Ar_0,A^2r_0,\ldots,A^{k-1}r_0 \}\]<p>逐渐逼近：</p>
+\[x^*.\]<p>第 \(k\) 步返回：</p>
+\[x_k.\]<p>传统 CG 的逻辑：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">迭代
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">获得更多矩阵信息
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">更新 x_k
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">直到 residual 足够小
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Bayesian Conjugate Gradient 换成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">prior over x
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">执行矩阵-向量运算
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">这些运算产生关于 x 的信息
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">Bayesian conditioning
+</span></span><span class="line"><span class="cl">↓
+</span></span><span class="line"><span class="cl">posterior over x
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>所以最初：</p>
+\[x\sim\mathcal N(x_0,\Sigma_0).\]<p>迭代之后：</p>
+\[\boxed{ x\mid D_k \sim \mathcal N(x_k,\Sigma_k). }\]<p>Cockayne、Oates、Ipsen 和 Girolami 的 Bayesian CG 工作证明，在特定 prior 选择下，传统 CG 的迭代解可以作为该概率方法的 posterior mean 恢复出来，因此它可以视为经典 CG 的概率化推广。</p>
+<p>这非常漂亮：</p>
+\[\boxed{ \ ext{经典数值算法没有消失； 它成为概率算法的均值。} }\]<hr>
+<h1 id="5-那么协方差--在说什么">5. 那么协方差 \(\Sigma_k\) 在说什么？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设：</p>
+\[x\in\mathbb R^{1000}.\]<p>CG 已经通过若干 Krylov directions 学到了很多信息。</p>
+<p>某些方向已经确定得很好：</p>
+\[\operatorname{Var}(v_i^Tx)\approx0.\]<p>另一些方向几乎还没被探测：</p>
+\[\operatorname{Var}(v_j^Tx)\gg0.\]<p>于是：</p>
+\[\Sigma_k\]<p>描述：</p>
+\[\boxed{\ ext{哪些解空间方向仍然缺乏数值信息。}}\]<p>随着迭代：</p>
+\[\Sigma_0 \rightarrow \Sigma_1 \rightarrow \cdots \rightarrow \Sigma_k.\]<p>理想情况下：</p>
+\[\boxed{\Sigma_k\rightarrow0.}\]<p>因此迭代求解不再只是：</p>
+\[x_0\rightarrow x_1\rightarrow x_2\]<p>一串点。</p>
+<p>而是：</p>
+\[\boxed{ p_0(x) \rightarrow p_1(x) \rightarrow p_2(x) }\]<p>一个不断收缩的 belief state。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="6-为什么-residual-norm-不能完全替代这个东西">6. 为什么 residual norm 不能完全替代这个东西？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>CG 常用：</p>
+\[\|r_k\| = \|b-Ax_k\|\]<p>判断收敛。</p>
+<p>但真正关心的可能是：</p>
+\[\|x_k-x^*\|.\]<p>两者通过：</p>
+\[x_k-x^* = A^{-1}r_k\]<p>联系。</p>
+<p>如果：</p>
+\[A\]<p>condition number 很大，</p>
+<p>小 residual 并不自动意味着所有解方向都同样准确。</p>
+<p>例如某个方向对应很小特征值：</p>
+\[A v_i=\lambda_i v_i, \qquad \lambda_i\ll1.\]<p>那么：</p>
+\[A^{-1}v_i = \frac1{\lambda_i}v_i.\]<p>一个看似很小的 residual component：</p>
+\[\epsilon v_i\]<p>对应解误差：</p>
+\[\frac{\epsilon}{\lambda_i}v_i\]<p>可能并不小。</p>
+<p>Bayesian CG 的动机之一正是：</p>
+\[\boxed{ \ ext{给出对 numerical error 更丰富的统计描述， 而不只是一个迭代点估计。} }\]<p>论文也明确指出，在困难线性系统中，即使执行许多迭代仍可能残留显著误差，因此仅有点估计的价值有限。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="7-但这里必须警惕一个很重要的问题posterior-variance-不自动等于真实误差">7. 但这里必须警惕一个很重要的问题：posterior variance 不自动等于“真实误差”
+</h1><p>看到：</p>
+\[x\mid D_k \sim N(x_k,\Sigma_k)\]<p>很容易产生误解：</p>
+<blockquote>
+<p>那 \(\Sigma_k\) 就是 solver error 的真实统计分布？</p>
+</blockquote>
+<p>不能这么简单理解。</p>
+<p>因为：</p>
+\[\Sigma_k\]<p>依赖：</p>
+\[\boxed{\ ext{prior / information model 的选择。}}\]<p>如果 prior 过度自信：</p>
+\[\Sigma_0\]<p>就可能过小。</p>
+<p>最终 posterior 同样可能：</p>
+\[\boxed{\ ext{under-dispersed}.}\]<p>所以 PN 一个核心研究问题就是：</p>
+\[\boxed{\ ext{calibration}.}\]<p>即：</p>
+<p>如果算法声称：</p>
+\[95\%\]<p>credible region，</p>
+<p>真实数值解是否真的以接近：</p>
+\[95\%\]<p>的频率落在其中？</p>
+<p>因此：</p>
+\[\boxed{ \ ext{“输出概率” 不等于 “概率已经可信”。} }\]<p>这与 Kriging 的 predictive uncertainty 完全一样：方差本身也需要验证。</p>
+<hr>
+<h1 id="8-这对有限元真正有意思的地方在-pde-离散误差">8. 这对有限元真正有意思的地方，在 PDE 离散误差
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>考虑：</p>
+\[\mathcal Lu=f\]<p>以及边界条件：</p>
+\[\mathcal Bu=g.\]<p>有限元/meshless 方法最终得到：</p>
+\[u_h.\]<p>传统方法：</p>
+\[u_h\]<p>就是一个确定函数。</p>
+<p>但我们知道：</p>
+\[u_h\ eq u.\]<p>如果后面做参数反演：</p>
+\[y=\mathcal G(u(\ heta))+\epsilon,\]<p>通常实际上计算：</p>
+\[y\approx\mathcal G(u_h(\ heta))+\epsilon.\]<p>于是 inverse solver 很可能把：</p>
+\[\boxed{\ ext{PDE discretization error}}\]<p>错误解释成：</p>
+\[\boxed{\ ext{参数变化或观测噪声。}}\]<p>Cockayne、Oates、Sullivan 和 Girolami 的概率 PDE 方法正是针对这一问题：给 PDE 解的离散误差建立概率描述，再把它传播到 Bayesian inverse problem 中；其结果之一是，当 forward solver 的数值误差显著时，反演 posterior 会相应更保守。</p>
+<p>这是一个非常重要的思想：</p>
+\[\boxed{ \ ext{下游推断不应该比上游数值计算本身更自信。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="9-可靠性分析里这个问题尤其危险">9. 可靠性分析里这个问题尤其危险
+</h1><p>假设极限状态：</p>
+\[g(\ heta)=F_{\rm lim}-F_{\max}(\ heta).\]<p>失效：</p>
+\[g<0.\]<p>真实某个样本：</p>
+\[g=0.002.\]<p>有限元数值误差：</p>
+\[\epsilon_{\rm num}\approx\pm0.01.\]<p>如果求解器只返回：</p>
+\[\hat g=0.006,\]<p>传统可靠性算法会直接判断：</p>
+\[\boxed{\ ext{safe}.}\]<p>但实际上这个样本就在：</p>
+\[\boxed{\ ext{numerical uncertainty band}}\]<p>里面。</p>
+<p>如果：</p>
+\[g\mid\mathcal D \sim N(0.006,0.01^2),\]<p>那么真正应该关注的是：</p>
+\[P(g<0\mid\mathcal D),\]<p>而不是简单看：</p>
+\[\operatorname{sign}(\hat g).\]<p>这对 failure boundary：</p>
+\[g(\ heta)=0\]<p>附近尤其重要。</p>
+<hr>
+<h1 id="10-于是可靠性问题可以出现三层概率">10. 于是可靠性问题可以出现“三层概率”
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>设输入：</p>
+\[\ heta\sim p(\ heta).\]<p>高保真数值模型由于有限计算预算给：</p>
+\[g(\ heta)\mid\mathcal D_{\rm num}.\]<p>外面再套 Kriging：</p>
+\[\hat g(\ heta)\mid\mathcal D_{\rm surrogate}.\]<p>于是失效概率原则上不再只是：</p>
+\[P_\ heta[g(\ heta)<0].\]<p>而需要考虑：</p>
+\[\boxed{ P( g<0 \mid \ ext{parameter uncertainty}, \ ext{numerical uncertainty}, \ ext{surrogate uncertainty} ). }\]<p>这三种 uncertainty 的来源完全不同：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>层</th>
+					<th>不确定性的来源</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>参数</td>
+					<td>世界本身不知道</td>
+			</tr>
+			<tr>
+					<td>数值</td>
+					<td>没有投入无限计算</td>
+			</tr>
+			<tr>
+					<td>代理</td>
+					<td>没有运行足够多高保真样本</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>如果全部混在一个 Kriging variance 里，</p>
+<p>解释会非常困难。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="11-这对代理模型还有一个很直接的启发训练标签不一定是真值">11. 这对代理模型还有一个很直接的启发：训练标签不一定是真值
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>通常代理训练数据写成：</p>
+\[\mathcal D = \{(\ heta_i,y_i)\}.\]<p>默认：</p>
+\[y_i=f(\ heta_i)\]<p>是精确标签。</p>
+<p>但如果标签来自：</p>
+<ul>
+<li>未完全收敛 FEM；</li>
+<li>contact solver；</li>
+<li>CFD；</li>
+<li>nonlinear dynamics；</li>
+</ul>
+<p>更真实的模型可能是：</p>
+\[\boxed{ y_i = f(\ heta_i) + \epsilon_{{\rm num},i}. }\]<p>而且：</p>
+\[\epsilon_{{\rm num},i}\]<p>往往还是：</p>
+\[\boxed{\ ext{heteroscedastic}}\]<p>的。</p>
+<p>例如：</p>
+<p>正常工况：</p>
+\[\sigma_{\rm num}=10^{-5}.\]<p>接触切换附近：</p>
+\[\sigma_{\rm num}=10^{-2}.\]<p>那么把所有样本当成 exact interpolation points：</p>
+\[\boxed{\ ext{并不合理。}}\]<p>Kriging 的 nugget/noise model 在这里就有更物理的解释：</p>
+\[\boxed{ \ ext{它可以部分表示标签本身的 numerical uncertainty。} }\]<p>这比单纯把 nugget 当“防止矩阵奇异的小参数”更值得理解。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="12-它甚至改变了高保真模型这个词的含义">12. 它甚至改变了“高保真模型”这个词的含义
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>工程研究中经常说：</p>
+\[\boxed{\ ext{HF model = ground truth}}\]<p>。</p>
+<p>例如：</p>
+<ul>
+<li>Adams；</li>
+<li>Ansys；</li>
+<li>Abaqus；</li>
+<li>CFD。</li>
+</ul>
+<p>但从 PN 的角度：</p>
+\[\boxed{ \ ext{high fidelity} \ eq \ ext{exact}. }\]<p>一个 FEM evaluation 实际取决于：</p>
+\[y_{h,\Delta t,\ au}\]<p>其中：</p>
+<ul>
+<li>\(h\)：mesh resolution；</li>
+<li>\(\Delta t\)：time step；</li>
+<li>\(\ au\)：solver tolerance。</li>
+</ul>
+<p>所以所谓高保真标签其实属于一个计算层级：</p>
+\[y_{h,\Delta t,\ au} \rightarrow y.\]<p>当：</p>
+\[h\rightarrow0,\qquad \Delta t\rightarrow0,\qquad \ au\rightarrow0\]<p>才逐渐逼近连续问题。</p>
+<p>因此 Multi-Fidelity 甚至可以重新解释成：</p>
+\[\boxed{ \ ext{不同计算预算对应不同 numerical uncertainty level。} }\]<p>这和昨天 Randomized SVD 的“不要精确计算无关方向”又形成了另一种计算哲学：</p>
+\[\boxed{ \ ext{既然计算预算有限， 就显式承认剩下没有算完的东西。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="13-一个很强的工程用途自适应决定该不该继续算">13. 一个很强的工程用途：自适应决定“该不该继续算”
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设 CG 第 \(k\) 步以后：</p>
+\[x\mid D_k \sim N(m_k,\Sigma_k).\]<p>最终真正关心的并不是完整：</p>
+\[x,\]<p>而是某个工程量：</p>
+\[Q=c^Tx.\]<p>那么：</p>
+\[Q\mid D_k \sim N( c^Tm_k, c^T\Sigma_kc ).\]<p>如果：</p>
+\[\sqrt{c^T\Sigma_kc} < \varepsilon_Q,\]<p>就可以停止。</p>
+<p>这比：</p>
+\[\|r_k\|<10^{-8}\]<p>更接近实际目标：</p>
+\[\boxed{\ ext{我关心的输出已经足够确定了吗？}}\]<p>于是 numerical uncertainty 不再只是“报告误差”。</p>
+<p>它可以直接控制：</p>
+\[\boxed{\ ext{computational resource allocation}.}\]<p>这也是 PN 最有工程潜力的一点。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="14-更进一步计算预算可以被主动分配">14. 更进一步：计算预算可以被主动分配
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设可靠性计算中有两个样本。</p>
+<h3 id="sample-a">Sample A
+</h3>\[g_A=3.5.\]<p>离失效面很远。</p>
+<p>即使 numerical uncertainty：</p>
+\[\sigma_A=0.1,\]<p>也几乎不会改变分类。</p>
+<h3 id="sample-b">Sample B
+</h3>\[g_B=0.002.\]<p>numerical uncertainty：</p>
+\[\sigma_B=0.05.\]<p>显然：</p>
+\[B\]<p>值得继续：</p>
+<ul>
+<li>refine mesh；</li>
+<li>减小 timestep；</li>
+<li>收紧 nonlinear tolerance。</li>
+</ul>
+<p>而 A 没必要。</p>
+<p>于是 PN 很自然地产生：</p>
+\[\boxed{\ ext{adaptive fidelity allocation}.}\]<p>计算资源优先投入：</p>
+\[\boxed{ \ ext{numerical uncertainty 真正会改变决策的地方。} }\]<p>这与 reliability active learning 的思想高度兼容。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="15-它和-multi-fidelity-monte-carlo-的关系也值得区分">15. 它和 Multi-Fidelity Monte Carlo 的关系也值得区分
+</h1><p><span class="term-anchor" data-term="mfmc" tabindex="0">MFMC</span>：</p>
+\[\boxed{ \ ext{利用低/高保真模型之间的相关性， 降低统计估计成本。} }\]<p>Probabilistic Numerics：</p>
+\[\boxed{ \ ext{描述一次有限数值计算本身剩余的认识不确定性。} }\]<p>二者可以组合。</p>
+<p>例如：</p>
+<p>粗网格：</p>
+\[u_{h_c}\]<p>有较大 numerical uncertainty。</p>
+<p>细网格：</p>
+\[u_{h_f}\]<p>较小。</p>
+<p>理论上可以构建：</p>
+\[p(u\mid u_{h_c},u_{h_f})\]<p>并让：</p>
+\[\boxed{ \ ext{fidelity level 与 uncertainty contraction 形成统一描述。} }\]<p>这比简单标记：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">low fidelity
+</span></span><span class="line"><span class="cl">medium fidelity
+</span></span><span class="line"><span class="cl">high fidelity
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>的信息更丰富。</p>
+<hr>
+<h1 id="16-和昨天-backward-error-analysis-又有什么区别">16. 和昨天 Backward Error Analysis 又有什么区别？
+</h1><p>这是一个很重要的边界。</p>
+<p>Backward Error Analysis 问：</p>
+\[\boxed{ \ ext{这个数值轨迹精确对应哪个附近的 modified system？} }\]<p>它偏向：</p>
+\[\ ext{deterministic structural explanation}.\]<p>Probabilistic Numerics 问：</p>
+\[\boxed{ \ ext{有限计算提供了哪些信息， 还有哪些量没有确定？} }\]<p>它偏向：</p>
+\[\ ext{epistemic uncertainty representation}.\]<p>两者都反对：</p>
+\[\boxed{\ ext{“solver 输出 = exact truth”}}\]<p>这种过度简化，</p>
+<p>但方向完全不同：</p>
+\[\ ext{BEA} \rightarrow \ ext{解释误差结构}\]\[\ ext{PN} \rightarrow \ ext{量化剩余未知}.\]<p>这两种思维其实非常互补。</p>
+<hr>
+<h1 id="17-为什么它现在和-scientific-machine-learning-特别相关">17. 为什么它现在和 Scientific Machine Learning 特别相关？
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>因为现代 scientific computing 越来越多地形成：</p>
+\[\ ext{PDE solver} \rightarrow \ ext{dataset} \rightarrow \ ext{neural surrogate} \rightarrow \ ext{Bayesian inference} \rightarrow \ ext{decision}.\]<p>如果第一步给出的训练数据已经有：</p>
+\[\epsilon_{\rm num},\]<p>但后面的机器学习系统默认：</p>
+\[\epsilon_{\rm num}=0,\]<p>最终模型就可能：</p>
+\[\boxed{\ ext{对自己的预测过度自信。}}\]<p>PN 提供了一种统一接口：</p>
+<p>上游 solver 不只输出：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">value
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>而输出：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">value
+</span></span><span class="line"><span class="cl">uncertainty
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>下游算法再决定：</p>
+<ul>
+<li>是否相信；</li>
+<li>是否 refine；</li>
+<li>是否追加计算；</li>
+<li>是否传播 uncertainty。</li>
+</ul>
+<p>这其实非常符合现代 AI pipeline：</p>
+\[\boxed{ \ ext{每个组件都传递 prediction + confidence， 而不是假装自己绝对正确。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="18-但-pn-目前仍然有很现实的局限">18. 但 PN 目前仍然有很现实的局限
+</h1><p>首先是：</p>
+\[\boxed{\ ext{概率模型本身也需要成本。}}\]<p>如果为了给一个 CG solver 计算完整：</p>
+\[\Sigma_k\in\mathbb R^{10^7\ imes10^7},\]<p>显然完全不可接受。</p>
+<p>所以实际方法必须利用：</p>
+<ul>
+<li>low rank；</li>
+<li>Krylov structure；</li>
+<li>structured covariance；</li>
+<li>matrix-free operations。</li>
+</ul>
+<p>其次是：</p>
+\[\boxed{\ ext{calibration 很难。}}\]<p>一个漂亮的 posterior 如果系统性过窄，</p>
+<p>反而比没有 uncertainty 更危险。</p>
+<p>第三：</p>
+<p>对于工业级：</p>
+<ul>
+<li>nonlinear contact；</li>
+<li>plasticity；</li>
+<li>remeshing；</li>
+<li>topology change；</li>
+</ul>
+<p>建立可信的 probabilistic numerical model 比线性问题困难得多。</p>
+<p>所以 PN 目前更像：</p>
+\[\boxed{ \ ext{一套非常成熟的理论方向 + 仍在扩展工程适用范围的方法体系} }\]<p>，而不是可以直接替代所有传统 FEM solver 的技术。</p>
+<hr>
+<h1 id="19-一个特别适合自己做的小实验">19. 一个特别适合自己做的小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>构造：</p>
+\[Ax=b\]<p>其中：</p>
+\[A\]<p>是 SPD，并让 condition number：</p>
+\[\kappa(A)=10^6.\]<p>先算高精度参考解：</p>
+\[x^*.\]<p>然后跑 CG。</p>
+<p>每一步记录：</p>
+\[\|r_k\|,\]\[\|x_k-x^*\|,\]<p>以及工程输出：</p>
+\[Q_k=c^Tx_k.\]<p>你会发现三者的收敛行为并不完全同步。</p>
+<p>然后进一步尝试 Bayesian CG，观察：</p>
+\[p(Q\mid D_k).\]<p>真正值得画的图是：</p>
+\[Q^*\]<p>以及每次迭代：</p>
+\[\mu_{Q,k} \pm 2\sigma_{Q,k}.\]<p>如果方法 calibration 合理，你应该看到：</p>
+\[\boxed{ \ ext{随着计算增加， credible interval 逐渐收缩并覆盖真实 }Q^*. }\]<p>这比单独画 residual convergence curve 多了一层非常重要的信息：</p>
+\[\boxed{ \ ext{计算过程正在“获得知识”。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="20-对可靠性代理模型最值得迁移的一步">20. 对可靠性/代理模型最值得迁移的一步
+</h1><p>以后拿到一个：</p>
+\[R^2=0.99\]<p>的 Kriging 模型，可以把误差链写完整：</p>
+\[\boxed{ y_{\rm reality} = y_{\rm model} + \epsilon_{\rm model} }\]\[\boxed{ y_{\rm solver} = y_{\rm model} + \epsilon_{\rm numerical} }\]\[\boxed{ y_{\rm surrogate} = y_{\rm solver} + \epsilon_{\rm surrogate}. }\]<p>你最终观察到：</p>
+\[y_{\rm surrogate}\]<p>距离现实的误差并不只有：</p>
+\[\epsilon_{\rm surrogate}.\]<p>所以：</p>
+\[\boxed{ \ ext{继续把 Kriging 的 }R^2 \ ext{ 从 }0.99\ ext{ 提到 }0.999 }\]<p>在某些问题里可能毫无意义，</p>
+<p>如果：</p>
+\[|\epsilon_{\rm numerical}| \gg |\epsilon_{\rm surrogate}|.\]<p>这实际上给代理模型研究提供了一个非常好的“停止优化”标准：</p>
+\[\boxed{ \ ext{代理误差已经低于底层 solver uncertainty 后， 继续提高 surrogate accuracy 的边际价值会迅速下降。} }\]<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Probabilistic Numerics 最值得记住的并不是：</p>
+\[x\sim\mathcal N(m,\Sigma).\]<p>而是：</p>
+\[\boxed{ \ ext{数值计算本身也是一次有限信息下的推断。} }\]<p>传统数值分析倾向于：</p>
+\[\ ext{algorithm} \rightarrow \boxed{\ ext{answer}}\]<p>PN 希望得到：</p>
+\[\ ext{algorithm} \rightarrow \boxed{\ ext{answer + remaining computational uncertainty}}.\]<p>它在整个知识体系中的位置可以理解成：</p>
+\[\ ext{Numerical Analysis}\]\[\downarrow\]\[\boxed{\ ext{Probabilistic Numerics}}\]\[\downarrow\]\[\ ext{uncertainty-aware computation}\]\[\downarrow\]\[\ ext{surrogate / inverse problem / reliability / decision}.\]<p>对于可靠性和代理建模，它带来的最重要提醒是：</p>
+\[\boxed{ \ ext{高保真仿真结果也只是计算结果， 不要在进入代理模型的那一刻突然把它升级成“绝对真值”。} }\]<p>一旦开始显式区分：</p>
+\[\boxed{ \ ext{physical uncertainty}, \quad \ ext{model uncertainty}, \quad \ ext{numerical uncertainty}, \quad \ ext{surrogate uncertainty} }\]<p>很多原本混在“模型精度”里的问题就会变得清晰。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p><strong>Hennig, Osborne &amp; Kersting, <em>Probabilistic Numerics: Computation as Machine Learning</em>, Cambridge University Press, 2022</strong>。目前最系统的教材级入口，内容从 Bayesian quadrature 一直延伸到线性代数、优化和 ODE。<br>
+<a class="link" href="https://www.cambridge.org/core/books/probabilistic-numerics/0EBFF0B15E2481099F6EED1F62EE1ABE"  target="_blank" rel="noopener"
+    >Cambridge University Press 图书页</a></p>
+</li>
+<li>
+<p><strong>Hennig, Osborne &amp; Girolami, <em>Probabilistic numerics and uncertainty in computations</em>, Proceedings of the Royal Society A, 2015</strong>。领域早期非常重要的纲领性论文，适合先理解“为什么数值误差值得概率化”。<br>
+Royal Society 原论文</p>
+</li>
+<li>
+<p><strong>Cockayne, Oates, Ipsen &amp; Girolami, <em>A Bayesian Conjugate Gradient Method</em>, Bayesian Analysis, 2019</strong>。如果想把抽象思想落实到一个熟悉算法上，推荐从这篇开始；经典 CG 可以在特定 prior 下作为 posterior mean 恢复。<br>
+论文开放页面</p>
+</li>
+<li>
+<p><strong>Cockayne, Oates, Sullivan &amp; Girolami, <em>Probabilistic Numerical Methods for PDE-constrained Bayesian Inverse Problems</em></strong>。把 PDE discretisation uncertainty 真正传播进下游 Bayesian inverse problem，是理解 PN 工程价值非常好的案例。</p>
+</li>
+<li>
+<p>Philipp Hennig 的研究工作长期集中在 probabilistic numerics 与 probabilistic machine learning；Hans Kersting 的 Probabilistic Numerics 图书/研究页面也整理了教材与相关资料。</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/">可靠性</a>
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-33<span class="card-badge card-badge--role" title="认知分型">概念基石</span><span class="card-badge" title="次要分型">权衡对比</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/02-ak-mcs/">AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界<span class="dep-radar-meta"> · card-02</span></a><a class="dep-radar-node" href="/cards/31-backward-error-analysis/">Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程”<span class="dep-radar-meta"> · card-31</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-33<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div><span class="dep-radar-arrow">→</span><div class="dep-radar-col dep-radar-col--suc">
+            <div class="dep-radar-colhead">后继延伸</div><a class="dep-radar-node" href="/cards/34-certified-reduced-order-modeling/">Certified Reduced-Order Modeling：代理模型除了“预测值”，能不能同时给出一个数学上保证不会错过真值的误差界？<span class="dep-radar-meta"> · card-34</span></a></div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/34-certified-reduced-order-modeling/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Certified Reduced-Order Modeling：代理模型除了“预测值”，能不能同时给出一个数学上保证不会错过真值的误差界？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/17-dual-weighted-residual/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Dual-Weighted Residual：网格该细化哪里，不应由“哪里误差大”决定，而应由“哪里误差会影响最终答案”决定</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/13-neural-operator/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/32-randomized-svd/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Randomized SVD：为什么“随机乘几个向量”就能抓住一个百万维矩阵最重要的子空间</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/25-hyper-reduction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
