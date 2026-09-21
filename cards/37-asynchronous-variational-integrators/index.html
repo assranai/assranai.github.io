@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？ 主题：Asynchronous Variational Integrators（AVI，异步变分积分器）\n领域：有限元 × 软体动力学 × 数值方法 × 物理引擎\n推荐阅读时间：约 8–10 分钟\n今天选一个与前几天的 IPC、Anderson Acceleration、Randomized SVD 明显不同的问题：\n\\[\\boxed{\\ ext{为什么一个拥有百万个单元的动力学系统，通常必须所有单元一起走 } \\Delta t？}\\]这件事我们太习惯了，以至于很少质疑它。\n显式有限元通常执行：\n\\[t_n \\rightarrow t_n+\\Delta t\\]然后：\n\\[\\boxed{\\ ext{所有单元统一更新一次。}}\\]但如果一个软体里：\n95% 区域柔软、变化缓慢； 4% 区域发生较快振动； 1% 区域非常刚、需要极小稳定时间步； 整个系统的：\n\\[\\Delta t\\]往往被最后那 1% 决定。\nAVI 提出了一个很激进但自然的答案：\n\\[\\boxed{ \\ ext{每个有限元单元可以拥有自己的时间步， 甚至这些时间步不需要互为整数倍。} }\\]例如：\n\\[h_1=1\\ ext{ ms}, \\qquad h_2=1.7\\ ext{ ms}, \\qquad h_3=5.3\\ ext{ ms}.\\]哪个单元下一次该更新，就只更新哪个单元。\n这听起来像简单的 local time stepping，但真正让 AVI 特别的地方是：\n\\[\\boxed{\\ ext{这种异步更新仍然来自一个离散 Hamilton 变分原理。}}\\]因此它并非随意把不同时间步拼起来，而是在离散时空上重新构造力学系统。Lew、Marsden、Ortiz 与 West 2003 年的原始 AVI 工作证明，这种结构允许每个单元选择相互独立、甚至没有整数比例关系的局部时间步，同时精确保留局部动量以及离散 multisymplectic structure；后续数值实验也显示出很好的长期能量行为。\n">
+<title>Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/37-asynchronous-variational-integrators/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？">
+<meta property='og:description' content="Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？ 主题：Asynchronous Variational Integrators（AVI，异步变分积分器）\n领域：有限元 × 软体动力学 × 数值方法 × 物理引擎\n推荐阅读时间：约 8–10 分钟\n今天选一个与前几天的 IPC、Anderson Acceleration、Randomized SVD 明显不同的问题：\n\\[\\boxed{\\ ext{为什么一个拥有百万个单元的动力学系统，通常必须所有单元一起走 } \\Delta t？}\\]这件事我们太习惯了，以至于很少质疑它。\n显式有限元通常执行：\n\\[t_n \\rightarrow t_n+\\Delta t\\]然后：\n\\[\\boxed{\\ ext{所有单元统一更新一次。}}\\]但如果一个软体里：\n95% 区域柔软、变化缓慢； 4% 区域发生较快振动； 1% 区域非常刚、需要极小稳定时间步； 整个系统的：\n\\[\\Delta t\\]往往被最后那 1% 决定。\nAVI 提出了一个很激进但自然的答案：\n\\[\\boxed{ \\ ext{每个有限元单元可以拥有自己的时间步， 甚至这些时间步不需要互为整数倍。} }\\]例如：\n\\[h_1=1\\ ext{ ms}, \\qquad h_2=1.7\\ ext{ ms}, \\qquad h_3=5.3\\ ext{ ms}.\\]哪个单元下一次该更新，就只更新哪个单元。\n这听起来像简单的 local time stepping，但真正让 AVI 特别的地方是：\n\\[\\boxed{\\ ext{这种异步更新仍然来自一个离散 Hamilton 变分原理。}}\\]因此它并非随意把不同时间步拼起来，而是在离散时空上重新构造力学系统。Lew、Marsden、Ortiz 与 West 2003 年的原始 AVI 工作证明，这种结构允许每个单元选择相互独立、甚至没有整数比例关系的局部时间步，同时精确保留局部动量以及离散 multisymplectic structure；后续数值实验也显示出很好的长期能量行为。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/37-asynchronous-variational-integrators/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='软体动力学' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='物理引擎' /><meta property='article:published_time' content='2026-09-19T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-19T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？">
+<meta name="twitter:description" content="Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？ 主题：Asynchronous Variational Integrators（AVI，异步变分积分器）\n领域：有限元 × 软体动力学 × 数值方法 × 物理引擎\n推荐阅读时间：约 8–10 分钟\n今天选一个与前几天的 IPC、Anderson Acceleration、Randomized SVD 明显不同的问题：\n\\[\\boxed{\\ ext{为什么一个拥有百万个单元的动力学系统，通常必须所有单元一起走 } \\Delta t？}\\]这件事我们太习惯了，以至于很少质疑它。\n显式有限元通常执行：\n\\[t_n \\rightarrow t_n+\\Delta t\\]然后：\n\\[\\boxed{\\ ext{所有单元统一更新一次。}}\\]但如果一个软体里：\n95% 区域柔软、变化缓慢； 4% 区域发生较快振动； 1% 区域非常刚、需要极小稳定时间步； 整个系统的：\n\\[\\Delta t\\]往往被最后那 1% 决定。\nAVI 提出了一个很激进但自然的答案：\n\\[\\boxed{ \\ ext{每个有限元单元可以拥有自己的时间步， 甚至这些时间步不需要互为整数倍。} }\\]例如：\n\\[h_1=1\\ ext{ ms}, \\qquad h_2=1.7\\ ext{ ms}, \\qquad h_3=5.3\\ ext{ ms}.\\]哪个单元下一次该更新，就只更新哪个单元。\n这听起来像简单的 local time stepping，但真正让 AVI 特别的地方是：\n\\[\\boxed{\\ ext{这种异步更新仍然来自一个离散 Hamilton 变分原理。}}\\]因此它并非随意把不同时间步拼起来，而是在离散时空上重新构造力学系统。Lew、Marsden、Ortiz 与 West 2003 年的原始 AVI 工作证明，这种结构允许每个单元选择相互独立、甚至没有整数比例关系的局部时间步，同时精确保留局部动量以及离散 multisymplectic structure；后续数值实验也显示出很好的长期能量行为。\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-传统显式有限元的一个结构性浪费">1. 传统显式有限元的一个结构性浪费</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/37-asynchronous-variational-integrators/">Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-19T00:00:00Z'>Sep 19, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 7 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="asynchronous-variational-integrators为什么整个有限元模型必须共用同一个时间步">Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？
+</h1><p><strong>主题：Asynchronous <span class="term-anchor" data-term="vi" tabindex="0">Variational Integrators</span>（AVI，异步变分积分器）</strong><br>
+<strong>领域：有限元 × 软体动力学 × 数值方法 × 物理引擎</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong><br>
+今天选一个与前几天的 <span class="term-anchor" data-term="ipc" tabindex="0">IPC</span>、<span class="term-anchor" data-term="anderson" tabindex="0">Anderson Acceleration</span>、Randomized SVD 明显不同的问题：</p>
+\[\boxed{\ ext{为什么一个拥有百万个单元的动力学系统，通常必须所有单元一起走 } \Delta t？}\]<p>这件事我们太习惯了，以至于很少质疑它。</p>
+<p>显式有限元通常执行：</p>
+\[t_n \rightarrow t_n+\Delta t\]<p>然后：</p>
+\[\boxed{\ ext{所有单元统一更新一次。}}\]<p>但如果一个软体里：</p>
+<ul>
+<li>95% 区域柔软、变化缓慢；</li>
+<li>4% 区域发生较快振动；</li>
+<li>1% 区域非常刚、需要极小稳定时间步；</li>
+</ul>
+<p>整个系统的：</p>
+\[\Delta t\]<p>往往被最后那 1% 决定。</p>
+<p>AVI 提出了一个很激进但自然的答案：</p>
+\[\boxed{ \ ext{每个有限元单元可以拥有自己的时间步， 甚至这些时间步不需要互为整数倍。} }\]<p>例如：</p>
+\[h_1=1\ ext{ ms}, \qquad h_2=1.7\ ext{ ms}, \qquad h_3=5.3\ ext{ ms}.\]<p>哪个单元下一次该更新，就只更新哪个单元。</p>
+<p>这听起来像简单的 local time stepping，但真正让 AVI 特别的地方是：</p>
+\[\boxed{\ ext{这种异步更新仍然来自一个离散 Hamilton 变分原理。}}\]<p>因此它并非随意把不同时间步拼起来，而是在离散时空上重新构造力学系统。Lew、Marsden、Ortiz 与 West 2003 年的原始 AVI 工作证明，这种结构允许每个单元选择相互独立、甚至没有整数比例关系的局部时间步，同时精确保留局部动量以及离散 multisymplectic structure；后续数值实验也显示出很好的长期能量行为。</p>
+<p>真正值得学的是：</p>
+\[\boxed{ \ ext{时间离散本身也可以被局部化。} }\]<hr>
+<h2 id="1-传统显式有限元的一个结构性浪费">1. 传统显式有限元的一个结构性浪费
+</h2><p>考虑半离散动力学：</p>
+\[M\ddot x=-\ abla V(x),\]<p>其中：</p>
+\[V(x)=\sum_{e=1}^{N_e}V_e(x).\]<p>每个有限元单元贡献一个势能：</p>
+\[V_e.\]<p>显式积分的稳定时间步通常受最高频率限制：</p>
+\[\Delta t \lesssim \frac{C}{\omega_{\max}}.\]<p>在 FEM 中也常写成类似 CFL 条件：</p>
+\[\Delta t_e \sim \frac{h_e}{c_e},\]<p>其中：</p>
+<ul>
+<li>\(h_e\)：单元尺度；</li>
+<li>\(c_e\)：局部波速。</li>
+</ul>
+<p>假设模型中：</p>
+\[100000\]<p>个单元。</p>
+<p>其中只有一个极小单元：</p>
+\[h_{\min}=0.01h_{\rm typical}.\]<p>那么：</p>
+\[\Delta t_{\rm global}\]<p>可能直接缩小约两个数量级。</p>
+<p>于是：</p>
+\[\boxed{ 99999\ ext{ 个本来不需要这么频繁更新的单元， 被迫陪着那个最刚/最小的单元一起计算。} }\]<p>这就是 AVI 要攻击的问题。</p>
+<hr>
+<h1 id="2-最直接的想法当然是-local-time-stepping">2. 最直接的想法当然是 Local Time Stepping
+</h1><p>假设：</p>
+\[\Delta t_e\]<p>是单元 \(e\) 的稳定时间步。</p>
+<p>可以自然地想：</p>
+\[\boxed{\ ext{每个 element 自己走自己的时间。}}\]<p>例如：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>element</th>
+					<th style="text-align: right">timestep</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>\(e_1\)</td>
+					<td style="text-align: right">0.1 ms</td>
+			</tr>
+			<tr>
+					<td>\(e_2\)</td>
+					<td style="text-align: right">0.1 ms</td>
+			</tr>
+			<tr>
+					<td>\(e_3\)</td>
+					<td style="text-align: right">1 ms</td>
+			</tr>
+			<tr>
+					<td>\(e_4\)</td>
+					<td style="text-align: right">5 ms</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>那么 5 ms 内：</p>
+\[e_1,e_2\]<p>更新 50 次，</p>
+<p>而：</p>
+\[e_4\]<p>只更新一次。</p>
+<p>理论计算量可能大幅降低。</p>
+<p>问题随之出现：</p>
+\[\boxed{\ ext{这些单元共享节点。}}\]<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">tet A ---- node i ---- tet B
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果：</p>
+\[t_A=1.3\ ext{ ms}\]<p>而：</p>
+\[t_B=4.7\ ext{ ms},\]<p>共享节点 \(i\) 到底“处于哪个时间”？</p>
+<p>这就是 asynchronous dynamics 真正困难的地方。</p>
+<hr>
+<h1 id="3-avi-的突破不要先写微分方程再异步积分">3. AVI 的突破：不要先写微分方程再异步积分
+</h1><p>普通思路是：</p>
+\[M\ddot x=f(x)\]<p>然后寻找一个 asynchronous ODE solver。</p>
+<p>AVI 走了一条更底层的路线：</p>
+\[\boxed{\ ext{从 Hamilton's principle 开始离散。}}\]<p>连续力学的 action：</p>
+\[S[q] = \int L(q,\dot q)\,dt\]<p>其中：</p>
+\[L=T-V.\]<p>真实轨迹满足：</p>
+\[\boxed{\delta S=0.}\]<p>Variational Integrator 不先离散：</p>
+\[\ddot q=f(q),\]<p>而是先离散：</p>
+\[\boxed{\ ext{action integral}.}\]<p>然后要求：</p>
+\[\delta S_d=0.\]<p>Marsden 与 West 的经典 <em>Acta Numerica</em> 综述系统说明了这种 discrete mechanics 思路，并展示了 <span class="term-anchor" data-term="verlet" tabindex="0">Verlet</span>、SHAKE、RATTLE、Newmark 和 symplectic Runge–Kutta 等大量熟悉算法都可以放进离散变分框架。</p>
+<p>这一步非常重要：</p>
+\[\boxed{ \ ext{算法的守恒结构不是事后补出来的， 而是从离散力学原理里长出来的。} }\]<hr>
+<h1 id="4-avi-再进一步每个势能项拥有自己的时钟">4. AVI 再进一步：每个势能项拥有自己的“时钟”
+</h1><p>因为：</p>
+\[V(x) = \sum_eV_e(x),\]<p>可以给每个：</p>
+\[V_e\]<p>单独定义更新时间：</p>
+\[t_e^0,t_e^1,t_e^2,\ldots\]<p>其中：</p>
+\[t_e^{j+1}-t_e^j=h_e.\]<p>于是整个系统不再拥有唯一：</p>
+\[t_0,t_1,t_2,\ldots\]<p>而拥有很多交错的 event times：</p>
+\[\boxed{ \mathcal T = \bigcup_e \{t_e^0,t_e^1,\ldots\}. }\]<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">element A: |---|---|---|---|---|
+</span></span><span class="line"><span class="cl">element B: |---------|---------|
+</span></span><span class="line"><span class="cl">element C: |-----|-----|-----|
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">time ------→
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>系统每到达一个：</p>
+\[t\in\mathcal T\]<p>只处理在这个时间触发的 element。</p>
+<p>于是时间积分器本质上变成：</p>
+\[\boxed{\ ext{event-driven simulation}.}\]<hr>
+<h1 id="5-最简单的实现结构其实像优先队列">5. 最简单的实现结构其实像优先队列
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>每个 element 保存：</p>
+\[t_e^{next}.\]<p>建立 min-heap：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">(element, next_time)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>主循环：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">while t &lt; T_end:
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    e = pop_element_with_smallest_next_time()
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    advance relevant nodes to t_e
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    evaluate force from element e
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    apply impulse / momentum update
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    t_e += h_e
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    push e back into queue
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>所以：</p>
+\[\boxed{ \ ext{AVI 的 scheduler 很像离散事件模拟器。} }\]<p>这和传统：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">for timestep:
+</span></span><span class="line"><span class="cl">    for every element:
+</span></span><span class="line"><span class="cl">        compute force
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>完全不同。</p>
+<p>传统 FEM 的主要外层循环是：</p>
+\[\boxed{\ ext{time}}\]<p>AVI 的主要外层循环是：</p>
+\[\boxed{\ ext{events}.}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="6-为什么这里会出现impulse">6. 为什么这里会出现“impulse”？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>如果某个 element：</p>
+\[e\]<p>在时刻：</p>
+\[t\]<p>被更新，</p>
+<p>其势能：</p>
+\[V_e(x)\]<p>产生力：</p>
+\[f_e=-\ abla V_e.\]<p>在一个局部时间间隔：</p>
+\[h_e\]<p>内，它可以形成近似 impulse：</p>
+\[\boxed{ \Delta p_e = -h_e\ abla V_e(x). }\]<p>于是节点 momentum 更新：</p>
+\[p_i \leftarrow p_i+\Delta p_{e,i}.\]<p>位置则根据当前 momentum 在 event 之间漂移。</p>
+<p>因此一个很粗略的 AVI 心智模型是：</p>
+\[\boxed{ \ ext{节点自由漂移} + \ ext{不同 element 在自己的时刻施加 impulse}. }\]<p>这已经足以理解它为什么能够异步。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="7-一个非常直观的例子软体里嵌了一块高刚度材料">7. 一个非常直观的例子：软体里嵌了一块高刚度材料
+</h1><p>假设一个角色腹部软组织：</p>
+\[E=10^4\ ext{ Pa}.\]<p>内部有一个刚得多的骨骼附近区域：</p>
+\[E=10^8\ ext{ Pa}.\]<p>波速近似：</p>
+\[c\sim\sqrt{\frac{E}{\rho}}.\]<p>于是刚区域的：</p>
+\[c\]<p>可能高约：</p>
+\[100\ imes.\]<p>如果使用 global explicit timestep：</p>
+\[\Delta t \propto\frac{1}{c_{\max}},\]<p>整个软体都必须跟着骨骼附近区域使用很小：</p>
+\[\Delta t.\]<p>AVI 可以让：</p>
+\[h_{\rm stiff}=0.01\ ext{ ms},\]<p>而远处柔软区域：</p>
+\[h_{\rm soft}=1\ ext{ ms}.\]<p>于是：</p>
+\[\boxed{ \ ext{高频动力学只在真正产生高频动力学的地方付费。} }\]<p>这就是 local temporal adaptivity 的核心价值。</p>
+<hr>
+<h1 id="8-为什么这比普通-substepping-更深">8. 为什么这比普通 substepping 更深？
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>游戏物理中常做：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">frame dt = 16 ms
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">for 4 substeps:
+</span></span><span class="line"><span class="cl">    simulate(dt / 4)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>但所有对象仍然：</p>
+\[\boxed{\ ext{一起 substep}.}\]<p>更高级一点可以：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">fast object → 8 substeps
+</span></span><span class="line"><span class="cl">slow object → 2 substeps
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>但对象发生强耦合后，很快会出现同步问题。</p>
+<p>AVI 的区别在于：</p>
+\[\boxed{ \ ext{异步性被写进离散 variational structure 本身。} }\]<p>它不是简单地：</p>
+\[\boxed{\ ext{“有些东西多算几遍”。}}\]<p>原始 AVI 允许局部时间步甚至<strong>没有整数关系</strong>：</p>
+\[\frac{h_i}{h_j}\ otin\mathbb Q\]<p>也没有原则性问题。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="9-为什么-variational-这部分非常重要">9. 为什么 Variational 这部分非常重要？
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>如果简单地：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">tet A 用 dtA
+</span></span><span class="line"><span class="cl">tet B 用 dtB
+</span></span><span class="line"><span class="cl">然后凭经验交换力
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>很容易破坏：</p>
+<ul>
+<li>momentum；</li>
+<li>angular momentum；</li>
+<li>energy behavior；</li>
+<li>long-term stability。</li>
+</ul>
+<p>Variational Integrator 的优势是：</p>
+\[\boxed{\ ext{离散 Noether theorem}.}\]<p>连续系统中：</p>
+\[\ ext{symmetry} \rightarrow \ ext{conserved quantity}.\]<p>例如空间平移对称：</p>
+\[\rightarrow \ ext{linear momentum}.\]<p>旋转对称：</p>
+\[\rightarrow \ ext{angular momentum}.\]<p>VI 在离散 action 上保留相应 symmetry 后，会自然得到离散守恒律。Marsden–West 的综述正是把 discrete variational principle 与 discrete <span class="term-anchor" data-term="noether" tabindex="0">Noether</span> theorem 作为整个体系的核心联系。</p>
+<p>AVI 进一步证明异步时空离散仍可以精确保留局部 momentum 和离散 multisymplectic structure。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="10-一个反直觉点avi-不一定严格守恒总能量">10. 一个反直觉点：AVI 不一定严格守恒总能量
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这值得特别强调。</p>
+<p>Symplectic/variational integrator 的优势通常并不是：</p>
+\[E_n=E_0\]<p>每一步严格成立。</p>
+<p>更典型的是：</p>
+\[\boxed{\ ext{长期能量误差保持有界并振荡。}}\]<p>普通积分器可能出现：</p>
+\[E_n-E_0 \sim Cn\]<p>长期系统性漂移。</p>
+<p>Variational/symplectic 方法更常出现：</p>
+\[E_n-E_0\]<p>在一个小范围内上下摆动。</p>
+<p>原始 AVI 论文明确指出，虽然局部 energy balance 并没有被强制精确满足，但数值实验中的全局与局部能量行为非常好；作者将这种表现与其 symplectic/variational structure 联系起来。</p>
+<p>这和软体求解器里的一个常见误区很相关：</p>
+\[\boxed{ \ ext{“单步误差小” 并不等于 “长期动力学结构好”。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="11-这与-xpbd-有一个很有意思的对照">11. 这与 XPBD 有一个很有意思的对照
+</h1><p><span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 的主要思想是：</p>
+\[\boxed{\ ext{把刚度编码进 constraint compliance}.}\]<p>解决的是：</p>
+\[\ ext{constraint stiffness dependence on } \Delta t.\]<p>AVI 的问题则是：</p>
+\[\boxed{\ ext{为什么所有局部物理必须共享 }\Delta t？}\]<p>所以二者攻击的是不同层：</p>
+\[\ ext{XPBD} \rightarrow \ ext{spatial constraint solve}\]\[\ ext{AVI} \rightarrow \ ext{temporal scheduling}.\]<p>理论上甚至可以想象：</p>
+\[\boxed{ \ ext{局部 constraint/element} + \ ext{local clock} }\]<p>这种更激进的物理引擎架构。</p>
+<p>但它马上会遇到后面要说的 GPU 问题。</p>
+<hr>
+<h1 id="12-avi-最大的现代工程问题它天然不喜欢-simdgpu">12. AVI 最大的现代工程问题：它天然不喜欢 SIMD/GPU
+</h1><p>CPU event queue：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">pop event
+</span></span><span class="line"><span class="cl">update element
+</span></span><span class="line"><span class="cl">push event
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>非常自然。</p>
+<p>GPU 喜欢的是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">launch 1,000,000 identical operations
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>AVI 却不断说：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">现在更新 element 18291
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">下一次 element 7
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">然后 element 892033
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这会产生：</p>
+<ul>
+<li>irregular memory access；</li>
+<li>synchronization；</li>
+<li>priority queue overhead；</li>
+<li>poor occupancy；</li>
+<li>dependency conflicts。</li>
+</ul>
+<p>所以 AVI 的理论优势：</p>
+\[\boxed{\ ext{只计算需要更新的局部区域}}\]<p>会与现代硬件优势：</p>
+\[\boxed{\ ext{大量统一并行计算}}\]<p>发生冲突。</p>
+<p>这是一个非常值得记住的工程规律：</p>
+\[\boxed{ \ ext{减少 FLOPs 不一定减少 wall-clock time。} }\]<hr>
+<h1 id="13-这个问题后来在-asynchronous-contact-mechanics-中表现得非常明显">13. 这个问题后来在 Asynchronous Contact Mechanics 中表现得非常明显
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>AVI 后来被用于 contact。</p>
+<p>Harmon、Vouga、Smith、Tamstorf 与 Grinspun 2009 年提出 Asynchronous Contact Mechanics（ACM），把：</p>
+<ul>
+<li>AVI；</li>
+<li>kinetic data structures；</li>
+<li>一组嵌套 contact barrier potentials；</li>
+</ul>
+<p>组合起来，希望同时保证：</p>
+\[\boxed{\ ext{无穿透、因果性、动量/能量性质以及有限时间完成。}}\]<p>但异步 contact 的 scheduling 很复杂。</p>
+<p>2012 年，Ainsley、Vouga、Grinspun 与 Tamstorf 又提出 Speculative Parallel ACM。</p>
+<p>有趣的是，他们获得了约：</p>
+\[\boxed{100\ imes}\]<p>的性能提升，而核心思想之一恰恰是：</p>
+<blockquote>
+<p>不再每次微小 trajectory change 后立刻重新做碰撞调度，而是在一个时间窗口里先批量处理，再并行检测碰撞。</p>
+</blockquote>
+<p>这样原本极难并行的算法变成了高度并行的结构。</p>
+<p>这是一个很漂亮的例子：</p>
+\[\boxed{ \ ext{理论上最细粒度的异步， 未必是硬件上最快的异步。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="14-这件事对今天-gpu-物理求解器特别有启发">14. 这件事对今天 GPU 物理求解器特别有启发
+</h1><p>如果现在重新设计 AVI-like solver，我不会真的给：</p>
+\[10^6\]<p>个 tet 各维护一个完全独立的 heap event。</p>
+<p>更现实的路线可能是：</p>
+\[\boxed{\ ext{time bins / timestep levels}.}\]<p>例如只允许：</p>
+\[h, \quad 2h, \quad 4h, \quad 8h.\]<p>把 element 分成：</p>
+\[G_0,G_1,G_2,G_3.\]<p>于是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">every h:
+</span></span><span class="line"><span class="cl">    update G0
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">every 2h:
+</span></span><span class="line"><span class="cl">    update G1
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">every 4h:
+</span></span><span class="line"><span class="cl">    update G2
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">every 8h:
+</span></span><span class="line"><span class="cl">    update G3
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这样牺牲：</p>
+\[\boxed{\ ext{完全自由的异步性}}\]<p>换取：</p>
+\[\boxed{\ ext{GPU batching}.}\]<p>这和现代 adaptive mesh / multirate integrator / hierarchical timestep 的工程思路很接近。</p>
+<hr>
+<h1 id="15-它和-multi-rate-time-integration-的关系">15. 它和 Multi-Rate Time Integration 的关系
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>AVI 属于更大的：</p>
+\[\boxed{\ ext{multirate integration}}\]<p>思想。</p>
+<p>Multirate 方法的基本目标都是：</p>
+\[\boxed{ \ ext{不同时间尺度的自由度， 不应该以同样频率更新。} }\]<p>但普通 multirate ODE 方法常把变量划分成：</p>
+\[y_{\rm fast}, \qquad y_{\rm slow}.\]<p>AVI 的特别之处是：</p>
+\[\boxed{ \ ext{时间尺度直接附着在有限元 element/potential 上。} }\]<p>这对 continuum mechanics 很自然：</p>
+\[V(x)=\sum_eV_e(x)\]<p>本来就是局部势能之和。</p>
+<p>所以：</p>
+\[\boxed{ \ ext{空间局部性} \rightarrow \ ext{时间局部性}. }\]<p>这是 AVI 最漂亮的结构之一。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="16-它和有限元自适应还有一个重要对应">16. 它和有限元自适应还有一个重要对应
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>空间自适应 FEM 已经非常成熟：</p>
+<p>高误差区域：</p>
+\[h_x\downarrow\]<p>网格加密。</p>
+<p>低误差区域：</p>
+\[h_x\uparrow.\]<p>AVI 做的事情可以理解成：</p>
+\[\boxed{\ ext{temporal adaptivity 的局部化版本}.}\]<p>即：</p>
+<p>高频区域：</p>
+\[h_t\downarrow.\]<p>低频区域：</p>
+\[h_t\uparrow.\]<p>于是完整的时空自适应实际上应该考虑：</p>
+\[\boxed{ (h_x,h_t) }\]<p>而不是只问：</p>
+\[\boxed{\ ext{mesh 要不要加密？}}\]<p>这也是原始 AVI 从 <strong>spacetime discrete variational principle</strong> 出发的重要原因之一。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="17-对可靠性分析也有一个不太显眼但很实用的迁移">17. 对可靠性分析也有一个不太显眼但很实用的迁移
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设做机构动态可靠性：</p>
+\[g(\ heta) = F_{\rm lim} - \max_tF(t;\ heta).\]<p>某些参数样本会进入：</p>
+<ul>
+<li>高频碰撞；</li>
+<li>高频振动；</li>
+<li>near-singular configuration。</li>
+</ul>
+<p>另外大量样本动力学非常平缓。</p>
+<p>传统固定 timestep：</p>
+\[\Delta t\]<p>必须按照最困难情况选择。</p>
+<p>于是：</p>
+\[\boxed{\ ext{简单样本被严重过计算。}}\]<p>AVI/multirate 的思想提醒我们：</p>
+\[\boxed{ \ ext{计算 fidelity 不只可以在样本之间变化， 也可以在单次仿真的时间和空间内部变化。} }\]<p>因此 fidelity allocation 有三个维度：</p>
+\[\boxed{ \ ext{sample} \ imes \ ext{space} \ imes \ ext{time}. }\]<p>这是把 multi-fidelity 思想推进到 solver 内部之后很值得思考的一步。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="18-一个非常适合自己实现的小实验">18. 一个非常适合自己实现的小实验
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>不用做 FEM。</p>
+<p>只做三个质量点：</p>
+\[m_1-m_2-m_3\]<p>其中两根弹簧：</p>
+\[k_1=10^5, \qquad k_2=10.\]<p>传统 explicit Verlet 必须根据：</p>
+\[k_1\]<p>选择：</p>
+\[\Delta t.\]<p>先跑：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">global dt = 0.001
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>然后实现一个极简 multirate 版本：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">spring 1:
+</span></span><span class="line"><span class="cl">    dt = 0.001
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">spring 2:
+</span></span><span class="line"><span class="cl">    dt = 0.01
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>分别统计：</p>
+\[\ ext{force evaluations}\]<p>和：</p>
+\[E(t)=T(t)+V(t).\]<p>你会很快看到：</p>
+\[\boxed{ \ ext{减少 force evaluations 很容易； 让异步算法同时保持正确的长期动力学，却并不容易。} }\]<p>然后再阅读 AVI 的 variational construction，就会明白为什么作者没有简单写一个：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">if stiff:
+</span></span><span class="line"><span class="cl">    update more often
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>而是从 Hamilton principle 重新推导整个算法。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="19-对自研软体求解器最值得迁移的思想">19. 对自研软体求解器最值得迁移的思想
+</h1><p>我认为不应该马上去实现完整 AVI。</p>
+<p>更有价值的是先建立一个 profiler：</p>
+<p>对每个 tet 估计局部时间尺度：</p>
+\[\ au_e \sim \frac{h_e}{c_e}\]<p>或者根据：</p>
+\[\|\Delta x_e\|, \quad \|\Delta\lambda_e\|, \quad J_e, \quad \ ext{contact activity}\]<p>估计：</p>
+\[\ au_e.\]<p>然后画：</p>
+\[\boxed{\ ext{local required timestep histogram}.}\]<p>如果发现：</p>
+\[90\%\]<p>tet 都允许：</p>
+\[8h,\]<p>只有：</p>
+\[1\%\]<p>必须：</p>
+\[h,\]<p>那么 multirate/asynchronous architecture 才真正有潜在价值。</p>
+<p>如果所有 tet 都差不多需要：</p>
+\[h,\]<p>AVI 再漂亮也不会产生明显收益。</p>
+<p>这和 Randomized SVD 那张卡片的原则其实一致：</p>
+\[\boxed{ \ ext{先证明问题存在可利用的非均匀结构， 再设计利用这种结构的算法。}\]<hr>
+<h1 id="20-它还给-ai系统工程一个非常一般的启发">20. 它还给 AI/系统工程一个非常一般的启发
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>很多系统默认：</p>
+\[\boxed{\ ext{所有组件以同一个频率更新。}}\]<p>例如 agent pipeline：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">retrieve
+</span></span><span class="line"><span class="cl">reason
+</span></span><span class="line"><span class="cl">tool call
+</span></span><span class="line"><span class="cl">verify
+</span></span><span class="line"><span class="cl">summarize
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>每一步都每轮执行。</p>
+<p>但真实系统里：</p>
+<ul>
+<li>retrieval 可能只偶尔需要更新；</li>
+<li>planner 更新较慢；</li>
+<li>executor 更新很快；</li>
+<li>monitor 可以事件触发。</li>
+</ul>
+<p>AVI 背后的系统思想可以抽象成：</p>
+\[\boxed{ \ ext{让每个组件按照自己的信息变化时间尺度运行。} }\]<p>也就是从：</p>
+\[\boxed{\ ext{synchronous pipeline}}\]<p>转向：</p>
+\[\boxed{\ ext{event-driven multirate system}}.\]<p>这在：</p>
+<ul>
+<li>distributed systems；</li>
+<li>game ECS；</li>
+<li>AI agent orchestration；</li>
+<li>simulation；</li>
+</ul>
+<p>里其实是同一个架构问题。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>AVI 最值得记住的不是：</p>
+\[h_1\ eq h_2.\]<p>而是：</p>
+\[\boxed{ \ ext{全局最困难的局部区域， 没有天然权利决定整个系统的计算频率。} }\]<p>它在整个知识体系中的位置大致是：</p>
+\[\ ext{Hamilton's Principle}\]\[\downarrow\]\[\ ext{Variational Integrators}\]\[\downarrow\]\[\boxed{\ ext{Asynchronous Variational Integrators}}\]\[\downarrow\]\[\ ext{local temporal resolution}\]\[\downarrow\]\[\ ext{multirate FEM / asynchronous contact}.\]<p>而它留下的第二层工程教训甚至更重要：</p>
+\[\boxed{ \ ext{算法上的“少算”，只有和硬件上的“好算”同时成立， 才真正意味着更快。} }\]<p>AVI 极端强调局部计算；后来的并行 ACM 又不得不重新引入 batching 和 speculative execution 来适配并行硬件。这个历史本身就很值得求解器开发者学习：<strong>数学结构、计算复杂度和硬件执行结构，是三个必须同时设计的层次。</strong></p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p>Lew, Marsden, Ortiz &amp; West, <strong><em>Asynchronous Variational Integrators</em></strong>, <em>Archive for Rational Mechanics and Analysis</em>, 2003。AVI 原始工作，重点看 independent element timesteps、spacetime variational principle 和 conservation structure。<br>
+Caltech AVI 论文页</p>
+</li>
+<li>
+<p>Jerrold E. Marsden &amp; Matthew West, <strong><em>Discrete Mechanics and Variational Integrators</em></strong>, <em>Acta Numerica</em>, 2001/2003 online。理解整个 VI 理论体系的经典综述，尤其推荐 discrete Hamilton principle 与 discrete Noether theorem 部分。<br>
+Cambridge Acta Numerica 论文页</p>
+</li>
+<li>
+<p>Lew et al., <strong><em>Variational Time Integrators</em></strong>, <em>International Journal for Numerical Methods in Engineering</em>, 2004。更偏工程有限元，包含同步/异步 VI、收敛证明以及数值效率比较；论文报告的测试中 AVI 在相同精度下相对 explicit Newmark 获得了显著加速。<br>
+Caltech 论文页</p>
+</li>
+<li>
+<p>Harmon, Vouga, Smith, Tamstorf &amp; Grinspun, <strong><em>Asynchronous Contact Mechanics</em></strong>, <em>ACM TOG / SIGGRAPH 2009</em>。把 AVI 推到复杂接触问题，目标是同时保证无穿透、因果性、守恒性质和有限时间完成。<br>
+Etienne Vouga 研究页与论文入口</p>
+</li>
+<li>
+<p>Ainsley, Vouga, Eitan Grinspun &amp; Tamstorf, <strong><em>Speculative Parallel Asynchronous Contact Mechanics</em></strong>, <em>SIGGRAPH Asia 2012</em>。特别推荐从工程角度读：作者在保持 ACM 的安全、进展和正确性保证下，通过 speculative collision processing 和并行化把性能提高约两个数量级，是“算法结构如何迁就硬件结构”的优秀案例。<br>
+Disney Research / Animation 论文页</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/">软体动力学</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-37<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge" title="次要分型">概念基石</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/04-variational-integrators/">Variational Integrators：时间积分器也可以“从力学原理里推出来”<span class="dep-radar-meta"> · card-04</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-37<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/12-imex/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/36-ipc-potential-contact/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">IPC：为什么“CCD 检测到不穿透”还不够——把接触本身写进时间步的势能里</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/35-anderson-acceleration-2/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/31-backward-error-analysis/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/28-inf-sup-lbb-condition/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

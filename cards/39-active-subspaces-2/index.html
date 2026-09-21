@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它 主题：Active Subspaces（主动子空间）\n领域：代理模型 × 可靠性 × 不确定性量化 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\n今天选 Active Subspaces，是因为它与你最近关注的高维代理/ROM问题衔接得很好，同时补上一个容易混淆的层次：\n\\[\\boxed{\\ ext{减少变量数量}}\\]和\n\\[\\boxed{\\ ext{寻找真正控制输出的低维方向}}\\]并不是一回事。\n考虑一个 20 维模型\n\\[f(x_1,\\ldots,x_{20}).\\]传统敏感性分析可能告诉你 20 个变量都重要，于是似乎不存在降维空间。\n但假如真实函数是\n\\[f(x)=\\sin(x_1+x_2+\\cdots+x_{20}),\\]20 个变量确实都重要，可整个输出实际上只依赖一个变量：\n\\[y=\\frac{1}{\\sqrt{20}}\\sum_{i=1}^{20}x_i.\\]也就是说：\n\\[\\boxed{20\\ ext{ 个重要变量}\\ eq20\\ ext{ 维有效问题}.}\\]Active Subspaces 专门寻找这种输入空间中的重要方向。它由 Paul G. Constantine 系统化发展，用于高维计算模型的优化、不确定性量化、敏感性分析和响应面构造。\n1. 它和“变量筛选”的根本区别 假设：\n\\[f(x_1,x_2)=g(x_1+x_2).\\]分别改变 \\(x_1\\)：\n\\[f\\ ext{ 变化很大};\\]改变 \\(x_2\\)：\n\\[f\\ ext{ 也变化很大}.\\]所以 Morris、Sobol 或简单灵敏度分析可能都认为：\n\\[x_1,\\quad x_2\\]重要。\n但旋转坐标：\n\\[y_1=\\frac{x_1+x_2}{\\sqrt2}, \\qquad y_2=\\frac{x_1-x_2}{\\sqrt2}.\\]立刻得到：\n\\[f(x)=g(\\sqrt2 y_1),\\]而：\n\\[\\frac{\\partial f}{\\partial y_2}=0.\\]所以真实结构是：\n">
+<title>Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/39-active-subspaces-2/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它">
+<meta property='og:description' content="Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它 主题：Active Subspaces（主动子空间）\n领域：代理模型 × 可靠性 × 不确定性量化 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\n今天选 Active Subspaces，是因为它与你最近关注的高维代理/ROM问题衔接得很好，同时补上一个容易混淆的层次：\n\\[\\boxed{\\ ext{减少变量数量}}\\]和\n\\[\\boxed{\\ ext{寻找真正控制输出的低维方向}}\\]并不是一回事。\n考虑一个 20 维模型\n\\[f(x_1,\\ldots,x_{20}).\\]传统敏感性分析可能告诉你 20 个变量都重要，于是似乎不存在降维空间。\n但假如真实函数是\n\\[f(x)=\\sin(x_1+x_2+\\cdots+x_{20}),\\]20 个变量确实都重要，可整个输出实际上只依赖一个变量：\n\\[y=\\frac{1}{\\sqrt{20}}\\sum_{i=1}^{20}x_i.\\]也就是说：\n\\[\\boxed{20\\ ext{ 个重要变量}\\ eq20\\ ext{ 维有效问题}.}\\]Active Subspaces 专门寻找这种输入空间中的重要方向。它由 Paul G. Constantine 系统化发展，用于高维计算模型的优化、不确定性量化、敏感性分析和响应面构造。\n1. 它和“变量筛选”的根本区别 假设：\n\\[f(x_1,x_2)=g(x_1+x_2).\\]分别改变 \\(x_1\\)：\n\\[f\\ ext{ 变化很大};\\]改变 \\(x_2\\)：\n\\[f\\ ext{ 也变化很大}.\\]所以 Morris、Sobol 或简单灵敏度分析可能都认为：\n\\[x_1,\\quad x_2\\]重要。\n但旋转坐标：\n\\[y_1=\\frac{x_1+x_2}{\\sqrt2}, \\qquad y_2=\\frac{x_1-x_2}{\\sqrt2}.\\]立刻得到：\n\\[f(x)=g(\\sqrt2 y_1),\\]而：\n\\[\\frac{\\partial f}{\\partial y_2}=0.\\]所以真实结构是：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/39-active-subspaces-2/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='不确定性量化' /><meta property='article:tag' content='科学机器学习' /><meta property='article:published_time' content='2026-09-21T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-21T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它">
+<meta name="twitter:description" content="Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它 主题：Active Subspaces（主动子空间）\n领域：代理模型 × 可靠性 × 不确定性量化 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\n今天选 Active Subspaces，是因为它与你最近关注的高维代理/ROM问题衔接得很好，同时补上一个容易混淆的层次：\n\\[\\boxed{\\ ext{减少变量数量}}\\]和\n\\[\\boxed{\\ ext{寻找真正控制输出的低维方向}}\\]并不是一回事。\n考虑一个 20 维模型\n\\[f(x_1,\\ldots,x_{20}).\\]传统敏感性分析可能告诉你 20 个变量都重要，于是似乎不存在降维空间。\n但假如真实函数是\n\\[f(x)=\\sin(x_1+x_2+\\cdots+x_{20}),\\]20 个变量确实都重要，可整个输出实际上只依赖一个变量：\n\\[y=\\frac{1}{\\sqrt{20}}\\sum_{i=1}^{20}x_i.\\]也就是说：\n\\[\\boxed{20\\ ext{ 个重要变量}\\ eq20\\ ext{ 维有效问题}.}\\]Active Subspaces 专门寻找这种输入空间中的重要方向。它由 Paul G. Constantine 系统化发展，用于高维计算模型的优化、不确定性量化、敏感性分析和响应面构造。\n1. 它和“变量筛选”的根本区别 假设：\n\\[f(x_1,x_2)=g(x_1+x_2).\\]分别改变 \\(x_1\\)：\n\\[f\\ ext{ 变化很大};\\]改变 \\(x_2\\)：\n\\[f\\ ext{ 也变化很大}.\\]所以 Morris、Sobol 或简单灵敏度分析可能都认为：\n\\[x_1,\\quad x_2\\]重要。\n但旋转坐标：\n\\[y_1=\\frac{x_1+x_2}{\\sqrt2}, \\qquad y_2=\\frac{x_1-x_2}{\\sqrt2}.\\]立刻得到：\n\\[f(x)=g(\\sqrt2 y_1),\\]而：\n\\[\\frac{\\partial f}{\\partial y_2}=0.\\]所以真实结构是：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-它和变量筛选的根本区别">1. 它和“变量筛选”的根本区别</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/39-active-subspaces-2/">Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-21T00:00:00Z'>Sep 21, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 5 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="active-subspaces高维问题真正困难的可能不是变量太多而是你一直沿坐标轴看它">Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它
+</h1><p><strong>主题：<span class="term-anchor" data-term="active-subspace" tabindex="0">Active Subspaces</span>（主动子空间）</strong><br>
+<strong>领域：代理模型 × 可靠性 × 不确定性量化 × 科学机器学习</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong><br>
+今天选 Active Subspaces，是因为它与你最近关注的<strong>高维代理/ROM</strong>问题衔接得很好，同时补上一个容易混淆的层次：</p>
+\[\boxed{\ ext{减少变量数量}}\]<p>和</p>
+\[\boxed{\ ext{寻找真正控制输出的低维方向}}\]<p>并不是一回事。</p>
+<p>考虑一个 20 维模型</p>
+\[f(x_1,\ldots,x_{20}).\]<p>传统敏感性分析可能告诉你 20 个变量都重要，于是似乎不存在降维空间。</p>
+<p>但假如真实函数是</p>
+\[f(x)=\sin(x_1+x_2+\cdots+x_{20}),\]<p>20 个变量确实都重要，可整个输出实际上只依赖一个变量：</p>
+\[y=\frac{1}{\sqrt{20}}\sum_{i=1}^{20}x_i.\]<p>也就是说：</p>
+\[\boxed{20\ ext{ 个重要变量}\ eq20\ ext{ 维有效问题}.}\]<p>Active Subspaces 专门寻找这种<strong>输入空间中的重要方向</strong>。它由 Paul G. Constantine 系统化发展，用于高维计算模型的优化、不确定性量化、敏感性分析和响应面构造。</p>
+<hr>
+<h2 id="1-它和变量筛选的根本区别">1. 它和“变量筛选”的根本区别
+</h2><p>假设：</p>
+\[f(x_1,x_2)=g(x_1+x_2).\]<p>分别改变 \(x_1\)：</p>
+\[f\ ext{ 变化很大};\]<p>改变 \(x_2\)：</p>
+\[f\ ext{ 也变化很大}.\]<p>所以 Morris、<span class="term-anchor" data-term="sobol" tabindex="0">Sobol</span> 或简单灵敏度分析可能都认为：</p>
+\[x_1,\quad x_2\]<p>重要。</p>
+<p>但旋转坐标：</p>
+\[y_1=\frac{x_1+x_2}{\sqrt2}, \qquad y_2=\frac{x_1-x_2}{\sqrt2}.\]<p>立刻得到：</p>
+\[f(x)=g(\sqrt2 y_1),\]<p>而：</p>
+\[\frac{\partial f}{\partial y_2}=0.\]<p>所以真实结构是：</p>
+\[\boxed{\ ext{二维输入，实际一维函数。}}\]<p>Active Subspace 要找的就是这个旋转后的：</p>
+\[y_1.\]<p>因此它属于：</p>
+\[\boxed{\ ext{feature extraction}}\]<p>而不只是：</p>
+\[\ ext{feature selection}.\]<p>这一区别对高维代理模型非常重要。Constantine 对 Active Subspace 的定义正是：寻找输入空间中的方向，使沿这些方向扰动输入时，模型输出平均变化最大。</p>
+<hr>
+<h1 id="2-核心数学对象其实非常简单">2. 核心数学对象其实非常简单
+</h1><p>考虑：</p>
+\[f:\mathbb R^m\rightarrow\mathbb R\]<p>以及输入概率密度：</p>
+\[\rho(x).\]<p>计算梯度：</p>
+\[\ abla f(x).\]<p>然后定义矩阵：</p>
+\[\boxed{ C= \mathbb E_\rho [ \ abla f(x)\ abla f(x)^T ] }\]<p>即：</p>
+\[C= \int \ abla f(x)\ abla f(x)^T\rho(x)\,dx.\]<p>这是一个：</p>
+\[m\ imes m\]<p>的对称半正定矩阵。</p>
+<p>做特征分解：</p>
+\[C=W\Lambda W^T\]<p>其中：</p>
+\[\Lambda= \operatorname{diag} (\lambda_1,\ldots,\lambda_m),\]<p>并令：</p>
+\[\lambda_1\ge\lambda_2\ge\cdots\ge\lambda_m\ge0.\]<p>这就是 Active Subspace 的核心。</p>
+<hr>
+<h1 id="3-为什么这个矩阵能找到重要方向">3. 为什么这个矩阵能找到“重要方向”？
+</h1><p>任选单位方向：</p>
+\[w.\]<p>沿 \(w\) 的方向导数：</p>
+\[D_wf = w^T\ abla f.\]<p>它的平均平方大小：</p>
+\[\mathbb E[(D_wf)^2] = w^TCw.\]<p>如果选择：</p>
+\[w=w_1,\]<p>即 \(C\) 最大特征值对应的特征向量：</p>
+\[\boxed{ \mathbb E[(D_{w_1}f)^2] = \lambda_1. }\]<p>所以：</p>
+\[w_1\]<p>就是：</p>
+\[\boxed{\ ext{平均而言，函数变化最快的输入方向。}}\]<p>同理：</p>
+\[w_2\]<p>是在与 \(w_1\) 正交的前提下，第二重要的方向。</p>
+<p>因此：</p>
+\[\lambda_i\]<p>可以理解成：</p>
+\[\boxed{\ ext{函数沿方向 }w_i\ ext{ 的平均敏感度。}}\]<p>这也是为什么 Active Subspace 是<strong>函数本身的性质</strong>，而不仅是输入数据分布的 PCA。</p>
+<hr>
+<h1 id="4-如果谱里出现-gap事情就有意思了">4. 如果谱里出现 gap，事情就有意思了
+</h1><p>假设：</p>
+\[\lambda_1=20,\]\[\lambda_2=8,\]\[\lambda_3=0.07,\]\[\lambda_4=0.02,\ldots\]<p>那么：</p>
+\[\lambda_2\gg\lambda_3.\]<p>这暗示模型可能主要沿两个方向变化。</p>
+<p>于是写：</p>
+\[W= [W_1\;W_2]\]<p>其中：</p>
+\[W_1\in\mathbb R^{m\ imes2}.\]<p>定义：</p>
+\[\boxed{y=W_1^Tx}\]<p>和：</p>
+\[z=W_2^Tx.\]<p>那么可能存在近似：</p>
+\[\boxed{ f(x)\approx g(W_1^Tx)=g(y). }\]<p>原来：</p>
+\[f:\mathbb R^{20}\rightarrow\mathbb R\]<p>的问题变成：</p>
+\[g:\mathbb R^2\rightarrow\mathbb R.\]<p>这就是 Active Subspace 真正开始产生工程价值的位置。</p>
+<hr>
+<h1 id="5-它为什么对-kriging-特别有吸引力">5. 它为什么对 Kriging 特别有吸引力？
+</h1><p>假设：</p>
+\[x\in\mathbb R^{30}.\]<p>直接训练 Gaussian Process：</p>
+\[x\rightarrow f\]<p>意味着 kernel 要在：</p>
+\[30\]<p>维空间里学习距离结构：</p>
+\[k(x,x').\]<p>样本很快变得稀疏：</p>
+\[\boxed{\ ext{curse of dimensionality}.}\]<p>如果 Active Subspace 发现：</p>
+\[r=3,\]<p>那么先投影：</p>
+\[y=W_1^Tx\in\mathbb R^3,\]<p>再训练：</p>
+\[\boxed{y\rightarrow f.}\]<p>于是 GP/<span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span> 只需要处理三维空间。</p>
+<p>Constantine 的专著明确把 response-surface construction 作为 Active Subspace 最成熟的应用之一，并指出 active variables 可用于更有效地进行响应面、优化、积分与反演。</p>
+<hr>
+<h1 id="6-这里有一个和-pca-极其重要的区别">6. 这里有一个和 PCA 极其重要的区别
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>PCA 研究：</p>
+\[\boxed{\ ext{输入数据 }x\ ext{ 自己在哪里变化最大。}}\]<p>典型矩阵：</p>
+\[C_x= \mathbb E[(x-\mu)(x-\mu)^T].\]<p>Active Subspace 研究：</p>
+\[\boxed{\ ext{输出 }f\ ext{ 对输入的哪些方向最敏感。}}\]<p>矩阵：</p>
+\[C_f= \mathbb E[\ abla f\ abla f^T].\]<p>因此可能出现：</p>
+<p>某方向输入变化很大：</p>
+\[\operatorname{Var}(x_i)\gg1,\]<p>但：</p>
+\[f\]<p>根本不关心它。</p>
+<p>PCA 会保留。</p>
+<p>Active Subspace 会倾向于丢掉。</p>
+<p>反过来，某方向输入变化范围很小，但：</p>
+\[\frac{\partial f}{\partial x}\]<p>巨大。</p>
+<p>PCA 可能忽略它。</p>
+<p>Active Subspace 会认为它非常重要。</p>
+<p>所以：</p>
+\[\boxed{ \ ext{PCA 是 data-aware； Active Subspace 是 model-response-aware。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="7-它和-sobol-灵敏度也不是一回事">7. 它和 Sobol 灵敏度也不是一回事
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>Sobol 指数问：</p>
+\[\boxed{\ ext{某个变量贡献了多少输出方差？}}\]<p>因此结果仍然附着在：</p>
+\[x_1,x_2,\ldots,x_m.\]<p>Active Subspace 问：</p>
+\[\boxed{\ ext{哪个线性组合方向控制输出？}}\]<p>例如：</p>
+\[0.42x_1 - 0.38x_2 + 0.71x_7 +\cdots.\]<p>所以 Sobol 更适合：</p>
+\[\boxed{\ ext{解释原始变量重要性}}\]<p>而 Active Subspace 更适合：</p>
+\[\boxed{\ ext{发现隐藏的低维坐标系}.}\]<p>两者可以互补，不能简单互换。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="8-一个很值得记住的例子">8. 一个很值得记住的例子
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设机构最大驱动力：</p>
+\[F_{\max} = g( 0.7L_1 -0.6L_2 +0.2c ).\]<p>输入：</p>
+\[x= [L_1,L_2,c].\]<p>三个变量都影响结果。</p>
+<p>所以变量筛选无法删除任何一个。</p>
+<p>但 Active Subspace 会发现：</p>
+\[w_1 \approx \begin{bmatrix} 0.7\\ -0.6\\ 0.2 \end{bmatrix}.\]<p>因此：</p>
+\[y=w_1^Tx\]<p>就是唯一真正重要的方向。</p>
+<p>物理上它可能对应：</p>
+\[\boxed{\ ext{某种有效几何失配量}.}\]<p>这正是 Active Subspace 一个很容易被低估的价值：</p>
+<p>它有时不只是降维。</p>
+<p>它还能帮助你发现：</p>
+\[\boxed{\ ext{隐藏的组合物理参数}.}\]<p>比如很多经典无量纲数，本质上也是若干原始变量组合后才揭示真正控制规律。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="9-但怎么得到-这就是它最大的成本">9. 但怎么得到 \(C\)？这就是它最大的成本
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>真实模型通常不能解析计算：</p>
+\[C= \mathbb E[\ abla f\ abla f^T].\]<p>于是 Monte Carlo：</p>
+\[\boxed{ \hat C= \frac1N \sum_{i=1}^N g_i g_i^T }\]<p>其中：</p>
+\[g_i=\ abla f(x_i).\]<p>然后：</p>
+\[\hat C = \hat W\hat\Lambda\hat W^T.\]<p>Constantine 的标准方法就是随机采样梯度，再通过该经验矩阵估计 active eigenspace。</p>
+<p>问题来了：</p>
+<p>如果一次：</p>
+\[f(x)\]<p>就是一次昂贵 FEM，</p>
+<p>而梯度用有限差分：</p>
+\[\frac{\partial f}{\partial x_j} \approx \frac{f(x+\epsilon e_j)-f(x)}{\epsilon},\]<p>那么一次 gradient 需要约：</p>
+\[m+1\]<p>次仿真。</p>
+<p>对于：</p>
+\[m=100,\]<p>代价可能直接不可接受。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="10-所以-adjoint-又出现了">10. 所以 Adjoint 又出现了
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>如果：</p>
+\[f(x)\]<p>是一个 scalar Quantity of Interest，</p>
+<p><span class="term-anchor" data-term="adjoint" tabindex="0">adjoint</span> 方法常能以大约：</p>
+\[\boxed{\ ext{一次额外 PDE solve}}\]<p>的成本获得：</p>
+\[\ abla_x f.\]<p>这与昨天 <span class="term-anchor" data-term="dwr" tabindex="0">DWR</span> 卡片产生了非常漂亮的连接。</p>
+<p>DWR：</p>
+\[\boxed{\ ext{adjoint 用来判断空间中的误差哪里影响 }J.}\]<p>Active Subspace：</p>
+\[\boxed{\ ext{gradient 用来判断参数空间中的哪个方向影响 }J.}\]<p>于是可以把它们放在两个不同空间里：</p>
+\[\boxed{ \ ext{DWR} \rightarrow \ ext{physical-space importance} }\]\[\boxed{ \ ext{Active Subspace} \rightarrow \ ext{parameter-space importance}. }\]<p>而二者背后都依赖：</p>
+\[\boxed{\ ext{Quantity of Interest 的 sensitivity}.}\]<p>这是很值得建立起来的统一认识。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="11-没有梯度怎么办">11. 没有梯度怎么办？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这是 Active Subspace 很现实的问题。</p>
+<p>可以：</p>
+<ul>
+<li>finite difference；</li>
+<li>automatic differentiation；</li>
+<li>adjoint；</li>
+<li>local surrogate gradient；</li>
+<li>gradient sketching。</li>
+</ul>
+<p>Constantine、Eftekhari 与 Wakin 研究过 gradient sketching：不必恢复整个 \(m\) 维梯度，而只测量若干随机方向导数，并利用这些信息估计主要 eigenspace；方向导数可通过两次函数评价近似，成本不直接随输入维度增长。</p>
+<p>这给了一个很实用的原则：</p>
+\[\boxed{ \ ext{如果你最终只需要 gradient 的主子空间， 未必需要完整 gradient。} }\]<p>这和 randomized linear algebra 的思想高度一致。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="12-这里必须讲一个很重要的局限active-subspace-是全局平均">12. 这里必须讲一个很重要的局限：Active Subspace 是全局平均
+</h1><p>矩阵：</p>
+\[C= \mathbb E[ \ abla f\ abla f^T ]\]<p>对整个输入分布：</p>
+\[\rho(x)\]<p>取平均。</p>
+<p>所以它发现的是：</p>
+\[\boxed{\ ext{global average sensitivity directions}.}\]<p>这对普通 UQ 很合理。</p>
+<p>但可靠性分析关心：</p>
+\[\boxed{g(x)\approx0}\]<p>附近。</p>
+<p>假设：</p>
+<p>99.9% 概率区域里：</p>
+\[x_1\]<p>控制输出。</p>
+<p>但极小 failure region 中：</p>
+\[x_{17}\]<p>突然决定：</p>
+\[g(x)<0.\]<p>全局 Active Subspace 很可能把：</p>
+\[x_{17}\]<p>对应方向压掉。</p>
+<p>结果：</p>
+\[\boxed{\ ext{平均预测很好，失效概率却完全错误。}}\]<p>这对可靠性问题尤其危险。</p>
+<hr>
+<h1 id="13-所以可靠性真正需要的是failure-aware-active-subspace">13. 所以可靠性真正需要的是“failure-aware active subspace”
+</h1><p>这也是为什么近年的可靠性方法不满足于：</p>
+\[\ ext{AS} \rightarrow \ ext{GP} \rightarrow P_f.\]<p>例如 Kim、Wang 与 Junho Song 的高维可靠性工作把：</p>
+\[\boxed{ \ ext{Active Subspace} + \ ext{heteroscedastic Gaussian Process} + \ ext{active learning} }\]<p>耦合起来。</p>
+<p>Active learning 把新高保真样本主动推向：</p>
+\[\boxed{\ ext{critical region}}\]<p>而不是仅仅优化整个输入空间的平均拟合质量，并随数据更新 feature-space mapping。</p>
+<p>这解决的正是：</p>
+\[\boxed{\ ext{全局重要方向不一定等于失效面重要方向}.}\]<hr>
+<h1 id="14-一个很有用的可靠性版本">14. 一个很有用的可靠性版本
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>普通 Active Subspace：</p>
+\[C= \mathbb E_\rho[ \ abla g\ abla g^T ].\]<p>可以设想引入 failure-boundary weighting：</p>
+\[\boxed{ C_w = \mathbb E[ w(g(x)) \ abla g\ abla g^T ] }\]<p>其中：</p>
+\[w(g)\]<p>在：</p>
+\[g\approx0\]<p>附近较大。</p>
+<p>例如概念上：</p>
+\[w(g) = \exp\left( -\frac{g^2}{2\sigma_g^2} \right).\]<p>这样寻找的方向变成：</p>
+\[\boxed{\ ext{主要改变失效边界的参数组合}.}\]<p>这与可靠性 active learning 的核心目标更一致。</p>
+<p>注意这已经不是最经典的 vanilla Active Subspace，而属于它面向任务的扩展思路；现有高维可靠性研究正通过 active learning、surrogate-assisted AS 等方式解决类似问题。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="15-active-subspace-还有一个经常被忽略的问题它只寻找线性子空间">15. Active Subspace 还有一个经常被忽略的问题：它只寻找线性子空间
+</h1><p>假设：</p>
+\[f(x_1,x_2) = g(x_1^2+x_2^2).\]<p>真正的低维变量是：</p>
+\[r=x_1^2+x_2^2.\]<p>这是一个：</p>
+\[\boxed{\ ext{非线性 feature}.}\]<p>不存在一个固定：</p>
+\[w\]<p>使：</p>
+\[f(x)\approx g(w^Tx).\]<p>此时 Active Subspace 可能需要多个方向，甚至无法实现明显降维。</p>
+<p>因此：</p>
+\[\boxed{\ ext{low-dimensional structure}}\]<p>不一定意味着：</p>
+\[\boxed{\ ext{low-dimensional linear subspace}.}\]<p>这也是后来：</p>
+<ul>
+<li>nonlinear sufficient dimension reduction；</li>
+<li>autoencoder；</li>
+<li>active manifold；</li>
+<li>ridge approximation；</li>
+</ul>
+<p>等方法存在的原因。</p>
+<hr>
+<h1 id="16-这和-rom-的区别也值得分清">16. 这和 ROM 的区别也值得分清
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p><span class="term-anchor" data-term="pod" tabindex="0">POD</span>/<span class="term-anchor" data-term="reduced-basis" tabindex="0">Reduced Basis</span> 通常降低：</p>
+\[\boxed{\ ext{state dimension}.}\]<p>例如：</p>
+\[u\in\mathbb R^{10^6}\]<p>变成：</p>
+\[a\in\mathbb R^{50}.\]<p>Active Subspace 降低：</p>
+\[\boxed{\ ext{parameter dimension}.}\]<p>例如：</p>
+\[\mu\in\mathbb R^{100}\]<p>变成：</p>
+\[y\in\mathbb R^3.\]<p>所以二者解决的是完全不同的 curse of dimensionality：</p>
+\[\boxed{ \ ext{ROM: output/state space} }\]\[\boxed{ \ ext{AS: input/parameter space}. }\]<p>理论上可以组合：</p>
+\[\mu\in\mathbb R^{100}\]\[\downarrow\quad AS\]\[y\in\mathbb R^3\]\[\downarrow\quad surrogate\]<p>同时：</p>
+\[u\in\mathbb R^{10^6}\]\[\downarrow\quad POD/RB\]\[a\in\mathbb R^{50}.\]<p>这就是非常典型的<strong>双侧降维</strong>。</p>
+<p>甚至已有工作进一步研究 multi-fidelity Active Subspaces，用廉价低保真梯度辅助恢复高保真模型的主要参数方向。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="17-对你当前高维代理问题最值得迁移的一点">17. 对你当前高维代理问题最值得迁移的一点
+</h1><p>面对：</p>
+\[30,\ 50,\ 100\]<p>维参数空间时，一个很容易产生的条件反射是：</p>
+\[\boxed{\ ext{找更强的高维 surrogate。}}\]<p>例如：</p>
+<ul>
+<li>Deep GP；</li>
+<li>neural operator；</li>
+<li>sparse GP；</li>
+<li>mixture-of-experts。</li>
+</ul>
+<p>但应该先问一个更基础的问题：</p>
+\[\boxed{ f(x)\ ext{ 真的具有这么高的 intrinsic dimension 吗？} }\]<p>如果：</p>
+\[100\]<p>个原始参数实际上主要通过：</p>
+\[3\]<p>种组合影响输出，</p>
+<p>那么真正值得解决的是：</p>
+\[\boxed{\ ext{发现这三个组合}.}\]<p>然后普通 Kriging 可能已经足够。</p>
+<p>所以面对高维代理模型，方法顺序最好是：</p>
+\[\boxed{ \ ext{先诊断 intrinsic dimension} \rightarrow \ ext{再选择 surrogate complexity}. }\]<p>不要反过来。</p>
+<hr>
+<h1 id="18-一个很适合自己实现的小实验">18. 一个很适合自己实现的小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>构造：</p>
+\[x\in[-1,1]^{20}\]<p>和：</p>
+\[f(x) = \sin(w_1^Tx) + 0.1(w_2^Tx)^2\]<p>其中随机生成两个正交单位向量：</p>
+\[w_1,w_2.\]<p>于是你知道真实 intrinsic dimension：</p>
+\[r=2.\]<p>随机生成：</p>
+\[N=200\]<p>个样本。</p>
+<p>计算：</p>
+\[g_i=\ abla f(x_i)\]<p>然后：</p>
+\[\hat C = \frac1N \sum_i g_ig_i^T.\]<p>特征分解：</p>
+\[\hat C=W\Lambda W^T.\]<p>你应该看到：</p>
+\[\lambda_1,\lambda_2\]<p>明显大于：</p>
+\[\lambda_3,\ldots,\lambda_{20}.\]<p>然后比较两个 Kriging：</p>
+\[\boxed{ GP_{20D}:x\rightarrow f }\]<p>和：</p>
+\[\boxed{ GP_{2D}:W_1^Tx\rightarrow f. }\]<p>控制相同训练样本量。</p>
+<p>通常后者会非常明显地体现低维建模优势。</p>
+<p>最后把函数换成：</p>
+\[f(x)=\sin(x_1^2+x_2^2)\]<p>观察线性 Active Subspace 开始失效。</p>
+<p>这一个实验就能同时理解：</p>
+\[\boxed{\ ext{它为什么有效，以及它什么时候无效。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Active Subspace 最值得记住的并不是：</p>
+\[C=\mathbb E[\ abla f\ abla f^T].\]<p>而是一个关于高维问题非常重要的认识：</p>
+\[\boxed{ \ ext{“有很多重要变量” 并不意味着 “函数具有很高的内在维度”。} }\]<p>原始坐标：</p>
+\[(x_1,\ldots,x_m)\]<p>可能只是看待问题的一种方式。</p>
+<p>真正控制物理输出的可能是：</p>
+\[\boxed{ y_1=w_1^Tx,\quad y_2=w_2^Tx,\ldots }\]<p>这些隐藏的组合变量。</p>
+<p>它在整个知识体系中的位置可以画成：</p>
+\[\ ext{High-dimensional parameter model}\]\[\downarrow\]\[\ ext{gradient sensitivity}\]\[\downarrow\]\[\boxed{\ ext{Active Subspace}}\]\[\downarrow\]\[\ ext{low-dimensional active variables}\]\[\downarrow\]\[\boxed{\ ext{GP / optimization / UQ / reliability}.}\]<p>而对高维代理和可靠性最重要的警告同样值得记住：</p>
+\[\boxed{ \ ext{“平均意义下不重要的方向” 仍然可能决定一个极小概率失效事件。} }\]<p>因此 Active Subspace 在普通 UQ 中可以直接用于降维；进入可靠性以后，最好进一步变成 <strong>failure-aware / adaptive dimension reduction</strong>。这一步，恰恰是它与 active learning、Kriging 和高维可靠性真正发生交汇的地方。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p>Paul G. Constantine, <strong><em>Active Subspaces: Emerging Ideas for Dimension Reduction in Parameter Studies</em></strong>, SIAM, 2015。这是最推荐的系统入口，篇幅不到百页，从定义、Monte Carlo 估计一直讲到 response surface、优化和 UQ。<br>
+<a class="link" href="https://epubs.siam.org/doi/book/10.1137/1.9781611973860"  target="_blank" rel="noopener"
+    >SIAM Active Subspaces 专著</a></p>
+<p>Constantine, Eftekhari &amp; Wakin, <strong><em>Computing Active Subspaces Efficiently with Gradient Sketching</em></strong>。如果真正准备把 AS 用在昂贵 FEM 上，这篇尤其值得看，因为它直接处理“完整梯度太贵怎么办”。<br>
+<a class="link" href="https://arxiv.org/abs/1506.04190"  target="_blank" rel="noopener"
+    >论文页面</a></p>
+<p>Lam, Zahm, Youssef M. Marzouk &amp; Karen E. Willcox, <strong><em>Multifidelity Dimension Reduction via Active Subspaces</em></strong>, <em>SIAM Journal on Scientific Computing</em>, 2020。把 AS 与 multi-fidelity 联系起来，很适合沿你最近的 <span class="term-anchor" data-term="mfmc" tabindex="0">MFMC</span>/ROM 方向继续读。<br>
+SIAM 论文页</p>
+<p>Kim, Wang &amp; Junho Song, <strong><em>Adaptive Active Subspace-Based Metamodeling for High-Dimensional Reliability Analysis</em></strong>, <em>Structural Safety</em>, 2023。把 Active Subspace、heteroscedastic GP 和 active learning 联合起来，最直接对应高维可靠性代理问题。<br>
+<a class="link" href="https://arxiv.org/abs/2304.06252"  target="_blank" rel="noopener"
+    >公开预印本</a></p>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+            <a href="/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/">可靠性</a>
+        
+            <a href="/tags/%E4%B8%8D%E7%A1%AE%E5%AE%9A%E6%80%A7%E9%87%8F%E5%8C%96/">不确定性量化</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-39<span class="card-badge card-badge--role" title="认知分型">概念基石</span><span class="card-badge" title="次要分型">权衡对比</span><span class="card-badge card-badge--diff" title="难度 2/3">◆◆◇</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/16-active-subspaces/">Active Subspaces：真正该降的维，可能不是“变量”，而是“变量的方向组合”<span class="dep-radar-meta"> · card-16</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-39<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/33-probabilistic-numerics/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/23-distributionally-robust-reliability/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Distributionally Robust Reliability：可靠性分析里更危险的，往往不是随机性，而是“你把随机性认错了”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/19-conformal-prediction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Conformal Prediction：代理模型真正缺的，往往不是“置信区间”，而是“覆盖率保证”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/16-active-subspaces/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Active Subspaces：真正该降的维，可能不是“变量”，而是“变量的方向组合”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/09-subset-simulation/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Subset Simulation：把“百万分之一失效”拆成一串“十分之一事件”</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

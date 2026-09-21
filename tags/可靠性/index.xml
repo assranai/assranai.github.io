@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Wed, 16 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Mon, 21 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
         <link>https://assranai.github.io/cards/02-ak-mcs/</link>
         <pubDate>Sat, 15 Aug 2026 00:00:00 +0000</pubDate>
@@ -4243,6 +4243,823 @@ MIT DSpace 论文与 PDF&lt;/p&gt;
 &lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://pymor.org/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;pyMOR 官方网站&lt;/a&gt; 是目前非常适合实际动手的开源 ROM 框架；其 coercive RB reductor 已直接实现 residual dual norm + coercivity estimator 的认证结构。&lt;br&gt;
 pyMOR CoerciveRBReductor 文档&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Dual-Weighted Residual：有限元网格为什么要追着“你真正关心的输出”加密？</title>
+        <link>https://assranai.github.io/cards/38-dual-weighted-residual-2/</link>
+        <pubDate>Sun, 20 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/38-dual-weighted-residual-2/</guid>
+        <description>&lt;h1 id=&#34;dual-weighted-residual有限元网格为什么要追着你真正关心的输出加密&#34;&gt;Dual-Weighted Residual：有限元网格为什么要追着“你真正关心的输出”加密？
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;Dual-Weighted Residual&lt;/span&gt;（DWR，双重加权残差）与 Goal-Oriented Adaptivity&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 数值方法 × 可靠性 × 代理模型&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
+今天选一个和前几张卡片形成很好衔接、但关注点明显不同的方法。&lt;/p&gt;
+&lt;p&gt;有限元自适应通常问：&lt;/p&gt;
+\[\boxed{\ ext{哪里的解误差最大？}}\]&lt;p&gt;DWR 改问：&lt;/p&gt;
+\[\boxed{\ ext{哪里的误差最影响我最终关心的工程量？}}\]&lt;p&gt;这两个问题差别非常大。&lt;/p&gt;
+&lt;p&gt;假设模拟飞机结构，你真正关心的是某个铰链处的最大应力：&lt;/p&gt;
+\[J(u)=\sigma_{\mathrm{hinge}}(u).\]&lt;p&gt;模型另一端存在一个尖角奇异性，局部位移梯度巨大。&lt;/p&gt;
+&lt;p&gt;普通 residual-based adaptive FEM 很可能不断在那里加密网格，因为那里：&lt;/p&gt;
+\[\|R\|\gg 0.\]&lt;p&gt;但如果那个奇异性对铰链应力几乎没有影响，计算资源其实花错了地方。&lt;/p&gt;
+&lt;p&gt;DWR 的核心思想可以压缩成：&lt;/p&gt;
+\[\boxed{ \ ext{输出误差} \approx \ ext{局部方程残差} \ imes \ ext{该位置对目标输出的影响程度}. }\]&lt;p&gt;后一个量由一个 &lt;strong&gt;dual / &lt;span class=&#34;term-anchor&#34; data-term=&#34;adjoint&#34; tabindex=&#34;0&#34;&gt;adjoint&lt;/span&gt; problem（对偶/伴随问题）&lt;/strong&gt; 给出。&lt;/p&gt;
+&lt;p&gt;这使 DWR 成为连接有限元误差估计、伴随灵敏度、可靠性和现代 surrogate/ROM 的一个非常漂亮的节点。Becker 与 Rannacher 的经典框架正是为“任意目标泛函”的误差控制而发展，而不局限于传统 energy norm。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-传统-fem-误差指标其实回答了一个未必重要的问题&#34;&gt;1. 传统 FEM 误差指标其实回答了一个未必重要的问题
+&lt;/h2&gt;&lt;p&gt;考虑：&lt;/p&gt;
+\[-\ abla\cdot(k\ abla u)=f.\]&lt;p&gt;有限元得到：&lt;/p&gt;
+\[u_h.\]&lt;p&gt;典型 a posteriori estimator 会看：&lt;/p&gt;
+\[R_K = f+\ abla\cdot(k\ abla u_h)\]&lt;p&gt;以及单元边界上的 flux jump。&lt;/p&gt;
+&lt;p&gt;然后构造：&lt;/p&gt;
+\[\eta_K \sim h_K\|R_K\|.\]&lt;p&gt;大的：&lt;/p&gt;
+\[\eta_K\]&lt;p&gt;意味着：&lt;/p&gt;
+\[\boxed{\ ext{这里 PDE 没有被离散解很好地满足。}}\]&lt;p&gt;于是：&lt;/p&gt;
+\[\eta_K\uparrow \Rightarrow \ ext{refine element }K.\]&lt;p&gt;这是合理的。&lt;/p&gt;
+&lt;p&gt;但工程真正需要的往往不是整个：&lt;/p&gt;
+\[u(x)\]&lt;p&gt;都同样准确。&lt;/p&gt;
+&lt;p&gt;我们可能只关心：&lt;/p&gt;
+\[J(u)= \begin{cases} \ ext{某点位移}\\ \ ext{最大载荷}\\ \ ext{阻力}\\ \ ext{热流}\\ \ ext{某接口反力}\\ \ ext{某失效指标} \end{cases}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;于是真正的问题应该是：&lt;/p&gt;
+\[\boxed{|J(u)-J(u_h)|\ ext{ 有多大？}}\]&lt;hr&gt;
+&lt;h1 id=&#34;2-一个极端例子&#34;&gt;2. 一个极端例子
+&lt;/h1&gt;&lt;p&gt;假设一块二维结构：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;singularity                         sensor
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    ↓                                 ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ┌───────┐───────────────────────────●
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; │ crack │
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; └───────┘
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;左侧裂纹尖端产生巨大局部误差：&lt;/p&gt;
+\[R_{\rm left}\gg0.\]&lt;p&gt;但我们只关心右侧传感器：&lt;/p&gt;
+\[J(u)=u(x_{\rm sensor}).\]&lt;p&gt;现在存在两种可能。&lt;/p&gt;
+&lt;h3 id=&#34;情况-a&#34;&gt;情况 A
+&lt;/h3&gt;&lt;p&gt;裂纹扰动强烈传播到 sensor：&lt;/p&gt;
+\[\boxed{\ ext{左侧误差很重要。}}\]&lt;h3 id=&#34;情况-b&#34;&gt;情况 B
+&lt;/h3&gt;&lt;p&gt;几何/边界条件使它对 sensor 几乎没有影响：&lt;/p&gt;
+\[\boxed{\ ext{左侧误差虽大，却不重要。}}\]&lt;p&gt;只看：&lt;/p&gt;
+\[R\]&lt;p&gt;根本无法区分 A 与 B。&lt;/p&gt;
+&lt;p&gt;所以还需要一个量回答：&lt;/p&gt;
+\[\boxed{ \ ext{如果这里产生一点误差， 最终 }J\ ext{ 会变化多少？} }\]&lt;p&gt;这就是 adjoint。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-从最简单的线性代数看dwr-几乎一眼就能理解&#34;&gt;3. 从最简单的线性代数看，DWR 几乎一眼就能理解
+&lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
+\[Au=b.\]&lt;p&gt;有限元/迭代近似：&lt;/p&gt;
+\[u_h.\]&lt;p&gt;残差：&lt;/p&gt;
+\[r=b-Au_h.\]&lt;p&gt;假设我们关心：&lt;/p&gt;
+\[J(u)=c^Tu.\]&lt;p&gt;真实输出误差：&lt;/p&gt;
+\[J(u)-J(u_h) = c^T(u-u_h).\]&lt;p&gt;定义：&lt;/p&gt;
+\[e=u-u_h.\]&lt;p&gt;因为：&lt;/p&gt;
+\[Ae=r,\]&lt;p&gt;所以：&lt;/p&gt;
+\[e=A^{-1}r.\]&lt;p&gt;于是：&lt;/p&gt;
+\[J(u)-J(u_h) = c^TA^{-1}r.\]&lt;p&gt;现在定义 adjoint：&lt;/p&gt;
+\[\boxed{A^Tz=c.}\]&lt;p&gt;因此：&lt;/p&gt;
+\[z=A^{-T}c.\]&lt;p&gt;代回：&lt;/p&gt;
+\[\boxed{ J(u)-J(u_h) = z^Tr. }\]&lt;p&gt;这就是整个 DWR 思想最干净的原型。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-这个公式值得认真看一分钟&#34;&gt;4. 这个公式值得认真看一分钟
+&lt;/h1&gt;\[\boxed{ J(u)-J(u_h)=z^Tr. }\]&lt;p&gt;其中：&lt;/p&gt;
+\[r\]&lt;p&gt;表示：&lt;/p&gt;
+\[\boxed{\ ext{哪里算得不准。}}\]&lt;p&gt;而：&lt;/p&gt;
+\[z\]&lt;p&gt;表示：&lt;/p&gt;
+\[\boxed{\ ext{哪里的误差会影响目标 }J.}\]&lt;p&gt;所以真正值得修正的是：&lt;/p&gt;
+\[\boxed{z_ir_i}\]&lt;p&gt;大的地方。&lt;/p&gt;
+&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{\ ext{Dual-Weighted Residual}}\]&lt;p&gt;这个名字的来源。&lt;/p&gt;
+&lt;p&gt;不是：&lt;/p&gt;
+\[\ ext{Residual}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\ ext{Residual × Goal Sensitivity}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;5-一个只有三个自由度的例子&#34;&gt;5. 一个只有三个自由度的例子
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[r= \begin{bmatrix} 100\\ 2\\ 1 \end{bmatrix}.\]&lt;p&gt;普通 residual estimator 会立即认为：&lt;/p&gt;
+\[\boxed{\ ext{DOF 1 最危险。}}\]&lt;p&gt;但假设 adjoint：&lt;/p&gt;
+\[z= \begin{bmatrix} 0.001\\ 5\\ 2 \end{bmatrix}.\]&lt;p&gt;于是：&lt;/p&gt;
+\[z\odot r = \begin{bmatrix} 0.1\\ 10\\ 2 \end{bmatrix}.\]&lt;p&gt;对目标输出而言：&lt;/p&gt;
+\[\boxed{\ ext{DOF 2 才是最值得提高精度的地方。}}\]&lt;p&gt;因为第一处虽然：&lt;/p&gt;
+\[r_1=100,\]&lt;p&gt;但：&lt;/p&gt;
+\[z_1\approx0.\]&lt;p&gt;它产生的误差根本传不到我们关心的输出。&lt;/p&gt;
+&lt;p&gt;这就是 goal-oriented adaptivity 与普通 error-based adaptivity 的根本区别。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;6-pde-中也是完全相同的逻辑&#34;&gt;6. PDE 中也是完全相同的逻辑
+&lt;/h1&gt;&lt;p&gt;把 PDE 写成抽象形式：&lt;/p&gt;
+\[A(u)(v)=0 \qquad \forall v.\]&lt;p&gt;有限元解：&lt;/p&gt;
+\[u_h.\]&lt;p&gt;定义 residual：&lt;/p&gt;
+\[\rho(u_h)(v) = -A(u_h)(v).\]&lt;p&gt;目标：&lt;/p&gt;
+\[J(u).\]&lt;p&gt;通过线性化和 adjoint，可以得到类似：&lt;/p&gt;
+\[\boxed{ J(u)-J(u_h) \approx \rho(u_h)(z-\varphi_h) }\]&lt;p&gt;的 error representation。&lt;/p&gt;
+&lt;p&gt;于是单元级：&lt;/p&gt;
+\[\boxed{ \eta_K \approx R_K \cdot (z-I_hz) }\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;deal.II 的官方 step-14 教程正是这样解释 DWR：cell/edge residual 描述局部 PDE violation，而 \(z-I_hz\) 充当权重，告诉算法该残差对于指定 functional 到底有多重要。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么-adjoint-会知道误差怎么传播&#34;&gt;7. 为什么 adjoint 会知道“误差怎么传播”？
+&lt;/h1&gt;&lt;p&gt;再次看：&lt;/p&gt;
+\[A^Tz=c.\]&lt;p&gt;如果：&lt;/p&gt;
+\[c\]&lt;p&gt;只在目标位置非零，&lt;/p&gt;
+&lt;p&gt;adjoint 相当于：&lt;/p&gt;
+\[\boxed{\ ext{从目标位置反向传播影响。}}\]&lt;p&gt;这与神经网络 backpropagation 非常相似。&lt;/p&gt;
+&lt;p&gt;Forward：&lt;/p&gt;
+\[\ ext{input} \rightarrow \ ext{state} \rightarrow J.\]&lt;p&gt;Adjoint：&lt;/p&gt;
+\[J \rightarrow \ ext{state sensitivities} \rightarrow \ ext{input/error sources}.\]&lt;p&gt;因此可以把 adjoint 理解成：&lt;/p&gt;
+\[\boxed{\ ext{PDE 的反向传播。}}\]&lt;p&gt;这也是为什么 adjoint 同时大量出现在：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PDE optimization；&lt;/li&gt;
+&lt;li&gt;aerodynamic shape optimization；&lt;/li&gt;
+&lt;li&gt;inverse problems；&lt;/li&gt;
+&lt;li&gt;differentiable simulation；&lt;/li&gt;
+&lt;li&gt;DWR error estimation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;它们其实都在使用同一个数学对象：&lt;/p&gt;
+\[\boxed{\ ext{目标对系统内部状态的反向敏感度。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;8-dwr-最漂亮的地方网格会出现反直觉的加密&#34;&gt;8. DWR 最漂亮的地方：网格会出现“反直觉”的加密
+&lt;/h1&gt;&lt;p&gt;deal.II 的经典 step-14 示例就非常直观。&lt;/p&gt;
+&lt;p&gt;它计算一个区域中某个指定点的：&lt;/p&gt;
+\[J(u)=u(x_0).\]&lt;p&gt;解本身在多个角点存在奇异结构。&lt;/p&gt;
+&lt;p&gt;但 DWR 自适应后，有些奇异区域几乎完全没有被加密。&lt;/p&gt;
+&lt;p&gt;原因不是算法没发现那里误差大。&lt;/p&gt;
+&lt;p&gt;原因是：&lt;/p&gt;
+\[\boxed{\ ext{那些误差对目标点值几乎没有影响。}}\]&lt;p&gt;官方示例明确展示：某个角落即使解存在 singularity，DWR 网格仍保持很粗，因为该区域对于另一角落的 point-value functional 不重要。&lt;/p&gt;
+&lt;p&gt;这就是 goal-oriented 方法最违反“直觉”的地方：&lt;/p&gt;
+\[\boxed{ \ ext{局部解很差，可以完全没关系。} }\]&lt;p&gt;只要：&lt;/p&gt;
+\[\boxed{ \ ext{它不污染我们真正需要的答案。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;9-这其实改变了高质量有限元模型的定义&#34;&gt;9. 这其实改变了“高质量有限元模型”的定义
+&lt;/h1&gt;&lt;p&gt;传统想法：&lt;/p&gt;
+\[\boxed{\ ext{整个场都尽量准确。}}\]&lt;p&gt;DWR：&lt;/p&gt;
+\[\boxed{\ ext{为指定 Quantity of Interest 分配计算精度。}}\]&lt;p&gt;假设你只需要：&lt;/p&gt;
+\[F_{\rm hinge}.\]&lt;p&gt;那么远离铰链区域的位移误差：&lt;/p&gt;
+\[10\%\]&lt;p&gt;可能完全可接受，&lt;/p&gt;
+&lt;p&gt;只要：&lt;/p&gt;
+\[|F_{\rm hinge}-F_{\rm hinge,h}|&lt;0.1\%.\]&lt;p&gt;这是一种非常成熟的：&lt;/p&gt;
+\[\boxed{\ ext{task-oriented computation}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;10-它和上一张-certified-rom-卡片的关系很值得区分&#34;&gt;10. 它和上一张 Certified ROM 卡片的关系很值得区分
+&lt;/h1&gt;&lt;p&gt;Certified RB 中我们看到：&lt;/p&gt;
+\[\ ext{error} \lesssim \frac{\ ext{residual}} {\ ext{stability}}.\]&lt;p&gt;它回答：&lt;/p&gt;
+\[\boxed{\ ext{整个 reduced solution 离 full solution 多远？}}\]&lt;p&gt;DWR 更进一步问：&lt;/p&gt;
+\[\boxed{\ ext{这些误差到底有多少会传播到 }J？}\]&lt;p&gt;所以可以粗略理解：&lt;/p&gt;
+\[\ ext{Residual estimator} \rightarrow \ ext{solution accuracy}\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \ ext{DWR} \rightarrow \ ext{decision/output accuracy}. }\]&lt;p&gt;这也是为什么 goal-oriented error estimation 对工程设计特别有价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;11-对可靠性分析这个思想非常强&#34;&gt;11. 对可靠性分析，这个思想非常强
+&lt;/h1&gt;&lt;p&gt;可靠性真正关心的不是：&lt;/p&gt;
+\[\|u-u_h\|.\]&lt;p&gt;而是极限状态：&lt;/p&gt;
+\[g(\ heta).\]&lt;p&gt;例如：&lt;/p&gt;
+\[g(\ heta) = F_{\rm lim} - F_{\max}(u(\ heta)).\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{|g-g_h|.}\]&lt;p&gt;于是完全可以建立 goal-oriented estimator：&lt;/p&gt;
+\[\eta_g.\]&lt;p&gt;如果：&lt;/p&gt;
+\[g_h=2.3\]&lt;p&gt;而：&lt;/p&gt;
+\[|\eta_g|=0.01,\]&lt;p&gt;无需继续加密。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[g_h=0.005\]&lt;p&gt;且：&lt;/p&gt;
+\[|\eta_g|=0.02,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\boxed{\ ext{当前 FEM 连 safe/fail 符号都无法可靠确定。}}\]&lt;p&gt;这时才值得投入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;更细网格；&lt;/li&gt;
+&lt;li&gt;更严格 nonlinear tolerance；&lt;/li&gt;
+&lt;li&gt;更高阶单元。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \ ext{可靠性 FEM 的最佳网格， 未必是全局误差最小的网格； 它应该优先让极限状态函数足够准确。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;12-这还能解决一个经常被忽略的问题solver-什么时候该停止&#34;&gt;12. 这还能解决一个经常被忽略的问题：solver 什么时候该停止？
+&lt;/h1&gt;&lt;p&gt;假设线性系统迭代：&lt;/p&gt;
+\[A u_k=b.\]&lt;p&gt;通常停止条件：&lt;/p&gt;
+\[\|r_k\|&lt;10^{-8}.\]&lt;p&gt;但真正关心：&lt;/p&gt;
+\[J(u).\]&lt;p&gt;如果 adjoint：&lt;/p&gt;
+\[A^Tz=c,\]&lt;p&gt;那么：&lt;/p&gt;
+\[J(u)-J(u_k)=z^Tr_k.\]&lt;p&gt;可能在：&lt;/p&gt;
+\[\|r_k\|=10^{-3}\]&lt;p&gt;时，&lt;/p&gt;
+&lt;p&gt;已经有：&lt;/p&gt;
+\[|z^Tr_k|&lt;10^{-8}.\]&lt;p&gt;继续迭代只是浪费。&lt;/p&gt;
+&lt;p&gt;反过来也可能：&lt;/p&gt;
+\[\|r_k\|\ll1\]&lt;p&gt;但 residual 恰好位于：&lt;/p&gt;
+\[z\]&lt;p&gt;非常敏感的方向，&lt;/p&gt;
+&lt;p&gt;导致目标仍然不够准确。&lt;/p&gt;
+&lt;p&gt;Meidner、Rannacher 与 Vihharev 就将 DWR 用于联合控制 FEM discretization error 和 algebraic iteration error，使线性求解精度能够与网格离散精度匹配。&lt;/p&gt;
+&lt;p&gt;这与前几张卡片反复出现的思想高度一致：&lt;/p&gt;
+\[\boxed{\ ext{不要把 solver tolerance 当成物理精度。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;13-一个实际-dwr-流程&#34;&gt;13. 一个实际 DWR 流程
+&lt;/h1&gt;&lt;p&gt;假设目标：&lt;/p&gt;
+\[J(u).\]&lt;p&gt;一个典型循环：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;1. solve primal PDE
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      → u_h
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;2. solve adjoint PDE
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      → z_h
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;3. compute local residuals
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      → R_K
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;4. compute weighted indicators
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      → η_K ≈ R_K · z_K
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;5. rank elements by |η_K|
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;6. refine important elements
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;7. repeat until
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      |Σ η_K| &amp;lt; target QoI tolerance
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这与普通 adaptive FEM 最大区别只有一处：&lt;/p&gt;
+&lt;p&gt;普通方法：&lt;/p&gt;
+\[\boxed{\eta_K\sim R_K}\]&lt;p&gt;DWR：&lt;/p&gt;
+\[\boxed{\eta_K\sim R_Kz_K}.\]&lt;p&gt;但就是多出的这个：&lt;/p&gt;
+\[z_K\]&lt;p&gt;让“哪里应该加密”的含义彻底改变。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;14-为什么-dual-不能简单和-primal-用完全相同的空间&#34;&gt;14. 为什么 dual 不能简单和 primal 用完全相同的空间？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这里有一个很漂亮的 Galerkin 陷阱。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[z_h\]&lt;p&gt;与：&lt;/p&gt;
+\[u_h\]&lt;p&gt;属于同一个有限元空间，&lt;/p&gt;
+&lt;p&gt;由于 Galerkin orthogonality：&lt;/p&gt;
+\[R(u_h)(v_h)=0 \qquad \forall v_h\in V_h,\]&lt;p&gt;直接代：&lt;/p&gt;
+\[v_h=z_h\]&lt;p&gt;可能得到：&lt;/p&gt;
+\[\boxed{\eta=0.}\]&lt;p&gt;显然荒谬。&lt;/p&gt;
+&lt;p&gt;因此实际 DWR 通常需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;higher-order dual space；&lt;/li&gt;
+&lt;li&gt;refined dual mesh；&lt;/li&gt;
+&lt;li&gt;reconstruction；&lt;/li&gt;
+&lt;li&gt;enrichment。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;deal.II 的 step-14 就专门强调：dual approximation 必须来自比 primal FE space 更丰富的空间；示例使用更高阶有限元来完成这一点。&lt;/p&gt;
+&lt;p&gt;这也是 DWR 的主要额外成本来源之一：&lt;/p&gt;
+\[\boxed{\ ext{你需要再解一个 adjoint problem。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-那为什么值得多解一次-pde&#34;&gt;15. 那为什么值得多解一次 PDE？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为：&lt;/p&gt;
+\[\boxed{\ ext{一次 adjoint 可以告诉你整个空间哪些误差值得消除。}}\]&lt;p&gt;如果 full FEM：&lt;/p&gt;
+\[10^7\ ext{ DOF},\]&lt;p&gt;盲目全局加密可能变成：&lt;/p&gt;
+\[8\ imes10^7.\]&lt;p&gt;而 DWR 可能发现真正影响：&lt;/p&gt;
+\[J\]&lt;p&gt;的只有一条狭窄传播路径。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[10^7 \rightarrow 1.5\ imes10^7\]&lt;p&gt;就达到同样 QoI accuracy。&lt;/p&gt;
+&lt;p&gt;deal.II 的官方教程引用的大量实际工作中，goal-oriented refinement 对某些问题可以减少数个数量级的数值工作；其简单教程本身则也坦率指出，在高度规则的测试问题上优势可能没有这么明显。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \ ext{DWR 并不是免费午餐； 它押注的是“目标输出只依赖解空间中的少数重要误差方向”。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它和代理模型有一个非常重要的联系&#34;&gt;16. 它和代理模型有一个非常重要的联系
+&lt;/h1&gt;&lt;p&gt;假设训练 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt;：&lt;/p&gt;
+\[\mu\mapsto J(u(\mu)).\]&lt;p&gt;通常认为每个 FEM label：&lt;/p&gt;
+\[y_i=J(u_h(\mu_i))\]&lt;p&gt;质量一样。&lt;/p&gt;
+&lt;p&gt;其实不同样本的：&lt;/p&gt;
+\[|J(u)-J(u_h)|\]&lt;p&gt;可能差很多。&lt;/p&gt;
+&lt;p&gt;DWR 可以为每个训练标签提供：&lt;/p&gt;
+\[\boxed{\eta_J(\mu_i)}.\]&lt;p&gt;于是训练数据从：&lt;/p&gt;
+\[(\mu_i,y_i)\]&lt;p&gt;升级成：&lt;/p&gt;
+\[\boxed{ (\mu_i,y_i,\eta_i). }\]&lt;p&gt;这意味着你可以：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;给高数值误差样本较低权重；&lt;/li&gt;
+&lt;li&gt;对它们重新计算；&lt;/li&gt;
+&lt;li&gt;建 heteroscedastic GP；&lt;/li&gt;
+&lt;li&gt;区分 surrogate error 与 FEM discretization error。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这正好与前几天 Probabilistic Numerics 的思想衔接：&lt;/p&gt;
+\[\boxed{ \ ext{仿真标签本身不是绝对真值。} }\]&lt;p&gt;DWR 提供了一条非常经典的 deterministic 路线去估计：&lt;/p&gt;
+\[\boxed{\ ext{这个标签对指定工程输出到底有多准。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;17-对软体动力学也有一个很强的迁移&#34;&gt;17. 对软体动力学也有一个很强的迁移
+&lt;/h1&gt;&lt;p&gt;假设模拟软体角色。&lt;/p&gt;
+&lt;p&gt;你真正关心的可能是：&lt;/p&gt;
+\[J= \ ext{手部接触力}\]&lt;p&gt;或：&lt;/p&gt;
+\[J= \ ext{某处表面位移}.\]&lt;p&gt;全局：&lt;/p&gt;
+\[\|x-x_h\|\]&lt;p&gt;并不一定是好的 refinement criterion。&lt;/p&gt;
+&lt;p&gt;某个远离接触区域的 tet：&lt;/p&gt;
+\[J_e=0.8\]&lt;p&gt;虽然形变误差明显，&lt;/p&gt;
+&lt;p&gt;但它对手部接触力可能没有任何影响。&lt;/p&gt;
+&lt;p&gt;另一个看起来形变很小的 tet，却位于力传递链上。&lt;/p&gt;
+&lt;p&gt;DWR 的思维会问：&lt;/p&gt;
+\[\boxed{ \ ext{哪些 tet 的误差最终能够传播到我关心的 gameplay/physics output？} }\]&lt;p&gt;这比单独依据：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;strain；&lt;/li&gt;
+&lt;li&gt;\(J\)；&lt;/li&gt;
+&lt;li&gt;residual；&lt;/li&gt;
+&lt;li&gt;mesh quality；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;做 refinement 更接近真正的 task-aware simulation。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-与-ai-的联系其实比表面上更深&#34;&gt;18. 与 AI 的联系其实比表面上更深
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;现代 AI 很熟悉：&lt;/p&gt;
+\[\boxed{\ ext{backpropagation}.}\]&lt;p&gt;Loss：&lt;/p&gt;
+\[L.\]&lt;p&gt;反向传播计算：&lt;/p&gt;
+\[\frac{\partial L}{\partial x_i}.\]&lt;p&gt;然后知道：&lt;/p&gt;
+\[\boxed{\ ext{哪些中间变量最影响最终 loss。}}\]&lt;p&gt;DWR 几乎在做同一件事情：&lt;/p&gt;
+\[J\]&lt;p&gt;相当于 loss，&lt;/p&gt;
+&lt;p&gt;adjoint：&lt;/p&gt;
+\[z\]&lt;p&gt;相当于反向传播的 sensitivity，&lt;/p&gt;
+&lt;p&gt;residual：&lt;/p&gt;
+\[R\]&lt;p&gt;相当于每个计算节点的局部 approximation error。&lt;/p&gt;
+&lt;p&gt;最终：&lt;/p&gt;
+\[\boxed{R\ imes z}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\boxed{\ ext{这个局部计算误差最终对 loss 贡献多少？}}\]&lt;p&gt;因此可以把 DWR 看成：&lt;/p&gt;
+\[\boxed{\ ext{numerical simulation 的 error backpropagation}.}\]&lt;p&gt;这个视角对于理解 differentiable simulation、adjoint CFD、PDE-constrained optimization 都非常有迁移价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;19-最近这个方向仍然在继续发展&#34;&gt;19. 最近这个方向仍然在继续发展
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;DWR 已经不是“老 FEM 技术”。&lt;/p&gt;
+&lt;p&gt;它不断被扩展到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;nonlinear PDE；&lt;/li&gt;
+&lt;li&gt;multiphysics；&lt;/li&gt;
+&lt;li&gt;FSI；&lt;/li&gt;
+&lt;li&gt;optimal control；&lt;/li&gt;
+&lt;li&gt;multiscale；&lt;/li&gt;
+&lt;li&gt;multiple quantities of interest。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;例如已有开源工作把 partition-of-unity DWR 用于单体式 fluid-structure interaction，对 beam displacement、drag 和 lift 等 QoI 做 goal-oriented mesh adaptation。&lt;/p&gt;
+&lt;p&gt;2026 年的新工作甚至继续研究 least-squares FEM 中如何使用&lt;strong&gt;物理 PDE adjoint&lt;/strong&gt;而非 least-squares formulation 自身诱导的 adjoint 来构造 goal-oriented estimator，说明“什么才是最有物理意义的 dual problem”本身仍是活跃问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;20-一个非常值得自己做的小实验&#34;&gt;20. 一个非常值得自己做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;不用复杂结构。&lt;/p&gt;
+&lt;p&gt;做二维 Poisson：&lt;/p&gt;
+\[-\Delta u=f\]&lt;p&gt;在：&lt;/p&gt;
+\[[0,1]^2.\]&lt;p&gt;设置：&lt;/p&gt;
+\[J(u)=u(0.9,0.9).\]&lt;p&gt;然后人为让：&lt;/p&gt;
+\[(0.1,0.1)\]&lt;p&gt;附近出现强梯度。&lt;/p&gt;
+&lt;p&gt;比较三种网格：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;uniform refinement；&lt;/li&gt;
+&lt;li&gt;residual-based refinement；&lt;/li&gt;
+&lt;li&gt;DWR refinement。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;记录：&lt;/p&gt;
+\[N_{\rm DOF}\]&lt;p&gt;与：&lt;/p&gt;
+\[|J(u)-J(u_h)|.\]&lt;p&gt;真正值得画的是：&lt;/p&gt;
+\[\boxed{ \ ext{QoI error} \quad\ ext{vs}\quad \ ext{DOFs}. }\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\|u-u_h\|_{L^2}.\]&lt;p&gt;然后把：&lt;/p&gt;
+\[J\]&lt;p&gt;从右上角换到左下角。&lt;/p&gt;
+&lt;p&gt;你会看到：&lt;/p&gt;
+\[\boxed{\ ext{PDE 完全没变，最佳网格却改变了。}}\]&lt;p&gt;这正是 DWR 最应该形成的直觉。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;DWR 最值得记住的不是：&lt;/p&gt;
+\[\eta_K=R_Kz_K.\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \ ext{误差本身没有绝对的重要性； 只有“它会不会污染你最终需要的答案”才决定计算资源是否值得投入。} }\]&lt;p&gt;它在知识体系中的位置非常清晰：&lt;/p&gt;
+\[\ ext{FEM}\]\[\downarrow\]\[\ ext{Residual-based error estimation}\]\[+\]\[\boxed{\ ext{Adjoint sensitivity}}\]\[\downarrow\]\[\boxed{\ ext{Dual-Weighted Residual}}\]\[\downarrow\]\[\ ext{Goal-Oriented Adaptivity}\]\[\downarrow\]\[\ ext{reliability / optimization / ROM / task-aware simulation}.\]&lt;p&gt;对于可靠性、代理模型和物理求解器，这个原则尤其值得长期保留：&lt;/p&gt;
+\[\boxed{ \ ext{不要追求“整个数值解都很准”， 先定义最终决策真正依赖什么，再让计算精度沿着这条依赖链分配。} }\]&lt;p&gt;这其实是从传统“高精度仿真”走向&lt;strong&gt;计算资源最优分配&lt;/strong&gt;非常关键的一步。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Becker &amp;amp; Rolf Rannacher, &lt;strong&gt;&lt;em&gt;An Optimal Control Approach to A Posteriori Error Estimation in Finite Element Methods&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Acta Numerica&lt;/em&gt;, 2001。DWR 的经典系统性文献，最值得理解的是“global norm error 为什么不等于 physical quantity error”。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;deal.II Step-14：Dual-Weighted Residual 教程。非常推荐直接动手：它完整实现 primal solve、dual solve、weighted residual、mesh refinement，并展示不同 QoI 如何产生完全不同的自适应网格。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Meidner, Rannacher &amp;amp; Vihharev, &lt;strong&gt;&lt;em&gt;Goal-Oriented Error Control of the Iterative Solution of Finite Element Equations&lt;/em&gt;&lt;/strong&gt;。如果想把 DWR 与 CG、Gauss–Seidel、multigrid 等线性求解器连接起来，这篇很有价值：它联合控制 discretization error 与 algebraic iteration error。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Wick, &lt;strong&gt;&lt;em&gt;Adjoint-based Methods for Optimization and Goal-Oriented Error Control Applied to Fluid-Structure Interaction&lt;/em&gt;&lt;/strong&gt;，2021。适合进一步看 DWR 怎样进入真实 multiphysics：目标量直接是 displacement、drag、lift，并有公开实现。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Maier &amp;amp; Rannacher, &lt;strong&gt;&lt;em&gt;Duality-based Adaptivity in Finite Element Discretization of Heterogeneous Multiscale Problems&lt;/em&gt;&lt;/strong&gt;。进一步展示 DWR 可以同时区分和权衡 modeling error、macro discretization error 与 micro discretization error，很适合沿着“多保真/多层误差预算”继续深入。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它</title>
+        <link>https://assranai.github.io/cards/39-active-subspaces-2/</link>
+        <pubDate>Mon, 21 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/39-active-subspaces-2/</guid>
+        <description>&lt;h1 id=&#34;active-subspaces高维问题真正困难的可能不是变量太多而是你一直沿坐标轴看它&#34;&gt;Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它
+&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;active-subspace&#34; tabindex=&#34;0&#34;&gt;Active Subspaces&lt;/span&gt;（主动子空间）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：代理模型 × 可靠性 × 不确定性量化 × 科学机器学习&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
+今天选 Active Subspaces，是因为它与你最近关注的&lt;strong&gt;高维代理/ROM&lt;/strong&gt;问题衔接得很好，同时补上一个容易混淆的层次：&lt;/p&gt;
+\[\boxed{\ ext{减少变量数量}}\]&lt;p&gt;和&lt;/p&gt;
+\[\boxed{\ ext{寻找真正控制输出的低维方向}}\]&lt;p&gt;并不是一回事。&lt;/p&gt;
+&lt;p&gt;考虑一个 20 维模型&lt;/p&gt;
+\[f(x_1,\ldots,x_{20}).\]&lt;p&gt;传统敏感性分析可能告诉你 20 个变量都重要，于是似乎不存在降维空间。&lt;/p&gt;
+&lt;p&gt;但假如真实函数是&lt;/p&gt;
+\[f(x)=\sin(x_1+x_2+\cdots+x_{20}),\]&lt;p&gt;20 个变量确实都重要，可整个输出实际上只依赖一个变量：&lt;/p&gt;
+\[y=\frac{1}{\sqrt{20}}\sum_{i=1}^{20}x_i.\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{20\ ext{ 个重要变量}\ eq20\ ext{ 维有效问题}.}\]&lt;p&gt;Active Subspaces 专门寻找这种&lt;strong&gt;输入空间中的重要方向&lt;/strong&gt;。它由 Paul G. Constantine 系统化发展，用于高维计算模型的优化、不确定性量化、敏感性分析和响应面构造。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-它和变量筛选的根本区别&#34;&gt;1. 它和“变量筛选”的根本区别
+&lt;/h2&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[f(x_1,x_2)=g(x_1+x_2).\]&lt;p&gt;分别改变 \(x_1\)：&lt;/p&gt;
+\[f\ ext{ 变化很大};\]&lt;p&gt;改变 \(x_2\)：&lt;/p&gt;
+\[f\ ext{ 也变化很大}.\]&lt;p&gt;所以 Morris、&lt;span class=&#34;term-anchor&#34; data-term=&#34;sobol&#34; tabindex=&#34;0&#34;&gt;Sobol&lt;/span&gt; 或简单灵敏度分析可能都认为：&lt;/p&gt;
+\[x_1,\quad x_2\]&lt;p&gt;重要。&lt;/p&gt;
+&lt;p&gt;但旋转坐标：&lt;/p&gt;
+\[y_1=\frac{x_1+x_2}{\sqrt2}, \qquad y_2=\frac{x_1-x_2}{\sqrt2}.\]&lt;p&gt;立刻得到：&lt;/p&gt;
+\[f(x)=g(\sqrt2 y_1),\]&lt;p&gt;而：&lt;/p&gt;
+\[\frac{\partial f}{\partial y_2}=0.\]&lt;p&gt;所以真实结构是：&lt;/p&gt;
+\[\boxed{\ ext{二维输入，实际一维函数。}}\]&lt;p&gt;Active Subspace 要找的就是这个旋转后的：&lt;/p&gt;
+\[y_1.\]&lt;p&gt;因此它属于：&lt;/p&gt;
+\[\boxed{\ ext{feature extraction}}\]&lt;p&gt;而不只是：&lt;/p&gt;
+\[\ ext{feature selection}.\]&lt;p&gt;这一区别对高维代理模型非常重要。Constantine 对 Active Subspace 的定义正是：寻找输入空间中的方向，使沿这些方向扰动输入时，模型输出平均变化最大。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-核心数学对象其实非常简单&#34;&gt;2. 核心数学对象其实非常简单
+&lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
+\[f:\mathbb R^m\rightarrow\mathbb R\]&lt;p&gt;以及输入概率密度：&lt;/p&gt;
+\[\rho(x).\]&lt;p&gt;计算梯度：&lt;/p&gt;
+\[\ abla f(x).\]&lt;p&gt;然后定义矩阵：&lt;/p&gt;
+\[\boxed{ C= \mathbb E_\rho [ \ abla f(x)\ abla f(x)^T ] }\]&lt;p&gt;即：&lt;/p&gt;
+\[C= \int \ abla f(x)\ abla f(x)^T\rho(x)\,dx.\]&lt;p&gt;这是一个：&lt;/p&gt;
+\[m\ imes m\]&lt;p&gt;的对称半正定矩阵。&lt;/p&gt;
+&lt;p&gt;做特征分解：&lt;/p&gt;
+\[C=W\Lambda W^T\]&lt;p&gt;其中：&lt;/p&gt;
+\[\Lambda= \operatorname{diag} (\lambda_1,\ldots,\lambda_m),\]&lt;p&gt;并令：&lt;/p&gt;
+\[\lambda_1\ge\lambda_2\ge\cdots\ge\lambda_m\ge0.\]&lt;p&gt;这就是 Active Subspace 的核心。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-为什么这个矩阵能找到重要方向&#34;&gt;3. 为什么这个矩阵能找到“重要方向”？
+&lt;/h1&gt;&lt;p&gt;任选单位方向：&lt;/p&gt;
+\[w.\]&lt;p&gt;沿 \(w\) 的方向导数：&lt;/p&gt;
+\[D_wf = w^T\ abla f.\]&lt;p&gt;它的平均平方大小：&lt;/p&gt;
+\[\mathbb E[(D_wf)^2] = w^TCw.\]&lt;p&gt;如果选择：&lt;/p&gt;
+\[w=w_1,\]&lt;p&gt;即 \(C\) 最大特征值对应的特征向量：&lt;/p&gt;
+\[\boxed{ \mathbb E[(D_{w_1}f)^2] = \lambda_1. }\]&lt;p&gt;所以：&lt;/p&gt;
+\[w_1\]&lt;p&gt;就是：&lt;/p&gt;
+\[\boxed{\ ext{平均而言，函数变化最快的输入方向。}}\]&lt;p&gt;同理：&lt;/p&gt;
+\[w_2\]&lt;p&gt;是在与 \(w_1\) 正交的前提下，第二重要的方向。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\lambda_i\]&lt;p&gt;可以理解成：&lt;/p&gt;
+\[\boxed{\ ext{函数沿方向 }w_i\ ext{ 的平均敏感度。}}\]&lt;p&gt;这也是为什么 Active Subspace 是&lt;strong&gt;函数本身的性质&lt;/strong&gt;，而不仅是输入数据分布的 PCA。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-如果谱里出现-gap事情就有意思了&#34;&gt;4. 如果谱里出现 gap，事情就有意思了
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[\lambda_1=20,\]\[\lambda_2=8,\]\[\lambda_3=0.07,\]\[\lambda_4=0.02,\ldots\]&lt;p&gt;那么：&lt;/p&gt;
+\[\lambda_2\gg\lambda_3.\]&lt;p&gt;这暗示模型可能主要沿两个方向变化。&lt;/p&gt;
+&lt;p&gt;于是写：&lt;/p&gt;
+\[W= [W_1\;W_2]\]&lt;p&gt;其中：&lt;/p&gt;
+\[W_1\in\mathbb R^{m\ imes2}.\]&lt;p&gt;定义：&lt;/p&gt;
+\[\boxed{y=W_1^Tx}\]&lt;p&gt;和：&lt;/p&gt;
+\[z=W_2^Tx.\]&lt;p&gt;那么可能存在近似：&lt;/p&gt;
+\[\boxed{ f(x)\approx g(W_1^Tx)=g(y). }\]&lt;p&gt;原来：&lt;/p&gt;
+\[f:\mathbb R^{20}\rightarrow\mathbb R\]&lt;p&gt;的问题变成：&lt;/p&gt;
+\[g:\mathbb R^2\rightarrow\mathbb R.\]&lt;p&gt;这就是 Active Subspace 真正开始产生工程价值的位置。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-它为什么对-kriging-特别有吸引力&#34;&gt;5. 它为什么对 Kriging 特别有吸引力？
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[x\in\mathbb R^{30}.\]&lt;p&gt;直接训练 Gaussian Process：&lt;/p&gt;
+\[x\rightarrow f\]&lt;p&gt;意味着 kernel 要在：&lt;/p&gt;
+\[30\]&lt;p&gt;维空间里学习距离结构：&lt;/p&gt;
+\[k(x,x&#39;).\]&lt;p&gt;样本很快变得稀疏：&lt;/p&gt;
+\[\boxed{\ ext{curse of dimensionality}.}\]&lt;p&gt;如果 Active Subspace 发现：&lt;/p&gt;
+\[r=3,\]&lt;p&gt;那么先投影：&lt;/p&gt;
+\[y=W_1^Tx\in\mathbb R^3,\]&lt;p&gt;再训练：&lt;/p&gt;
+\[\boxed{y\rightarrow f.}\]&lt;p&gt;于是 GP/&lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; 只需要处理三维空间。&lt;/p&gt;
+&lt;p&gt;Constantine 的专著明确把 response-surface construction 作为 Active Subspace 最成熟的应用之一，并指出 active variables 可用于更有效地进行响应面、优化、积分与反演。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-这里有一个和-pca-极其重要的区别&#34;&gt;6. 这里有一个和 PCA 极其重要的区别
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;PCA 研究：&lt;/p&gt;
+\[\boxed{\ ext{输入数据 }x\ ext{ 自己在哪里变化最大。}}\]&lt;p&gt;典型矩阵：&lt;/p&gt;
+\[C_x= \mathbb E[(x-\mu)(x-\mu)^T].\]&lt;p&gt;Active Subspace 研究：&lt;/p&gt;
+\[\boxed{\ ext{输出 }f\ ext{ 对输入的哪些方向最敏感。}}\]&lt;p&gt;矩阵：&lt;/p&gt;
+\[C_f= \mathbb E[\ abla f\ abla f^T].\]&lt;p&gt;因此可能出现：&lt;/p&gt;
+&lt;p&gt;某方向输入变化很大：&lt;/p&gt;
+\[\operatorname{Var}(x_i)\gg1,\]&lt;p&gt;但：&lt;/p&gt;
+\[f\]&lt;p&gt;根本不关心它。&lt;/p&gt;
+&lt;p&gt;PCA 会保留。&lt;/p&gt;
+&lt;p&gt;Active Subspace 会倾向于丢掉。&lt;/p&gt;
+&lt;p&gt;反过来，某方向输入变化范围很小，但：&lt;/p&gt;
+\[\frac{\partial f}{\partial x}\]&lt;p&gt;巨大。&lt;/p&gt;
+&lt;p&gt;PCA 可能忽略它。&lt;/p&gt;
+&lt;p&gt;Active Subspace 会认为它非常重要。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \ ext{PCA 是 data-aware； Active Subspace 是 model-response-aware。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;7-它和-sobol-灵敏度也不是一回事&#34;&gt;7. 它和 Sobol 灵敏度也不是一回事
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Sobol 指数问：&lt;/p&gt;
+\[\boxed{\ ext{某个变量贡献了多少输出方差？}}\]&lt;p&gt;因此结果仍然附着在：&lt;/p&gt;
+\[x_1,x_2,\ldots,x_m.\]&lt;p&gt;Active Subspace 问：&lt;/p&gt;
+\[\boxed{\ ext{哪个线性组合方向控制输出？}}\]&lt;p&gt;例如：&lt;/p&gt;
+\[0.42x_1 - 0.38x_2 + 0.71x_7 +\cdots.\]&lt;p&gt;所以 Sobol 更适合：&lt;/p&gt;
+\[\boxed{\ ext{解释原始变量重要性}}\]&lt;p&gt;而 Active Subspace 更适合：&lt;/p&gt;
+\[\boxed{\ ext{发现隐藏的低维坐标系}.}\]&lt;p&gt;两者可以互补，不能简单互换。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;8-一个很值得记住的例子&#34;&gt;8. 一个很值得记住的例子
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设机构最大驱动力：&lt;/p&gt;
+\[F_{\max} = g( 0.7L_1 -0.6L_2 +0.2c ).\]&lt;p&gt;输入：&lt;/p&gt;
+\[x= [L_1,L_2,c].\]&lt;p&gt;三个变量都影响结果。&lt;/p&gt;
+&lt;p&gt;所以变量筛选无法删除任何一个。&lt;/p&gt;
+&lt;p&gt;但 Active Subspace 会发现：&lt;/p&gt;
+\[w_1 \approx \begin{bmatrix} 0.7\\ -0.6\\ 0.2 \end{bmatrix}.\]&lt;p&gt;因此：&lt;/p&gt;
+\[y=w_1^Tx\]&lt;p&gt;就是唯一真正重要的方向。&lt;/p&gt;
+&lt;p&gt;物理上它可能对应：&lt;/p&gt;
+\[\boxed{\ ext{某种有效几何失配量}.}\]&lt;p&gt;这正是 Active Subspace 一个很容易被低估的价值：&lt;/p&gt;
+&lt;p&gt;它有时不只是降维。&lt;/p&gt;
+&lt;p&gt;它还能帮助你发现：&lt;/p&gt;
+\[\boxed{\ ext{隐藏的组合物理参数}.}\]&lt;p&gt;比如很多经典无量纲数，本质上也是若干原始变量组合后才揭示真正控制规律。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-但怎么得到-这就是它最大的成本&#34;&gt;9. 但怎么得到 \(C\)？这就是它最大的成本
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;真实模型通常不能解析计算：&lt;/p&gt;
+\[C= \mathbb E[\ abla f\ abla f^T].\]&lt;p&gt;于是 Monte Carlo：&lt;/p&gt;
+\[\boxed{ \hat C= \frac1N \sum_{i=1}^N g_i g_i^T }\]&lt;p&gt;其中：&lt;/p&gt;
+\[g_i=\ abla f(x_i).\]&lt;p&gt;然后：&lt;/p&gt;
+\[\hat C = \hat W\hat\Lambda\hat W^T.\]&lt;p&gt;Constantine 的标准方法就是随机采样梯度，再通过该经验矩阵估计 active eigenspace。&lt;/p&gt;
+&lt;p&gt;问题来了：&lt;/p&gt;
+&lt;p&gt;如果一次：&lt;/p&gt;
+\[f(x)\]&lt;p&gt;就是一次昂贵 FEM，&lt;/p&gt;
+&lt;p&gt;而梯度用有限差分：&lt;/p&gt;
+\[\frac{\partial f}{\partial x_j} \approx \frac{f(x+\epsilon e_j)-f(x)}{\epsilon},\]&lt;p&gt;那么一次 gradient 需要约：&lt;/p&gt;
+\[m+1\]&lt;p&gt;次仿真。&lt;/p&gt;
+&lt;p&gt;对于：&lt;/p&gt;
+\[m=100,\]&lt;p&gt;代价可能直接不可接受。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-所以-adjoint-又出现了&#34;&gt;10. 所以 Adjoint 又出现了
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果：&lt;/p&gt;
+\[f(x)\]&lt;p&gt;是一个 scalar Quantity of Interest，&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;adjoint&#34; tabindex=&#34;0&#34;&gt;adjoint&lt;/span&gt; 方法常能以大约：&lt;/p&gt;
+\[\boxed{\ ext{一次额外 PDE solve}}\]&lt;p&gt;的成本获得：&lt;/p&gt;
+\[\ abla_x f.\]&lt;p&gt;这与昨天 &lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt; 卡片产生了非常漂亮的连接。&lt;/p&gt;
+&lt;p&gt;DWR：&lt;/p&gt;
+\[\boxed{\ ext{adjoint 用来判断空间中的误差哪里影响 }J.}\]&lt;p&gt;Active Subspace：&lt;/p&gt;
+\[\boxed{\ ext{gradient 用来判断参数空间中的哪个方向影响 }J.}\]&lt;p&gt;于是可以把它们放在两个不同空间里：&lt;/p&gt;
+\[\boxed{ \ ext{DWR} \rightarrow \ ext{physical-space importance} }\]\[\boxed{ \ ext{Active Subspace} \rightarrow \ ext{parameter-space importance}. }\]&lt;p&gt;而二者背后都依赖：&lt;/p&gt;
+\[\boxed{\ ext{Quantity of Interest 的 sensitivity}.}\]&lt;p&gt;这是很值得建立起来的统一认识。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-没有梯度怎么办&#34;&gt;11. 没有梯度怎么办？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这是 Active Subspace 很现实的问题。&lt;/p&gt;
+&lt;p&gt;可以：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;finite difference；&lt;/li&gt;
+&lt;li&gt;automatic differentiation；&lt;/li&gt;
+&lt;li&gt;adjoint；&lt;/li&gt;
+&lt;li&gt;local surrogate gradient；&lt;/li&gt;
+&lt;li&gt;gradient sketching。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Constantine、Eftekhari 与 Wakin 研究过 gradient sketching：不必恢复整个 \(m\) 维梯度，而只测量若干随机方向导数，并利用这些信息估计主要 eigenspace；方向导数可通过两次函数评价近似，成本不直接随输入维度增长。&lt;/p&gt;
+&lt;p&gt;这给了一个很实用的原则：&lt;/p&gt;
+\[\boxed{ \ ext{如果你最终只需要 gradient 的主子空间， 未必需要完整 gradient。} }\]&lt;p&gt;这和 randomized linear algebra 的思想高度一致。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-这里必须讲一个很重要的局限active-subspace-是全局平均&#34;&gt;12. 这里必须讲一个很重要的局限：Active Subspace 是全局平均
+&lt;/h1&gt;&lt;p&gt;矩阵：&lt;/p&gt;
+\[C= \mathbb E[ \ abla f\ abla f^T ]\]&lt;p&gt;对整个输入分布：&lt;/p&gt;
+\[\rho(x)\]&lt;p&gt;取平均。&lt;/p&gt;
+&lt;p&gt;所以它发现的是：&lt;/p&gt;
+\[\boxed{\ ext{global average sensitivity directions}.}\]&lt;p&gt;这对普通 UQ 很合理。&lt;/p&gt;
+&lt;p&gt;但可靠性分析关心：&lt;/p&gt;
+\[\boxed{g(x)\approx0}\]&lt;p&gt;附近。&lt;/p&gt;
+&lt;p&gt;假设：&lt;/p&gt;
+&lt;p&gt;99.9% 概率区域里：&lt;/p&gt;
+\[x_1\]&lt;p&gt;控制输出。&lt;/p&gt;
+&lt;p&gt;但极小 failure region 中：&lt;/p&gt;
+\[x_{17}\]&lt;p&gt;突然决定：&lt;/p&gt;
+\[g(x)&lt;0.\]&lt;p&gt;全局 Active Subspace 很可能把：&lt;/p&gt;
+\[x_{17}\]&lt;p&gt;对应方向压掉。&lt;/p&gt;
+&lt;p&gt;结果：&lt;/p&gt;
+\[\boxed{\ ext{平均预测很好，失效概率却完全错误。}}\]&lt;p&gt;这对可靠性问题尤其危险。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;13-所以可靠性真正需要的是failure-aware-active-subspace&#34;&gt;13. 所以可靠性真正需要的是“failure-aware active subspace”
+&lt;/h1&gt;&lt;p&gt;这也是为什么近年的可靠性方法不满足于：&lt;/p&gt;
+\[\ ext{AS} \rightarrow \ ext{GP} \rightarrow P_f.\]&lt;p&gt;例如 Kim、Wang 与 Junho Song 的高维可靠性工作把：&lt;/p&gt;
+\[\boxed{ \ ext{Active Subspace} + \ ext{heteroscedastic Gaussian Process} + \ ext{active learning} }\]&lt;p&gt;耦合起来。&lt;/p&gt;
+&lt;p&gt;Active learning 把新高保真样本主动推向：&lt;/p&gt;
+\[\boxed{\ ext{critical region}}\]&lt;p&gt;而不是仅仅优化整个输入空间的平均拟合质量，并随数据更新 feature-space mapping。&lt;/p&gt;
+&lt;p&gt;这解决的正是：&lt;/p&gt;
+\[\boxed{\ ext{全局重要方向不一定等于失效面重要方向}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;14-一个很有用的可靠性版本&#34;&gt;14. 一个很有用的可靠性版本
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;普通 Active Subspace：&lt;/p&gt;
+\[C= \mathbb E_\rho[ \ abla g\ abla g^T ].\]&lt;p&gt;可以设想引入 failure-boundary weighting：&lt;/p&gt;
+\[\boxed{ C_w = \mathbb E[ w(g(x)) \ abla g\ abla g^T ] }\]&lt;p&gt;其中：&lt;/p&gt;
+\[w(g)\]&lt;p&gt;在：&lt;/p&gt;
+\[g\approx0\]&lt;p&gt;附近较大。&lt;/p&gt;
+&lt;p&gt;例如概念上：&lt;/p&gt;
+\[w(g) = \exp\left( -\frac{g^2}{2\sigma_g^2} \right).\]&lt;p&gt;这样寻找的方向变成：&lt;/p&gt;
+\[\boxed{\ ext{主要改变失效边界的参数组合}.}\]&lt;p&gt;这与可靠性 active learning 的核心目标更一致。&lt;/p&gt;
+&lt;p&gt;注意这已经不是最经典的 vanilla Active Subspace，而属于它面向任务的扩展思路；现有高维可靠性研究正通过 active learning、surrogate-assisted AS 等方式解决类似问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-active-subspace-还有一个经常被忽略的问题它只寻找线性子空间&#34;&gt;15. Active Subspace 还有一个经常被忽略的问题：它只寻找线性子空间
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[f(x_1,x_2) = g(x_1^2+x_2^2).\]&lt;p&gt;真正的低维变量是：&lt;/p&gt;
+\[r=x_1^2+x_2^2.\]&lt;p&gt;这是一个：&lt;/p&gt;
+\[\boxed{\ ext{非线性 feature}.}\]&lt;p&gt;不存在一个固定：&lt;/p&gt;
+\[w\]&lt;p&gt;使：&lt;/p&gt;
+\[f(x)\approx g(w^Tx).\]&lt;p&gt;此时 Active Subspace 可能需要多个方向，甚至无法实现明显降维。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{\ ext{low-dimensional structure}}\]&lt;p&gt;不一定意味着：&lt;/p&gt;
+\[\boxed{\ ext{low-dimensional linear subspace}.}\]&lt;p&gt;这也是后来：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;nonlinear sufficient dimension reduction；&lt;/li&gt;
+&lt;li&gt;autoencoder；&lt;/li&gt;
+&lt;li&gt;active manifold；&lt;/li&gt;
+&lt;li&gt;ridge approximation；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;等方法存在的原因。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;16-这和-rom-的区别也值得分清&#34;&gt;16. 这和 ROM 的区别也值得分清
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt;/&lt;span class=&#34;term-anchor&#34; data-term=&#34;reduced-basis&#34; tabindex=&#34;0&#34;&gt;Reduced Basis&lt;/span&gt; 通常降低：&lt;/p&gt;
+\[\boxed{\ ext{state dimension}.}\]&lt;p&gt;例如：&lt;/p&gt;
+\[u\in\mathbb R^{10^6}\]&lt;p&gt;变成：&lt;/p&gt;
+\[a\in\mathbb R^{50}.\]&lt;p&gt;Active Subspace 降低：&lt;/p&gt;
+\[\boxed{\ ext{parameter dimension}.}\]&lt;p&gt;例如：&lt;/p&gt;
+\[\mu\in\mathbb R^{100}\]&lt;p&gt;变成：&lt;/p&gt;
+\[y\in\mathbb R^3.\]&lt;p&gt;所以二者解决的是完全不同的 curse of dimensionality：&lt;/p&gt;
+\[\boxed{ \ ext{ROM: output/state space} }\]\[\boxed{ \ ext{AS: input/parameter space}. }\]&lt;p&gt;理论上可以组合：&lt;/p&gt;
+\[\mu\in\mathbb R^{100}\]\[\downarrow\quad AS\]\[y\in\mathbb R^3\]\[\downarrow\quad surrogate\]&lt;p&gt;同时：&lt;/p&gt;
+\[u\in\mathbb R^{10^6}\]\[\downarrow\quad POD/RB\]\[a\in\mathbb R^{50}.\]&lt;p&gt;这就是非常典型的&lt;strong&gt;双侧降维&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;甚至已有工作进一步研究 multi-fidelity Active Subspaces，用廉价低保真梯度辅助恢复高保真模型的主要参数方向。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-对你当前高维代理问题最值得迁移的一点&#34;&gt;17. 对你当前高维代理问题最值得迁移的一点
+&lt;/h1&gt;&lt;p&gt;面对：&lt;/p&gt;
+\[30,\ 50,\ 100\]&lt;p&gt;维参数空间时，一个很容易产生的条件反射是：&lt;/p&gt;
+\[\boxed{\ ext{找更强的高维 surrogate。}}\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Deep GP；&lt;/li&gt;
+&lt;li&gt;neural operator；&lt;/li&gt;
+&lt;li&gt;sparse GP；&lt;/li&gt;
+&lt;li&gt;mixture-of-experts。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但应该先问一个更基础的问题：&lt;/p&gt;
+\[\boxed{ f(x)\ ext{ 真的具有这么高的 intrinsic dimension 吗？} }\]&lt;p&gt;如果：&lt;/p&gt;
+\[100\]&lt;p&gt;个原始参数实际上主要通过：&lt;/p&gt;
+\[3\]&lt;p&gt;种组合影响输出，&lt;/p&gt;
+&lt;p&gt;那么真正值得解决的是：&lt;/p&gt;
+\[\boxed{\ ext{发现这三个组合}.}\]&lt;p&gt;然后普通 Kriging 可能已经足够。&lt;/p&gt;
+&lt;p&gt;所以面对高维代理模型，方法顺序最好是：&lt;/p&gt;
+\[\boxed{ \ ext{先诊断 intrinsic dimension} \rightarrow \ ext{再选择 surrogate complexity}. }\]&lt;p&gt;不要反过来。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;18-一个很适合自己实现的小实验&#34;&gt;18. 一个很适合自己实现的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;构造：&lt;/p&gt;
+\[x\in[-1,1]^{20}\]&lt;p&gt;和：&lt;/p&gt;
+\[f(x) = \sin(w_1^Tx) + 0.1(w_2^Tx)^2\]&lt;p&gt;其中随机生成两个正交单位向量：&lt;/p&gt;
+\[w_1,w_2.\]&lt;p&gt;于是你知道真实 intrinsic dimension：&lt;/p&gt;
+\[r=2.\]&lt;p&gt;随机生成：&lt;/p&gt;
+\[N=200\]&lt;p&gt;个样本。&lt;/p&gt;
+&lt;p&gt;计算：&lt;/p&gt;
+\[g_i=\ abla f(x_i)\]&lt;p&gt;然后：&lt;/p&gt;
+\[\hat C = \frac1N \sum_i g_ig_i^T.\]&lt;p&gt;特征分解：&lt;/p&gt;
+\[\hat C=W\Lambda W^T.\]&lt;p&gt;你应该看到：&lt;/p&gt;
+\[\lambda_1,\lambda_2\]&lt;p&gt;明显大于：&lt;/p&gt;
+\[\lambda_3,\ldots,\lambda_{20}.\]&lt;p&gt;然后比较两个 Kriging：&lt;/p&gt;
+\[\boxed{ GP_{20D}:x\rightarrow f }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ GP_{2D}:W_1^Tx\rightarrow f. }\]&lt;p&gt;控制相同训练样本量。&lt;/p&gt;
+&lt;p&gt;通常后者会非常明显地体现低维建模优势。&lt;/p&gt;
+&lt;p&gt;最后把函数换成：&lt;/p&gt;
+\[f(x)=\sin(x_1^2+x_2^2)\]&lt;p&gt;观察线性 Active Subspace 开始失效。&lt;/p&gt;
+&lt;p&gt;这一个实验就能同时理解：&lt;/p&gt;
+\[\boxed{\ ext{它为什么有效，以及它什么时候无效。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Active Subspace 最值得记住的并不是：&lt;/p&gt;
+\[C=\mathbb E[\ abla f\ abla f^T].\]&lt;p&gt;而是一个关于高维问题非常重要的认识：&lt;/p&gt;
+\[\boxed{ \ ext{“有很多重要变量” 并不意味着 “函数具有很高的内在维度”。} }\]&lt;p&gt;原始坐标：&lt;/p&gt;
+\[(x_1,\ldots,x_m)\]&lt;p&gt;可能只是看待问题的一种方式。&lt;/p&gt;
+&lt;p&gt;真正控制物理输出的可能是：&lt;/p&gt;
+\[\boxed{ y_1=w_1^Tx,\quad y_2=w_2^Tx,\ldots }\]&lt;p&gt;这些隐藏的组合变量。&lt;/p&gt;
+&lt;p&gt;它在整个知识体系中的位置可以画成：&lt;/p&gt;
+\[\ ext{High-dimensional parameter model}\]\[\downarrow\]\[\ ext{gradient sensitivity}\]\[\downarrow\]\[\boxed{\ ext{Active Subspace}}\]\[\downarrow\]\[\ ext{low-dimensional active variables}\]\[\downarrow\]\[\boxed{\ ext{GP / optimization / UQ / reliability}.}\]&lt;p&gt;而对高维代理和可靠性最重要的警告同样值得记住：&lt;/p&gt;
+\[\boxed{ \ ext{“平均意义下不重要的方向” 仍然可能决定一个极小概率失效事件。} }\]&lt;p&gt;因此 Active Subspace 在普通 UQ 中可以直接用于降维；进入可靠性以后，最好进一步变成 &lt;strong&gt;failure-aware / adaptive dimension reduction&lt;/strong&gt;。这一步，恰恰是它与 active learning、Kriging 和高维可靠性真正发生交汇的地方。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Paul G. Constantine, &lt;strong&gt;&lt;em&gt;Active Subspaces: Emerging Ideas for Dimension Reduction in Parameter Studies&lt;/em&gt;&lt;/strong&gt;, SIAM, 2015。这是最推荐的系统入口，篇幅不到百页，从定义、Monte Carlo 估计一直讲到 response surface、优化和 UQ。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/book/10.1137/1.9781611973860&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM Active Subspaces 专著&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Constantine, Eftekhari &amp;amp; Wakin, &lt;strong&gt;&lt;em&gt;Computing Active Subspaces Efficiently with Gradient Sketching&lt;/em&gt;&lt;/strong&gt;。如果真正准备把 AS 用在昂贵 FEM 上，这篇尤其值得看，因为它直接处理“完整梯度太贵怎么办”。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/1506.04190&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文页面&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Lam, Zahm, Youssef M. Marzouk &amp;amp; Karen E. Willcox, &lt;strong&gt;&lt;em&gt;Multifidelity Dimension Reduction via Active Subspaces&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Scientific Computing&lt;/em&gt;, 2020。把 AS 与 multi-fidelity 联系起来，很适合沿你最近的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt;/ROM 方向继续读。&lt;br&gt;
+SIAM 论文页&lt;/p&gt;
+&lt;p&gt;Kim, Wang &amp;amp; Junho Song, &lt;strong&gt;&lt;em&gt;Adaptive Active Subspace-Based Metamodeling for High-Dimensional Reliability Analysis&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Structural Safety&lt;/em&gt;, 2023。把 Active Subspace、heteroscedastic GP 和 active learning 联合起来，最直接对应高维可靠性代理问题。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2304.06252&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;公开预印本&lt;/a&gt;&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
