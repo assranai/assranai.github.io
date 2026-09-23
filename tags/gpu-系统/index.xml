@@ -568,13 +568,13 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × GPU 系统 × 高性能计算&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
 这期转到 AI 推理基础设施。Continuous Batching 值得学，因为它揭示了 LLM serving 和普通神经网络 inference 的一个根本区别：&lt;/p&gt;
-\[\boxed{ \ ext{LLM 请求不是一次 forward pass，而是一串长度未知的 forward passes。} }\]&lt;p&gt;如果还沿用传统“收集一批请求 → 整批跑完 → 再接下一批”的 batching 思路，会造成非常严重的 GPU 空转。&lt;/p&gt;
+\[\boxed{ \text{LLM 请求不是一次 forward pass，而是一串长度未知的 forward passes。} }\]&lt;p&gt;如果还沿用传统“收集一批请求 → 整批跑完 → 再接下一批”的 batching 思路，会造成非常严重的 GPU 空转。&lt;/p&gt;
 &lt;p&gt;2022 年 OSDI 的 &lt;strong&gt;Orca&lt;/strong&gt; 把调度粒度从 request level 降到 &lt;strong&gt;iteration level&lt;/strong&gt;：每生成一轮 token 后，已经完成的请求立即退出，新请求立即加入。论文在其 GPT-3 175B 实验中报告，相同延迟水平下相比 FasterTransformer 可达到最高约 36.9× 的吞吐提升。今天 Hugging Face Transformers、vLLM、SGLang 等推理体系都采用或建立在类似 continuous batching 思路之上。&lt;/p&gt;
 &lt;p&gt;真正值得理解的不是“动态加请求”这句话，而是：&lt;/p&gt;
-\[\boxed{ \ ext{调度器开始控制 token，而不只是控制 request。} }\]&lt;hr&gt;
+\[\boxed{ \text{调度器开始控制 token，而不只是控制 request。} }\]&lt;hr&gt;
 &lt;h2 id=&#34;1-为什么普通-static-batching-在-llm-上特别浪费&#34;&gt;1. 为什么普通 static batching 在 LLM 上特别浪费？
 &lt;/h2&gt;&lt;p&gt;传统图像模型一次请求可能就是：&lt;/p&gt;
-\[x\rightarrow f_\ heta(x)\rightarrow y.\]&lt;p&gt;所以四个请求组成 batch：&lt;/p&gt;
+\[x\rightarrow f_\theta(x)\rightarrow y.\]&lt;p&gt;所以四个请求组成 batch：&lt;/p&gt;
 \[[x_1,x_2,x_3,x_4]\]&lt;p&gt;一起 forward 一次，然后全部结束。&lt;/p&gt;
 &lt;p&gt;LLM 完全不同。&lt;/p&gt;
 &lt;p&gt;一个请求可能生成：&lt;/p&gt;
@@ -583,7 +583,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[500\]&lt;p&gt;个 token，&lt;/p&gt;
 &lt;p&gt;第三个：&lt;/p&gt;
 \[2000.\]&lt;p&gt;自回归生成意味着：&lt;/p&gt;
-\[x_{t+1} = f_\ heta(x_{\le t}).\]&lt;p&gt;所以每生成一个新 token，都要再次执行模型。&lt;/p&gt;
+\[x_{t+1} = f_\theta(x_{\le t}).\]&lt;p&gt;所以每生成一个新 token，都要再次执行模型。&lt;/p&gt;
 &lt;p&gt;假设一个 batch：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -633,7 +633,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;最终 GPU 实际上在等 C。&lt;/p&gt;
 &lt;p&gt;问题可以概括为：&lt;/p&gt;
-\[\boxed{ \ ext{batch occupancy 随生成过程不断下降。} }\]&lt;p&gt;而刚结束的槽位却不能立即给排队的新请求使用。&lt;/p&gt;
+\[\boxed{ \text{batch occupancy 随生成过程不断下降。} }\]&lt;p&gt;而刚结束的槽位却不能立即给排队的新请求使用。&lt;/p&gt;
 &lt;p&gt;Orca 论文正是针对这种 generative workload 的 multi-iteration 特性提出 iteration-level scheduling。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-continuous-batching-的核心操作其实非常简单&#34;&gt;2. Continuous Batching 的核心操作其实非常简单
@@ -697,12 +697,12 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;因此 batch 不再是一个固定对象。&lt;/p&gt;
 &lt;p&gt;它变成：&lt;/p&gt;
-\[\boxed{ B_t= \{\ ext{第 }t\ ext{ 次迭代被调度的活跃 sequences}\} }\]&lt;p&gt;并且：&lt;/p&gt;
-\[B_t\ eq B_{t+1}.\]&lt;p&gt;Hugging Face 当前 ContinuousBatchingManager 的行为就是每轮检查已完成请求，并立即用队列中的请求补充 GPU 容量。&lt;/p&gt;
+\[\boxed{ B_t= \{\text{第 }t\text{ 次迭代被调度的活跃 sequences}\} }\]&lt;p&gt;并且：&lt;/p&gt;
+\[B_t\neq B_{t+1}.\]&lt;p&gt;Hugging Face 当前 ContinuousBatchingManager 的行为就是每轮检查已完成请求，并立即用队列中的请求补充 GPU 容量。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-为什么一次-token-iteration才是自然的调度单位&#34;&gt;3. 为什么“一次 token iteration”才是自然的调度单位？
 &lt;/h1&gt;&lt;p&gt;因为 autoregressive decode 的最小同步计算单位就是：&lt;/p&gt;
-\[\boxed{\ ext{每个活跃 sequence 生成一个 token}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{每个活跃 sequence 生成一个 token}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;假设当前有：&lt;/p&gt;
 \[B\]&lt;p&gt;个 sequence。&lt;/p&gt;
 &lt;p&gt;一次 decode iteration：&lt;/p&gt;
@@ -713,15 +713,15 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;li&gt;sequence 3 还剩 500 token。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;只要它们当前都需要：&lt;/p&gt;
-\[\boxed{\ ext{执行下一次 forward}}\]&lt;p&gt;就可以组成计算 batch。&lt;/p&gt;
+\[\boxed{\text{执行下一次 forward}}\]&lt;p&gt;就可以组成计算 batch。&lt;/p&gt;
 &lt;p&gt;所以 Orca 的关键变化并不是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;batching 更聪明了。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;而是重新定义：&lt;/p&gt;
-\[\boxed{ \ ext{scheduler 的工作单位。} }\]&lt;p&gt;传统：&lt;/p&gt;
-\[\ ext{request}\]&lt;p&gt;Orca：&lt;/p&gt;
-\[\boxed{\ ext{iteration}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{scheduler 的工作单位。} }\]&lt;p&gt;传统：&lt;/p&gt;
+\[\text{request}\]&lt;p&gt;Orca：&lt;/p&gt;
+\[\boxed{\text{iteration}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这是一个很典型的系统设计原则：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;调度粒度应该匹配工作负载真正可以被抢占和重组的粒度。&lt;/p&gt;
@@ -735,7 +735,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;Attention 对 A 需要读取：&lt;/p&gt;
 \[KV_A[1:1000],\]&lt;p&gt;对 B 读取：&lt;/p&gt;
 \[KV_B[1:50].\]&lt;p&gt;因此不像普通 GEMM 那样简单：&lt;/p&gt;
-\[X\in\mathbb R^{B\ imes d}\]&lt;p&gt;就可以全部整齐打包。&lt;/p&gt;
+\[X\in\mathbb R^{B\times d}\]&lt;p&gt;就可以全部整齐打包。&lt;/p&gt;
 &lt;p&gt;早期 Orca 为此提出 &lt;strong&gt;selective batching&lt;/strong&gt;：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;对线性层等天然适合 batch 的操作一起执行；&lt;/li&gt;
@@ -746,8 +746,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;h1 id=&#34;5-这正好解释了-pagedattention-为什么后来如此重要&#34;&gt;5. 这正好解释了 PagedAttention 为什么后来如此重要
 &lt;/h1&gt;&lt;p&gt;前面知识卡片讲过 &lt;span class=&#34;term-anchor&#34; data-term=&#34;paged-attention&#34; tabindex=&#34;0&#34;&gt;PagedAttention&lt;/span&gt;。&lt;/p&gt;
 &lt;p&gt;Continuous Batching 解决：&lt;/p&gt;
-\[\boxed{\ ext{谁什么时候进入 GPU 计算}}\]&lt;p&gt;PagedAttention 解决：&lt;/p&gt;
-\[\boxed{\ ext{这些不断加入/退出的请求，其 KV Cache 放在哪里}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{谁什么时候进入 GPU 计算}}\]&lt;p&gt;PagedAttention 解决：&lt;/p&gt;
+\[\boxed{\text{这些不断加入/退出的请求，其 KV Cache 放在哪里}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;Continuous batching 会让：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;sequence 动态加入；&lt;/li&gt;
@@ -764,7 +764,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/ul&gt;
 &lt;p&gt;vLLM 的 PagedAttention 把 KV cache 做成类似虚拟内存页的 fixed-size blocks，并报告其系统相较 Orca 等基线在相同延迟下可得到约 2–4× 的吞吐提升。&lt;/p&gt;
 &lt;p&gt;所以两者的关系可以非常清楚地写成：&lt;/p&gt;
-\[\boxed{ \ ext{Continuous Batching = computation scheduling} }\]\[\boxed{ \ ext{PagedAttention = state-memory virtualization} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{Continuous Batching = computation scheduling} }\]\[\boxed{ \text{PagedAttention = state-memory virtualization} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;二者共同组成现代 LLM serving 的基础。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-continuous-batching-真正困难的地方在-prefill-和-decode-混在了一起&#34;&gt;6. Continuous Batching 真正困难的地方，在 Prefill 和 Decode 混在了一起
@@ -777,16 +777,16 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[L_p\]&lt;p&gt;个 prompt tokens。&lt;/p&gt;
 &lt;p&gt;整个 prompt 可以并行处理。&lt;/p&gt;
 &lt;p&gt;因此有大量矩阵计算：&lt;/p&gt;
-\[\boxed{\ ext{compute intensive}}\]&lt;p&gt;GPU 利用率很高。&lt;/p&gt;
+\[\boxed{\text{compute intensive}}\]&lt;p&gt;GPU 利用率很高。&lt;/p&gt;
 &lt;p&gt;它直接影响：&lt;/p&gt;
-\[\boxed{\ ext{TTFT — Time To First Token}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{TTFT — Time To First Token}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;h3 id=&#34;decode&#34;&gt;Decode
 &lt;/h3&gt;&lt;p&gt;每次只增加：&lt;/p&gt;
 \[1\]&lt;p&gt;个 token。&lt;/p&gt;
 &lt;p&gt;需要反复读取 KV cache。&lt;/p&gt;
 &lt;p&gt;单个 request 的计算规模相对小，常更偏 memory-bandwidth bound。&lt;/p&gt;
 &lt;p&gt;它影响：&lt;/p&gt;
-\[\boxed{\ ext{ITL/TBT — Inter-Token Latency}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{ITL/TBT — Inter-Token Latency}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;Sarathi 的工作明确指出，这两种 phase 的计算特征非常不同：prefill 很容易把 GPU 算力吃满，而单次 decode 的计算利用率相对较低，因此 decode 特别依赖 batching。&lt;/p&gt;
 
   &lt;/div&gt;
@@ -805,7 +805,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;每次 iteration 比较短。&lt;/p&gt;
 &lt;p&gt;突然进来一个：&lt;/p&gt;
-\[10000\ ext{-token prompt}.\]&lt;p&gt;如果直接把整个 prefill 一次做完：&lt;/p&gt;
+\[10000\text{-token prompt}.\]&lt;p&gt;如果直接把整个 prefill 一次做完：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -831,17 +831,17 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;即：&lt;/p&gt;
-\[\boxed{\ ext{inter-token latency spike}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{inter-token latency spike}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;所以“continuous batching”并不自动等于低延迟。&lt;/p&gt;
 &lt;p&gt;你还必须决定：&lt;/p&gt;
-\[\boxed{ \ ext{prefill 与 decode 如何共享 GPU 时间} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{prefill 与 decode 如何共享 GPU 时间} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这就是现代 LLM scheduler 的真正核心。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-chunked-prefill把一个大任务切碎让-decode-穿插进去&#34;&gt;8. Chunked Prefill：把一个大任务切碎，让 decode 穿插进去
 &lt;/h1&gt;&lt;p&gt;Sarathi 提出的关键方法之一是：&lt;/p&gt;
-\[\boxed{\ ext{chunked prefill}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{chunked prefill}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;例如原 prompt：&lt;/p&gt;
-\[8192\ ext{ tokens}\]&lt;p&gt;不要一次运行：&lt;/p&gt;
+\[8192\text{ tokens}\]&lt;p&gt;不要一次运行：&lt;/p&gt;
 \[8192,\]&lt;p&gt;而拆成：&lt;/p&gt;
 \[1024+1024+\cdots+1024.\]&lt;p&gt;于是执行可以从：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -874,7 +874,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;Sarathi 称其中一种策略为：&lt;/p&gt;
-\[\boxed{\ ext{decode-maximal batching}}\]&lt;p&gt;——尽量保留大量 decode，再用 prefill chunk 填充 GPU 的计算能力。&lt;/p&gt;
+\[\boxed{\text{decode-maximal batching}}\]&lt;p&gt;——尽量保留大量 decode，再用 prefill chunk 填充 GPU 的计算能力。&lt;/p&gt;
 &lt;p&gt;其论文实验报告，例如 LLaMA-13B/A6000 条件下 decode throughput 最高提升约 10×，端到端吞吐最高提升约 1.33×；后来的 Sarathi-Serve 进一步针对真实 serving 中 throughput-latency tradeoff 优化调度。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-为什么-chunked-prefill-这么巧&#34;&gt;9. 为什么 Chunked Prefill 这么巧？
@@ -883,13 +883,13 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;因为 prefill 和 decode 正好存在互补性。&lt;/p&gt;
 &lt;p&gt;Decode：&lt;/p&gt;
-\[\boxed{\ ext{单请求计算量小}}\]&lt;p&gt;所以需要很大的 batch 才能充分利用 GPU。&lt;/p&gt;
+\[\boxed{\text{单请求计算量小}}\]&lt;p&gt;所以需要很大的 batch 才能充分利用 GPU。&lt;/p&gt;
 &lt;p&gt;Prefill：&lt;/p&gt;
-\[\boxed{\ ext{单请求计算密度高}}\]&lt;p&gt;很容易利用 GPU。&lt;/p&gt;
+\[\boxed{\text{单请求计算密度高}}\]&lt;p&gt;很容易利用 GPU。&lt;/p&gt;
 &lt;p&gt;因此可以把它们混合：&lt;/p&gt;
-\[\boxed{ \ ext{prefill 提供 compute intensity} + \ ext{decode 提供并发 token workload} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{prefill 提供 compute intensity} + \text{decode 提供并发 token workload} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这是一种很典型的：&lt;/p&gt;
-\[\boxed{\ ext{heterogeneous workload co-scheduling}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{heterogeneous workload co-scheduling}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;它与简单的 FIFO 队列已经是完全不同层级的问题。&lt;/p&gt;
 
   &lt;/div&gt;
@@ -905,32 +905,32 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;li&gt;chunked prefill：512 个 tokens。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;因此只限制：&lt;/p&gt;
-\[\ ext{number of sequences}\]&lt;p&gt;并不能很好描述一次 GPU workload。&lt;/p&gt;
+\[\text{number of sequences}\]&lt;p&gt;并不能很好描述一次 GPU workload。&lt;/p&gt;
 &lt;p&gt;现代 scheduler 更自然的约束是：&lt;/p&gt;
-\[\boxed{ \sum_i n_i^{(\ ext{scheduled})} \le T_{\max} }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\boxed{ \sum_i n_i^{(\text{scheduled})} \le T_{\max} }\]&lt;p&gt;其中：&lt;/p&gt;
 \[T_{\max}\]&lt;p&gt;是一次 iteration 的 token budget。&lt;/p&gt;
 &lt;p&gt;Hugging Face 当前 Continuous Batching 配置已经直接暴露类似的 &lt;code&gt;max_batch_tokens&lt;/code&gt; 概念，并让 scheduler 根据 token budget、KV-cache blocks 和请求状态选择每轮执行内容。&lt;/p&gt;
 &lt;p&gt;这意味着 batching 已经从：&lt;/p&gt;
-\[\boxed{\ ext{“这一批有多少请求？”}}\]&lt;p&gt;进化成：&lt;/p&gt;
-\[\boxed{\ ext{“这一轮 GPU 应该处理多少 token，以及属于哪些请求？”}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{“这一批有多少请求？”}}\]&lt;p&gt;进化成：&lt;/p&gt;
+\[\boxed{\text{“这一轮 GPU 应该处理多少 token，以及属于哪些请求？”}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;11-为什么只看-tokenss-会误判-serving-系统&#34;&gt;11. 为什么只看 tokens/s 会误判 serving 系统？
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;假设系统 A：&lt;/p&gt;
-\[10000\ ext{ tokens/s}\]&lt;p&gt;系统 B：&lt;/p&gt;
-\[8000\ ext{ tokens/s}.\]&lt;p&gt;看起来 A 更好。&lt;/p&gt;
+\[10000\text{ tokens/s}\]&lt;p&gt;系统 B：&lt;/p&gt;
+\[8000\text{ tokens/s}.\]&lt;p&gt;看起来 A 更好。&lt;/p&gt;
 &lt;p&gt;但如果：&lt;/p&gt;
 &lt;h3 id=&#34;a&#34;&gt;A
 &lt;/h3&gt;&lt;p&gt;TTFT：&lt;/p&gt;
-\[4\ ext{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
-\[150\ ext{ms}\]&lt;h3 id=&#34;b&#34;&gt;B
+\[4\text{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
+\[150\text{ms}\]&lt;h3 id=&#34;b&#34;&gt;B
 &lt;/h3&gt;&lt;p&gt;TTFT：&lt;/p&gt;
-\[0.5\ ext{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
-\[35\ ext{ms}\]&lt;p&gt;对于交互式聊天：&lt;/p&gt;
-\[\boxed{B\ ext{ 很可能明显更好。}}\]&lt;p&gt;因此 LLM serving 通常至少要同时观察：&lt;/p&gt;
-\[\boxed{\ ext{Throughput}}\]\[\boxed{\ ext{TTFT}}\]\[\boxed{\ ext{ITL/TBT}}\]&lt;p&gt;以及尾延迟：&lt;/p&gt;
+\[0.5\text{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
+\[35\text{ms}\]&lt;p&gt;对于交互式聊天：&lt;/p&gt;
+\[\boxed{B\text{ 很可能明显更好。}}\]&lt;p&gt;因此 LLM serving 通常至少要同时观察：&lt;/p&gt;
+\[\boxed{\text{Throughput}}\]\[\boxed{\text{TTFT}}\]\[\boxed{\text{ITL/TBT}}\]&lt;p&gt;以及尾延迟：&lt;/p&gt;
 \[P_{95},P_{99}.\]&lt;p&gt;Sarathi-Serve 的研究重点正是：最大吞吐与低延迟之间并非自然一致，需要显式设计 scheduling policy。&lt;/p&gt;
 
   &lt;/div&gt;
@@ -946,18 +946,18 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[\mu.\]&lt;p&gt;当：&lt;/p&gt;
 \[\lambda\ll\mu,\]&lt;p&gt;系统很空。&lt;/p&gt;
 &lt;p&gt;这时为了拼大 batch 等待更多请求反而会增加：&lt;/p&gt;
-\[\boxed{\ ext{queueing delay}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{queueing delay}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;但当：&lt;/p&gt;
 \[\lambda\rightarrow\mu,\]&lt;p&gt;batching 会显著提高 GPU efficiency。&lt;/p&gt;
 &lt;p&gt;所以 scheduler 一直在权衡：&lt;/p&gt;
-\[\boxed{ \ ext{等一等，凑更大的 batch} }\]&lt;p&gt;和：&lt;/p&gt;
-\[\boxed{ \ ext{立即执行，降低当前用户 latency} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{等一等，凑更大的 batch} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \text{立即执行，降低当前用户 latency} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这和离线 benchmark 完全不同。&lt;/p&gt;
 &lt;p&gt;离线：&lt;/p&gt;
-\[\boxed{\ ext{永远有任务可算}}\]&lt;p&gt;在线：&lt;/p&gt;
-\[\boxed{\ ext{任务随机到达，而且用户正在等}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{永远有任务可算}}\]&lt;p&gt;在线：&lt;/p&gt;
+\[\boxed{\text{任务随机到达，而且用户正在等}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;所以 AI serving 本质上已经进入：&lt;/p&gt;
-\[\boxed{ \ ext{queueing + scheduling + memory management} }\]&lt;p&gt;系统工程领域。&lt;/p&gt;
+\[\boxed{ \text{queueing + scheduling + memory management} }\]&lt;p&gt;系统工程领域。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -979,11 +979,11 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[B_t= 31,32,29,32,\ldots\]&lt;p&gt;sequence lengths：&lt;/p&gt;
 \[L_i\]&lt;p&gt;也各不相同。&lt;/p&gt;
 &lt;p&gt;因此现代 inference engine 经常会把动态 workload 映射到有限的：&lt;/p&gt;
-\[\boxed{\ ext{shape buckets}}\]&lt;p&gt;或 graph sizes。&lt;/p&gt;
+\[\boxed{\text{shape buckets}}\]&lt;p&gt;或 graph sizes。&lt;/p&gt;
 &lt;p&gt;Hugging Face 当前 continuous batching 配置也包含 CUDA graph、padding intervals、KV-cache block 等硬件相关配置。&lt;/p&gt;
 &lt;p&gt;这是非常典型的系统矛盾：&lt;/p&gt;
-\[\boxed{ \ ext{scheduler 希望动态} }\]&lt;p&gt;而：&lt;/p&gt;
-\[\boxed{ \ ext{GPU kernel 希望静态} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{scheduler 希望动态} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{GPU kernel 希望静态} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;高性能 serving engine 的工作，就是在这两者之间建立中间层。&lt;/p&gt;
 
   &lt;/div&gt;
@@ -1008,7 +1008,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;反过来，如果一到长 prompt 就立即完整 prefill：&lt;/p&gt;
 \[B\]&lt;p&gt;又会严重阻塞正在 decode 的请求。&lt;/p&gt;
 &lt;p&gt;所以 scheduler 还需要处理：&lt;/p&gt;
-\[\boxed{\ ext{starvation / fairness}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{starvation / fairness}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;真实系统因此可能引入：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;FCFS；&lt;/li&gt;
@@ -1020,7 +1020,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;li&gt;latency SLO aware scheduling。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;这说明 continuous batching 并不是一个单独算法，而是：&lt;/p&gt;
-\[\boxed{\ ext{一个 scheduler architecture}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{一个 scheduler architecture}}\]&lt;p&gt;。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -1035,7 +1035,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;推理模型可能输出：&lt;/p&gt;
 \[5000, 10000,\]&lt;p&gt;甚至更多。&lt;/p&gt;
 &lt;p&gt;于是某些请求长期占据：&lt;/p&gt;
-\[\boxed{\ ext{KV cache + decode slot}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{KV cache + decode slot}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这会同时影响：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;memory occupancy；&lt;/li&gt;
@@ -1064,7 +1064,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
     &lt;p&gt;根本不需要 GPU。&lt;/p&gt;
 &lt;p&gt;只用 Python/Rust 写一个离散事件 simulator。&lt;/p&gt;
 &lt;p&gt;生成 1000 个请求：&lt;/p&gt;
-\[L_i^{out} \sim \ ext{某个长尾分布}.\]&lt;p&gt;假设 GPU 每 iteration 最多服务：&lt;/p&gt;
+\[L_i^{out} \sim \text{某个长尾分布}.\]&lt;p&gt;假设 GPU 每 iteration 最多服务：&lt;/p&gt;
 \[B=16.\]&lt;h3 id=&#34;static-batching&#34;&gt;Static batching
 &lt;/h3&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1102,9 +1102,9 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;记录：&lt;/p&gt;
-\[\ ext{GPU active slots}\]&lt;p&gt;例如：&lt;/p&gt;
+\[\text{GPU active slots}\]&lt;p&gt;例如：&lt;/p&gt;
 \[\eta= \frac{ \sum_t B_t }{ B_{\max}T }.\]&lt;p&gt;同时记录：&lt;/p&gt;
-\[\ ext{mean latency}\]&lt;p&gt;和：&lt;/p&gt;
+\[\text{mean latency}\]&lt;p&gt;和：&lt;/p&gt;
 \[P_{95}.\]&lt;p&gt;只要 output lengths 有明显差异，你就会看到 static batching 中出现大量：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1170,9 +1170,9 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;也就是说 request 会出现：&lt;/p&gt;
-\[\boxed{\ ext{暂停—恢复}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{暂停—恢复}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;如果暂停期间仍把完整 KV cache 长期占在 GPU 上：&lt;/p&gt;
-\[\boxed{\ ext{昂贵显存会被闲置状态占满。}}\]&lt;p&gt;如果直接丢掉：&lt;/p&gt;
+\[\boxed{\text{昂贵显存会被闲置状态占满。}}\]&lt;p&gt;如果直接丢掉：&lt;/p&gt;
 &lt;p&gt;恢复时又要重新 prefill。&lt;/p&gt;
 &lt;p&gt;因此 Agent serving 会进一步引出：&lt;/p&gt;
 &lt;ul&gt;
@@ -1183,7 +1183,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/ul&gt;
 &lt;p&gt;INFERCEPT 等工作正是针对 augmented LLM 中这种 request interception 问题研究何时保留、丢弃或交换 KV cache。&lt;/p&gt;
 &lt;p&gt;所以 Continuous Batching 也是理解：&lt;/p&gt;
-\[\boxed{\ ext{Agent runtime infrastructure}}\]&lt;p&gt;很好的入口。&lt;/p&gt;
+\[\boxed{\text{Agent runtime infrastructure}}\]&lt;p&gt;很好的入口。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;18-对游戏-ai-部署尤其有现实意义&#34;&gt;18. 对游戏 AI 部署尤其有现实意义
 &lt;/h1&gt;&lt;p&gt;假设游戏服务器同时运行：&lt;/p&gt;
@@ -1194,7 +1194,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/ul&gt;
 &lt;p&gt;每个请求生成长度不同。&lt;/p&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[\boxed{\ ext{一个 NPC = 一次独立 model.generate()}}\]&lt;p&gt;GPU 很难获得高利用率。&lt;/p&gt;
+\[\boxed{\text{一个 NPC = 一次独立 model.generate()}}\]&lt;p&gt;GPU 很难获得高利用率。&lt;/p&gt;
 &lt;p&gt;更合理的架构是：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1225,7 +1225,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;也就是说：&lt;/p&gt;
-\[\boxed{ \ ext{模型本身可能只是组件； 真正决定服务器容量的是调度层。} }\]&lt;p&gt;这也是为什么现在做 AI 游戏工程，只懂：&lt;/p&gt;
+\[\boxed{ \text{模型本身可能只是组件； 真正决定服务器容量的是调度层。} }\]&lt;p&gt;这也是为什么现在做 AI 游戏工程，只懂：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;模型 API；&lt;/li&gt;
 &lt;li&gt;prompt；&lt;/li&gt;
@@ -1233,13 +1233,13 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/ul&gt;
 &lt;p&gt;是不够的。&lt;/p&gt;
 &lt;p&gt;一旦进入本地/私有模型部署：&lt;/p&gt;
-\[\boxed{ \ ext{KV memory + batching + scheduling} }\]&lt;p&gt;都会直接决定成本。&lt;/p&gt;
+\[\boxed{ \text{KV memory + batching + scheduling} }\]&lt;p&gt;都会直接决定成本。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;19-它给其他工程领域一个很强的迁移启发重新寻找最小可调度工作单元&#34;&gt;19. 它给其他工程领域一个很强的迁移启发：重新寻找“最小可调度工作单元”
 &lt;/h1&gt;&lt;p&gt;Continuous Batching 最深的地方其实并不限于 LLM。&lt;/p&gt;
 &lt;p&gt;原来系统认为一个不可分割任务是：&lt;/p&gt;
-\[\boxed{\ ext{request}}\]&lt;p&gt;Orca 发现真正可以安全重组的是：&lt;/p&gt;
-\[\boxed{\ ext{iteration}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{request}}\]&lt;p&gt;Orca 发现真正可以安全重组的是：&lt;/p&gt;
+\[\boxed{\text{iteration}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这是一种很强的系统优化方法：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;当 workload 不均衡时，先检查当前 scheduling granularity 是否太粗。&lt;/p&gt;
@@ -1256,7 +1256,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;哪个才是真正合适的工作单位？&lt;/p&gt;
 &lt;p&gt;有时性能问题不是 kernel 太慢，&lt;/p&gt;
 &lt;p&gt;而是：&lt;/p&gt;
-\[\boxed{\ ext{scheduler 根本看不到足够细的可重组工作。}}\]&lt;hr&gt;
+\[\boxed{\text{scheduler 根本看不到足够细的可重组工作。}}\]&lt;hr&gt;
 &lt;h1 id=&#34;20-这和-gpu-物理引擎甚至有一个很直接的类比&#34;&gt;20. 这和 GPU 物理引擎甚至有一个很直接的类比
 &lt;/h1&gt;&lt;p&gt;假设有 100 个 physics islands。&lt;/p&gt;
 &lt;p&gt;传统方式：&lt;/p&gt;
@@ -1275,11 +1275,11 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/div&gt;&lt;p&gt;如果不同岛所需迭代数差异很大：&lt;/p&gt;
 \[4,\ 5,\ 30,\ 100,\ldots\]&lt;p&gt;就会遇到类似 static batching 的问题。&lt;/p&gt;
 &lt;p&gt;另一种思路：&lt;/p&gt;
-\[\boxed{ \ ext{以 solver iteration 为粒度重新装填 active islands} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{以 solver iteration 为粒度重新装填 active islands} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;已经收敛的 island 退出，&lt;/p&gt;
 &lt;p&gt;新 island 加入。&lt;/p&gt;
 &lt;p&gt;虽然具体 GPU 数据布局会复杂很多，但思维与 Orca 几乎一致：&lt;/p&gt;
-\[\boxed{ \ ext{variable-length iterative workloads 需要 iteration-aware scheduling。} }\]&lt;p&gt;这就是这张卡片对物理求解器最值得迁移的一点。&lt;/p&gt;
+\[\boxed{ \text{variable-length iterative workloads 需要 iteration-aware scheduling。} }\]&lt;p&gt;这就是这张卡片对物理求解器最值得迁移的一点。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Continuous Batching 最值得记住的不是：&lt;/p&gt;
@@ -1287,12 +1287,12 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;“请求完成以后立即补一个新请求。”&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;真正重要的是：&lt;/p&gt;
-\[\boxed{ \ ext{生成式模型的自然调度单位不是 request， 而是一次生成迭代。} }\]&lt;p&gt;知识体系可以这样定位：&lt;/p&gt;
-\[\ ext{Autoregressive inference}\]\[\downarrow\]\[\boxed{\ ext{Iteration-level / Continuous Batching}}\]\[\downarrow\]\[\ ext{Paged KV memory} + \ ext{Prefill/Decode scheduling}\]\[\downarrow\]\[\ ext{high-throughput LLM serving}.\]&lt;p&gt;而一旦真正进入生产系统，还要继续解决：&lt;/p&gt;
-\[\boxed{ \ ext{吞吐} \leftrightarrow \ ext{TTFT} \leftrightarrow \ ext{inter-token latency} \leftrightarrow \ ext{fairness} }\]&lt;p&gt;之间的多目标权衡。&lt;/p&gt;
+\[\boxed{ \text{生成式模型的自然调度单位不是 request， 而是一次生成迭代。} }\]&lt;p&gt;知识体系可以这样定位：&lt;/p&gt;
+\[\text{Autoregressive inference}\]\[\downarrow\]\[\boxed{\text{Iteration-level / Continuous Batching}}\]\[\downarrow\]\[\text{Paged KV memory} + \text{Prefill/Decode scheduling}\]\[\downarrow\]\[\text{high-throughput LLM serving}.\]&lt;p&gt;而一旦真正进入生产系统，还要继续解决：&lt;/p&gt;
+\[\boxed{ \text{吞吐} \leftrightarrow \text{TTFT} \leftrightarrow \text{inter-token latency} \leftrightarrow \text{fairness} }\]&lt;p&gt;之间的多目标权衡。&lt;/p&gt;
 &lt;p&gt;所以 Continuous Batching 的地位有点类似操作系统中的进程调度：它自身不改变模型任何一个权重，却可能让同一块 GPU 的有效服务能力相差数倍乃至更多。&lt;/p&gt;
 &lt;p&gt;这也是 AI 全栈工程里一个很值得长期保留的视角：&lt;/p&gt;
-\[\boxed{ \ ext{模型性能决定“一个请求能做到什么”； 调度系统决定“同一份硬件同时能为多少人做到”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+\[\boxed{ \text{模型性能决定“一个请求能做到什么”； 调度系统决定“同一份硬件同时能为多少人做到”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看扩展内容&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;

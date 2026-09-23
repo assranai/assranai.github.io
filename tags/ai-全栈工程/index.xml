@@ -2528,13 +2528,13 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × GPU 系统 × 高性能计算&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
 这期转到 AI 推理基础设施。Continuous Batching 值得学，因为它揭示了 LLM serving 和普通神经网络 inference 的一个根本区别：&lt;/p&gt;
-\[\boxed{ \ ext{LLM 请求不是一次 forward pass，而是一串长度未知的 forward passes。} }\]&lt;p&gt;如果还沿用传统“收集一批请求 → 整批跑完 → 再接下一批”的 batching 思路，会造成非常严重的 GPU 空转。&lt;/p&gt;
+\[\boxed{ \text{LLM 请求不是一次 forward pass，而是一串长度未知的 forward passes。} }\]&lt;p&gt;如果还沿用传统“收集一批请求 → 整批跑完 → 再接下一批”的 batching 思路，会造成非常严重的 GPU 空转。&lt;/p&gt;
 &lt;p&gt;2022 年 OSDI 的 &lt;strong&gt;Orca&lt;/strong&gt; 把调度粒度从 request level 降到 &lt;strong&gt;iteration level&lt;/strong&gt;：每生成一轮 token 后，已经完成的请求立即退出，新请求立即加入。论文在其 GPT-3 175B 实验中报告，相同延迟水平下相比 FasterTransformer 可达到最高约 36.9× 的吞吐提升。今天 Hugging Face Transformers、vLLM、SGLang 等推理体系都采用或建立在类似 continuous batching 思路之上。&lt;/p&gt;
 &lt;p&gt;真正值得理解的不是“动态加请求”这句话，而是：&lt;/p&gt;
-\[\boxed{ \ ext{调度器开始控制 token，而不只是控制 request。} }\]&lt;hr&gt;
+\[\boxed{ \text{调度器开始控制 token，而不只是控制 request。} }\]&lt;hr&gt;
 &lt;h2 id=&#34;1-为什么普通-static-batching-在-llm-上特别浪费&#34;&gt;1. 为什么普通 static batching 在 LLM 上特别浪费？
 &lt;/h2&gt;&lt;p&gt;传统图像模型一次请求可能就是：&lt;/p&gt;
-\[x\rightarrow f_\ heta(x)\rightarrow y.\]&lt;p&gt;所以四个请求组成 batch：&lt;/p&gt;
+\[x\rightarrow f_\theta(x)\rightarrow y.\]&lt;p&gt;所以四个请求组成 batch：&lt;/p&gt;
 \[[x_1,x_2,x_3,x_4]\]&lt;p&gt;一起 forward 一次，然后全部结束。&lt;/p&gt;
 &lt;p&gt;LLM 完全不同。&lt;/p&gt;
 &lt;p&gt;一个请求可能生成：&lt;/p&gt;
@@ -2543,7 +2543,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[500\]&lt;p&gt;个 token，&lt;/p&gt;
 &lt;p&gt;第三个：&lt;/p&gt;
 \[2000.\]&lt;p&gt;自回归生成意味着：&lt;/p&gt;
-\[x_{t+1} = f_\ heta(x_{\le t}).\]&lt;p&gt;所以每生成一个新 token，都要再次执行模型。&lt;/p&gt;
+\[x_{t+1} = f_\theta(x_{\le t}).\]&lt;p&gt;所以每生成一个新 token，都要再次执行模型。&lt;/p&gt;
 &lt;p&gt;假设一个 batch：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -2593,7 +2593,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;最终 GPU 实际上在等 C。&lt;/p&gt;
 &lt;p&gt;问题可以概括为：&lt;/p&gt;
-\[\boxed{ \ ext{batch occupancy 随生成过程不断下降。} }\]&lt;p&gt;而刚结束的槽位却不能立即给排队的新请求使用。&lt;/p&gt;
+\[\boxed{ \text{batch occupancy 随生成过程不断下降。} }\]&lt;p&gt;而刚结束的槽位却不能立即给排队的新请求使用。&lt;/p&gt;
 &lt;p&gt;Orca 论文正是针对这种 generative workload 的 multi-iteration 特性提出 iteration-level scheduling。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-continuous-batching-的核心操作其实非常简单&#34;&gt;2. Continuous Batching 的核心操作其实非常简单
@@ -2657,12 +2657,12 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;因此 batch 不再是一个固定对象。&lt;/p&gt;
 &lt;p&gt;它变成：&lt;/p&gt;
-\[\boxed{ B_t= \{\ ext{第 }t\ ext{ 次迭代被调度的活跃 sequences}\} }\]&lt;p&gt;并且：&lt;/p&gt;
-\[B_t\ eq B_{t+1}.\]&lt;p&gt;Hugging Face 当前 ContinuousBatchingManager 的行为就是每轮检查已完成请求，并立即用队列中的请求补充 GPU 容量。&lt;/p&gt;
+\[\boxed{ B_t= \{\text{第 }t\text{ 次迭代被调度的活跃 sequences}\} }\]&lt;p&gt;并且：&lt;/p&gt;
+\[B_t\neq B_{t+1}.\]&lt;p&gt;Hugging Face 当前 ContinuousBatchingManager 的行为就是每轮检查已完成请求，并立即用队列中的请求补充 GPU 容量。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-为什么一次-token-iteration才是自然的调度单位&#34;&gt;3. 为什么“一次 token iteration”才是自然的调度单位？
 &lt;/h1&gt;&lt;p&gt;因为 autoregressive decode 的最小同步计算单位就是：&lt;/p&gt;
-\[\boxed{\ ext{每个活跃 sequence 生成一个 token}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{每个活跃 sequence 生成一个 token}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;假设当前有：&lt;/p&gt;
 \[B\]&lt;p&gt;个 sequence。&lt;/p&gt;
 &lt;p&gt;一次 decode iteration：&lt;/p&gt;
@@ -2673,15 +2673,15 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;li&gt;sequence 3 还剩 500 token。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;只要它们当前都需要：&lt;/p&gt;
-\[\boxed{\ ext{执行下一次 forward}}\]&lt;p&gt;就可以组成计算 batch。&lt;/p&gt;
+\[\boxed{\text{执行下一次 forward}}\]&lt;p&gt;就可以组成计算 batch。&lt;/p&gt;
 &lt;p&gt;所以 Orca 的关键变化并不是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;batching 更聪明了。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;而是重新定义：&lt;/p&gt;
-\[\boxed{ \ ext{scheduler 的工作单位。} }\]&lt;p&gt;传统：&lt;/p&gt;
-\[\ ext{request}\]&lt;p&gt;Orca：&lt;/p&gt;
-\[\boxed{\ ext{iteration}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{scheduler 的工作单位。} }\]&lt;p&gt;传统：&lt;/p&gt;
+\[\text{request}\]&lt;p&gt;Orca：&lt;/p&gt;
+\[\boxed{\text{iteration}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这是一个很典型的系统设计原则：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;调度粒度应该匹配工作负载真正可以被抢占和重组的粒度。&lt;/p&gt;
@@ -2695,7 +2695,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;Attention 对 A 需要读取：&lt;/p&gt;
 \[KV_A[1:1000],\]&lt;p&gt;对 B 读取：&lt;/p&gt;
 \[KV_B[1:50].\]&lt;p&gt;因此不像普通 GEMM 那样简单：&lt;/p&gt;
-\[X\in\mathbb R^{B\ imes d}\]&lt;p&gt;就可以全部整齐打包。&lt;/p&gt;
+\[X\in\mathbb R^{B\times d}\]&lt;p&gt;就可以全部整齐打包。&lt;/p&gt;
 &lt;p&gt;早期 Orca 为此提出 &lt;strong&gt;selective batching&lt;/strong&gt;：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;对线性层等天然适合 batch 的操作一起执行；&lt;/li&gt;
@@ -2706,8 +2706,8 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;h1 id=&#34;5-这正好解释了-pagedattention-为什么后来如此重要&#34;&gt;5. 这正好解释了 PagedAttention 为什么后来如此重要
 &lt;/h1&gt;&lt;p&gt;前面知识卡片讲过 &lt;span class=&#34;term-anchor&#34; data-term=&#34;paged-attention&#34; tabindex=&#34;0&#34;&gt;PagedAttention&lt;/span&gt;。&lt;/p&gt;
 &lt;p&gt;Continuous Batching 解决：&lt;/p&gt;
-\[\boxed{\ ext{谁什么时候进入 GPU 计算}}\]&lt;p&gt;PagedAttention 解决：&lt;/p&gt;
-\[\boxed{\ ext{这些不断加入/退出的请求，其 KV Cache 放在哪里}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{谁什么时候进入 GPU 计算}}\]&lt;p&gt;PagedAttention 解决：&lt;/p&gt;
+\[\boxed{\text{这些不断加入/退出的请求，其 KV Cache 放在哪里}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;Continuous batching 会让：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;sequence 动态加入；&lt;/li&gt;
@@ -2724,7 +2724,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/ul&gt;
 &lt;p&gt;vLLM 的 PagedAttention 把 KV cache 做成类似虚拟内存页的 fixed-size blocks，并报告其系统相较 Orca 等基线在相同延迟下可得到约 2–4× 的吞吐提升。&lt;/p&gt;
 &lt;p&gt;所以两者的关系可以非常清楚地写成：&lt;/p&gt;
-\[\boxed{ \ ext{Continuous Batching = computation scheduling} }\]\[\boxed{ \ ext{PagedAttention = state-memory virtualization} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{Continuous Batching = computation scheduling} }\]\[\boxed{ \text{PagedAttention = state-memory virtualization} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;二者共同组成现代 LLM serving 的基础。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-continuous-batching-真正困难的地方在-prefill-和-decode-混在了一起&#34;&gt;6. Continuous Batching 真正困难的地方，在 Prefill 和 Decode 混在了一起
@@ -2737,16 +2737,16 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[L_p\]&lt;p&gt;个 prompt tokens。&lt;/p&gt;
 &lt;p&gt;整个 prompt 可以并行处理。&lt;/p&gt;
 &lt;p&gt;因此有大量矩阵计算：&lt;/p&gt;
-\[\boxed{\ ext{compute intensive}}\]&lt;p&gt;GPU 利用率很高。&lt;/p&gt;
+\[\boxed{\text{compute intensive}}\]&lt;p&gt;GPU 利用率很高。&lt;/p&gt;
 &lt;p&gt;它直接影响：&lt;/p&gt;
-\[\boxed{\ ext{TTFT — Time To First Token}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{TTFT — Time To First Token}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;h3 id=&#34;decode&#34;&gt;Decode
 &lt;/h3&gt;&lt;p&gt;每次只增加：&lt;/p&gt;
 \[1\]&lt;p&gt;个 token。&lt;/p&gt;
 &lt;p&gt;需要反复读取 KV cache。&lt;/p&gt;
 &lt;p&gt;单个 request 的计算规模相对小，常更偏 memory-bandwidth bound。&lt;/p&gt;
 &lt;p&gt;它影响：&lt;/p&gt;
-\[\boxed{\ ext{ITL/TBT — Inter-Token Latency}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{ITL/TBT — Inter-Token Latency}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;Sarathi 的工作明确指出，这两种 phase 的计算特征非常不同：prefill 很容易把 GPU 算力吃满，而单次 decode 的计算利用率相对较低，因此 decode 特别依赖 batching。&lt;/p&gt;
 
   &lt;/div&gt;
@@ -2765,7 +2765,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;每次 iteration 比较短。&lt;/p&gt;
 &lt;p&gt;突然进来一个：&lt;/p&gt;
-\[10000\ ext{-token prompt}.\]&lt;p&gt;如果直接把整个 prefill 一次做完：&lt;/p&gt;
+\[10000\text{-token prompt}.\]&lt;p&gt;如果直接把整个 prefill 一次做完：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -2791,17 +2791,17 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;即：&lt;/p&gt;
-\[\boxed{\ ext{inter-token latency spike}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{inter-token latency spike}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;所以“continuous batching”并不自动等于低延迟。&lt;/p&gt;
 &lt;p&gt;你还必须决定：&lt;/p&gt;
-\[\boxed{ \ ext{prefill 与 decode 如何共享 GPU 时间} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{prefill 与 decode 如何共享 GPU 时间} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这就是现代 LLM scheduler 的真正核心。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-chunked-prefill把一个大任务切碎让-decode-穿插进去&#34;&gt;8. Chunked Prefill：把一个大任务切碎，让 decode 穿插进去
 &lt;/h1&gt;&lt;p&gt;Sarathi 提出的关键方法之一是：&lt;/p&gt;
-\[\boxed{\ ext{chunked prefill}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{chunked prefill}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;例如原 prompt：&lt;/p&gt;
-\[8192\ ext{ tokens}\]&lt;p&gt;不要一次运行：&lt;/p&gt;
+\[8192\text{ tokens}\]&lt;p&gt;不要一次运行：&lt;/p&gt;
 \[8192,\]&lt;p&gt;而拆成：&lt;/p&gt;
 \[1024+1024+\cdots+1024.\]&lt;p&gt;于是执行可以从：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -2834,7 +2834,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;Sarathi 称其中一种策略为：&lt;/p&gt;
-\[\boxed{\ ext{decode-maximal batching}}\]&lt;p&gt;——尽量保留大量 decode，再用 prefill chunk 填充 GPU 的计算能力。&lt;/p&gt;
+\[\boxed{\text{decode-maximal batching}}\]&lt;p&gt;——尽量保留大量 decode，再用 prefill chunk 填充 GPU 的计算能力。&lt;/p&gt;
 &lt;p&gt;其论文实验报告，例如 LLaMA-13B/A6000 条件下 decode throughput 最高提升约 10×，端到端吞吐最高提升约 1.33×；后来的 Sarathi-Serve 进一步针对真实 serving 中 throughput-latency tradeoff 优化调度。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-为什么-chunked-prefill-这么巧&#34;&gt;9. 为什么 Chunked Prefill 这么巧？
@@ -2843,13 +2843,13 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;因为 prefill 和 decode 正好存在互补性。&lt;/p&gt;
 &lt;p&gt;Decode：&lt;/p&gt;
-\[\boxed{\ ext{单请求计算量小}}\]&lt;p&gt;所以需要很大的 batch 才能充分利用 GPU。&lt;/p&gt;
+\[\boxed{\text{单请求计算量小}}\]&lt;p&gt;所以需要很大的 batch 才能充分利用 GPU。&lt;/p&gt;
 &lt;p&gt;Prefill：&lt;/p&gt;
-\[\boxed{\ ext{单请求计算密度高}}\]&lt;p&gt;很容易利用 GPU。&lt;/p&gt;
+\[\boxed{\text{单请求计算密度高}}\]&lt;p&gt;很容易利用 GPU。&lt;/p&gt;
 &lt;p&gt;因此可以把它们混合：&lt;/p&gt;
-\[\boxed{ \ ext{prefill 提供 compute intensity} + \ ext{decode 提供并发 token workload} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{prefill 提供 compute intensity} + \text{decode 提供并发 token workload} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这是一种很典型的：&lt;/p&gt;
-\[\boxed{\ ext{heterogeneous workload co-scheduling}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{heterogeneous workload co-scheduling}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;它与简单的 FIFO 队列已经是完全不同层级的问题。&lt;/p&gt;
 
   &lt;/div&gt;
@@ -2865,32 +2865,32 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;li&gt;chunked prefill：512 个 tokens。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;因此只限制：&lt;/p&gt;
-\[\ ext{number of sequences}\]&lt;p&gt;并不能很好描述一次 GPU workload。&lt;/p&gt;
+\[\text{number of sequences}\]&lt;p&gt;并不能很好描述一次 GPU workload。&lt;/p&gt;
 &lt;p&gt;现代 scheduler 更自然的约束是：&lt;/p&gt;
-\[\boxed{ \sum_i n_i^{(\ ext{scheduled})} \le T_{\max} }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\boxed{ \sum_i n_i^{(\text{scheduled})} \le T_{\max} }\]&lt;p&gt;其中：&lt;/p&gt;
 \[T_{\max}\]&lt;p&gt;是一次 iteration 的 token budget。&lt;/p&gt;
 &lt;p&gt;Hugging Face 当前 Continuous Batching 配置已经直接暴露类似的 &lt;code&gt;max_batch_tokens&lt;/code&gt; 概念，并让 scheduler 根据 token budget、KV-cache blocks 和请求状态选择每轮执行内容。&lt;/p&gt;
 &lt;p&gt;这意味着 batching 已经从：&lt;/p&gt;
-\[\boxed{\ ext{“这一批有多少请求？”}}\]&lt;p&gt;进化成：&lt;/p&gt;
-\[\boxed{\ ext{“这一轮 GPU 应该处理多少 token，以及属于哪些请求？”}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{“这一批有多少请求？”}}\]&lt;p&gt;进化成：&lt;/p&gt;
+\[\boxed{\text{“这一轮 GPU 应该处理多少 token，以及属于哪些请求？”}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;11-为什么只看-tokenss-会误判-serving-系统&#34;&gt;11. 为什么只看 tokens/s 会误判 serving 系统？
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;假设系统 A：&lt;/p&gt;
-\[10000\ ext{ tokens/s}\]&lt;p&gt;系统 B：&lt;/p&gt;
-\[8000\ ext{ tokens/s}.\]&lt;p&gt;看起来 A 更好。&lt;/p&gt;
+\[10000\text{ tokens/s}\]&lt;p&gt;系统 B：&lt;/p&gt;
+\[8000\text{ tokens/s}.\]&lt;p&gt;看起来 A 更好。&lt;/p&gt;
 &lt;p&gt;但如果：&lt;/p&gt;
 &lt;h3 id=&#34;a&#34;&gt;A
 &lt;/h3&gt;&lt;p&gt;TTFT：&lt;/p&gt;
-\[4\ ext{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
-\[150\ ext{ms}\]&lt;h3 id=&#34;b&#34;&gt;B
+\[4\text{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
+\[150\text{ms}\]&lt;h3 id=&#34;b&#34;&gt;B
 &lt;/h3&gt;&lt;p&gt;TTFT：&lt;/p&gt;
-\[0.5\ ext{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
-\[35\ ext{ms}\]&lt;p&gt;对于交互式聊天：&lt;/p&gt;
-\[\boxed{B\ ext{ 很可能明显更好。}}\]&lt;p&gt;因此 LLM serving 通常至少要同时观察：&lt;/p&gt;
-\[\boxed{\ ext{Throughput}}\]\[\boxed{\ ext{TTFT}}\]\[\boxed{\ ext{ITL/TBT}}\]&lt;p&gt;以及尾延迟：&lt;/p&gt;
+\[0.5\text{s}\]&lt;p&gt;inter-token latency：&lt;/p&gt;
+\[35\text{ms}\]&lt;p&gt;对于交互式聊天：&lt;/p&gt;
+\[\boxed{B\text{ 很可能明显更好。}}\]&lt;p&gt;因此 LLM serving 通常至少要同时观察：&lt;/p&gt;
+\[\boxed{\text{Throughput}}\]\[\boxed{\text{TTFT}}\]\[\boxed{\text{ITL/TBT}}\]&lt;p&gt;以及尾延迟：&lt;/p&gt;
 \[P_{95},P_{99}.\]&lt;p&gt;Sarathi-Serve 的研究重点正是：最大吞吐与低延迟之间并非自然一致，需要显式设计 scheduling policy。&lt;/p&gt;
 
   &lt;/div&gt;
@@ -2906,18 +2906,18 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[\mu.\]&lt;p&gt;当：&lt;/p&gt;
 \[\lambda\ll\mu,\]&lt;p&gt;系统很空。&lt;/p&gt;
 &lt;p&gt;这时为了拼大 batch 等待更多请求反而会增加：&lt;/p&gt;
-\[\boxed{\ ext{queueing delay}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{queueing delay}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;但当：&lt;/p&gt;
 \[\lambda\rightarrow\mu,\]&lt;p&gt;batching 会显著提高 GPU efficiency。&lt;/p&gt;
 &lt;p&gt;所以 scheduler 一直在权衡：&lt;/p&gt;
-\[\boxed{ \ ext{等一等，凑更大的 batch} }\]&lt;p&gt;和：&lt;/p&gt;
-\[\boxed{ \ ext{立即执行，降低当前用户 latency} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{等一等，凑更大的 batch} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \text{立即执行，降低当前用户 latency} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这和离线 benchmark 完全不同。&lt;/p&gt;
 &lt;p&gt;离线：&lt;/p&gt;
-\[\boxed{\ ext{永远有任务可算}}\]&lt;p&gt;在线：&lt;/p&gt;
-\[\boxed{\ ext{任务随机到达，而且用户正在等}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{永远有任务可算}}\]&lt;p&gt;在线：&lt;/p&gt;
+\[\boxed{\text{任务随机到达，而且用户正在等}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;所以 AI serving 本质上已经进入：&lt;/p&gt;
-\[\boxed{ \ ext{queueing + scheduling + memory management} }\]&lt;p&gt;系统工程领域。&lt;/p&gt;
+\[\boxed{ \text{queueing + scheduling + memory management} }\]&lt;p&gt;系统工程领域。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -2939,11 +2939,11 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[B_t= 31,32,29,32,\ldots\]&lt;p&gt;sequence lengths：&lt;/p&gt;
 \[L_i\]&lt;p&gt;也各不相同。&lt;/p&gt;
 &lt;p&gt;因此现代 inference engine 经常会把动态 workload 映射到有限的：&lt;/p&gt;
-\[\boxed{\ ext{shape buckets}}\]&lt;p&gt;或 graph sizes。&lt;/p&gt;
+\[\boxed{\text{shape buckets}}\]&lt;p&gt;或 graph sizes。&lt;/p&gt;
 &lt;p&gt;Hugging Face 当前 continuous batching 配置也包含 CUDA graph、padding intervals、KV-cache block 等硬件相关配置。&lt;/p&gt;
 &lt;p&gt;这是非常典型的系统矛盾：&lt;/p&gt;
-\[\boxed{ \ ext{scheduler 希望动态} }\]&lt;p&gt;而：&lt;/p&gt;
-\[\boxed{ \ ext{GPU kernel 希望静态} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{scheduler 希望动态} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{GPU kernel 希望静态} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;高性能 serving engine 的工作，就是在这两者之间建立中间层。&lt;/p&gt;
 
   &lt;/div&gt;
@@ -2968,7 +2968,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;反过来，如果一到长 prompt 就立即完整 prefill：&lt;/p&gt;
 \[B\]&lt;p&gt;又会严重阻塞正在 decode 的请求。&lt;/p&gt;
 &lt;p&gt;所以 scheduler 还需要处理：&lt;/p&gt;
-\[\boxed{\ ext{starvation / fairness}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{starvation / fairness}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;真实系统因此可能引入：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;FCFS；&lt;/li&gt;
@@ -2980,7 +2980,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;li&gt;latency SLO aware scheduling。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;这说明 continuous batching 并不是一个单独算法，而是：&lt;/p&gt;
-\[\boxed{\ ext{一个 scheduler architecture}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{一个 scheduler architecture}}\]&lt;p&gt;。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -2995,7 +2995,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;推理模型可能输出：&lt;/p&gt;
 \[5000, 10000,\]&lt;p&gt;甚至更多。&lt;/p&gt;
 &lt;p&gt;于是某些请求长期占据：&lt;/p&gt;
-\[\boxed{\ ext{KV cache + decode slot}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{KV cache + decode slot}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这会同时影响：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;memory occupancy；&lt;/li&gt;
@@ -3024,7 +3024,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
     &lt;p&gt;根本不需要 GPU。&lt;/p&gt;
 &lt;p&gt;只用 Python/Rust 写一个离散事件 simulator。&lt;/p&gt;
 &lt;p&gt;生成 1000 个请求：&lt;/p&gt;
-\[L_i^{out} \sim \ ext{某个长尾分布}.\]&lt;p&gt;假设 GPU 每 iteration 最多服务：&lt;/p&gt;
+\[L_i^{out} \sim \text{某个长尾分布}.\]&lt;p&gt;假设 GPU 每 iteration 最多服务：&lt;/p&gt;
 \[B=16.\]&lt;h3 id=&#34;static-batching&#34;&gt;Static batching
 &lt;/h3&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -3062,9 +3062,9 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;记录：&lt;/p&gt;
-\[\ ext{GPU active slots}\]&lt;p&gt;例如：&lt;/p&gt;
+\[\text{GPU active slots}\]&lt;p&gt;例如：&lt;/p&gt;
 \[\eta= \frac{ \sum_t B_t }{ B_{\max}T }.\]&lt;p&gt;同时记录：&lt;/p&gt;
-\[\ ext{mean latency}\]&lt;p&gt;和：&lt;/p&gt;
+\[\text{mean latency}\]&lt;p&gt;和：&lt;/p&gt;
 \[P_{95}.\]&lt;p&gt;只要 output lengths 有明显差异，你就会看到 static batching 中出现大量：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -3130,9 +3130,9 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;也就是说 request 会出现：&lt;/p&gt;
-\[\boxed{\ ext{暂停—恢复}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{暂停—恢复}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;如果暂停期间仍把完整 KV cache 长期占在 GPU 上：&lt;/p&gt;
-\[\boxed{\ ext{昂贵显存会被闲置状态占满。}}\]&lt;p&gt;如果直接丢掉：&lt;/p&gt;
+\[\boxed{\text{昂贵显存会被闲置状态占满。}}\]&lt;p&gt;如果直接丢掉：&lt;/p&gt;
 &lt;p&gt;恢复时又要重新 prefill。&lt;/p&gt;
 &lt;p&gt;因此 Agent serving 会进一步引出：&lt;/p&gt;
 &lt;ul&gt;
@@ -3143,7 +3143,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/ul&gt;
 &lt;p&gt;INFERCEPT 等工作正是针对 augmented LLM 中这种 request interception 问题研究何时保留、丢弃或交换 KV cache。&lt;/p&gt;
 &lt;p&gt;所以 Continuous Batching 也是理解：&lt;/p&gt;
-\[\boxed{\ ext{Agent runtime infrastructure}}\]&lt;p&gt;很好的入口。&lt;/p&gt;
+\[\boxed{\text{Agent runtime infrastructure}}\]&lt;p&gt;很好的入口。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;18-对游戏-ai-部署尤其有现实意义&#34;&gt;18. 对游戏 AI 部署尤其有现实意义
 &lt;/h1&gt;&lt;p&gt;假设游戏服务器同时运行：&lt;/p&gt;
@@ -3154,7 +3154,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/ul&gt;
 &lt;p&gt;每个请求生成长度不同。&lt;/p&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[\boxed{\ ext{一个 NPC = 一次独立 model.generate()}}\]&lt;p&gt;GPU 很难获得高利用率。&lt;/p&gt;
+\[\boxed{\text{一个 NPC = 一次独立 model.generate()}}\]&lt;p&gt;GPU 很难获得高利用率。&lt;/p&gt;
 &lt;p&gt;更合理的架构是：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -3185,7 +3185,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;也就是说：&lt;/p&gt;
-\[\boxed{ \ ext{模型本身可能只是组件； 真正决定服务器容量的是调度层。} }\]&lt;p&gt;这也是为什么现在做 AI 游戏工程，只懂：&lt;/p&gt;
+\[\boxed{ \text{模型本身可能只是组件； 真正决定服务器容量的是调度层。} }\]&lt;p&gt;这也是为什么现在做 AI 游戏工程，只懂：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;模型 API；&lt;/li&gt;
 &lt;li&gt;prompt；&lt;/li&gt;
@@ -3193,13 +3193,13 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/ul&gt;
 &lt;p&gt;是不够的。&lt;/p&gt;
 &lt;p&gt;一旦进入本地/私有模型部署：&lt;/p&gt;
-\[\boxed{ \ ext{KV memory + batching + scheduling} }\]&lt;p&gt;都会直接决定成本。&lt;/p&gt;
+\[\boxed{ \text{KV memory + batching + scheduling} }\]&lt;p&gt;都会直接决定成本。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;19-它给其他工程领域一个很强的迁移启发重新寻找最小可调度工作单元&#34;&gt;19. 它给其他工程领域一个很强的迁移启发：重新寻找“最小可调度工作单元”
 &lt;/h1&gt;&lt;p&gt;Continuous Batching 最深的地方其实并不限于 LLM。&lt;/p&gt;
 &lt;p&gt;原来系统认为一个不可分割任务是：&lt;/p&gt;
-\[\boxed{\ ext{request}}\]&lt;p&gt;Orca 发现真正可以安全重组的是：&lt;/p&gt;
-\[\boxed{\ ext{iteration}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{request}}\]&lt;p&gt;Orca 发现真正可以安全重组的是：&lt;/p&gt;
+\[\boxed{\text{iteration}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这是一种很强的系统优化方法：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;当 workload 不均衡时，先检查当前 scheduling granularity 是否太粗。&lt;/p&gt;
@@ -3216,7 +3216,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;哪个才是真正合适的工作单位？&lt;/p&gt;
 &lt;p&gt;有时性能问题不是 kernel 太慢，&lt;/p&gt;
 &lt;p&gt;而是：&lt;/p&gt;
-\[\boxed{\ ext{scheduler 根本看不到足够细的可重组工作。}}\]&lt;hr&gt;
+\[\boxed{\text{scheduler 根本看不到足够细的可重组工作。}}\]&lt;hr&gt;
 &lt;h1 id=&#34;20-这和-gpu-物理引擎甚至有一个很直接的类比&#34;&gt;20. 这和 GPU 物理引擎甚至有一个很直接的类比
 &lt;/h1&gt;&lt;p&gt;假设有 100 个 physics islands。&lt;/p&gt;
 &lt;p&gt;传统方式：&lt;/p&gt;
@@ -3235,11 +3235,11 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;&lt;p&gt;如果不同岛所需迭代数差异很大：&lt;/p&gt;
 \[4,\ 5,\ 30,\ 100,\ldots\]&lt;p&gt;就会遇到类似 static batching 的问题。&lt;/p&gt;
 &lt;p&gt;另一种思路：&lt;/p&gt;
-\[\boxed{ \ ext{以 solver iteration 为粒度重新装填 active islands} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{以 solver iteration 为粒度重新装填 active islands} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;已经收敛的 island 退出，&lt;/p&gt;
 &lt;p&gt;新 island 加入。&lt;/p&gt;
 &lt;p&gt;虽然具体 GPU 数据布局会复杂很多，但思维与 Orca 几乎一致：&lt;/p&gt;
-\[\boxed{ \ ext{variable-length iterative workloads 需要 iteration-aware scheduling。} }\]&lt;p&gt;这就是这张卡片对物理求解器最值得迁移的一点。&lt;/p&gt;
+\[\boxed{ \text{variable-length iterative workloads 需要 iteration-aware scheduling。} }\]&lt;p&gt;这就是这张卡片对物理求解器最值得迁移的一点。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Continuous Batching 最值得记住的不是：&lt;/p&gt;
@@ -3247,12 +3247,12 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;“请求完成以后立即补一个新请求。”&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;真正重要的是：&lt;/p&gt;
-\[\boxed{ \ ext{生成式模型的自然调度单位不是 request， 而是一次生成迭代。} }\]&lt;p&gt;知识体系可以这样定位：&lt;/p&gt;
-\[\ ext{Autoregressive inference}\]\[\downarrow\]\[\boxed{\ ext{Iteration-level / Continuous Batching}}\]\[\downarrow\]\[\ ext{Paged KV memory} + \ ext{Prefill/Decode scheduling}\]\[\downarrow\]\[\ ext{high-throughput LLM serving}.\]&lt;p&gt;而一旦真正进入生产系统，还要继续解决：&lt;/p&gt;
-\[\boxed{ \ ext{吞吐} \leftrightarrow \ ext{TTFT} \leftrightarrow \ ext{inter-token latency} \leftrightarrow \ ext{fairness} }\]&lt;p&gt;之间的多目标权衡。&lt;/p&gt;
+\[\boxed{ \text{生成式模型的自然调度单位不是 request， 而是一次生成迭代。} }\]&lt;p&gt;知识体系可以这样定位：&lt;/p&gt;
+\[\text{Autoregressive inference}\]\[\downarrow\]\[\boxed{\text{Iteration-level / Continuous Batching}}\]\[\downarrow\]\[\text{Paged KV memory} + \text{Prefill/Decode scheduling}\]\[\downarrow\]\[\text{high-throughput LLM serving}.\]&lt;p&gt;而一旦真正进入生产系统，还要继续解决：&lt;/p&gt;
+\[\boxed{ \text{吞吐} \leftrightarrow \text{TTFT} \leftrightarrow \text{inter-token latency} \leftrightarrow \text{fairness} }\]&lt;p&gt;之间的多目标权衡。&lt;/p&gt;
 &lt;p&gt;所以 Continuous Batching 的地位有点类似操作系统中的进程调度：它自身不改变模型任何一个权重，却可能让同一块 GPU 的有效服务能力相差数倍乃至更多。&lt;/p&gt;
 &lt;p&gt;这也是 AI 全栈工程里一个很值得长期保留的视角：&lt;/p&gt;
-\[\boxed{ \ ext{模型性能决定“一个请求能做到什么”； 调度系统决定“同一份硬件同时能为多少人做到”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+\[\boxed{ \text{模型性能决定“一个请求能做到什么”； 调度系统决定“同一份硬件同时能为多少人做到”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看扩展内容&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
@@ -3300,14 +3300,14 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × 高性能计算&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
 上一张卡片讲 Continuous Batching，解决的是：&lt;/p&gt;
-\[\boxed{\ ext{多个请求之间怎样更高效地共享 GPU}}\]&lt;p&gt;今天的 Speculative Decoding 解决的是另一个更底层的问题：&lt;/p&gt;
-\[\boxed{\ ext{单个请求为什么非得一个 token 一个 token 串行生成？}}\]&lt;p&gt;标准自回归模型：&lt;/p&gt;
+\[\boxed{\text{多个请求之间怎样更高效地共享 GPU}}\]&lt;p&gt;今天的 Speculative Decoding 解决的是另一个更底层的问题：&lt;/p&gt;
+\[\boxed{\text{单个请求为什么非得一个 token 一个 token 串行生成？}}\]&lt;p&gt;标准自回归模型：&lt;/p&gt;
 \[p(x_{1:T}) = \prod_{t=1}^{T} p(x_t\mid x_{&lt;t})\]&lt;p&gt;导致生成第 \(t+1\) 个 token 前，必须先知道第 \(t\) 个：&lt;/p&gt;
 \[x_t\rightarrow x_{t+1}\rightarrow x_{t+2}.\]&lt;p&gt;因此生成 100 个 token，原则上需要约 100 次串行 target-model decoding step。&lt;/p&gt;
 &lt;p&gt;Speculative Decoding 的关键突破是：&lt;/p&gt;
-\[\boxed{ \ ext{依赖关系不能消灭， 但可以“猜测未来”，然后并行验证。} }\]&lt;p&gt;让一个便宜的 draft model 一次猜出：&lt;/p&gt;
+\[\boxed{ \text{依赖关系不能消灭， 但可以“猜测未来”，然后并行验证。} }\]&lt;p&gt;让一个便宜的 draft model 一次猜出：&lt;/p&gt;
 \[x_{t+1},x_{t+2},\ldots,x_{t+\gamma},\]&lt;p&gt;再让昂贵的大模型在&lt;strong&gt;一次并行 forward&lt;/strong&gt;中同时检查这些位置。&lt;/p&gt;
-&lt;p&gt;Leviathan、Kalman、Matias 在 ICML 2023 的工作报告 T5-XXL 上约 \(2\!-\!3\ imes\) 加速；几乎同期 DeepMind 的 Chen 等人在 Chinchilla 70B 上报告约 \(2\!-\!2.5\ imes\) decoding speedup。更关键的是，两套工作的经典 speculative sampling 都能保持 target model 的原始采样分布，而非用质量换速度。&lt;/p&gt;
+&lt;p&gt;Leviathan、Kalman、Matias 在 ICML 2023 的工作报告 T5-XXL 上约 \(2\!-\!3\times\) 加速；几乎同期 DeepMind 的 Chen 等人在 Chinchilla 70B 上报告约 \(2\!-\!2.5\times\) decoding speedup。更关键的是，两套工作的经典 speculative sampling 都能保持 target model 的原始采样分布，而非用质量换速度。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-为什么大模型一次验证-5-个-token可能和生成-1-个-token-差不多快&#34;&gt;1. 为什么“大模型一次验证 5 个 token”可能和生成 1 个 token 差不多快？
 &lt;/h2&gt;&lt;p&gt;这件事一开始很反直觉。&lt;/p&gt;
@@ -3315,17 +3315,17 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;GPU 需要把大量：&lt;/p&gt;
 \[W_Q,W_K,W_V,W_{\rm FFN},\ldots\]&lt;p&gt;模型权重从 HBM 搬到计算单元。&lt;/p&gt;
 &lt;p&gt;在低 batch 的 decode 阶段，经常存在：&lt;/p&gt;
-\[\boxed{\ ext{memory-bandwidth bound}}\]&lt;p&gt;现象：&lt;/p&gt;
+\[\boxed{\text{memory-bandwidth bound}}\]&lt;p&gt;现象：&lt;/p&gt;
 &lt;p&gt;算力没有吃满，时间主要花在搬模型权重。&lt;/p&gt;
 &lt;p&gt;于是：&lt;/p&gt;
 &lt;h3 id=&#34;普通-decode&#34;&gt;普通 decode
 &lt;/h3&gt;&lt;p&gt;一次加载这些庞大权重：&lt;/p&gt;
-\[\rightarrow1\ ext{ 个 token}\]&lt;h3 id=&#34;验证一串候选&#34;&gt;验证一串候选
+\[\rightarrow1\text{ 个 token}\]&lt;h3 id=&#34;验证一串候选&#34;&gt;验证一串候选
 &lt;/h3&gt;&lt;p&gt;还是加载相似的模型权重：&lt;/p&gt;
-\[\rightarrow \gamma\ ext{ 个 candidate positions 并行评分}\]&lt;p&gt;后者虽然 FLOPs 更多，却可能没有成比例增加 wall-clock time。&lt;/p&gt;
+\[\rightarrow \gamma\text{ 个 candidate positions 并行评分}\]&lt;p&gt;后者虽然 FLOPs 更多，却可能没有成比例增加 wall-clock time。&lt;/p&gt;
 &lt;p&gt;Medusa 对这个瓶颈的表述很直接：自回归 decode 的每一步都需要重新把庞大的模型参数从 HBM 带入计算路径，而计算本身往往没有充分利用 accelerator。&lt;/p&gt;
 &lt;p&gt;所以 speculative decoding 利用的是：&lt;/p&gt;
-\[\boxed{\ ext{模型 decode 阶段存在“闲置算力”。}}\]&lt;p&gt;它拿这些闲置算力来验证未来 token。&lt;/p&gt;
+\[\boxed{\text{模型 decode 阶段存在“闲置算力”。}}\]&lt;p&gt;它拿这些闲置算力来验证未来 token。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-基本结构draft--verify&#34;&gt;2. 基本结构：Draft → Verify
 &lt;/h1&gt;&lt;p&gt;设：&lt;/p&gt;
@@ -3333,7 +3333,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[p\]&lt;p&gt;是我们真正想采样的大 target model。&lt;/p&gt;
 &lt;p&gt;当前上下文：&lt;/p&gt;
 \[x_{1:t}.\]&lt;p&gt;Draft 先自回归生成：&lt;/p&gt;
-\[\ ilde x_{t+1}, \ ilde x_{t+2}, \ldots, \ ilde x_{t+\gamma}.\]&lt;p&gt;比如：&lt;/p&gt;
+\[\tilde x_{t+1}, \tilde x_{t+2}, \ldots, \tilde x_{t+\gamma}.\]&lt;p&gt;比如：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3365,43 +3365,43 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;&lt;p&gt;利用 Transformer 对不同位置并行计算的能力，一次得到：&lt;/p&gt;
 \[p(x_{t+1}|x_{\le t}),\]\[p(x_{t+2}|x_{\le t+1}),\]&lt;p&gt;……&lt;/p&gt;
 \[p(x_{t+\gamma}|x_{\le t+\gamma-1}).\]&lt;p&gt;于是：&lt;/p&gt;
-\[\boxed{ \ ext{原本 }\gamma\ ext{ 次昂贵 target decode} }\]&lt;p&gt;有机会被压缩成：&lt;/p&gt;
-\[\boxed{\ ext{1 次昂贵 target verification}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{原本 }\gamma\text{ 次昂贵 target decode} }\]&lt;p&gt;有机会被压缩成：&lt;/p&gt;
+\[\boxed{\text{1 次昂贵 target verification}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-但这里有一个核心难题draft-猜错怎么办&#34;&gt;3. 但这里有一个核心难题：Draft 猜错怎么办？
 &lt;/h1&gt;&lt;p&gt;假设 draft 给：&lt;/p&gt;
-\[q(\ ext{Paris})=0.50\]&lt;p&gt;而 target 给：&lt;/p&gt;
-\[p(\ ext{Paris})=0.80.\]&lt;p&gt;很好。&lt;/p&gt;
+\[q(\text{Paris})=0.50\]&lt;p&gt;而 target 给：&lt;/p&gt;
+\[p(\text{Paris})=0.80.\]&lt;p&gt;很好。&lt;/p&gt;
 &lt;p&gt;但另一个 token：&lt;/p&gt;
-\[q(\ ext{London})=0.30,\]&lt;p&gt;target：&lt;/p&gt;
-\[p(\ ext{London})=0.02.\]&lt;p&gt;显然不能无条件相信 draft。&lt;/p&gt;
+\[q(\text{London})=0.30,\]&lt;p&gt;target：&lt;/p&gt;
+\[p(\text{London})=0.02.\]&lt;p&gt;显然不能无条件相信 draft。&lt;/p&gt;
 &lt;p&gt;最粗暴的办法是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;target 不同意就丢掉。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;这对 greedy decoding 可以做得相对简单。&lt;/p&gt;
 &lt;p&gt;但对于：&lt;/p&gt;
-\[\boxed{\ ext{sampling}}\]&lt;p&gt;会产生更深的问题：&lt;/p&gt;
+\[\boxed{\text{sampling}}\]&lt;p&gt;会产生更深的问题：&lt;/p&gt;
 &lt;p&gt;你一旦按某种随意规则接受/拒绝 draft token，&lt;/p&gt;
 &lt;p&gt;最终生成分布就可能不再等于：&lt;/p&gt;
 \[p.\]&lt;p&gt;这意味着 temperature、top-p 等采样行为都会被悄悄改变。&lt;/p&gt;
 &lt;p&gt;经典 speculative sampling 真正漂亮的地方就在这里：&lt;/p&gt;
-\[\boxed{ \ ext{它把这件事做成了严格的 rejection sampling。} }\]&lt;hr&gt;
+\[\boxed{ \text{它把这件事做成了严格的 rejection sampling。} }\]&lt;hr&gt;
 &lt;h1 id=&#34;4-最值得理解的公式接受概率&#34;&gt;4. 最值得理解的公式：接受概率
 &lt;/h1&gt;&lt;p&gt;Draft 从：&lt;/p&gt;
 \[q(x)\]&lt;p&gt;采样出候选：&lt;/p&gt;
-\[\ ilde x.\]&lt;p&gt;Target 对同一个位置给出：&lt;/p&gt;
+\[\tilde x.\]&lt;p&gt;Target 对同一个位置给出：&lt;/p&gt;
 \[p(x).\]&lt;p&gt;候选的接受概率为：&lt;/p&gt;
-\[\boxed{ a(\ ilde x) = \min \left( 1, \frac{p(\ ilde x)}{q(\ ilde x)} \right) }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ a(\tilde x) = \min \left( 1, \frac{p(\tilde x)}{q(\tilde x)} \right) }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这条公式非常有意思。&lt;/p&gt;
 &lt;hr&gt;
 &lt;p&gt;如果 draft：&lt;/p&gt;
-\[q(\ ilde x)\le p(\ ilde x),\]&lt;p&gt;那么：&lt;/p&gt;
+\[q(\tilde x)\le p(\tilde x),\]&lt;p&gt;那么：&lt;/p&gt;
 \[\frac pq\ge1,\]&lt;p&gt;所以：&lt;/p&gt;
 \[\boxed{a=1}.\]&lt;p&gt;Draft 对这个 token 没有“过度推荐”，直接接受。&lt;/p&gt;
 &lt;hr&gt;
 &lt;p&gt;如果：&lt;/p&gt;
-\[q(\ ilde x)&gt;p(\ ilde x),\]&lt;p&gt;那么 draft 给这个 token 太多概率。&lt;/p&gt;
+\[q(\tilde x)&gt;p(\tilde x),\]&lt;p&gt;那么 draft 给这个 token 太多概率。&lt;/p&gt;
 &lt;p&gt;于是只以：&lt;/p&gt;
 \[\frac{p}{q}\]&lt;p&gt;的概率接受。&lt;/p&gt;
 &lt;p&gt;因此 draft 分布中“超出 target 的部分”会被削掉。&lt;/p&gt;
@@ -3423,7 +3423,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[\min(p,q)\]&lt;p&gt;概率质量。&lt;/p&gt;
 &lt;p&gt;剩下没有覆盖的恰好是：&lt;/p&gt;
 \[[p-q]_+.\]&lt;p&gt;因此：&lt;/p&gt;
-\[\boxed{ \ ext{接受部分} + \ ext{拒绝后的 correction 部分} = p }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{接受部分} + \text{拒绝后的 correction 部分} = p }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;最终采样分布仍然严格等于 target：&lt;/p&gt;
 \[\boxed{x\sim p.}\]&lt;p&gt;这就是“lossless speculative decoding”中 &lt;strong&gt;lossless&lt;/strong&gt; 的真正含义：不是说浮点执行完全逐位一致，而是算法意义上保持 target sampling distribution。&lt;/p&gt;
 
@@ -3481,7 +3481,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;&lt;p&gt;那么后面三个 draft token 都失效，因为第二个 token 已经改变了后续上下文。&lt;/p&gt;
 &lt;p&gt;此时一次 target forward 只推进约 1–2 个 token。&lt;/p&gt;
 &lt;p&gt;于是 speculative decoding 的关键性能变量并非 draft model 单独的 perplexity，而是：&lt;/p&gt;
-\[\boxed{\ ext{candidate acceptance rate}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{candidate acceptance rate}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;粗略设每个 candidate 独立具有接受概率：&lt;/p&gt;
 \[\alpha.\]&lt;p&gt;连续接受 token 数的期望约包含：&lt;/p&gt;
 \[\alpha+\alpha^2+\cdots+\alpha^\gamma.\]&lt;p&gt;所以：&lt;/p&gt;
@@ -3490,7 +3490,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[3.69.\]&lt;p&gt;如果：&lt;/p&gt;
 \[\alpha=0.5,\]&lt;p&gt;只约：&lt;/p&gt;
 \[0.97.\]&lt;p&gt;因此：&lt;/p&gt;
-\[\boxed{ \ ext{draft 只需要“便宜”是不够的， 还必须与 target 足够一致。} }\]&lt;hr&gt;
+\[\boxed{ \text{draft 只需要“便宜”是不够的， 还必须与 target 足够一致。} }\]&lt;hr&gt;
 &lt;h1 id=&#34;8-这产生了一个很典型的双重-trade-off&#34;&gt;8. 这产生了一个很典型的双重 trade-off
 &lt;/h1&gt;&lt;p&gt;Draft 越大：&lt;/p&gt;
 \[\boxed{\alpha\uparrow}\]&lt;p&gt;通常预测越准。&lt;/p&gt;
@@ -3499,10 +3499,10 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;Draft 太小：&lt;/p&gt;
 \[T_{\rm draft}\downarrow\]&lt;p&gt;但接受率下降：&lt;/p&gt;
 \[\alpha\downarrow.\]&lt;p&gt;所以真正需要优化：&lt;/p&gt;
-\[\boxed{ \frac{\ ext{每轮有效推进 token 数}} {\ ext{draft cost + verification cost}} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \frac{\text{每轮有效推进 token 数}} {\text{draft cost + verification cost}} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;存在一个最佳 draft capacity。&lt;/p&gt;
 &lt;p&gt;这和很多工程问题类似：&lt;/p&gt;
-\[\boxed{ \ ext{代理模型不是越准越好； 它的精度必须和调用成本一起评价。} }\]&lt;p&gt;这也是 speculative decoding 对 surrogate modeling 特别有迁移价值的一点。&lt;/p&gt;
+\[\boxed{ \text{代理模型不是越准越好； 它的精度必须和调用成本一起评价。} }\]&lt;p&gt;这也是 speculative decoding 对 surrogate modeling 特别有迁移价值的一点。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-为什么-speculative-decoding-本质上也是一种-multi-fidelity-方法&#34;&gt;9. 为什么 Speculative Decoding 本质上也是一种 Multi-Fidelity 方法？
 &lt;/h1&gt;&lt;p&gt;把它换一种语言描述：&lt;/p&gt;
@@ -3511,21 +3511,21 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;h3 id=&#34;高保真模型&#34;&gt;高保真模型
 &lt;/h3&gt;\[p(x)\]&lt;p&gt;昂贵、权威。&lt;/p&gt;
 &lt;p&gt;传统 multi-fidelity 常做：&lt;/p&gt;
-\[\boxed{ \ ext{低保真筛选} + \ ext{少量高保真校正}. }\]&lt;p&gt;Speculative decoding 则做：&lt;/p&gt;
-\[\boxed{ \ ext{低保真提出未来轨迹} + \ ext{高保真并行验证}. }\]&lt;p&gt;而且非常关键的一点是：&lt;/p&gt;
-\[\boxed{\ ext{低保真模型永远没有最终决定权。}}\]&lt;p&gt;因此它和很多 surrogate 加速策略不同：&lt;/p&gt;
+\[\boxed{ \text{低保真筛选} + \text{少量高保真校正}. }\]&lt;p&gt;Speculative decoding 则做：&lt;/p&gt;
+\[\boxed{ \text{低保真提出未来轨迹} + \text{高保真并行验证}. }\]&lt;p&gt;而且非常关键的一点是：&lt;/p&gt;
+\[\boxed{\text{低保真模型永远没有最终决定权。}}\]&lt;p&gt;因此它和很多 surrogate 加速策略不同：&lt;/p&gt;
 &lt;p&gt;低保真误差不会直接污染最终输出分布。&lt;/p&gt;
 &lt;p&gt;这是一种非常强的：&lt;/p&gt;
-\[\boxed{\ ext{proposal + exact correction}}\]&lt;p&gt;架构。&lt;/p&gt;
+\[\boxed{\text{proposal + exact correction}}\]&lt;p&gt;架构。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;10-这和-mfmc-又有一个重要区别&#34;&gt;10. 这和 MFMC 又有一个重要区别
 &lt;/h1&gt;&lt;p&gt;之前 &lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt; 使用低保真模型的方式是：&lt;/p&gt;
-\[\boxed{ \ ext{利用相关性降低统计估计方差} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{利用相关性降低统计估计方差} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;Speculative decoding 使用低保真模型：&lt;/p&gt;
-\[\boxed{ \ ext{预测未来高保真计算可能接受的状态} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{预测未来高保真计算可能接受的状态} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;所以两者都利用：&lt;/p&gt;
-\[\ ext{cheap correlated model},\]&lt;p&gt;但用途不同：&lt;/p&gt;
-\[\ ext{MFMC} \rightarrow \ ext{variance reduction}\]\[\boxed{ \ ext{Speculation} \rightarrow \ ext{latency hiding / parallel verification} }\]&lt;p&gt;。&lt;/p&gt;
+\[\text{cheap correlated model},\]&lt;p&gt;但用途不同：&lt;/p&gt;
+\[\text{MFMC} \rightarrow \text{variance reduction}\]\[\boxed{ \text{Speculation} \rightarrow \text{latency hiding / parallel verification} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这是 multi-fidelity 思想一个非常不同的分支。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;11-为什么draft-正确率-90仍不足以预测-speedup&#34;&gt;11. 为什么“Draft 正确率 90%”仍不足以预测 speedup？
@@ -3539,7 +3539,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;如果：&lt;/p&gt;
 \[T_{\rm target}(5) \approx 5T_{\rm target}(1),\]&lt;p&gt;那完全没有意义。&lt;/p&gt;
 &lt;p&gt;因此 speculative decoding 的基础条件其实是：&lt;/p&gt;
-\[\boxed{ \ ext{并行验证多个 token 的边际成本远低于串行生成它们。} }\]&lt;p&gt;这高度依赖：&lt;/p&gt;
+\[\boxed{ \text{并行验证多个 token 的边际成本远低于串行生成它们。} }\]&lt;p&gt;这高度依赖：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;GPU；&lt;/li&gt;
 &lt;li&gt;batch size；&lt;/li&gt;
@@ -3550,7 +3550,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;li&gt;serving load。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;这也解释了为什么论文中的：&lt;/p&gt;
-\[2\ imes,3\ imes\]&lt;p&gt;不能直接理解成任何环境都会得到同样收益。&lt;/p&gt;
+\[2\times,3\times\]&lt;p&gt;不能直接理解成任何环境都会得到同样收益。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -3562,17 +3562,17 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;这是 speculative decoding 和上一期 Continuous Batching 最重要的联系。&lt;/p&gt;
 &lt;p&gt;在低并发时，大模型 decode 可能：&lt;/p&gt;
-\[\boxed{\ ext{memory bound + GPU 算力闲置}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{memory bound + GPU 算力闲置}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;Speculative verification 可以利用闲置算力。&lt;/p&gt;
 &lt;p&gt;但当 Continuous Batching 已经把：&lt;/p&gt;
 \[B\]&lt;p&gt;推得很大时，&lt;/p&gt;
 &lt;p&gt;GPU 本身可能已经非常忙。&lt;/p&gt;
 &lt;p&gt;这时 speculative verification 增加额外计算：&lt;/p&gt;
-\[\boxed{\ ext{可能没有“免费算力”可用了。}}\]&lt;p&gt;于是：&lt;/p&gt;
-\[\ ext{single-request latency}\downarrow\]&lt;p&gt;并不自动意味着：&lt;/p&gt;
-\[\ ext{system throughput}\uparrow.\]&lt;p&gt;当前 vLLM 文档也把 speculative decoding 的主要目标明确定位在&lt;strong&gt;中低 QPS、memory-bound&lt;/strong&gt; 的 serving workload，而不是所有负载条件。&lt;/p&gt;
+\[\boxed{\text{可能没有“免费算力”可用了。}}\]&lt;p&gt;于是：&lt;/p&gt;
+\[\text{single-request latency}\downarrow\]&lt;p&gt;并不自动意味着：&lt;/p&gt;
+\[\text{system throughput}\uparrow.\]&lt;p&gt;当前 vLLM 文档也把 speculative decoding 的主要目标明确定位在&lt;strong&gt;中低 QPS、memory-bound&lt;/strong&gt; 的 serving workload，而不是所有负载条件。&lt;/p&gt;
 &lt;p&gt;这点非常重要：&lt;/p&gt;
-\[\boxed{ \ ext{Speculative Decoding 与 Continuous Batching 既互补，也会争抢同一份 GPU capacity。} }\]
+\[\boxed{ \text{Speculative Decoding 与 Continuous Batching 既互补，也会争抢同一份 GPU capacity。} }\]
   &lt;/div&gt;
 &lt;/details&gt;
 
@@ -3595,7 +3595,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[q\]&lt;p&gt;最好与：&lt;/p&gt;
 \[p\]&lt;p&gt;行为高度相关。&lt;/p&gt;
 &lt;p&gt;这促成了一整条后续研究线：&lt;/p&gt;
-\[\boxed{ \ ext{能不能不再单独部署一个完整 draft model？} }\]&lt;p&gt;答案是：可以。&lt;/p&gt;
+\[\boxed{ \text{能不能不再单独部署一个完整 draft model？} }\]&lt;p&gt;答案是：可以。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -3624,9 +3624,9 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;这样避免维护独立 draft LLM。&lt;/p&gt;
-&lt;p&gt;Medusa 在 ICML 2024 发表；论文报告 Medusa-1 可超过约 \(2.2\ imes\) 加速，进一步联合训练的 Medusa-2 报告约 \(2.3\!-\!3.6\ imes\) 的实验加速范围。&lt;/p&gt;
+&lt;p&gt;Medusa 在 ICML 2024 发表；论文报告 Medusa-1 可超过约 \(2.2\times\) 加速，进一步联合训练的 Medusa-2 报告约 \(2.3\!-\!3.6\times\) 的实验加速范围。&lt;/p&gt;
 &lt;p&gt;它体现了另一个重要方向：&lt;/p&gt;
-\[\boxed{ \ ext{未来 token prediction 本身可以成为模型 architecture 的能力。} }\]&lt;hr&gt;
+\[\boxed{ \text{未来 token prediction 本身可以成为模型 architecture 的能力。} }\]&lt;hr&gt;
 &lt;h1 id=&#34;15-eagle甚至不一定要在-token-空间里猜&#34;&gt;15. EAGLE：甚至不一定要在 token 空间里猜
 &lt;/h1&gt;&lt;p&gt;EAGLE 提出了一个更有意思的问题：&lt;/p&gt;
 &lt;blockquote&gt;
@@ -3635,9 +3635,9 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;它观察到高层 hidden feature 的自回归预测可能比直接猜 token 更容易。&lt;/p&gt;
 &lt;p&gt;于是：&lt;/p&gt;
 \[h_t \rightarrow \hat h_{t+1} \rightarrow \hat x_{t+1}.\]&lt;p&gt;EAGLE 使用 lightweight autoregressive head 预测接近顶层的 feature，再由 target model 验证。&lt;/p&gt;
-&lt;p&gt;其 ICML 2024 工作在 LLaMA2-Chat 70B 上报告约 \(2.7\!-\!3.5\ imes\) latency speedup，并保持最终生成分布。&lt;/p&gt;
+&lt;p&gt;其 ICML 2024 工作在 LLaMA2-Chat 70B 上报告约 \(2.7\!-\!3.5\times\) latency speedup，并保持最终生成分布。&lt;/p&gt;
 &lt;p&gt;这揭示了 speculative decoding 的一个更普遍版本：&lt;/p&gt;
-\[\boxed{ \ ext{“猜未来”不一定发生在输出 token 空间， 也可以发生在内部状态空间。} }\]&lt;hr&gt;
+\[\boxed{ \text{“猜未来”不一定发生在输出 token 空间， 也可以发生在内部状态空间。} }\]&lt;hr&gt;
 &lt;h1 id=&#34;16-到-2026-年speculative-decoding-已经从一个算法演化成方法族&#34;&gt;16. 到 2026 年，Speculative Decoding 已经从“一个算法”演化成“方法族”
 &lt;/h1&gt;&lt;p&gt;当前 vLLM 文档已经把 speculation 暴露成统一配置，并支持/覆盖多类 proposer 思路，包括：&lt;/p&gt;
 &lt;ul&gt;
@@ -3648,12 +3648,12 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;li&gt;EAGLE 系列等。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;当前接口的核心仍然是：&lt;/p&gt;
-\[\boxed{\ ext{propose several tokens → target verifies}}\]&lt;p&gt;，只是“谁负责 propose”发生变化。&lt;/p&gt;
+\[\boxed{\text{propose several tokens → target verifies}}\]&lt;p&gt;，只是“谁负责 propose”发生变化。&lt;/p&gt;
 &lt;p&gt;Hugging Face 当前 Transformers 同样正式支持 assisted/speculative decoding：辅助模型生成候选，主模型一次验证；其文档同时提醒，经典双模型实现的实际收益依赖 assistant 足够小、candidate agreement 足够好等条件。&lt;/p&gt;
 &lt;p&gt;甚至 2026 年发布的 &lt;strong&gt;Gemma 4 Assistant&lt;/strong&gt; 已专门提供面向 Gemma 4 的 speculative assistant，并通过 KV sharing 复用 target 的 KV cache，从而减少 assistant 自身的 prefill 和 attention 成本。&lt;/p&gt;
 &lt;p&gt;所以今天再理解 speculative decoding，最好不要把它等同于：&lt;/p&gt;
-\[\boxed{\ ext{“一个小 LLM + 一个大 LLM”}}\]&lt;p&gt;而应该理解为：&lt;/p&gt;
-\[\boxed{ \ ext{cheap proposal mechanism} + \ ext{authoritative parallel verification} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{“一个小 LLM + 一个大 LLM”}}\]&lt;p&gt;而应该理解为：&lt;/p&gt;
+\[\boxed{ \text{cheap proposal mechanism} + \text{authoritative parallel verification} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;17-它和-branch-prediction-有什么共同思想&#34;&gt;17. 它和 Branch Prediction 有什么共同思想？
 &lt;/h1&gt;&lt;p&gt;CPU 遇到：&lt;/p&gt;
@@ -3671,46 +3671,46 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;不知道下一条真正执行哪个分支。&lt;/p&gt;
 &lt;p&gt;如果等条件确定以后再取指：&lt;/p&gt;
-\[\boxed{\ ext{流水线会停}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{流水线会停}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;所以 CPU：&lt;/p&gt;
-\[\ ext{predict branch} \rightarrow \ ext{speculatively execute} \rightarrow \ ext{verify}\]&lt;p&gt;预测对：&lt;/p&gt;
-\[\ ext{保留工作}.\]&lt;p&gt;预测错：&lt;/p&gt;
-\[\ ext{rollback}.\]&lt;p&gt;Speculative decoding 也是：&lt;/p&gt;
-\[\boxed{ \ ext{predict future computation} \rightarrow \ ext{execute/verify in parallel} \rightarrow \ ext{accept or discard}. }\]&lt;p&gt;共同思想是：&lt;/p&gt;
-\[\boxed{ \ ext{当真正的依赖无法消除时， 可以通过预测跨越依赖。} }\]&lt;p&gt;这是一种非常普遍的计算机体系结构思想。&lt;/p&gt;
+\[\text{predict branch} \rightarrow \text{speculatively execute} \rightarrow \text{verify}\]&lt;p&gt;预测对：&lt;/p&gt;
+\[\text{保留工作}.\]&lt;p&gt;预测错：&lt;/p&gt;
+\[\text{rollback}.\]&lt;p&gt;Speculative decoding 也是：&lt;/p&gt;
+\[\boxed{ \text{predict future computation} \rightarrow \text{execute/verify in parallel} \rightarrow \text{accept or discard}. }\]&lt;p&gt;共同思想是：&lt;/p&gt;
+\[\boxed{ \text{当真正的依赖无法消除时， 可以通过预测跨越依赖。} }\]&lt;p&gt;这是一种非常普遍的计算机体系结构思想。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;18-对物理求解器它甚至提供了一个很有野心的类比&#34;&gt;18. 对物理求解器，它甚至提供了一个很有野心的类比
 &lt;/h1&gt;&lt;p&gt;假设 nonlinear time stepping：&lt;/p&gt;
 \[x_{n+1} = \Phi(x_n).\]&lt;p&gt;传统严格串行：&lt;/p&gt;
 \[x_n \rightarrow x_{n+1} \rightarrow x_{n+2}.\]&lt;p&gt;现在有一个非常便宜的 approximate solver：&lt;/p&gt;
-\[\ ilde\Phi.\]&lt;p&gt;它先猜：&lt;/p&gt;
-\[\ ilde x_{n+1}, \ ilde x_{n+2}, \ldots\]&lt;p&gt;高保真 solver 再检查这些 predicted states。&lt;/p&gt;
+\[\tilde\Phi.\]&lt;p&gt;它先猜：&lt;/p&gt;
+\[\tilde x_{n+1}, \tilde x_{n+2}, \ldots\]&lt;p&gt;高保真 solver 再检查这些 predicted states。&lt;/p&gt;
 &lt;p&gt;这和已有的：&lt;/p&gt;
-\[\boxed{\ ext{Parareal / parallel-in-time}}\]&lt;p&gt;思想已经相当接近——用 cheap coarse propagator 预测未来，再由 expensive fine propagator 纠正。&lt;/p&gt;
+\[\boxed{\text{Parareal / parallel-in-time}}\]&lt;p&gt;思想已经相当接近——用 cheap coarse propagator 预测未来，再由 expensive fine propagator 纠正。&lt;/p&gt;
 &lt;p&gt;所以 speculative decoding 并不是 LLM 特有的魔法。&lt;/p&gt;
 &lt;p&gt;它属于一个更大的算法母题：&lt;/p&gt;
-\[\boxed{ \ ext{cheap prediction of serial dependencies} + \ ext{expensive correction} }\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{cheap prediction of serial dependencies} + \text{expensive correction} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这对物理求解器开发非常值得保留。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;19-对代理模型还有一个更重要的启发代理不必直接取代高保真模型&#34;&gt;19. 对代理模型还有一个更重要的启发：代理不必直接取代高保真模型
 &lt;/h1&gt;&lt;p&gt;通常 surrogate 的目标是：&lt;/p&gt;
 \[f_H(x) \approx \hat f(x)\]&lt;p&gt;然后部署时：&lt;/p&gt;
-\[\boxed{\hat f\ ext{ 替代 }f_H}.\]&lt;p&gt;于是代理误差直接进入最终答案。&lt;/p&gt;
+\[\boxed{\hat f\text{ 替代 }f_H}.\]&lt;p&gt;于是代理误差直接进入最终答案。&lt;/p&gt;
 &lt;p&gt;Speculative decoding 展示了另一种用法：&lt;/p&gt;
-\[\boxed{ \hat f \ ext{ 只负责提出候选， 最终正确性仍由 }f_H\ ext{ 保证。} }\]&lt;p&gt;于是 surrogate 可以：&lt;/p&gt;
+\[\boxed{ \hat f \text{ 只负责提出候选， 最终正确性仍由 }f_H\text{ 保证。} }\]&lt;p&gt;于是 surrogate 可以：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;很便宜；&lt;/li&gt;
 &lt;li&gt;不需要极高精度；&lt;/li&gt;
 &lt;li&gt;允许犯错；&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;只要：&lt;/p&gt;
-\[\boxed{\ ext{它经常猜对就有价值。}}\]&lt;p&gt;这其实是一种非常重要的工程思想。&lt;/p&gt;
+\[\boxed{\text{它经常猜对就有价值。}}\]&lt;p&gt;这其实是一种非常重要的工程思想。&lt;/p&gt;
 &lt;p&gt;例如可靠性仿真中，低精度代理可以负责提出：&lt;/p&gt;
-\[\boxed{\ ext{可能靠近失效面的 candidate samples}}\]&lt;p&gt;而真正失效标签始终由高保真模型验证。&lt;/p&gt;
+\[\boxed{\text{可能靠近失效面的 candidate samples}}\]&lt;p&gt;而真正失效标签始终由高保真模型验证。&lt;/p&gt;
 &lt;p&gt;代理不承担最终真值职责，训练目标就可以发生变化：&lt;/p&gt;
 &lt;p&gt;从：&lt;/p&gt;
 \[\min E[(f-\hat f)^2]\]&lt;p&gt;变成：&lt;/p&gt;
-\[\boxed{ \max \ ext{proposal usefulness per unit cost}. }\]&lt;p&gt;这往往是更符合实际系统目标的指标。&lt;/p&gt;
+\[\boxed{ \max \text{proposal usefulness per unit cost}. }\]&lt;p&gt;这往往是更符合实际系统目标的指标。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;20-一个最值得自己实现的最小实验&#34;&gt;20. 一个最值得自己实现的最小实验
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
@@ -3763,7 +3763,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[\alpha.\]&lt;p&gt;假设：&lt;/p&gt;
 \[T_{\rm draft}=0.1, \qquad T_{\rm verify}=1.1\]&lt;p&gt;估计每生成一个有效 token 的平均成本。&lt;/p&gt;
 &lt;p&gt;你会很快看到：&lt;/p&gt;
-\[\boxed{ \gamma\ ext{ 并非越大越好。} }\]&lt;p&gt;Candidate 太长以后，后部 token 被整体废弃的概率快速增长。&lt;/p&gt;
+\[\boxed{ \gamma\text{ 并非越大越好。} }\]&lt;p&gt;Candidate 太长以后，后部 token 被整体废弃的概率快速增长。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -3772,11 +3772,11 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Speculative Decoding 最值得记住的不是：&lt;/p&gt;
 \[a(x)=\min(1,p(x)/q(x)).\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
-\[\boxed{ \ ext{串行依赖不能被删除时， 仍然可以通过“便宜地猜未来 + 昂贵地批量验证” 把一部分串行工作转化成并行工作。} }\]&lt;p&gt;它在 LLM serving 知识体系中的位置可以理解成：&lt;/p&gt;
-\[\ ext{Autoregressive decoding}\]\[\downarrow\]\[\boxed{\ ext{Speculative proposal}}\]\[+\]\[\boxed{\ ext{Parallel target verification}}\]\[\downarrow\]\[\ ext{fewer expensive serial target steps}.\]&lt;p&gt;它与前两张 AI 工程卡恰好组成三个完全不同的优化轴：&lt;/p&gt;
-\[\boxed{ \ ext{PagedAttention：优化状态内存} }\]\[\boxed{ \ ext{Continuous Batching：优化请求调度} }\]\[\boxed{ \ ext{Speculative Decoding：优化算法关键路径} }\]&lt;p&gt;真正深的一层则是：&lt;/p&gt;
-\[\boxed{ \ ext{低保真模型最大的价值，有时并不是替代高保真模型， 而是预测“高保真模型下一步大概率会做什么”。} }\]&lt;p&gt;一旦低保真预测错误可以被便宜而严格地检测和纠正，你就得到了一种非常强的加速架构：&lt;/p&gt;
-\[\boxed{ \ ext{approximate speculation} + \ ext{exact authority}. }\]&lt;p&gt;这个思想完全可以迁移到 AI 之外。&lt;/p&gt;
+\[\boxed{ \text{串行依赖不能被删除时， 仍然可以通过“便宜地猜未来 + 昂贵地批量验证” 把一部分串行工作转化成并行工作。} }\]&lt;p&gt;它在 LLM serving 知识体系中的位置可以理解成：&lt;/p&gt;
+\[\text{Autoregressive decoding}\]\[\downarrow\]\[\boxed{\text{Speculative proposal}}\]\[+\]\[\boxed{\text{Parallel target verification}}\]\[\downarrow\]\[\text{fewer expensive serial target steps}.\]&lt;p&gt;它与前两张 AI 工程卡恰好组成三个完全不同的优化轴：&lt;/p&gt;
+\[\boxed{ \text{PagedAttention：优化状态内存} }\]\[\boxed{ \text{Continuous Batching：优化请求调度} }\]\[\boxed{ \text{Speculative Decoding：优化算法关键路径} }\]&lt;p&gt;真正深的一层则是：&lt;/p&gt;
+\[\boxed{ \text{低保真模型最大的价值，有时并不是替代高保真模型， 而是预测“高保真模型下一步大概率会做什么”。} }\]&lt;p&gt;一旦低保真预测错误可以被便宜而严格地检测和纠正，你就得到了一种非常强的加速架构：&lt;/p&gt;
+\[\boxed{ \text{approximate speculation} + \text{exact authority}. }\]&lt;p&gt;这个思想完全可以迁移到 AI 之外。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看扩展内容&lt;/summary&gt;
@@ -3788,7 +3788,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
     &gt;PMLR 原论文&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;&lt;strong&gt;Chen et al., &lt;em&gt;Accelerating Large Language Model Decoding with Speculative Sampling&lt;/em&gt;, 2023&lt;/strong&gt;。DeepMind 几乎同期的经典工作，在 Chinchilla 70B 上报告约 \(2\!-\!2.5\ imes\) 加速，对“为什么一次批量验证可以替代多次 decode”的工程解释尤其好。&lt;br&gt;
+&lt;p&gt;&lt;strong&gt;Chen et al., &lt;em&gt;Accelerating Large Language Model Decoding with Speculative Sampling&lt;/em&gt;, 2023&lt;/strong&gt;。DeepMind 几乎同期的经典工作，在 Chinchilla 70B 上报告约 \(2\!-\!2.5\times\) 加速，对“为什么一次批量验证可以替代多次 decode”的工程解释尤其好。&lt;br&gt;
 &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2302.01318&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;论文&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
@@ -3825,39 +3825,39 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;strong&gt;领域：代理模型 × 有限元 × 科学机器学习 × AI 全栈工程&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
 这次选 Randomized SVD，因为它体现了一种很值得迁移的计算思想：&lt;/p&gt;
-\[\boxed{ \ ext{如果你只需要一个巨大系统最重要的低维结构， 就没有必要精确理解整个巨大系统。} }\]&lt;p&gt;标准 SVD：&lt;/p&gt;
+\[\boxed{ \text{如果你只需要一个巨大系统最重要的低维结构， 就没有必要精确理解整个巨大系统。} }\]&lt;p&gt;标准 SVD：&lt;/p&gt;
 \[A=U\Sigma V^T\]&lt;p&gt;是数值线性代数最重要的工具之一，但当：&lt;/p&gt;
-\[A\in\mathbb R^{10^6\ imes10^4}\]&lt;p&gt;时，精确 SVD 本身就可能成为瓶颈。&lt;/p&gt;
+\[A\in\mathbb R^{10^6\times10^4}\]&lt;p&gt;时，精确 SVD 本身就可能成为瓶颈。&lt;/p&gt;
 &lt;p&gt;Randomized SVD 的做法非常反直觉：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;随机生成少量方向，让大矩阵作用在这些方向上，再根据这些响应反推出矩阵的主导子空间。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;典型结构只有：&lt;/p&gt;
 \[\boxed{ Y=A\Omega }\]&lt;p&gt;其中：&lt;/p&gt;
-\[\Omega\in\mathbb R^{n\ imes(k+p)}\]&lt;p&gt;是一组随机向量。&lt;/p&gt;
+\[\Omega\in\mathbb R^{n\times(k+p)}\]&lt;p&gt;是一组随机向量。&lt;/p&gt;
 &lt;p&gt;然后对：&lt;/p&gt;
 \[Y\]&lt;p&gt;正交化：&lt;/p&gt;
 \[Y=QR,\]&lt;p&gt;就能得到：&lt;/p&gt;
 \[Q\]&lt;p&gt;作为 \(A\) 主导列空间的近似。&lt;/p&gt;
 &lt;p&gt;Halko、Martinsson、Tropp 2011 年的 SIAM Review 论文把这一框架系统化；Martinsson 与 Tropp 2020 年的 &lt;em&gt;Acta Numerica&lt;/em&gt; 综述进一步将其扩展到低秩近似、回归、核矩阵、流式算法和线性系统等多个方向。&lt;/p&gt;
 &lt;p&gt;真正值得学的不是“随机算法会更快”，而是：&lt;/p&gt;
-\[\boxed{ \ ext{随机探测为什么足以发现确定性的低维结构？} }\]&lt;hr&gt;
+\[\boxed{ \text{随机探测为什么足以发现确定性的低维结构？} }\]&lt;hr&gt;
 &lt;h2 id=&#34;1-先明确问题很多时候我们根本不需要完整-svd&#34;&gt;1. 先明确问题：很多时候我们根本不需要完整 SVD
 &lt;/h2&gt;&lt;p&gt;假设有限元跑出：&lt;/p&gt;
 \[m=10000\]&lt;p&gt;个快照，&lt;/p&gt;
 &lt;p&gt;每个快照有：&lt;/p&gt;
 \[N=10^6\]&lt;p&gt;个自由度。&lt;/p&gt;
 &lt;p&gt;组成 snapshot matrix：&lt;/p&gt;
-\[X= [u(t_1),u(t_2),\ldots,u(t_m)] \in\mathbb R^{10^6\ imes10^4}.\]&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt; 通常通过 SVD：&lt;/p&gt;
+\[X= [u(t_1),u(t_2),\ldots,u(t_m)] \in\mathbb R^{10^6\times10^4}.\]&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt; 通常通过 SVD：&lt;/p&gt;
 \[X=U\Sigma V^T\]&lt;p&gt;取前：&lt;/p&gt;
 \[r=50\]&lt;p&gt;个模态：&lt;/p&gt;
 \[U_r.\]&lt;p&gt;真正需要的是：&lt;/p&gt;
-\[\boxed{\ ext{前 50 个主方向}}\]&lt;p&gt;而不是后面：&lt;/p&gt;
+\[\boxed{\text{前 50 个主方向}}\]&lt;p&gt;而不是后面：&lt;/p&gt;
 \[9950\]&lt;p&gt;个奇异向量。&lt;/p&gt;
 &lt;p&gt;这就是 truncated SVD：&lt;/p&gt;
 \[X \approx U_r\Sigma_rV_r^T.\]&lt;p&gt;理论上最优的 rank-\(r\) 近似由 Eckart–Young 定理给出：&lt;/p&gt;
 \[\|A-A_r\|_2=\sigma_{r+1}.\]&lt;p&gt;问题在于：&lt;/p&gt;
-\[\boxed{ \ ext{为了得到 50 个方向， 传统算法有时仍需要对整个巨大矩阵做大量工作。} }\]&lt;p&gt;Randomized SVD 就专门针对这种：&lt;/p&gt;
+\[\boxed{ \text{为了得到 50 个方向， 传统算法有时仍需要对整个巨大矩阵做大量工作。} }\]&lt;p&gt;Randomized SVD 就专门针对这种：&lt;/p&gt;
 \[r\ll\min(m,n)\]&lt;p&gt;的场景。Scikit-learn 当前的官方 &lt;code&gt;randomized_svd&lt;/code&gt; 也明确将其定位为：当矩阵很大、而只需要少量 singular components 时，随机化 truncated SVD 往往非常高效。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-最核心的思想不要直接分解-先找到它的-range&#34;&gt;2. 最核心的思想：不要直接分解 \(A\)，先找到它的 range
@@ -3880,7 +3880,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[\Omega= [\omega_1,\ldots,\omega_l].\]&lt;p&gt;然后：&lt;/p&gt;
 \[Q=\operatorname{orth}(Y).\]&lt;p&gt;于是：&lt;/p&gt;
 \[\boxed{ A \approx QQ^TA. }\]&lt;p&gt;这一步叫：&lt;/p&gt;
-\[\boxed{\ ext{randomized range finder}}\]&lt;p&gt;，也是 Randomized SVD 的核心。&lt;/p&gt;
+\[\boxed{\text{randomized range finder}}\]&lt;p&gt;，也是 Randomized SVD 的核心。&lt;/p&gt;
 &lt;p&gt;Halko 等把大量随机化矩阵分解统一成“两阶段”框架：先用随机采样找到近似 range，再在这个低维空间里做传统确定性线性代数。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-为什么随机方向不会刚好错过重要子空间&#34;&gt;3. 为什么随机方向不会刚好错过重要子空间？
@@ -3898,7 +3898,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[A\omega\]&lt;p&gt;天然被前几个：&lt;/p&gt;
 \[u_i\]&lt;p&gt;支配。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
-\[\boxed{ \ ext{矩阵本身在替你过滤随机噪声， 把随机输入变成主导结构的混合。} }\]&lt;p&gt;多取几个随机向量，就能把整个 dominant subspace 展开出来。&lt;/p&gt;
+\[\boxed{ \text{矩阵本身在替你过滤随机噪声， 把随机输入变成主导结构的混合。} }\]&lt;p&gt;多取几个随机向量，就能把整个 dominant subspace 展开出来。&lt;/p&gt;
 &lt;p&gt;这其实和 power iteration 的思想非常接近。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-标准-randomized-svd-算法只有几步&#34;&gt;4. 标准 Randomized SVD 算法只有几步
@@ -3938,22 +3938,22 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;&lt;p&gt;最终：&lt;/p&gt;
 \[\boxed{ A \approx U\Sigma V^T. }\]&lt;p&gt;关键在：&lt;/p&gt;
 \[B=Q^TA.\]&lt;p&gt;如果：&lt;/p&gt;
-\[Q\in\mathbb R^{m\ imes50},\]&lt;p&gt;那么：&lt;/p&gt;
+\[Q\in\mathbb R^{m\times50},\]&lt;p&gt;那么：&lt;/p&gt;
 \[B\]&lt;p&gt;只有：&lt;/p&gt;
-\[50\ imes n.\]&lt;p&gt;真正昂贵的 SVD 已经从巨大矩阵：&lt;/p&gt;
+\[50\times n.\]&lt;p&gt;真正昂贵的 SVD 已经从巨大矩阵：&lt;/p&gt;
 \[A\]&lt;p&gt;转移到了一个小得多的：&lt;/p&gt;
 \[B.\]&lt;hr&gt;
 &lt;h1 id=&#34;5-这其实是先压缩再精确计算&#34;&gt;5. 这其实是“先压缩，再精确计算”
 &lt;/h1&gt;&lt;p&gt;Randomized SVD 并不是完全随机地给答案。&lt;/p&gt;
 &lt;p&gt;随机性只用于：&lt;/p&gt;
-\[\boxed{\ ext{发现一个好的低维子空间}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{发现一个好的低维子空间}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;找到：&lt;/p&gt;
 \[Q\]&lt;p&gt;之后，&lt;/p&gt;
 &lt;p&gt;后面的：&lt;/p&gt;
 \[B=Q^TA\]&lt;p&gt;和：&lt;/p&gt;
-\[B=\ ilde U\Sigma V^T\]&lt;p&gt;仍然是标准确定性 SVD。&lt;/p&gt;
+\[B=\tilde U\Sigma V^T\]&lt;p&gt;仍然是标准确定性 SVD。&lt;/p&gt;
 &lt;p&gt;所以它的结构是：&lt;/p&gt;
-\[\ ext{Huge deterministic problem}\]\[\downarrow\]\[\boxed{\ ext{Random sketch}}\]\[\downarrow\]\[\ ext{Small deterministic problem}.\]&lt;p&gt;这是 Randomized Numerical Linear Algebra 一个非常典型的架构。&lt;/p&gt;
+\[\text{Huge deterministic problem}\]\[\downarrow\]\[\boxed{\text{Random sketch}}\]\[\downarrow\]\[\text{Small deterministic problem}.\]&lt;p&gt;这是 Randomized Numerical Linear Algebra 一个非常典型的架构。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-为什么-oversampling-很重要&#34;&gt;6. 为什么 oversampling 很重要？
 &lt;/h1&gt;&lt;p&gt;假设真正要：&lt;/p&gt;
@@ -3965,7 +3965,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;所以常取：&lt;/p&gt;
 \[l=k+p\]&lt;p&gt;例如：&lt;/p&gt;
 \[k=20,\quad p=10.\]&lt;p&gt;相当于给算法一些：&lt;/p&gt;
-\[\boxed{\ ext{冗余观察方向}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{冗余观察方向}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;然后最终仍只保留：&lt;/p&gt;
 \[20\]&lt;p&gt;个 singular vectors。&lt;/p&gt;
 &lt;p&gt;Scikit-learn 当前默认：&lt;/p&gt;
@@ -3985,8 +3985,8 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;这时随机采样得到的：&lt;/p&gt;
 \[Y=A\Omega\]&lt;p&gt;中，尾部方向仍占有明显能量。&lt;/p&gt;
 &lt;p&gt;于是：&lt;/p&gt;
-\[\boxed{ \ ext{dominant subspace 不够突出。} }\]&lt;p&gt;Randomized SVD 最常用的解决方法就是：&lt;/p&gt;
-\[\boxed{\ ext{Power Iteration}.}\]
+\[\boxed{ \text{dominant subspace 不够突出。} }\]&lt;p&gt;Randomized SVD 最常用的解决方法就是：&lt;/p&gt;
+\[\boxed{\text{Power Iteration}.}\]
   &lt;/div&gt;
 &lt;/details&gt;
 
@@ -4006,7 +4006,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[q=2\]&lt;p&gt;差距变成：&lt;/p&gt;
 \[2^5=32.\]&lt;p&gt;主导子空间一下变得非常明显。&lt;/p&gt;
 &lt;p&gt;所以 power iteration 的本质是：&lt;/p&gt;
-\[\boxed{ \ ext{人为把 singular spectrum 拉开。} }\]&lt;p&gt;Scikit-learn 也把 &lt;code&gt;n_iter&lt;/code&gt; 暴露为 Randomized SVD 的核心参数，特别用于噪声较大或谱衰减较慢的问题。&lt;/p&gt;
+\[\boxed{ \text{人为把 singular spectrum 拉开。} }\]&lt;p&gt;Scikit-learn 也把 &lt;code&gt;n_iter&lt;/code&gt; 暴露为 Randomized SVD 的核心参数，特别用于噪声较大或谱衰减较慢的问题。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -4022,9 +4022,9 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[A\]&lt;p&gt;非常巨大，&lt;/p&gt;
 &lt;p&gt;真正昂贵的可能不是 FLOPs，&lt;/p&gt;
 &lt;p&gt;而是：&lt;/p&gt;
-\[\boxed{\ ext{内存带宽 / 数据读取}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{内存带宽 / 数据读取}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;所以实际 Randomized Linear Algebra 很关心：&lt;/p&gt;
-\[\boxed{\ ext{passes over the matrix}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{passes over the matrix}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;1-pass algorithm；&lt;/li&gt;
@@ -4033,8 +4033,8 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/ul&gt;
 &lt;p&gt;本身就是重要研究方向。&lt;/p&gt;
 &lt;p&gt;Martinsson 与 Tropp 的综述专门讨论 single-view / streaming randomized algorithms，因为很多大数据环境中：&lt;/p&gt;
-\[\boxed{ \ ext{把矩阵从磁盘或分布式存储读第二遍， 可能比额外算几亿次乘法更贵。} }\]&lt;p&gt;这和现代 AI 系统非常相似：&lt;/p&gt;
-\[\boxed{ \ ext{数据移动经常比计算本身更贵。} }\]
+\[\boxed{ \text{把矩阵从磁盘或分布式存储读第二遍， 可能比额外算几亿次乘法更贵。} }\]&lt;p&gt;这和现代 AI 系统非常相似：&lt;/p&gt;
+\[\boxed{ \text{数据移动经常比计算本身更贵。} }\]
   &lt;/div&gt;
 &lt;/details&gt;
 
@@ -4050,7 +4050,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[\omega_j\]&lt;p&gt;都是所有列的随机线性组合。&lt;/p&gt;
 &lt;p&gt;所以每个：&lt;/p&gt;
 \[A\omega_j\]&lt;p&gt;都包含：&lt;/p&gt;
-\[\boxed{\ ext{整个矩阵的全局信息}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{整个矩阵的全局信息}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;相比直接随机挑列，这通常更稳定。&lt;/p&gt;
 &lt;p&gt;当然 Randomized Numerical Linear Algebra 也包括：&lt;/p&gt;
 &lt;ul&gt;
@@ -4071,11 +4071,11 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;点之间的距离：&lt;/p&gt;
 \[\|x_i-x_j\|\]&lt;p&gt;可以近似保持。&lt;/p&gt;
 &lt;p&gt;背后的核心思想是：&lt;/p&gt;
-\[\boxed{ \ ext{随机低维投影通常不会系统性破坏所有重要方向。} }\]&lt;p&gt;Randomized SVD 用的是类似直觉：&lt;/p&gt;
-\[\boxed{ \ ext{随机 probe 很难同时避开一个固定的重要低维子空间。} }\]&lt;p&gt;所以随机性在这里不是：&lt;/p&gt;
-\[\boxed{\ ext{用随机误差换速度}}\]&lt;p&gt;这么简单。&lt;/p&gt;
+\[\boxed{ \text{随机低维投影通常不会系统性破坏所有重要方向。} }\]&lt;p&gt;Randomized SVD 用的是类似直觉：&lt;/p&gt;
+\[\boxed{ \text{随机 probe 很难同时避开一个固定的重要低维子空间。} }\]&lt;p&gt;所以随机性在这里不是：&lt;/p&gt;
+\[\boxed{\text{用随机误差换速度}}\]&lt;p&gt;这么简单。&lt;/p&gt;
 &lt;p&gt;它更像：&lt;/p&gt;
-\[\boxed{ \ ext{利用高维空间的几何集中性质， 廉价获得对全局结构的观测。} }\]&lt;hr&gt;
+\[\boxed{ \text{利用高维空间的几何集中性质， 廉价获得对全局结构的观测。} }\]&lt;hr&gt;
 &lt;h1 id=&#34;12-为什么它和-pod-天然结合&#34;&gt;12. 为什么它和 POD 天然结合？
 &lt;/h1&gt;&lt;p&gt;POD snapshot matrix：&lt;/p&gt;
 \[X= [u_1,\ldots,u_m].\]&lt;p&gt;标准 POD：&lt;/p&gt;
@@ -4084,35 +4084,35 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;如果：&lt;/p&gt;
 \[N=10^7, \quad m=10^5,\]&lt;p&gt;POD 的 offline SVD 本身就可能极其昂贵。&lt;/p&gt;
 &lt;p&gt;这时可以直接：&lt;/p&gt;
-\[\boxed{ X \overset{\ ext{randomized SVD}} {\longrightarrow} U_r. }\]&lt;p&gt;已有 randomized POD 工作正是针对 PDE 离散后产生的大型 snapshot systems，通过随机投影/随机采样减少生成 dominant modes 所需的成本。&lt;/p&gt;
+\[\boxed{ X \overset{\text{randomized SVD}} {\longrightarrow} U_r. }\]&lt;p&gt;已有 randomized POD 工作正是针对 PDE 离散后产生的大型 snapshot systems，通过随机投影/随机采样减少生成 dominant modes 所需的成本。&lt;/p&gt;
 &lt;p&gt;最近的 ROM 工作也继续使用 randomized SVD、randomized DMD 等方式降低大规模降阶建模中 basis construction 的成本。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;13-这和上一张-hyper-reduction-卡片正好位于不同阶段&#34;&gt;13. 这和上一张 Hyper-reduction 卡片正好位于不同阶段
 &lt;/h1&gt;&lt;p&gt;Hyper-reduction 主要解决：&lt;/p&gt;
-\[\boxed{\ ext{ROM online evaluation 太贵}}\]&lt;p&gt;例如：&lt;/p&gt;
+\[\boxed{\text{ROM online evaluation 太贵}}\]&lt;p&gt;例如：&lt;/p&gt;
 \[f(Vq)\]&lt;p&gt;仍然需要全部有限元单元。&lt;/p&gt;
 &lt;p&gt;Randomized SVD 解决：&lt;/p&gt;
-\[\boxed{\ ext{ROM offline basis construction 太贵}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{ROM offline basis construction 太贵}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;完整流程可以写成：&lt;/p&gt;
-\[\ ext{Full simulations}\]\[\downarrow\]\[\ ext{huge snapshot matrix}\]\[\downarrow\]\[\boxed{\ ext{Randomized SVD}}\]\[\downarrow\]\[\ ext{Reduced basis}\]\[\downarrow\]\[\boxed{\ ext{DEIM/ECSW Hyper-reduction}}\]\[\downarrow\]\[\ ext{fast online ROM}.\]&lt;p&gt;两者解决的是 completely different bottleneck。&lt;/p&gt;
+\[\text{Full simulations}\]\[\downarrow\]\[\text{huge snapshot matrix}\]\[\downarrow\]\[\boxed{\text{Randomized SVD}}\]\[\downarrow\]\[\text{Reduced basis}\]\[\downarrow\]\[\boxed{\text{DEIM/ECSW Hyper-reduction}}\]\[\downarrow\]\[\text{fast online ROM}.\]&lt;p&gt;两者解决的是 completely different bottleneck。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;14-一个有限元中的具体量级&#34;&gt;14. 一个有限元中的具体量级
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;假设软体模型：&lt;/p&gt;
-\[N=3\ imes10^6\]&lt;p&gt;DOF。&lt;/p&gt;
+\[N=3\times10^6\]&lt;p&gt;DOF。&lt;/p&gt;
 &lt;p&gt;记录：&lt;/p&gt;
 \[50000\]&lt;p&gt;帧。&lt;/p&gt;
 &lt;p&gt;Snapshot matrix：&lt;/p&gt;
-\[X\in \mathbb R^{3\ imes10^6\ imes50000}.\]&lt;p&gt;如果用 float64，光存储：&lt;/p&gt;
-\[3\ imes10^6\ imes50000\ imes8\]&lt;p&gt;约等于：&lt;/p&gt;
-\[1.2\ ext{ TB}.\]&lt;p&gt;这时问题已经不再是：&lt;/p&gt;
+\[X\in \mathbb R^{3\times10^6\times50000}.\]&lt;p&gt;如果用 float64，光存储：&lt;/p&gt;
+\[3\times10^6\times50000\times8\]&lt;p&gt;约等于：&lt;/p&gt;
+\[1.2\text{ TB}.\]&lt;p&gt;这时问题已经不再是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;LAPACK SVD 快不快？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;而是：&lt;/p&gt;
-\[\boxed{ \ ext{矩阵甚至放不进普通内存。} }\]&lt;p&gt;Randomized/streaming algorithm 可以：&lt;/p&gt;
+\[\boxed{ \text{矩阵甚至放不进普通内存。} }\]&lt;p&gt;Randomized/streaming algorithm 可以：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;分块读取 snapshots；&lt;/li&gt;
 &lt;li&gt;计算：
@@ -4122,8 +4122,8 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;li&gt;不再长期保存完整矩阵。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;所以 Randomized Linear Algebra 在这里不只是：&lt;/p&gt;
-\[\boxed{\ ext{算法提速}}\]&lt;p&gt;而可能改变：&lt;/p&gt;
-\[\boxed{\ ext{这个计算是否可做。}}\]
+\[\boxed{\text{算法提速}}\]&lt;p&gt;而可能改变：&lt;/p&gt;
+\[\boxed{\text{这个计算是否可做。}}\]
   &lt;/div&gt;
 &lt;/details&gt;
 
@@ -4137,7 +4137,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;每个样本输出：&lt;/p&gt;
 \[5000\]&lt;p&gt;个时序/空间响应量。&lt;/p&gt;
 &lt;p&gt;于是响应矩阵：&lt;/p&gt;
-\[Y\in\mathbb R^{10^6\ imes5000}.\]&lt;p&gt;你可能想分析：&lt;/p&gt;
+\[Y\in\mathbb R^{10^6\times5000}.\]&lt;p&gt;你可能想分析：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;dominant response modes；&lt;/li&gt;
 &lt;li&gt;sensitivity directions；&lt;/li&gt;
@@ -4148,14 +4148,14 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[Y^TY\]&lt;p&gt;或完整 PCA，&lt;/p&gt;
 &lt;p&gt;成本可能很高。&lt;/p&gt;
 &lt;p&gt;Randomized SVD 可以直接提取：&lt;/p&gt;
-\[\boxed{\ ext{主导随机响应子空间}}\]&lt;p&gt;而无需完整 covariance decomposition。&lt;/p&gt;
+\[\boxed{\text{主导随机响应子空间}}\]&lt;p&gt;而无需完整 covariance decomposition。&lt;/p&gt;
 &lt;p&gt;这与之前 &lt;span class=&#34;term-anchor&#34; data-term=&#34;active-subspace&#34; tabindex=&#34;0&#34;&gt;Active Subspaces&lt;/span&gt; 的区别也很清楚：&lt;/p&gt;
 &lt;h3 id=&#34;active-subspaces&#34;&gt;Active Subspaces
 &lt;/h3&gt;&lt;p&gt;分析：&lt;/p&gt;
-\[\boxed{\ ext{输入空间中哪些方向最影响输出}}\]&lt;p&gt;通常依赖梯度信息。&lt;/p&gt;
+\[\boxed{\text{输入空间中哪些方向最影响输出}}\]&lt;p&gt;通常依赖梯度信息。&lt;/p&gt;
 &lt;h3 id=&#34;randomized-svdpca&#34;&gt;Randomized SVD/PCA
 &lt;/h3&gt;&lt;p&gt;分析：&lt;/p&gt;
-\[\boxed{\ ext{观测数据本身主要落在哪些线性方向}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{观测数据本身主要落在哪些线性方向}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;二者都降维，但问题完全不同。&lt;/p&gt;
 
   &lt;/div&gt;
@@ -4167,13 +4167,13 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;Gaussian Process 通常需要处理：&lt;/p&gt;
-\[K\in\mathbb R^{N\ imes N}.\]&lt;p&gt;标准训练和推理涉及：&lt;/p&gt;
+\[K\in\mathbb R^{N\times N}.\]&lt;p&gt;标准训练和推理涉及：&lt;/p&gt;
 \[K^{-1}\]&lt;p&gt;或 Cholesky：&lt;/p&gt;
 \[K=LL^T.\]&lt;p&gt;经典复杂度：&lt;/p&gt;
 \[O(N^3).\]&lt;p&gt;如果 kernel matrix 具有：&lt;/p&gt;
-\[\boxed{\ ext{低有效秩}}\]&lt;p&gt;可以近似：&lt;/p&gt;
+\[\boxed{\text{低有效秩}}\]&lt;p&gt;可以近似：&lt;/p&gt;
 \[K \approx QQ^TK\]&lt;p&gt;或使用：&lt;/p&gt;
-\[\boxed{\ ext{Nyström approximation}}\]&lt;p&gt;构造低秩表示。&lt;/p&gt;
+\[\boxed{\text{Nyström approximation}}\]&lt;p&gt;构造低秩表示。&lt;/p&gt;
 &lt;p&gt;Randomized numerical linear algebra 的成熟体系也专门包含：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Nyström；&lt;/li&gt;
@@ -4182,7 +4182,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/ul&gt;
 &lt;p&gt;Martinsson–Tropp 的综述明确将 kernel matrices from machine learning/scientific computing 列为典型应用。&lt;/p&gt;
 &lt;p&gt;所以 Randomized Linear Algebra 实际位于：&lt;/p&gt;
-\[\boxed{ \ ext{数值线性代数} \cap \ ext{代理模型} \cap \ ext{机器学习} }\]&lt;p&gt;的交界处。&lt;/p&gt;
+\[\boxed{ \text{数值线性代数} \cap \text{代理模型} \cap \text{机器学习} }\]&lt;p&gt;的交界处。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -4193,7 +4193,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;大型 AI 系统里到处存在：&lt;/p&gt;
-\[\boxed{\ ext{低秩结构}}\]&lt;p&gt;：&lt;/p&gt;
+\[\boxed{\text{低秩结构}}\]&lt;p&gt;：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;embedding covariance；&lt;/li&gt;
 &lt;li&gt;activation matrix；&lt;/li&gt;
@@ -4204,7 +4204,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;li&gt;dataset features。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;假设：&lt;/p&gt;
-\[X\in\mathbb R^{10^7\ imes4096}.\]&lt;p&gt;想做 PCA。&lt;/p&gt;
+\[X\in\mathbb R^{10^7\times4096}.\]&lt;p&gt;想做 PCA。&lt;/p&gt;
 &lt;p&gt;直接：&lt;/p&gt;
 \[X^TX\]&lt;p&gt;或 full SVD 可能非常贵。&lt;/p&gt;
 &lt;p&gt;Randomized projection 可以首先构造：&lt;/p&gt;
@@ -4222,14 +4222,14 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/h1&gt;&lt;p&gt;之前 LoRA 的核心假设：&lt;/p&gt;
 \[\Delta W\]&lt;p&gt;具有低秩结构。&lt;/p&gt;
 &lt;p&gt;Randomized SVD 则回答另一个问题：&lt;/p&gt;
-\[\boxed{ \ ext{如果一个巨大矩阵确实近似低秩， 怎样便宜地找到那个低秩子空间？} }\]&lt;p&gt;因此在分析 LoRA training dynamics 时，如果想研究：&lt;/p&gt;
+\[\boxed{ \text{如果一个巨大矩阵确实近似低秩， 怎样便宜地找到那个低秩子空间？} }\]&lt;p&gt;因此在分析 LoRA training dynamics 时，如果想研究：&lt;/p&gt;
 \[\Delta W\]&lt;p&gt;到底有多少有效奇异方向，&lt;/p&gt;
 &lt;p&gt;无需一定做完整：&lt;/p&gt;
-\[4096\ imes4096\]&lt;p&gt;SVD。&lt;/p&gt;
+\[4096\times4096\]&lt;p&gt;SVD。&lt;/p&gt;
 &lt;p&gt;可以直接 randomized SVD。&lt;/p&gt;
 &lt;p&gt;更一般地：&lt;/p&gt;
-\[\boxed{ \ ext{Low-rank modeling} }\]&lt;p&gt;和：&lt;/p&gt;
-\[\boxed{ \ ext{Randomized low-rank discovery} }\]&lt;p&gt;天然是一对。&lt;/p&gt;
+\[\boxed{ \text{Low-rank modeling} }\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{ \text{Randomized low-rank discovery} }\]&lt;p&gt;天然是一对。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;19-但它不是万能的真正低秩才是前提&#34;&gt;19. 但它不是万能的：真正低秩才是前提
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
@@ -4240,10 +4240,10 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;比如：&lt;/p&gt;
 \[\sigma_i\approx1\]&lt;p&gt;直到数千维。&lt;/p&gt;
 &lt;p&gt;那么：&lt;/p&gt;
-\[\boxed{ \ ext{矩阵本身就没有明显低维结构。} }\]&lt;p&gt;这时 randomized SVD 无法凭空制造：&lt;/p&gt;
+\[\boxed{ \text{矩阵本身就没有明显低维结构。} }\]&lt;p&gt;这时 randomized SVD 无法凭空制造：&lt;/p&gt;
 \[k=20\]&lt;p&gt;的高质量近似。&lt;/p&gt;
 &lt;p&gt;它最多更快地告诉你：&lt;/p&gt;
-\[\boxed{\ ext{rank-20 近似本身很差。}}\]&lt;p&gt;这是一条非常重要的原则：&lt;/p&gt;
+\[\boxed{\text{rank-20 近似本身很差。}}\]&lt;p&gt;这是一条非常重要的原则：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;随机化可以降低发现结构的成本，但不能创造不存在的结构。&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -4258,7 +4258,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;这对可靠性尤其重要。&lt;/p&gt;
 &lt;p&gt;POD/SVD 优先保留：&lt;/p&gt;
-\[\boxed{\ ext{最大方差 / 最大能量方向}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{最大方差 / 最大能量方向}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;假设 99.99% 的正常样本沿：&lt;/p&gt;
 \[u_1\]&lt;p&gt;波动。&lt;/p&gt;
 &lt;p&gt;但真正决定失效的微小模式：&lt;/p&gt;
@@ -4268,8 +4268,8 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[r=10,\]&lt;p&gt;这个 failure-sensitive mode 会被完全删除。&lt;/p&gt;
 &lt;p&gt;Randomized SVD 仍然会很好地逼近标准 SVD，&lt;/p&gt;
 &lt;p&gt;但：&lt;/p&gt;
-\[\boxed{ \ ext{标准 SVD 的任务目标本身就错了。} }\]&lt;p&gt;所以：&lt;/p&gt;
-\[\boxed{ \ ext{Randomized SVD 解决的是计算问题， 不解决“哪个子空间对任务最重要”的建模问题。} }\]&lt;p&gt;这是和 &lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt;、Active Subspaces、goal-oriented reduction 的根本区别。&lt;/p&gt;
+\[\boxed{ \text{标准 SVD 的任务目标本身就错了。} }\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Randomized SVD 解决的是计算问题， 不解决“哪个子空间对任务最重要”的建模问题。} }\]&lt;p&gt;这是和 &lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt;、Active Subspaces、goal-oriented reduction 的根本区别。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -4281,14 +4281,14 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;每次结果随机，会不会不靠谱？&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;p&gt;实际上现代 randomized numerical linear algebra 通常有严格的：&lt;/p&gt;
-\[\boxed{\ ext{probabilistic error bounds}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{probabilistic error bounds}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;比如对 range finder，可以控制：&lt;/p&gt;
 \[\|(I-QQ^T)A\|\]&lt;p&gt;与：&lt;/p&gt;
 \[\sigma_{k+1}\]&lt;p&gt;之间的关系，并且失败概率可以通过 oversampling 快速降低。&lt;/p&gt;
 &lt;p&gt;所以这里的随机性更像 Monte Carlo：&lt;/p&gt;
-\[\boxed{ \ ext{允许极小概率失败， 换取显著计算优势。} }\]&lt;p&gt;但 Randomized SVD 和普通 Monte Carlo 又有所不同：&lt;/p&gt;
+\[\boxed{ \text{允许极小概率失败， 换取显著计算优势。} }\]&lt;p&gt;但 Randomized SVD 和普通 Monte Carlo 又有所不同：&lt;/p&gt;
 &lt;p&gt;最终误差通常与：&lt;/p&gt;
-\[\boxed{\ ext{矩阵本身的 singular spectrum}}\]&lt;p&gt;强相关。&lt;/p&gt;
+\[\boxed{\text{矩阵本身的 singular spectrum}}\]&lt;p&gt;强相关。&lt;/p&gt;
 &lt;p&gt;矩阵越接近低秩，它越容易成功。Halko–Martinsson–Tropp 的经典工作正是系统建立了这类概率误差分析。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;22-一个非常适合亲手做的最小实验&#34;&gt;22. 一个非常适合亲手做的最小实验
@@ -4297,7 +4297,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;构造：&lt;/p&gt;
 \[A=U\Sigma V^T\]&lt;p&gt;其中：&lt;/p&gt;
-\[A\in\mathbb R^{10000\ imes2000}.\]&lt;p&gt;设置：&lt;/p&gt;
+\[A\in\mathbb R^{10000\times2000}.\]&lt;p&gt;设置：&lt;/p&gt;
 \[\sigma_i=e^{-i/10}.\]&lt;p&gt;只想要：&lt;/p&gt;
 \[k=20.\]&lt;p&gt;实现：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -4356,7 +4356,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;重新测试。&lt;/p&gt;
 &lt;p&gt;你会非常直观地看到：&lt;/p&gt;
-\[\boxed{ \ ext{Randomized SVD 的表现， 主要由 singular-spectrum separation 决定。} }\]&lt;p&gt;这比直接调用 &lt;code&gt;randomized_svd()&lt;/code&gt; 更有学习价值。&lt;/p&gt;
+\[\boxed{ \text{Randomized SVD 的表现， 主要由 singular-spectrum separation 决定。} }\]&lt;p&gt;这比直接调用 &lt;code&gt;randomized_svd()&lt;/code&gt; 更有学习价值。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -4364,7 +4364,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;hr&gt;
 &lt;h1 id=&#34;23-对你后续有限元软体方向一个实际可迁移场景&#34;&gt;23. 对你后续有限元/软体方向，一个实际可迁移场景
 &lt;/h1&gt;&lt;p&gt;假设未来做大规模软体 simulation dataset：&lt;/p&gt;
-\[u(\ heta,t)\]&lt;p&gt;参数包括：&lt;/p&gt;
+\[u(\theta,t)\]&lt;p&gt;参数包括：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;Young&amp;rsquo;s modulus；&lt;/li&gt;
 &lt;li&gt;Poisson ratio；&lt;/li&gt;
@@ -4375,15 +4375,15 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;很快就可能积累：&lt;/p&gt;
 \[10^4\sim10^5\]&lt;p&gt;个大型 deformation fields。&lt;/p&gt;
 &lt;p&gt;你想研究：&lt;/p&gt;
-\[\boxed{ \ ext{这些百万维形变场真正占据多少维 manifold？} }\]&lt;p&gt;第一步通常就是 PCA/POD/SVD。&lt;/p&gt;
+\[\boxed{ \text{这些百万维形变场真正占据多少维 manifold？} }\]&lt;p&gt;第一步通常就是 PCA/POD/SVD。&lt;/p&gt;
 &lt;p&gt;如果 full SVD 太贵，&lt;/p&gt;
 &lt;p&gt;Randomized SVD 可以直接成为：&lt;/p&gt;
-\[\boxed{ \ ext{数据诊断工具} }\]&lt;p&gt;，而不必立即把它理解成最终 ROM 方法。&lt;/p&gt;
+\[\boxed{ \text{数据诊断工具} }\]&lt;p&gt;，而不必立即把它理解成最终 ROM 方法。&lt;/p&gt;
 &lt;p&gt;比如你可能发现：&lt;/p&gt;
 \[r=30\]&lt;p&gt;已经解释：&lt;/p&gt;
 \[99.9\%\]&lt;p&gt;snapshot energy。&lt;/p&gt;
 &lt;p&gt;这就告诉你：&lt;/p&gt;
-\[\boxed{ \ ext{虽然每帧有百万 DOF， 真实运动数据可能只访问了几十维子空间。} }\]&lt;p&gt;这个结论会直接影响后续是否值得研究：&lt;/p&gt;
+\[\boxed{ \text{虽然每帧有百万 DOF， 真实运动数据可能只访问了几十维子空间。} }\]&lt;p&gt;这个结论会直接影响后续是否值得研究：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;ROM；&lt;/li&gt;
 &lt;li&gt;reduced coordinates；&lt;/li&gt;
@@ -4395,11 +4395,11 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Randomized SVD 最值得记住的不是：&lt;/p&gt;
 \[Y=A\Omega.\]&lt;p&gt;真正重要的是：&lt;/p&gt;
-\[\boxed{ \ ext{如果一个巨大系统只有少数真正重要的方向， 你无需完整检查系统的每一个方向， 只要用少量随机探针让这些重要方向自己显现出来。} }\]&lt;p&gt;它在知识体系中的位置可以这样理解：&lt;/p&gt;
-\[\ ext{Large matrix / dataset}\]\[\downarrow\]\[\boxed{\ ext{Random sketch}}\]\[\downarrow\]\[\boxed{\ ext{Approximate dominant subspace}}\]\[\downarrow\]\[\ ext{small deterministic linear algebra}.\]&lt;p&gt;与最近几张卡片相比，它代表的是一个新的优化轴：&lt;/p&gt;
-\[\boxed{\ ext{Hyper-reduction：少计算算子}}\]\[\boxed{\ ext{Schur complement：少参与全局协调}}\]\[\boxed{\ ext{Randomized SVD：少观察无关方向}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{ \text{如果一个巨大系统只有少数真正重要的方向， 你无需完整检查系统的每一个方向， 只要用少量随机探针让这些重要方向自己显现出来。} }\]&lt;p&gt;它在知识体系中的位置可以这样理解：&lt;/p&gt;
+\[\text{Large matrix / dataset}\]\[\downarrow\]\[\boxed{\text{Random sketch}}\]\[\downarrow\]\[\boxed{\text{Approximate dominant subspace}}\]\[\downarrow\]\[\text{small deterministic linear algebra}.\]&lt;p&gt;与最近几张卡片相比，它代表的是一个新的优化轴：&lt;/p&gt;
+\[\boxed{\text{Hyper-reduction：少计算算子}}\]\[\boxed{\text{Schur complement：少参与全局协调}}\]\[\boxed{\text{Randomized SVD：少观察无关方向}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;更普遍的工程启发则是：&lt;/p&gt;
-\[\boxed{ \ ext{面对百万维问题时， 第一反应不一定应该是“怎样更快地把所有东西算完”， 而应该先问：“我真正需要知道的结构有多少维？”} }\]&lt;p&gt;如果答案是：&lt;/p&gt;
+\[\boxed{ \text{面对百万维问题时， 第一反应不一定应该是“怎样更快地把所有东西算完”， 而应该先问：“我真正需要知道的结构有多少维？”} }\]&lt;p&gt;如果答案是：&lt;/p&gt;
 \[50\]&lt;p&gt;那么精确分析：&lt;/p&gt;
 \[10^6\]&lt;p&gt;个方向，本身可能就是错误的计算目标。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读

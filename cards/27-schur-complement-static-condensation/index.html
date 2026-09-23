@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉 主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）\n领域：有限元 × 数值方法 × 数值优化 × 流体\n推荐阅读时间：约 8–10 分钟\n今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：\n\\[\\boxed{ \\ ext{一个大系统里的不同未知量，并不一定值得被同等对待。} }\\]很多有限元、多物理场和约束问题最终都会得到块矩阵：\n\\[\\begin{bmatrix} A & B\\\\ C & D \\end{bmatrix} \\begin{bmatrix} x\\\\ y \\end{bmatrix} = \\begin{bmatrix} f\\\\ g \\end{bmatrix}.\\]Schur 补做的事情很直接：\n如果 \\(x\\) 相对容易求，那么先把 \\(x\\) 消掉，只留下一个关于 \\(y\\) 的有效系统。\n得到：\n\\[\\boxed{ S=D-CA^{-1}B }\\]这就是 Schur complement。\n看起来只是一条线性代数公式，但它实际上同时出现在：\n高阶有限元的 static condensation； FETI/BDDC 等 domain decomposition； Stokes/Navier–Stokes pressure solve； incompressibility； contact multiplier systems； 多物理场 block preconditioning； hybridized FEM； 图优化和高斯消元。 PETSc 当前的 PCFIELDSPLIT 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉 主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）\n领域：有限元 × 数值方法 × 数值优化 × 流体\n推荐阅读时间：约 8–10 分钟\n今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：\n\\[\\boxed{ \\text{一个大系统里的不同未知量，并不一定值得被同等对待。} }\\]很多有限元、多物理场和约束问题最终都会得到块矩阵：\n\\[\\begin{bmatrix} A & B\\\\ C & D \\end{bmatrix} \\begin{bmatrix} x\\\\ y \\end{bmatrix} = \\begin{bmatrix} f\\\\ g \\end{bmatrix}.\\]Schur 补做的事情很直接：\n如果 \\(x\\) 相对容易求，那么先把 \\(x\\) 消掉，只留下一个关于 \\(y\\) 的有效系统。\n得到：\n\\[\\boxed{ S=D-CA^{-1}B }\\]这就是 Schur complement。\n看起来只是一条线性代数公式，但它实际上同时出现在：\n高阶有限元的 static condensation； FETI/BDDC 等 domain decomposition； Stokes/Navier–Stokes pressure solve； incompressibility； contact multiplier systems； 多物理场 block preconditioning； hybridized FEM； 图优化和高斯消元。 PETSc 当前的 PCFIELDSPLIT 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。\n">
 <title>Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/27-schur-complement-static-condensation/'>
 
 <link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉">
-<meta property='og:description' content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉 主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）\n领域：有限元 × 数值方法 × 数值优化 × 流体\n推荐阅读时间：约 8–10 分钟\n今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：\n\\[\\boxed{ \\ ext{一个大系统里的不同未知量，并不一定值得被同等对待。} }\\]很多有限元、多物理场和约束问题最终都会得到块矩阵：\n\\[\\begin{bmatrix} A & B\\\\ C & D \\end{bmatrix} \\begin{bmatrix} x\\\\ y \\end{bmatrix} = \\begin{bmatrix} f\\\\ g \\end{bmatrix}.\\]Schur 补做的事情很直接：\n如果 \\(x\\) 相对容易求，那么先把 \\(x\\) 消掉，只留下一个关于 \\(y\\) 的有效系统。\n得到：\n\\[\\boxed{ S=D-CA^{-1}B }\\]这就是 Schur complement。\n看起来只是一条线性代数公式，但它实际上同时出现在：\n高阶有限元的 static condensation； FETI/BDDC 等 domain decomposition； Stokes/Navier–Stokes pressure solve； incompressibility； contact multiplier systems； 多物理场 block preconditioning； hybridized FEM； 图优化和高斯消元。 PETSc 当前的 PCFIELDSPLIT 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。\n">
+<meta property='og:description' content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉 主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）\n领域：有限元 × 数值方法 × 数值优化 × 流体\n推荐阅读时间：约 8–10 分钟\n今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：\n\\[\\boxed{ \\text{一个大系统里的不同未知量，并不一定值得被同等对待。} }\\]很多有限元、多物理场和约束问题最终都会得到块矩阵：\n\\[\\begin{bmatrix} A & B\\\\ C & D \\end{bmatrix} \\begin{bmatrix} x\\\\ y \\end{bmatrix} = \\begin{bmatrix} f\\\\ g \\end{bmatrix}.\\]Schur 补做的事情很直接：\n如果 \\(x\\) 相对容易求，那么先把 \\(x\\) 消掉，只留下一个关于 \\(y\\) 的有效系统。\n得到：\n\\[\\boxed{ S=D-CA^{-1}B }\\]这就是 Schur complement。\n看起来只是一条线性代数公式，但它实际上同时出现在：\n高阶有限元的 static condensation； FETI/BDDC 等 domain decomposition； Stokes/Navier–Stokes pressure solve； incompressibility； contact multiplier systems； 多物理场 block preconditioning； hybridized FEM； 图优化和高斯消元。 PETSc 当前的 PCFIELDSPLIT 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/27-schur-complement-static-condensation/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='数值优化' /><meta property='article:tag' content='流体' /><meta property='article:published_time' content='2026-09-09T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-09T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉">
-<meta name="twitter:description" content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉 主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）\n领域：有限元 × 数值方法 × 数值优化 × 流体\n推荐阅读时间：约 8–10 分钟\n今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：\n\\[\\boxed{ \\ ext{一个大系统里的不同未知量，并不一定值得被同等对待。} }\\]很多有限元、多物理场和约束问题最终都会得到块矩阵：\n\\[\\begin{bmatrix} A & B\\\\ C & D \\end{bmatrix} \\begin{bmatrix} x\\\\ y \\end{bmatrix} = \\begin{bmatrix} f\\\\ g \\end{bmatrix}.\\]Schur 补做的事情很直接：\n如果 \\(x\\) 相对容易求，那么先把 \\(x\\) 消掉，只留下一个关于 \\(y\\) 的有效系统。\n得到：\n\\[\\boxed{ S=D-CA^{-1}B }\\]这就是 Schur complement。\n看起来只是一条线性代数公式，但它实际上同时出现在：\n高阶有限元的 static condensation； FETI/BDDC 等 domain decomposition； Stokes/Navier–Stokes pressure solve； incompressibility； contact multiplier systems； 多物理场 block preconditioning； hybridized FEM； 图优化和高斯消元。 PETSc 当前的 PCFIELDSPLIT 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。\n">
+<meta name="twitter:description" content="Schur 补与静态凝聚：真正高效的大型求解器，经常不是“更快地解全部未知量”，而是先把不重要的自由度消掉 主题：Schur Complement（Schur 补）与 Static Condensation（静态凝聚）\n领域：有限元 × 数值方法 × 数值优化 × 流体\n推荐阅读时间：约 8–10 分钟\n今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：\n\\[\\boxed{ \\text{一个大系统里的不同未知量，并不一定值得被同等对待。} }\\]很多有限元、多物理场和约束问题最终都会得到块矩阵：\n\\[\\begin{bmatrix} A & B\\\\ C & D \\end{bmatrix} \\begin{bmatrix} x\\\\ y \\end{bmatrix} = \\begin{bmatrix} f\\\\ g \\end{bmatrix}.\\]Schur 补做的事情很直接：\n如果 \\(x\\) 相对容易求，那么先把 \\(x\\) 消掉，只留下一个关于 \\(y\\) 的有效系统。\n得到：\n\\[\\boxed{ S=D-CA^{-1}B }\\]这就是 Schur complement。\n看起来只是一条线性代数公式，但它实际上同时出现在：\n高阶有限元的 static condensation； FETI/BDDC 等 domain decomposition； Stokes/Navier–Stokes pressure solve； incompressibility； contact multiplier systems； 多物理场 block preconditioning； hybridized FEM； 图优化和高斯消元。 PETSc 当前的 PCFIELDSPLIT 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。\n">
     </head>
     <body class="
     article-page">
@@ -408,7 +408,7 @@
 <strong>领域：有限元 × 数值方法 × 数值优化 × 流体</strong><br>
 <strong>推荐阅读时间：约 8–10 分钟</strong><br>
 今天选 Schur 补，因为它代表了一种非常核心、但容易被低估的求解器思想：</p>
-\[\boxed{ \ ext{一个大系统里的不同未知量，并不一定值得被同等对待。} }\]<p>很多有限元、多物理场和约束问题最终都会得到块矩阵：</p>
+\[\boxed{ \text{一个大系统里的不同未知量，并不一定值得被同等对待。} }\]<p>很多有限元、多物理场和约束问题最终都会得到块矩阵：</p>
 \[\begin{bmatrix} A & B\\ C & D \end{bmatrix} \begin{bmatrix} x\\ y \end{bmatrix} = \begin{bmatrix} f\\ g \end{bmatrix}.\]<p>Schur 补做的事情很直接：</p>
 <blockquote>
 <p>如果 \(x\) 相对容易求，那么先把 \(x\) 消掉，只留下一个关于 \(y\) 的有效系统。</p>
@@ -428,7 +428,7 @@
 </ul>
 <p>PETSc 当前的 <code>PCFIELDSPLIT</code> 就直接把 Schur factorization 作为块系统的核心求解/预处理方式，并允许为 Schur complement 单独配置求解器和近似预条件器。</p>
 <p>真正值得学的不是公式本身，而是：</p>
-\[\boxed{ \ ext{消元以后，剩下的变量究竟代表了什么“有效物理”。} }\]<hr>
+\[\boxed{ \text{消元以后，剩下的变量究竟代表了什么“有效物理”。} }\]<hr>
 <h2 id="1-schur-补其实就是一次精确消元">1. Schur 补其实就是一次精确消元
 </h2><p>从：</p>
 \[Ax+By=f\]\[Cx+Dy=g\]<p>开始。</p>
@@ -438,12 +438,12 @@
 \[CA^{-1}(f-By)+Dy=g.\]<p>整理：</p>
 \[\boxed{ (D-CA^{-1}B)y = g-CA^{-1}f. }\]<p>所以：</p>
 \[S=D-CA^{-1}B.\]<p>先解：</p>
-\[Sy=\ ilde g,\]<p>然后回代：</p>
+\[Sy=\tilde g,\]<p>然后回代：</p>
 \[x=A^{-1}(f-By).\]<p>这并不是近似。</p>
 <p>如果 \(A^{-1}\) 精确计算，Schur 系统与原系统：</p>
-\[\boxed{\ ext{数学上完全等价。}}\]<p>因此 Schur 补的本质不是“降阶模型”。</p>
+\[\boxed{\text{数学上完全等价。}}\]<p>因此 Schur 补的本质不是“降阶模型”。</p>
 <p>而是：</p>
-\[\boxed{\ ext{通过变量消元重新组织同一个问题。}}\]<hr>
+\[\boxed{\text{通过变量消元重新组织同一个问题。}}\]<hr>
 <h1 id="2-为什么消掉变量以后系统反而可能更难">2. 为什么消掉变量以后，系统反而可能更难？
 </h1><p>这里有个很重要的反直觉点。</p>
 <p>原矩阵可能很稀疏：</p>
@@ -464,8 +464,8 @@
 <p>所以 Schur complement：</p>
 \[S\]<p>经常比原来的 \(D\) 更“全局”。</p>
 <p>这不是坏事，而是它的物理含义：</p>
-\[\boxed{ \ ext{被消掉的局部自由度，通过 }A^{-1}\ ext{ 把远处变量耦合起来了。} }\]<p>也就是说，Schur complement 其实是一种：</p>
-\[\boxed{\ ext{effective interaction operator}}\]<p>。</p>
+\[\boxed{ \text{被消掉的局部自由度，通过 }A^{-1}\text{ 把远处变量耦合起来了。} }\]<p>也就是说，Schur complement 其实是一种：</p>
+\[\boxed{\text{effective interaction operator}}\]<p>。</p>
 <p>被消掉的变量虽然不再显式出现，但它们的影响全部被编码进：</p>
 \[S.\]<hr>
 <h1 id="3-一个非常直观的弹簧例子">3. 一个非常直观的弹簧例子
@@ -486,11 +486,11 @@
 \[u_i = K_{ii}^{-1} (f_i-K_{ib}u_b).\]<p>边界系统变成：</p>
 \[\boxed{ S_bu_b = f_b-K_{bi}K_{ii}^{-1}f_i }\]<p>其中：</p>
 \[S_b = K_{bb} - K_{bi}K_{ii}^{-1}K_{ib}.\]<p>从外面看，这个含内部自由度的弹簧结构被替换成了：</p>
-\[\boxed{\ ext{边界节点之间的等效刚度}}\]<p>。</p>
+\[\boxed{\text{边界节点之间的等效刚度}}\]<p>。</p>
 <p>内部节点消失了，</p>
 <p>但它们对端点关系的所有影响仍然存在。</p>
 <p>这就是 Schur complement 最好的物理直觉：</p>
-\[\boxed{ \ ext{把内部物理“压缩”成边界上的等效响应。} }\]<hr>
+\[\boxed{ \text{把内部物理“压缩”成边界上的等效响应。} }\]<hr>
 <h1 id="4-static-condensation-就是有限元里的-schur-补">4. Static Condensation 就是有限元里的 Schur 补
 </h1><p>这在高阶有限元中特别重要。</p>
 <p>一个高阶单元内部可能有很多 DOF：</p>
@@ -534,11 +534,11 @@
 <p>单元内部 DOF 数大致会快速随：</p>
 \[p\]<p>增长。</p>
 <p>但真正跨 element 通信的只是在：</p>
-\[\boxed{\ ext{faces / edges}}\]<p>上的自由度。</p>
+\[\boxed{\text{faces / edges}}\]<p>上的自由度。</p>
 <p>如果把所有 interior DOFs 都直接放进 global solve：</p>
 \[N_{\rm global}\]<p>会非常大。</p>
 <p>Static condensation 让：</p>
-\[\boxed{ \ ext{大量局部未知量永远不进入全局 Krylov system。} }\]<p>于是问题变成：</p>
+\[\boxed{ \text{大量局部未知量永远不进入全局 Krylov system。} }\]<p>于是问题变成：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -562,9 +562,9 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>这和 HPC 中一个非常普遍的原则完全一致：</p>
-\[\boxed{ \ ext{尽量把计算留在本地，把真正需要全局通信的部分压到最小。} }\]<p>所以 static condensation 不只是减少 DOF。</p>
+\[\boxed{ \text{尽量把计算留在本地，把真正需要全局通信的部分压到最小。} }\]<p>所以 static condensation 不只是减少 DOF。</p>
 <p>它减少的是：</p>
-\[\boxed{\ ext{global coupling dimension}.}\]<p>这在并行求解里往往比单纯减少 FLOPs 更重要。</p>
+\[\boxed{\text{global coupling dimension}.}\]<p>这在并行求解里往往比单纯减少 FLOPs 更重要。</p>
 <hr>
 <h1 id="6-内部变量与接口变量的分离其实就是-domain-decomposition-的核心">6. “内部变量”与“接口变量”的分离，其实就是 domain decomposition 的核心
 </h1><p>假设把一个大有限元区域切成：</p>
@@ -579,12 +579,12 @@
 <p>这就是经典 <strong>substructuring</strong> 思路。</p>
 <p>Toselli 与 Widlund 的 domain decomposition 专著把这类 Schur complement/substructuring formulation 作为 FETI、BDD/BDDC 等非重叠域分解方法的重要基础：每个子域内部可以局部求解，全局问题主要转化为接口自由度协调。</p>
 <p>所以可以把两种方法看成同一个思想在不同尺度的应用：</p>
-\[\boxed{ \ ext{element-level elimination} \rightarrow \ ext{static condensation} }\]\[\boxed{ \ ext{subdomain-level elimination} \rightarrow \ ext{substructuring / domain decomposition} }\]<p>。</p>
+\[\boxed{ \text{element-level elimination} \rightarrow \text{static condensation} }\]\[\boxed{ \text{subdomain-level elimination} \rightarrow \text{substructuring / domain decomposition} }\]<p>。</p>
 <hr>
 <h1 id="7-这解释了一个很深的求解器原则全局问题本质上是接口协调问题">7. 这解释了一个很深的求解器原则：全局问题本质上是“接口协调问题”
 </h1><p>很多 PDE 在每一个局部区域内部其实都很好解。</p>
 <p>真正困难的是：</p>
-\[\boxed{\ ext{不同区域怎么彼此一致。}}\]<p>例如：</p>
+\[\boxed{\text{不同区域怎么彼此一致。}}\]<p>例如：</p>
 <ul>
 <li>位移连续；</li>
 <li>traction 平衡；</li>
@@ -594,7 +594,7 @@
 </ul>
 <p>Schur complement 把内部变量全部消去以后，</p>
 <p>剩下的往往恰恰就是：</p>
-\[\boxed{\ ext{这些全局协调变量。}}\]<p>所以一个很有价值的观察是：</p>
+\[\boxed{\text{这些全局协调变量。}}\]<p>所以一个很有价值的观察是：</p>
 <blockquote>
 <p>大规模 PDE 求解器的真正核心，有时不是解每个局部 PDE，而是高效解决接口上的协调问题。</p>
 </blockquote>
@@ -602,7 +602,7 @@
 <hr>
 <h1 id="8-schur-补在不可压流体里又变成了什么">8. Schur 补在不可压流体里又变成了什么？
 </h1><p>考虑 Stokes：</p>
-\[-\mu\ abla^2u+\ abla p=f\]\[\ abla\cdot u=0.\]<p>离散后常得到 saddle-point system：</p>
+\[-\mu\nabla^2u+\nabla p=f\]\[\nabla\cdot u=0.\]<p>离散后常得到 saddle-point system：</p>
 \[\begin{bmatrix} A & B^T\\ B & 0 \end{bmatrix} \begin{bmatrix} u\\ p \end{bmatrix} = \begin{bmatrix} f\\ 0 \end{bmatrix}.\]<p>消掉速度：</p>
 \[u = A^{-1}(f-B^Tp).\]<p>代入 incompressibility：</p>
 \[BA^{-1}(f-B^Tp)=0.\]<p>于是压力满足：</p>
@@ -612,7 +612,7 @@
 <p>一个压力场通过动量方程激发速度，再通过散度方程反馈出的有效作用。</p>
 </blockquote>
 <p>这就是为什么 incompressible solver 中：</p>
-\[\boxed{\ ext{pressure solve}}\]<p>如此核心。</p>
+\[\boxed{\text{pressure solve}}\]<p>如此核心。</p>
 <p>PETSc 当前专门为 saddle-point/field-split 系统提供 Schur-complement preconditioning；例如其 LSC preconditioner 就针对这类 Schur 系统，并指出在 incompressible flow 中相关 \(A_{10}A_{01}\) 结构对应 Laplacian 型算子。</p>
 <hr>
 <h1 id="9-所以-projection-method-和-schur-complement-其实很近">9. 所以 projection method 和 Schur complement 其实很近
@@ -627,7 +627,7 @@
 <p>pressure projection 很大程度上就是在近似处理：</p>
 \[\boxed{ BA^{-1}B^T }\]<p>这一 pressure Schur complement。</p>
 <p>所以很多“物理算法”和“块矩阵求解器”其实只是：</p>
-\[\boxed{\ ext{同一结构的不同表达。}}\]<p>这个联系非常值得记住。</p>
+\[\boxed{\text{同一结构的不同表达。}}\]<p>这个联系非常值得记住。</p>
 <hr>
 <h1 id="10-接触和约束问题里也会出现同样结构">10. 接触和约束问题里也会出现同样结构
 </h1><p>考虑约束动力学：</p>
@@ -638,14 +638,14 @@
 \[\boxed{ JM^{-1}J^T\lambda = b-JM^{-1}f. }\]<p>这里：</p>
 \[\boxed{ W=JM^{-1}J^T }\]<p>就是约束空间里的 Schur complement。</p>
 <p>在刚体物理里它经常叫：</p>
-\[\boxed{\ ext{Delassus operator}}\]<p>或有效质量矩阵。</p>
+\[\boxed{\text{Delassus operator}}\]<p>或有效质量矩阵。</p>
 <p>这条公式非常重要：</p>
 \[W = JM^{-1}J^T.\]<p>它回答：</p>
 <blockquote>
 <p>给约束施加一个单位 impulse，约束速度会改变多少？</p>
 </blockquote>
 <p>于是可以直接看出：</p>
-\[\boxed{ \ ext{LCP / contact solver 实际是在 constraint space 中求 Schur system。} }\]<p>这和有限元 static condensation 竟然是同一个数学母结构。</p>
+\[\boxed{ \text{LCP / contact solver 实际是在 constraint space 中求 Schur system。} }\]<p>这和有限元 static condensation 竟然是同一个数学母结构。</p>
 <hr>
 <h1 id="11-一个销轴孔接触的直观理解">11. 一个销轴—孔接触的直观理解
 </h1><details class="reveal">
@@ -663,10 +663,10 @@
 <p>得到：</p>
 \[S_c\lambda=b.\]<p>其中：</p>
 \[S_c\]<p>编码：</p>
-\[\boxed{ \ ext{一个接触点施力以后，所有其他接触点会发生多大位移响应。} }\]<p>这其实就是：</p>
-\[\boxed{\ ext{interface compliance matrix}}\]<p>。</p>
+\[\boxed{ \text{一个接触点施力以后，所有其他接触点会发生多大位移响应。} }\]<p>这其实就是：</p>
+\[\boxed{\text{interface compliance matrix}}\]<p>。</p>
 <p>所以 Schur complement 有一个特别清晰的物理解释：</p>
-\[\boxed{ \ ext{它把整个内部结构压缩成边界/接触点之间的等效柔度或刚度关系。} }\]<p>这也是 boundary element、substructuring、component mode synthesis 等方法背后共有的思维之一。</p>
+\[\boxed{ \text{它把整个内部结构压缩成边界/接触点之间的等效柔度或刚度关系。} }\]<p>这也是 boundary element、substructuring、component mode synthesis 等方法背后共有的思维之一。</p>
 
   </div>
 </details>
@@ -712,10 +712,10 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>因此：</p>
-\[\boxed{ \ ext{应用一次 Schur operator} }\]<p>内部实际上包含一次：</p>
+\[\boxed{ \text{应用一次 Schur operator} }\]<p>内部实际上包含一次：</p>
 \[A^{-1}\]<p>子问题求解。</p>
 <p>这就是所谓：</p>
-\[\boxed{\ ext{matrix-free Schur complement}}\]<p>思想。</p>
+\[\boxed{\text{matrix-free Schur complement}}\]<p>思想。</p>
 <p>PETSc 的 Schur machinery 也支持符号 Schur operator，而不是要求始终显式组装完整 Schur matrix。</p>
 <hr>
 <h1 id="13-于是新的问题出现schur-complement-本身怎么预条件">13. 于是新的问题出现：Schur complement 本身怎么预条件？
@@ -741,7 +741,7 @@
 <li>对 saddle-point 系统使用 LSC 等专门预条件器。</li>
 </ul>
 <p>这揭示了一个很重要的现实：</p>
-\[\boxed{ \ ext{Schur complement 的威力，通常来自“好的近似”，而不是显式精确构造。} }\]
+\[\boxed{ \text{Schur complement 的威力，通常来自“好的近似”，而不是显式精确构造。} }\]
   </div>
 </details>
 
@@ -751,9 +751,9 @@
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p><span class="term-anchor" data-term="multigrid" tabindex="0">Multigrid</span> 解决的是：</p>
-\[\boxed{\ ext{不同空间尺度的误差}}\]<p>。</p>
+\[\boxed{\text{不同空间尺度的误差}}\]<p>。</p>
 <p>Schur complement 解决的是：</p>
-\[\boxed{\ ext{不同变量/拓扑角色的耦合}}\]<p>。</p>
+\[\boxed{\text{不同变量/拓扑角色的耦合}}\]<p>。</p>
 <p>所以它们经常组合，而不是互相替代。</p>
 <p>例如：</p>
 <div class="highlight"><div class="chroma">
@@ -790,7 +790,7 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>因此：</p>
-\[\boxed{ \ ext{Schur：变量消元 / interface reduction} }\]\[\boxed{ \ ext{Multigrid：scale reduction} }\]<p>这是两个完全不同的求解器轴。</p>
+\[\boxed{ \text{Schur：变量消元 / interface reduction} }\]\[\boxed{ \text{Multigrid：scale reduction} }\]<p>这是两个完全不同的求解器轴。</p>
 
   </div>
 </details>
@@ -802,16 +802,16 @@
   <div class="reveal-body">
     <p>上一期 Hyper-reduction：</p>
 \[u\approx Vq\]<p>会产生：</p>
-\[\boxed{\ ext{近似模型}}\]<p>。</p>
+\[\boxed{\text{近似模型}}\]<p>。</p>
 <p>Schur elimination：</p>
 \[S=D-CA^{-1}B\]<p>如果精确执行，则：</p>
-\[\boxed{\ ext{不损失任何信息。}}\]<p>所以：</p>
+\[\boxed{\text{不损失任何信息。}}\]<p>所以：</p>
 <h3 id="model-reduction">Model reduction
 </h3><p>减少：</p>
-\[\boxed{\ ext{物理状态空间}}\]<p>可能引入 approximation error。</p>
+\[\boxed{\text{物理状态空间}}\]<p>可能引入 approximation error。</p>
 <h3 id="schur-reduction">Schur reduction
 </h3><p>减少：</p>
-\[\boxed{\ ext{显式未知量}}\]<p>但被消掉的信息以 effective operator 形式保留。</p>
+\[\boxed{\text{显式未知量}}\]<p>但被消掉的信息以 effective operator 形式保留。</p>
 <p>这是“降维”这个词下两种完全不同的数学操作。</p>
 
   </div>
@@ -834,7 +834,7 @@
 \[10^3.\]<p>一种思路是全局一起跑：</p>
 \[201000\]<p>自由度的大迭代。</p>
 <p>另一种是：</p>
-\[\boxed{ \ ext{每个 body 内部局部求解} + \ ext{只在 interface 上协调} }\]<p>。</p>
+\[\boxed{ \text{每个 body 内部局部求解} + \text{只在 interface 上协调} }\]<p>。</p>
 <p>这特别适合：</p>
 <ul>
 <li>destructible objects；</li>
@@ -844,7 +844,7 @@
 <li>multi-GPU physics。</li>
 </ul>
 <p>从系统角度：</p>
-\[\boxed{ \ ext{Schur complement 把“局部计算”和“全局通信”分开。} }\]<p>这和 GPU/分布式求解器的硬件结构非常契合。</p>
+\[\boxed{ \text{Schur complement 把“局部计算”和“全局通信”分开。} }\]<p>这和 GPU/分布式求解器的硬件结构非常契合。</p>
 <hr>
 <h1 id="17-对组件级数字样机它还有一个很现实的价值">17. 对组件级数字样机，它还有一个很现实的价值
 </h1><details class="reveal">
@@ -860,7 +860,7 @@
 </ul>
 <p>你可能不需要在整个系统装配以后仍保留每个组件的所有内部自由度。</p>
 <p>可以先为组件构造：</p>
-\[\boxed{\ ext{boundary/interface operator}}\]<p>然后系统级只耦合：</p>
+\[\boxed{\text{boundary/interface operator}}\]<p>然后系统级只耦合：</p>
 <ul>
 <li>接口位移；</li>
 <li>接口力；</li>
@@ -868,7 +868,7 @@
 </ul>
 <p>这正是 substructuring 与 component reduction 思想的自然基础。</p>
 <p>如果以后要做：</p>
-\[\boxed{\ ext{模块化高保真数字样机}}\]<p>Schur complement 几乎是绕不开的数学语言。</p>
+\[\boxed{\text{模块化高保真数字样机}}\]<p>Schur complement 几乎是绕不开的数学语言。</p>
 
   </div>
 </details>
@@ -880,13 +880,13 @@
   <div class="reveal-body">
     <p>通常我们想直接代理：</p>
 \[x\rightarrow y.\]<p>但如果复杂系统天然由：</p>
-\[\ ext{internal state} + \ ext{interface state}\]<p>组成，</p>
+\[\text{internal state} + \text{interface state}\]<p>组成，</p>
 <p>可能更好的学习目标是：</p>
-\[\boxed{ \ ext{interface input} \rightarrow \ ext{interface response} }\]<p>也就是学习一个近似：</p>
+\[\boxed{ \text{interface input} \rightarrow \text{interface response} }\]<p>也就是学习一个近似：</p>
 \[\boxed{\hat S}\]<p>。</p>
 <p>例如：</p>
-\[\ ext{边界位移} \rightarrow \ ext{边界力}.\]<p>这是一种：</p>
-\[\boxed{\ ext{learned Schur operator}}\]<p>。</p>
+\[\text{边界位移} \rightarrow \text{边界力}.\]<p>这是一种：</p>
+\[\boxed{\text{learned Schur operator}}\]<p>。</p>
 <p>它相比直接学习整个内部 displacement field 有几个天然优势：</p>
 <ul>
 <li>输出维数更小；</li>
@@ -934,7 +934,7 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>这一步一旦实现，你就真正跨过了：</p>
-\[\boxed{ \ ext{“知道 Schur 补公式” \rightarrow “理解大型求解器怎么用它”} }\]<p>这条线。</p>
+\[\boxed{ \text{“知道 Schur 补公式” \rightarrow “理解大型求解器怎么用它”} }\]<p>这条线。</p>
 
   </div>
 </details>
@@ -947,18 +947,18 @@
 <p>用 GMRES 还是 CG？</p>
 </blockquote>
 <p>而先问：</p>
-\[\boxed{ \ ext{哪些变量局部、便宜、适合消掉？} }\]<p>以及：</p>
-\[\boxed{ \ ext{哪些变量真正承担全局耦合？} }\]<p>如果找到后者，</p>
+\[\boxed{ \text{哪些变量局部、便宜、适合消掉？} }\]<p>以及：</p>
+\[\boxed{ \text{哪些变量真正承担全局耦合？} }\]<p>如果找到后者，</p>
 <p>它们往往正是最值得构造 Schur complement 的变量。</p>
 <p>这个问题比单纯选 Krylov solver 更接近系统结构。</p>
 <hr>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
 </h1><p>Schur complement 最值得记住的不是：</p>
 \[S=D-CA^{-1}B.\]<p>而是：</p>
-\[\boxed{ \ ext{被消掉的自由度并没有消失； 它们被压缩成了剩余自由度之间的有效耦合。} }\]<p>所以它在知识体系里的位置可以理解成：</p>
-\[\ ext{Full coupled system}\]\[\downarrow\]\[\boxed{\ ext{eliminate local/internal variables}}\]\[\downarrow\]\[\boxed{\ ext{effective interface operator / Schur complement}}\]\[\downarrow\]\[\ ext{interface solve + local recovery}.\]<p>而从工程角度看，它教会我们的一个极其重要的原则是：</p>
-\[\boxed{ \ ext{真正昂贵的不是系统里有多少变量， 而是多少变量必须参与全局协调。} }\]<p>Static condensation、domain decomposition、pressure projection、constraint-space contact solve 看起来属于完全不同的领域，但它们背后实际上都在利用同一个结构：</p>
-\[\boxed{ \ ext{先解决局部响应， 再集中解决少量全局耦合变量。} }\]<p>一旦看懂这一点，很多大型物理求解器的架构会突然变得非常统一。</p>
+\[\boxed{ \text{被消掉的自由度并没有消失； 它们被压缩成了剩余自由度之间的有效耦合。} }\]<p>所以它在知识体系里的位置可以理解成：</p>
+\[\text{Full coupled system}\]\[\downarrow\]\[\boxed{\text{eliminate local/internal variables}}\]\[\downarrow\]\[\boxed{\text{effective interface operator / Schur complement}}\]\[\downarrow\]\[\text{interface solve + local recovery}.\]<p>而从工程角度看，它教会我们的一个极其重要的原则是：</p>
+\[\boxed{ \text{真正昂贵的不是系统里有多少变量， 而是多少变量必须参与全局协调。} }\]<p>Static condensation、domain decomposition、pressure projection、constraint-space contact solve 看起来属于完全不同的领域，但它们背后实际上都在利用同一个结构：</p>
+\[\boxed{ \text{先解决局部响应， 再集中解决少量全局耦合变量。} }\]<p>一旦看懂这一点，很多大型物理求解器的架构会突然变得非常统一。</p>
 <h3 id="拓展阅读">拓展阅读
 </h3><details class="reveal">
   <summary>查看扩展内容</summary>

@@ -2080,35 +2080,35 @@
 &lt;strong&gt;领域：有限元 × 软体动力学 × 接触力学 × 物理引擎&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
 今天选 IPC，原因是它正好回答一个很容易混淆的问题：&lt;/p&gt;
-\[\boxed{\ ext{CCD 到底解决了接触问题的哪一部分？}}\]&lt;p&gt;你之前提到过一个很好的判断：“看起来 &lt;span class=&#34;term-anchor&#34; data-term=&#34;ccd&#34; tabindex=&#34;0&#34;&gt;CCD&lt;/span&gt; 才是起到碰撞合法决定性作用的约束。”这个判断抓住了一半关键：&lt;strong&gt;CCD 确实负责保证求解器走出的搜索轨迹不跨过碰撞边界，但它并不负责决定接触后的物理状态。&lt;/strong&gt; IPC 的贡献就在于把这两件事严密地组合起来。&lt;/p&gt;
+\[\boxed{\text{CCD 到底解决了接触问题的哪一部分？}}\]&lt;p&gt;你之前提到过一个很好的判断：“看起来 &lt;span class=&#34;term-anchor&#34; data-term=&#34;ccd&#34; tabindex=&#34;0&#34;&gt;CCD&lt;/span&gt; 才是起到碰撞合法决定性作用的约束。”这个判断抓住了一半关键：&lt;strong&gt;CCD 确实负责保证求解器走出的搜索轨迹不跨过碰撞边界，但它并不负责决定接触后的物理状态。&lt;/strong&gt; IPC 的贡献就在于把这两件事严密地组合起来。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h2 id=&#34;1-接触其实包含两个完全不同的问题&#34;&gt;1. 接触其实包含两个完全不同的问题
 &lt;/h2&gt;&lt;p&gt;假设两个软体表面正在接近。&lt;/p&gt;
 &lt;p&gt;第一个问题是几何问题：&lt;/p&gt;
-\[\boxed{\ ext{它们什么时候会相撞？}}\]&lt;p&gt;这是 Collision Detection，尤其是 Continuous Collision Detection（CCD）的职责。&lt;/p&gt;
+\[\boxed{\text{它们什么时候会相撞？}}\]&lt;p&gt;这是 Collision Detection，尤其是 Continuous Collision Detection（CCD）的职责。&lt;/p&gt;
 &lt;p&gt;第二个问题是动力学问题：&lt;/p&gt;
-\[\boxed{\ ext{相撞以后，新的位置、速度和接触力应该是什么？}}\]&lt;p&gt;这是 Contact Resolution。&lt;/p&gt;
+\[\boxed{\text{相撞以后，新的位置、速度和接触力应该是什么？}}\]&lt;p&gt;这是 Contact Resolution。&lt;/p&gt;
 &lt;p&gt;传统实时物理引擎常把两者写成：&lt;/p&gt;
-\[\ ext{integrate} \rightarrow \ ext{detect collision} \rightarrow \ ext{generate constraints} \rightarrow \ ext{solve impulses/projections}.\]&lt;p&gt;IPC 换了一种更统一的结构：&lt;/p&gt;
-\[\boxed{ \ ext{把弹性、惯性和接触全部放进同一个增量势能最小化问题。} }\]&lt;p&gt;然后 CCD 不再负责“算出接触响应”，而负责确保优化器在寻找这个最小值时&lt;strong&gt;永远不跨过不可穿透边界&lt;/strong&gt;。原始 IPC 工作正是为隐式时间步进的非线性弹性动力学构造这一变分框架，并给出 intersection- 和 inversion-free 的轨迹保证。&lt;/p&gt;
+\[\text{integrate} \rightarrow \text{detect collision} \rightarrow \text{generate constraints} \rightarrow \text{solve impulses/projections}.\]&lt;p&gt;IPC 换了一种更统一的结构：&lt;/p&gt;
+\[\boxed{ \text{把弹性、惯性和接触全部放进同一个增量势能最小化问题。} }\]&lt;p&gt;然后 CCD 不再负责“算出接触响应”，而负责确保优化器在寻找这个最小值时&lt;strong&gt;永远不跨过不可穿透边界&lt;/strong&gt;。原始 IPC 工作正是为隐式时间步进的非线性弹性动力学构造这一变分框架，并给出 intersection- 和 inversion-free 的轨迹保证。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;2-先从没有接触的隐式动力学开始&#34;&gt;2. 先从没有接触的隐式动力学开始
 &lt;/h1&gt;&lt;p&gt;考虑离散弹性体：&lt;/p&gt;
-\[M\ddot x=-\ abla E(x),\]&lt;p&gt;其中：&lt;/p&gt;
+\[M\ddot x=-\nabla E(x),\]&lt;p&gt;其中：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(x\)：节点位置；&lt;/li&gt;
 &lt;li&gt;\(M\)：质量矩阵；&lt;/li&gt;
 &lt;li&gt;\(E(x)\)：Neo-Hookean 等弹性势能。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;很多隐式时间积分可以改写成一个最小化问题。以一种典型形式表示：&lt;/p&gt;
-\[\boxed{ x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-\ ilde x\|_M^2 + E(x) \right] }\]&lt;p&gt;其中：&lt;/p&gt;
-\[\ ilde x=x^n+h v^n+\cdots\]&lt;p&gt;是忽略内部力时的预测位置。&lt;/p&gt;
+\[\boxed{ x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-\tilde x\|_M^2 + E(x) \right] }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\tilde x=x^n+h v^n+\cdots\]&lt;p&gt;是忽略内部力时的预测位置。&lt;/p&gt;
 &lt;p&gt;第一项：&lt;/p&gt;
-\[\frac{1}{2h^2} \|x-\ ilde x\|_M^2\]&lt;p&gt;可以理解成“惯性不希望你离预测位置太远”。&lt;/p&gt;
+\[\frac{1}{2h^2} \|x-\tilde x\|_M^2\]&lt;p&gt;可以理解成“惯性不希望你离预测位置太远”。&lt;/p&gt;
 &lt;p&gt;第二项：&lt;/p&gt;
 \[E(x)\]&lt;p&gt;则代表弹性体不希望发生高能量形变。&lt;/p&gt;
 &lt;p&gt;所以时间步本身变成：&lt;/p&gt;
-\[\boxed{\ ext{寻找惯性和弹性能量之间的最优折中。}}\]&lt;p&gt;这类 incremental-potential 观点本身是变分隐式积分的重要基础；IPC 的关键动作，是继续把 contact 放进这个目标函数。&lt;/p&gt;
+\[\boxed{\text{寻找惯性和弹性能量之间的最优折中。}}\]&lt;p&gt;这类 incremental-potential 观点本身是变分隐式积分的重要基础；IPC 的关键动作，是继续把 contact 放进这个目标函数。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;3-如果两个表面不能穿透最直接的数学表达是什么&#34;&gt;3. 如果两个表面不能穿透，最直接的数学表达是什么？
 &lt;/h1&gt;&lt;p&gt;设两个 primitive 的距离：&lt;/p&gt;
@@ -2124,7 +2124,7 @@
 \[d\downarrow0,\]&lt;p&gt;barrier energy：&lt;/p&gt;
 \[B(d)\uparrow\infty.\]&lt;p&gt;所以优化器会被无限大的能量墙挡住。&lt;/p&gt;
 &lt;p&gt;这就是 IPC 的第一块核心结构：&lt;/p&gt;
-\[\boxed{\ ext{Contact as barrier potential}.}\]&lt;p&gt;官方 IPC Toolkit 目前直接提供 &lt;span class=&#34;term-anchor&#34; data-term=&#34;barrier&#34; tabindex=&#34;0&#34;&gt;barrier function&lt;/span&gt;、导数、adaptive barrier stiffness、距离 barrier potential，以及相应的接触距离导数。&lt;/p&gt;
+\[\boxed{\text{Contact as barrier potential}.}\]&lt;p&gt;官方 IPC Toolkit 目前直接提供 &lt;span class=&#34;term-anchor&#34; data-term=&#34;barrier&#34; tabindex=&#34;0&#34;&gt;barrier function&lt;/span&gt;、导数、adaptive barrier stiffness、距离 barrier potential，以及相应的接触距离导数。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;4-一个直观的一维模型&#34;&gt;4. 一个直观的一维模型
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
@@ -2133,11 +2133,11 @@
     &lt;p&gt;假设一个质量点位于：&lt;/p&gt;
 \[x&gt;0\]&lt;p&gt;的半空间，墙在：&lt;/p&gt;
 \[x=0.\]&lt;p&gt;没有接触时：&lt;/p&gt;
-\[E(x) = \frac{m}{2h^2}(x-\ ilde x)^2.\]&lt;p&gt;假设预测位置：&lt;/p&gt;
-\[\ ilde x=-0.1.\]&lt;p&gt;惯性项希望：&lt;/p&gt;
+\[E(x) = \frac{m}{2h^2}(x-\tilde x)^2.\]&lt;p&gt;假设预测位置：&lt;/p&gt;
+\[\tilde x=-0.1.\]&lt;p&gt;惯性项希望：&lt;/p&gt;
 \[x=-0.1,\]&lt;p&gt;也就是直接穿墙。&lt;/p&gt;
 &lt;p&gt;现在加入 barrier：&lt;/p&gt;
-\[E(x) = \frac{m}{2h^2}(x-\ ilde x)^2 + \kappa B(x).\]&lt;p&gt;其中：&lt;/p&gt;
+\[E(x) = \frac{m}{2h^2}(x-\tilde x)^2 + \kappa B(x).\]&lt;p&gt;其中：&lt;/p&gt;
 \[B(x)\rightarrow\infty \quad(x\rightarrow0^+).\]&lt;p&gt;于是能量曲线大致变成：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -2170,7 +2170,7 @@
 &lt;/div&gt;&lt;p&gt;最小值只能存在于：&lt;/p&gt;
 \[x&gt;0.\]&lt;p&gt;因此接触响应不是一次额外的“位置修正”。&lt;/p&gt;
 &lt;p&gt;它直接成为：&lt;/p&gt;
-\[\boxed{\ ext{整个动力学时间步的最优解的一部分。}}\]
+\[\boxed{\text{整个动力学时间步的最优解的一部分。}}\]
   &lt;/div&gt;
 &lt;/details&gt;
 
@@ -2190,49 +2190,49 @@
 \[d&gt;0\]&lt;p&gt;跳到几何上的另一侧，离散距离函数未必能单凭端点状态可靠表达“途中发生过穿越”。&lt;/p&gt;
 &lt;p&gt;所以 IPC 使用 CCD 沿：&lt;/p&gt;
 \[x(\alpha)=x_k+\alpha p_k\]&lt;p&gt;检查：&lt;/p&gt;
-\[\boxed{\ ext{从当前状态沿搜索方向，第一次碰撞发生在哪个 }\alpha.}\]&lt;p&gt;得到最大合法步长：&lt;/p&gt;
+\[\boxed{\text{从当前状态沿搜索方向，第一次碰撞发生在哪个 }\alpha.}\]&lt;p&gt;得到最大合法步长：&lt;/p&gt;
 \[\alpha_{\rm CCD}.\]&lt;p&gt;然后 line search 只能选择：&lt;/p&gt;
 \[\boxed{ 0&lt;\alpha&lt;\alpha_{\rm CCD}. }\]&lt;p&gt;IPC Toolkit 因而同时提供 linear/nonlinear trajectory CCD；原始参考实现也包含 CTCD 与 Tight-Inclusion CCD。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;6-所以你之前关于-ccd-的判断可以更精确地改写成&#34;&gt;6. 所以你之前关于 CCD 的判断，可以更精确地改写成
-&lt;/h1&gt;\[\boxed{ \ ext{Barrier 决定“哪里不能去”， CCD 保证优化路径“不会一步跨过去”。} }\]&lt;p&gt;二者缺一不可。&lt;/p&gt;
+&lt;/h1&gt;\[\boxed{ \text{Barrier 决定“哪里不能去”， CCD 保证优化路径“不会一步跨过去”。} }\]&lt;p&gt;二者缺一不可。&lt;/p&gt;
 &lt;p&gt;Barrier：&lt;/p&gt;
 \[B(d)\rightarrow\infty\]&lt;p&gt;给出了&lt;strong&gt;动力学/优化意义上的不可穿透边界&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;CCD：&lt;/p&gt;
 \[\alpha\le\alpha_{\rm CCD}\]&lt;p&gt;给出了&lt;strong&gt;数值搜索轨迹的几何可行性保证&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;因此：&lt;/p&gt;
-\[\boxed{ \ ext{CCD 是 trajectory feasibility 的守门员， Barrier 是 contact response 的势能模型。} }\]&lt;p&gt;单独 CCD：&lt;/p&gt;
-\[\ ext{只知道什么时候撞上}\]&lt;p&gt;并不知道：&lt;/p&gt;
-\[\boxed{\ ext{撞上以后系统应该在哪里达到力学平衡。}}\]&lt;p&gt;单独 barrier 而没有 safe step：&lt;/p&gt;
+\[\boxed{ \text{CCD 是 trajectory feasibility 的守门员， Barrier 是 contact response 的势能模型。} }\]&lt;p&gt;单独 CCD：&lt;/p&gt;
+\[\text{只知道什么时候撞上}\]&lt;p&gt;并不知道：&lt;/p&gt;
+\[\boxed{\text{撞上以后系统应该在哪里达到力学平衡。}}\]&lt;p&gt;单独 barrier 而没有 safe step：&lt;/p&gt;
 &lt;p&gt;优化器又可能在离散迭代过程中越过 barrier domain。&lt;/p&gt;
 &lt;p&gt;IPC 的强项恰恰来自：&lt;/p&gt;
-\[\boxed{\ ext{variational contact + CCD-filtered optimization}.}\]&lt;hr&gt;
+\[\boxed{\text{variational contact + CCD-filtered optimization}.}\]&lt;hr&gt;
 &lt;h1 id=&#34;7-这和-xpbd-的碰撞思路差在哪里&#34;&gt;7. 这和 XPBD 的碰撞思路差在哪里？
 &lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 常把接触写成 inequality constraint：&lt;/p&gt;
 \[C(x)\ge0.\]&lt;p&gt;发生违反时做位置修正：&lt;/p&gt;
-\[\Delta x = M^{-1}\ abla C\,\Delta\lambda.\]&lt;p&gt;结构更像：&lt;/p&gt;
-\[\ ext{predict} \rightarrow \ ext{发现 violation} \rightarrow \ ext{projection}.\]&lt;p&gt;IPC 更接近：&lt;/p&gt;
-\[\boxed{ \ ext{从一开始就寻找一个不会进入 forbidden region 的动力学最小值。} }\]&lt;p&gt;因此二者对“合法状态”的处理哲学不同。&lt;/p&gt;
+\[\Delta x = M^{-1}\nabla C\,\Delta\lambda.\]&lt;p&gt;结构更像：&lt;/p&gt;
+\[\text{predict} \rightarrow \text{发现 violation} \rightarrow \text{projection}.\]&lt;p&gt;IPC 更接近：&lt;/p&gt;
+\[\boxed{ \text{从一开始就寻找一个不会进入 forbidden region 的动力学最小值。} }\]&lt;p&gt;因此二者对“合法状态”的处理哲学不同。&lt;/p&gt;
 &lt;p&gt;XPBD：&lt;/p&gt;
-\[\boxed{\ ext{constraint correction}}\]&lt;p&gt;IPC：&lt;/p&gt;
-\[\boxed{\ ext{interior-point optimization}}\]&lt;p&gt;。&lt;/p&gt;
+\[\boxed{\text{constraint correction}}\]&lt;p&gt;IPC：&lt;/p&gt;
+\[\boxed{\text{interior-point optimization}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这也解释了为什么 IPC 参考实现直接把默认 &lt;code&gt;constraintSolver&lt;/code&gt; 称为 &lt;code&gt;interiorPoint&lt;/code&gt;。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;8-为什么-ipc-特别适合大形变软体&#34;&gt;8. 为什么 IPC 特别适合大形变软体？
 &lt;/h1&gt;&lt;p&gt;软体接触最难的地方之一是：&lt;/p&gt;
-\[\boxed{\ ext{接触和材料形变高度耦合。}}\]&lt;p&gt;例如一个 Neo-Hookean 软体被挤过狭窄孔洞。&lt;/p&gt;
+\[\boxed{\text{接触和材料形变高度耦合。}}\]&lt;p&gt;例如一个 Neo-Hookean 软体被挤过狭窄孔洞。&lt;/p&gt;
 &lt;p&gt;接触力改变形变；&lt;/p&gt;
 &lt;p&gt;形变改变表面几何；&lt;/p&gt;
 &lt;p&gt;表面几何又改变接触集合。&lt;/p&gt;
 &lt;p&gt;如果采用松散的：&lt;/p&gt;
-\[\ ext{elastic solve} \rightarrow \ ext{collision correction}\]&lt;p&gt;循环，&lt;/p&gt;
+\[\text{elastic solve} \rightarrow \text{collision correction}\]&lt;p&gt;循环，&lt;/p&gt;
 &lt;p&gt;两个模块可能不断互相破坏对方的结果。&lt;/p&gt;
 &lt;p&gt;IPC 把：&lt;/p&gt;
 \[E_{\rm elastic}\]&lt;p&gt;和：&lt;/p&gt;
 \[E_{\rm contact}\]&lt;p&gt;放进同一个：&lt;/p&gt;
 \[\arg\min\]&lt;p&gt;里。&lt;/p&gt;
 &lt;p&gt;于是 Newton Hessian 中同时包含：&lt;/p&gt;
-\[\boxed{\ ext{material stiffness + contact stiffness}.}\]&lt;p&gt;接触不再是动力学求解完成后的“补丁”。&lt;/p&gt;
+\[\boxed{\text{material stiffness + contact stiffness}.}\]&lt;p&gt;接触不再是动力学求解完成后的“补丁”。&lt;/p&gt;
 &lt;p&gt;这也是原论文能处理极端压缩、大形变、多重自接触场景的重要原因。论文及官方项目展示了包括复杂四面体软体被压缩并挤过薄障碍物等案例。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;9-ipc-还有另一半很重要防止-tet-inversion&#34;&gt;9. IPC 还有另一半很重要：防止 tet inversion
@@ -2250,7 +2250,7 @@
 &lt;p&gt;而：&lt;/p&gt;
 \[J&gt;0\]&lt;p&gt;是 deformation admissibility。&lt;/p&gt;
 &lt;p&gt;两者都属于：&lt;/p&gt;
-\[\boxed{\ ext{configuration-space feasibility boundary}.}\]&lt;p&gt;这是一个非常值得迁移的理解。&lt;/p&gt;
+\[\boxed{\text{configuration-space feasibility boundary}.}\]&lt;p&gt;这是一个非常值得迁移的理解。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -2281,9 +2281,9 @@
 &lt;p&gt;更系统的方式是让：&lt;/p&gt;
 \[J\rightarrow0^+\]&lt;p&gt;时能量直接急剧增大：&lt;/p&gt;
 \[E_{\rm barrier}(J)\rightarrow\infty.\]&lt;p&gt;于是：&lt;/p&gt;
-\[\boxed{ \ ext{合法性从“事后检测条件” 升级为“求解空间本身的边界”。} }\]&lt;p&gt;2021 年的 Codimensional IPC 又把这种思想扩展到薄结构，并提出 \(C^2\) constitutive barrier，把 strain limiting 也直接作为能量势处理，从而把应变限制与弹性、接触放进同一个最小化框架。&lt;/p&gt;
+\[\boxed{ \text{合法性从“事后检测条件” 升级为“求解空间本身的边界”。} }\]&lt;p&gt;2021 年的 Codimensional IPC 又把这种思想扩展到薄结构，并提出 \(C^2\) constitutive barrier，把 strain limiting 也直接作为能量势处理，从而把应变限制与弹性、接触放进同一个最小化框架。&lt;/p&gt;
 &lt;p&gt;这是一种很强的统一建模哲学：&lt;/p&gt;
-\[\boxed{ \ ext{如果某个状态物理上绝不能发生， 尽量让优化问题本身无法到达那里。} }\]
+\[\boxed{ \text{如果某个状态物理上绝不能发生， 尽量让优化问题本身无法到达那里。} }\]
   &lt;/div&gt;
 &lt;/details&gt;
 
@@ -2316,7 +2316,7 @@
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;的模块拼接更统一。&lt;/p&gt;
 &lt;p&gt;代价则是：&lt;/p&gt;
-\[\boxed{\ ext{你必须解决一个更困难的全局非线性优化问题。}}\]
+\[\boxed{\text{你必须解决一个更困难的全局非线性优化问题。}}\]
   &lt;/div&gt;
 &lt;/details&gt;
 
@@ -2325,10 +2325,10 @@
 &lt;/h1&gt;&lt;p&gt;当：&lt;/p&gt;
 \[d\rightarrow0,\]&lt;p&gt;barrier curvature 会迅速增大。&lt;/p&gt;
 &lt;p&gt;也就是说 Hessian：&lt;/p&gt;
-\[\ abla^2 B(d)\]&lt;p&gt;可能非常大。&lt;/p&gt;
+\[\nabla^2 B(d)\]&lt;p&gt;可能非常大。&lt;/p&gt;
 &lt;p&gt;于是整个 Newton system：&lt;/p&gt;
 \[H\Delta x=-g\]&lt;p&gt;变得：&lt;/p&gt;
-\[\boxed{\ ext{ill-conditioned}.}\]&lt;p&gt;这不是实现 bug，而是 barrier formulation 的结构性代价：&lt;/p&gt;
+\[\boxed{\text{ill-conditioned}.}\]&lt;p&gt;这不是实现 bug，而是 barrier formulation 的结构性代价：&lt;/p&gt;
 &lt;p&gt;为了形成一道几乎不可穿越的“无限高能量墙”，它自然会在墙附近产生极大的 stiffness。&lt;/p&gt;
 &lt;p&gt;这会导致：&lt;/p&gt;
 &lt;ul&gt;
@@ -2342,26 +2342,26 @@
 &lt;hr&gt;
 &lt;h1 id=&#34;13-这也是为什么ipc-很稳定不等于适合游戏实时物理&#34;&gt;13. 这也是为什么“IPC 很稳定”不等于“适合游戏实时物理”
 &lt;/h1&gt;&lt;p&gt;IPC 原论文解决的主要目标是：&lt;/p&gt;
-\[\boxed{\ ext{robustness + accuracy + geometric validity}.}\]&lt;p&gt;游戏引擎通常还要求：&lt;/p&gt;
-\[\boxed{\ ext{严格帧预算}.}\]&lt;p&gt;例如：&lt;/p&gt;
-\[16.7\ ext{ ms/frame}.\]&lt;p&gt;Newton + sparse Hessian + CCD + line search + barrier contact 的成本，与几十次高度并行的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;/XPBD kernel 并不是一个工程目标。&lt;/p&gt;
+\[\boxed{\text{robustness + accuracy + geometric validity}.}\]&lt;p&gt;游戏引擎通常还要求：&lt;/p&gt;
+\[\boxed{\text{严格帧预算}.}\]&lt;p&gt;例如：&lt;/p&gt;
+\[16.7\text{ ms/frame}.\]&lt;p&gt;Newton + sparse Hessian + CCD + line search + barrier contact 的成本，与几十次高度并行的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;/XPBD kernel 并不是一个工程目标。&lt;/p&gt;
 &lt;p&gt;所以可以粗略理解：&lt;/p&gt;
-\[\ ext{XPBD} \rightarrow \boxed{\ ext{budget-first}}\]&lt;p&gt;而 IPC：&lt;/p&gt;
-\[\rightarrow \boxed{\ ext{robustness/validity-first}}.\]&lt;p&gt;当然两边正在互相靠近：IPC 后续已经有 reduced、GPU、codimensional 等大量加速方向；例如 Medial IPC 将 reduced deformable simulation 与 IPC contact 结合以提高效率。&lt;/p&gt;
+\[\text{XPBD} \rightarrow \boxed{\text{budget-first}}\]&lt;p&gt;而 IPC：&lt;/p&gt;
+\[\rightarrow \boxed{\text{robustness/validity-first}}.\]&lt;p&gt;当然两边正在互相靠近：IPC 后续已经有 reduced、GPU、codimensional 等大量加速方向；例如 Medial IPC 将 reduced deformable simulation 与 IPC contact 结合以提高效率。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;14-一个对自研求解器非常重要的架构启发&#34;&gt;14. 一个对自研求解器非常重要的架构启发
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;如果现在设计一个软体 solver，可以把碰撞系统分成三个职责，而不要混成一个“collision module”：&lt;/p&gt;
-\[\boxed{\ ext{Detection}}\]&lt;p&gt;回答：&lt;/p&gt;
-\[\ ext{哪些 primitive 可能接触？}\]&lt;p&gt;包括 broad phase / narrow phase。&lt;/p&gt;
+\[\boxed{\text{Detection}}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\text{哪些 primitive 可能接触？}\]&lt;p&gt;包括 broad phase / narrow phase。&lt;/p&gt;
 &lt;p&gt;第二层：&lt;/p&gt;
-\[\boxed{\ ext{Continuous feasibility}}\]&lt;p&gt;回答：&lt;/p&gt;
-\[\ ext{沿当前运动方向最多可以走多远而不穿透？}\]&lt;p&gt;这就是 CCD / TOI。&lt;/p&gt;
+\[\boxed{\text{Continuous feasibility}}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\text{沿当前运动方向最多可以走多远而不穿透？}\]&lt;p&gt;这就是 CCD / TOI。&lt;/p&gt;
 &lt;p&gt;第三层：&lt;/p&gt;
-\[\boxed{\ ext{Contact response}}\]&lt;p&gt;回答：&lt;/p&gt;
-\[\ ext{合法区域内部应该选择哪个状态？}\]&lt;p&gt;可以是：&lt;/p&gt;
+\[\boxed{\text{Contact response}}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\text{合法区域内部应该选择哪个状态？}\]&lt;p&gt;可以是：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;impulse；&lt;/li&gt;
 &lt;li&gt;complementarity；&lt;/li&gt;
@@ -2371,7 +2371,7 @@
 &lt;li&gt;augmented Lagrangian。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;所以：&lt;/p&gt;
-\[\boxed{ \ ext{CCD 和 contact constraint 并不是竞争方案； 它们处于不同层级。} }\]&lt;p&gt;这点非常重要。&lt;/p&gt;
+\[\boxed{ \text{CCD 和 contact constraint 并不是竞争方案； 它们处于不同层级。} }\]&lt;p&gt;这点非常重要。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -2382,7 +2382,7 @@
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;假设 CCD 完美保证：&lt;/p&gt;
-\[\boxed{\ ext{surface 永远不互穿。}}\]&lt;p&gt;软体仍然可能：&lt;/p&gt;
+\[\boxed{\text{surface 永远不互穿。}}\]&lt;p&gt;软体仍然可能：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;体积塌缩；&lt;/li&gt;
 &lt;li&gt;tet 退化；&lt;/li&gt;
@@ -2391,10 +2391,10 @@
 &lt;li&gt;velocity reconstruction 注入能量。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;因为 CCD 只保证：&lt;/p&gt;
-\[\boxed{\ ext{collision geometry admissibility}.}\]&lt;p&gt;它并不保证：&lt;/p&gt;
-\[\boxed{\ ext{constitutive admissibility}}\]&lt;p&gt;或：&lt;/p&gt;
-\[\boxed{\ ext{energy stability}.}\]&lt;p&gt;所以一个软体求解器至少存在几套不同合法性：&lt;/p&gt;
-\[\boxed{ d_{\rm contact}&gt;0 }\]\[\boxed{ J&gt;0 }\]\[\boxed{ \ ext{finite constitutive energy} }\]\[\boxed{ \ ext{consistent velocity/energy update}. }\]&lt;p&gt;IPC 的价值就在于，它展示了如何把前几个条件尽量统一进一个 variational optimization framework。&lt;/p&gt;
+\[\boxed{\text{collision geometry admissibility}.}\]&lt;p&gt;它并不保证：&lt;/p&gt;
+\[\boxed{\text{constitutive admissibility}}\]&lt;p&gt;或：&lt;/p&gt;
+\[\boxed{\text{energy stability}.}\]&lt;p&gt;所以一个软体求解器至少存在几套不同合法性：&lt;/p&gt;
+\[\boxed{ d_{\rm contact}&gt;0 }\]\[\boxed{ J&gt;0 }\]\[\boxed{ \text{finite constitutive energy} }\]\[\boxed{ \text{consistent velocity/energy update}. }\]&lt;p&gt;IPC 的价值就在于，它展示了如何把前几个条件尽量统一进一个 variational optimization framework。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -2409,7 +2409,7 @@
 &lt;p&gt;一个质量点：&lt;/p&gt;
 \[x=(x,y)\]&lt;p&gt;自由落向地面：&lt;/p&gt;
 \[y=0.\]&lt;p&gt;定义：&lt;/p&gt;
-\[E(x) = \frac{m}{2h^2} \|x-\ ilde x\|^2 + mgy + \kappa B(y).\]&lt;p&gt;例如选择一个只在：&lt;/p&gt;
+\[E(x) = \frac{m}{2h^2} \|x-\tilde x\|^2 + mgy + \kappa B(y).\]&lt;p&gt;例如选择一个只在：&lt;/p&gt;
 \[0&lt;y&lt;\hat d\]&lt;p&gt;激活的 barrier。&lt;/p&gt;
 &lt;p&gt;然后 Newton：&lt;/p&gt;
 \[H\Delta x=-g.\]&lt;p&gt;每次搜索：&lt;/p&gt;
@@ -2422,9 +2422,9 @@
 &lt;li&gt;barrier + CCD-safe line search。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;真正应该记录：&lt;/p&gt;
-\[y_{\min},\]\[B(y),\]\[\|\ abla B\|,\]\[\alpha_{\rm CCD},\]&lt;p&gt;Newton iterations。&lt;/p&gt;
+\[y_{\min},\]\[B(y),\]\[\|\nabla B\|,\]\[\alpha_{\rm CCD},\]&lt;p&gt;Newton iterations。&lt;/p&gt;
 &lt;p&gt;你会非常直观地看到：&lt;/p&gt;
-\[\boxed{ \ ext{Barrier 在塑造目标函数， CCD 在塑造优化器允许采取的路径。} }\]&lt;p&gt;这比直接阅读完整 IPC C++ 实现更容易建立正确心智模型。&lt;/p&gt;
+\[\boxed{ \text{Barrier 在塑造目标函数， CCD 在塑造优化器允许采取的路径。} }\]&lt;p&gt;这比直接阅读完整 IPC C++ 实现更容易建立正确心智模型。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -2444,18 +2444,18 @@
 &lt;/ul&gt;
 &lt;p&gt;把它们作为 ordinary penalty 处理并不理想。&lt;/p&gt;
 &lt;p&gt;IPC 提醒我们区分：&lt;/p&gt;
-\[\boxed{\ ext{physical failure}}\]&lt;p&gt;和：&lt;/p&gt;
-\[\boxed{\ ext{mathematical inadmissibility}}.\]&lt;p&gt;前者应该允许模型进入，然后统计概率。&lt;/p&gt;
+\[\boxed{\text{physical failure}}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{\text{mathematical inadmissibility}}.\]&lt;p&gt;前者应该允许模型进入，然后统计概率。&lt;/p&gt;
 &lt;p&gt;后者应该直接定义：&lt;/p&gt;
-\[\boxed{\ ext{feasible domain boundary}.}\]&lt;p&gt;这是做参数化 FEM、代理模型和自动采样时很容易忽略的一层。&lt;/p&gt;
+\[\boxed{\text{feasible domain boundary}.}\]&lt;p&gt;这是做参数化 FEM、代理模型和自动采样时很容易忽略的一层。&lt;/p&gt;
 &lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;IPC 最值得记住的并不是“用了 barrier function”。&lt;/p&gt;
 &lt;p&gt;真正重要的是它把接触拆清楚了：&lt;/p&gt;
-\[\boxed{ \ ext{Barrier 决定可行域边界附近的动力学； CCD 保证数值搜索轨迹永远留在可行域内。} }\]&lt;p&gt;因此：&lt;/p&gt;
-\[\ ext{Collision detection} \ eq \ ext{Collision response}.\]&lt;p&gt;更完整的结构是：&lt;/p&gt;
-\[\ ext{Incremental dynamics}\]\[+\]\[\boxed{\ ext{contact barrier potential}}\]\[+\]\[\boxed{\ ext{CCD-filtered line search}}\]\[+\]\[\ ext{nonlinear optimization}\]\[\downarrow\]\[\boxed{\ ext{intersection-free contacting elastodynamics}.}\]&lt;p&gt;对物理求解器开发，最有迁移价值的思想可以压缩成：&lt;/p&gt;
-\[\boxed{ \ ext{不要只在非法状态出现后修复它； 对于真正不可接受的状态， 更强的设计是让求解器的可行路径从一开始就无法穿过它。} }\]&lt;p&gt;这也是 IPC 在整个接触动力学知识体系中非常值得理解的位置。&lt;/p&gt;
+\[\boxed{ \text{Barrier 决定可行域边界附近的动力学； CCD 保证数值搜索轨迹永远留在可行域内。} }\]&lt;p&gt;因此：&lt;/p&gt;
+\[\text{Collision detection} \neq \text{Collision response}.\]&lt;p&gt;更完整的结构是：&lt;/p&gt;
+\[\text{Incremental dynamics}\]\[+\]\[\boxed{\text{contact barrier potential}}\]\[+\]\[\boxed{\text{CCD-filtered line search}}\]\[+\]\[\text{nonlinear optimization}\]\[\downarrow\]\[\boxed{\text{intersection-free contacting elastodynamics}.}\]&lt;p&gt;对物理求解器开发，最有迁移价值的思想可以压缩成：&lt;/p&gt;
+\[\boxed{ \text{不要只在非法状态出现后修复它； 对于真正不可接受的状态， 更强的设计是让求解器的可行路径从一开始就无法穿过它。} }\]&lt;p&gt;这也是 IPC 在整个接触动力学知识体系中非常值得理解的位置。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看扩展内容&lt;/summary&gt;

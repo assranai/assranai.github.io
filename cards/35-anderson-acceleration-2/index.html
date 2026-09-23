@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en-us" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器 主题：Anderson Acceleration（AA，安德森加速）\n领域：有限元 × 数值方法 × 数值优化 × 物理引擎\n推荐阅读时间：约 7–9 分钟\n今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：\n\\[\\boxed{\\ ext{你已经有一个能工作的迭代器，但它收敛太慢。}}\\]这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、PBD/XPBD 外层迭代，都可能被写成\n\\[x_{k+1}=G(x_k).\\]最朴素的方法就是反复调用 \\(G\\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。\n它最值得学的地方在于：\n\\[\\boxed{ \\ ext{历史迭代数据，本身可以近似局部逆 Jacobian。} }\\]这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 Acta Numerica 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。\n1. 它首先解决什么问题？ 考虑非线性方程\n\\[F(x)=0.\\]很多时候我们不会直接 Newton：\n\\[x_{k+1} = x_k- J_F(x_k)^{-1}F(x_k),\\]而是构造一个更便宜、更稳定的固定点映射：\n\\[x_{k+1}=G(x_k).\\]定义固定点残差\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器 主题：Anderson Acceleration（AA，安德森加速）\n领域：有限元 × 数值方法 × 数值优化 × 物理引擎\n推荐阅读时间：约 7–9 分钟\n今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：\n\\[\\boxed{\\text{你已经有一个能工作的迭代器，但它收敛太慢。}}\\]这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、PBD/XPBD 外层迭代，都可能被写成\n\\[x_{k+1}=G(x_k).\\]最朴素的方法就是反复调用 \\(G\\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。\n它最值得学的地方在于：\n\\[\\boxed{ \\text{历史迭代数据，本身可以近似局部逆 Jacobian。} }\\]这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 Acta Numerica 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。\n1. 它首先解决什么问题？ 考虑非线性方程\n\\[F(x)=0.\\]很多时候我们不会直接 Newton：\n\\[x_{k+1} = x_k- J_F(x_k)^{-1}F(x_k),\\]而是构造一个更便宜、更稳定的固定点映射：\n\\[x_{k+1}=G(x_k).\\]定义固定点残差\n\\[f_k=G(x_k)-x_k.\\]目标就是\n\\[f_k\\rightarrow0.\\]如果 \\(G\\) 是 contraction，\n">
 <title>Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/35-anderson-acceleration-2/'>
 
 <link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器">
-<meta property='og:description' content="Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器 主题：Anderson Acceleration（AA，安德森加速）\n领域：有限元 × 数值方法 × 数值优化 × 物理引擎\n推荐阅读时间：约 7–9 分钟\n今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：\n\\[\\boxed{\\ ext{你已经有一个能工作的迭代器，但它收敛太慢。}}\\]这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、PBD/XPBD 外层迭代，都可能被写成\n\\[x_{k+1}=G(x_k).\\]最朴素的方法就是反复调用 \\(G\\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。\n它最值得学的地方在于：\n\\[\\boxed{ \\ ext{历史迭代数据，本身可以近似局部逆 Jacobian。} }\\]这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 Acta Numerica 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。\n1. 它首先解决什么问题？ 考虑非线性方程\n\\[F(x)=0.\\]很多时候我们不会直接 Newton：\n\\[x_{k+1} = x_k- J_F(x_k)^{-1}F(x_k),\\]而是构造一个更便宜、更稳定的固定点映射：\n\\[x_{k+1}=G(x_k).\\]定义固定点残差\n">
+<meta property='og:description' content="Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器 主题：Anderson Acceleration（AA，安德森加速）\n领域：有限元 × 数值方法 × 数值优化 × 物理引擎\n推荐阅读时间：约 7–9 分钟\n今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：\n\\[\\boxed{\\text{你已经有一个能工作的迭代器，但它收敛太慢。}}\\]这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、PBD/XPBD 外层迭代，都可能被写成\n\\[x_{k+1}=G(x_k).\\]最朴素的方法就是反复调用 \\(G\\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。\n它最值得学的地方在于：\n\\[\\boxed{ \\text{历史迭代数据，本身可以近似局部逆 Jacobian。} }\\]这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 Acta Numerica 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。\n1. 它首先解决什么问题？ 考虑非线性方程\n\\[F(x)=0.\\]很多时候我们不会直接 Newton：\n\\[x_{k+1} = x_k- J_F(x_k)^{-1}F(x_k),\\]而是构造一个更便宜、更稳定的固定点映射：\n\\[x_{k+1}=G(x_k).\\]定义固定点残差\n\\[f_k=G(x_k)-x_k.\\]目标就是\n\\[f_k\\rightarrow0.\\]如果 \\(G\\) 是 contraction，\n">
 <meta property='og:url' content='https://assranai.github.io/cards/35-anderson-acceleration-2/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='数值优化' /><meta property='article:tag' content='物理引擎' /><meta property='article:published_time' content='2026-09-17T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-17T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器">
-<meta name="twitter:description" content="Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器 主题：Anderson Acceleration（AA，安德森加速）\n领域：有限元 × 数值方法 × 数值优化 × 物理引擎\n推荐阅读时间：约 7–9 分钟\n今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：\n\\[\\boxed{\\ ext{你已经有一个能工作的迭代器，但它收敛太慢。}}\\]这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、PBD/XPBD 外层迭代，都可能被写成\n\\[x_{k+1}=G(x_k).\\]最朴素的方法就是反复调用 \\(G\\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。\n它最值得学的地方在于：\n\\[\\boxed{ \\ ext{历史迭代数据，本身可以近似局部逆 Jacobian。} }\\]这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 Acta Numerica 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。\n1. 它首先解决什么问题？ 考虑非线性方程\n\\[F(x)=0.\\]很多时候我们不会直接 Newton：\n\\[x_{k+1} = x_k- J_F(x_k)^{-1}F(x_k),\\]而是构造一个更便宜、更稳定的固定点映射：\n\\[x_{k+1}=G(x_k).\\]定义固定点残差\n">
+<meta name="twitter:description" content="Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器 主题：Anderson Acceleration（AA，安德森加速）\n领域：有限元 × 数值方法 × 数值优化 × 物理引擎\n推荐阅读时间：约 7–9 分钟\n今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：\n\\[\\boxed{\\text{你已经有一个能工作的迭代器，但它收敛太慢。}}\\]这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、PBD/XPBD 外层迭代，都可能被写成\n\\[x_{k+1}=G(x_k).\\]最朴素的方法就是反复调用 \\(G\\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。\n它最值得学的地方在于：\n\\[\\boxed{ \\text{历史迭代数据，本身可以近似局部逆 Jacobian。} }\\]这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 Acta Numerica 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。\n1. 它首先解决什么问题？ 考虑非线性方程\n\\[F(x)=0.\\]很多时候我们不会直接 Newton：\n\\[x_{k+1} = x_k- J_F(x_k)^{-1}F(x_k),\\]而是构造一个更便宜、更稳定的固定点映射：\n\\[x_{k+1}=G(x_k).\\]定义固定点残差\n\\[f_k=G(x_k)-x_k.\\]目标就是\n\\[f_k\\rightarrow0.\\]如果 \\(G\\) 是 contraction，\n">
     </head>
     <body class="
     article-page">
@@ -408,10 +408,10 @@
 <strong>领域：有限元 × 数值方法 × 数值优化 × 物理引擎</strong><br>
 <strong>推荐阅读时间：约 7–9 分钟</strong><br>
 今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：</p>
-\[\boxed{\ ext{你已经有一个能工作的迭代器，但它收敛太慢。}}\]<p>这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、<span class="term-anchor" data-term="pbd" tabindex="0">PBD</span>/<span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 外层迭代，都可能被写成</p>
+\[\boxed{\text{你已经有一个能工作的迭代器，但它收敛太慢。}}\]<p>这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、<span class="term-anchor" data-term="pbd" tabindex="0">PBD</span>/<span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 外层迭代，都可能被写成</p>
 \[x_{k+1}=G(x_k).\]<p>最朴素的方法就是反复调用 \(G\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。</p>
 <p>它最值得学的地方在于：</p>
-\[\boxed{ \ ext{历史迭代数据，本身可以近似局部逆 Jacobian。} }\]<p>这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 <em>Acta Numerica</em> 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。</p>
+\[\boxed{ \text{历史迭代数据，本身可以近似局部逆 Jacobian。} }\]<p>这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 <em>Acta Numerica</em> 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。</p>
 <hr>
 <h2 id="1-它首先解决什么问题">1. 它首先解决什么问题？
 </h2><p>考虑非线性方程</p>
@@ -424,7 +424,7 @@
 <p>问题在于，如果</p>
 \[q=0.99,\]<p>每一步只消掉约 1% 的误差。</p>
 <p>于是你拥有一个：</p>
-\[\boxed{\ ext{稳定、便宜、但慢得令人难受的 solver。}}\]<p>这正是 AA 最典型的目标。</p>
+\[\boxed{\text{稳定、便宜、但慢得令人难受的 solver。}}\]<p>这正是 AA 最典型的目标。</p>
 <hr>
 <h1 id="2-普通固定点迭代其实浪费了大量信息">2. 普通固定点迭代其实浪费了大量信息
 </h1><p>假设已经计算过</p>
@@ -437,7 +437,7 @@
 <p>如果附近近似线性：</p>
 \[\Delta f \approx J_f\Delta x,\]<p>那么历史数据实际上已经给了若干条关于 Jacobian \(J_f\) 的 secant information。</p>
 <p>AA 的核心就是：</p>
-\[\boxed{\ ext{不要把这些信息扔掉。}}\]<hr>
+\[\boxed{\text{不要把这些信息扔掉。}}\]<hr>
 <h1 id="3-anderson-最直观的形式寻找残差最小的历史组合">3. Anderson 最直观的形式：寻找“残差最小的历史组合”
 </h1><p>保留最近 \(m+1\) 个 fixed-point evaluations：</p>
 \[G(x_{k-m}),\ldots,G(x_k).\]<p>同时有残差：</p>
@@ -452,7 +452,7 @@
 <p>最近几次迭代给了我若干个“候选方向”，怎样线性组合它们，使预测残差最小？</p>
 </blockquote>
 <p>因此 AA 本质上是一种：</p>
-\[\boxed{\ ext{history-based extrapolation}.}\]<p>Walker–Ni 对标准 AA 的描述正是保存先前固定点映射与残差，用小型最小二乘问题形成新的组合；AA(0) 则退化为普通 fixed-point iteration。</p>
+\[\boxed{\text{history-based extrapolation}.}\]<p>Walker–Ni 对标准 AA 的描述正是保存先前固定点映射与残差，用小型最小二乘问题形成新的组合；AA(0) 则退化为普通 fixed-point iteration。</p>
 <hr>
 <h1 id="4-一个一维例子马上能看出它在干什么">4. 一个一维例子马上能看出它在干什么
 </h1><details class="reveal">
@@ -469,7 +469,7 @@
 \[e=0\]<p>的位置。</p>
 <p>一维情况下，这和 Aitken \(\Delta^2\) acceleration 有很近的精神关系。</p>
 <p>高维 AA 可以粗略理解成：</p>
-\[\boxed{\ ext{Aitken extrapolation 的多维、最小二乘版本。}}\]
+\[\boxed{\text{Aitken extrapolation 的多维、最小二乘版本。}}\]
   </div>
 </details>
 
@@ -488,7 +488,7 @@
 \[J_f\Delta x_i \approx \Delta f_i.\]<p>于是可以从历史中构造一个隐式近似：</p>
 \[H_k\approx J_f^{-1}.\]<p>然后更新类似：</p>
 \[\boxed{ x_{k+1} = x_k-H_kf_k. }\]<p>所以 AA 的另一种理解是：</p>
-\[\boxed{\ ext{multisecant quasi-Newton method}.}\]<p>Fang 与 Saad 的工作澄清并推广了 Anderson 与 multisecant/quasi-Newton 方法之间的联系；Walker–Ni 随后进一步系统分析了这种关系。</p>
+\[\boxed{\text{multisecant quasi-Newton method}.}\]<p>Fang 与 Saad 的工作澄清并推广了 Anderson 与 multisecant/quasi-Newton 方法之间的联系；Walker–Ni 随后进一步系统分析了这种关系。</p>
 <p>这解释了一个看似神奇的现象：</p>
 <blockquote>
 <p>明明没有显式计算 Jacobian，为什么它有时会出现类似 Newton 的明显加速？</p>
@@ -511,8 +511,8 @@
 \[f(x) = -M^{-1}(Ax-b).\]<p>这已经是线性的。</p>
 <p>Walker 与 Ni 证明，在适当条件下，无截断 Anderson acceleration 与 GMRES 存在“essential equivalence”。</p>
 <p>这非常重要，因为它揭示：</p>
-\[\boxed{ \ ext{AA 可以看作把 Krylov residual-minimization 思想 推广到了非线性 fixed-point map。} }\]<p>所以可以建立一条很漂亮的知识链：</p>
-\[\ ext{Fixed-point iteration}\]\[\downarrow\]\[\boxed{\ ext{Anderson Acceleration}}\]\[\begin{array}{cc} \swarrow & \searrow\\ \ ext{Quasi-Newton} & \ ext{GMRES/Krylov} \end{array}\]<p>AA 卡在的正是这个交叉点。</p>
+\[\boxed{ \text{AA 可以看作把 Krylov residual-minimization 思想 推广到了非线性 fixed-point map。} }\]<p>所以可以建立一条很漂亮的知识链：</p>
+\[\text{Fixed-point iteration}\]\[\downarrow\]\[\boxed{\text{Anderson Acceleration}}\]\[\begin{array}{cc} \swarrow & \searrow\\ \text{Quasi-Newton} & \text{GMRES/Krylov} \end{array}\]<p>AA 卡在的正是这个交叉点。</p>
 
   </div>
 </details>
@@ -561,7 +561,7 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>也就是说：</p>
-\[\boxed{\ ext{它可以作为 solver wrapper。}}\]<p>这也是它特别值得求解器开发者掌握的原因。</p>
+\[\boxed{\text{它可以作为 solver wrapper。}}\]<p>这也是它特别值得求解器开发者掌握的原因。</p>
 <p>Amanzi-ATS 这样的多物理场模拟软件已经直接提供 Anderson acceleration nonlinear solver，并将其描述为 nonlinear GMRES 风格的方法。</p>
 <hr>
 <h1 id="8-为什么只保存很短的历史">8. 为什么只保存很短的历史？
@@ -579,8 +579,8 @@
 \[20,\,-35,\,18,\ldots\]<p>虽然它们满足：</p>
 \[\sum\alpha_i=1,\]<p>却意味着非常激进的 extrapolation。</p>
 <p>于是：</p>
-\[\boxed{\ ext{更多历史 ≠ 更稳定。}}\]<p>这和 GMRES restart、limited-memory BFGS 的思想很相似：</p>
-\[\boxed{\ ext{有限历史有时反而是一种正则化。}}\]<p>Walker–Ni 也专门讨论了 truncation、conditioning 和实现细节。</p>
+\[\boxed{\text{更多历史 ≠ 更稳定。}}\]<p>这和 GMRES restart、limited-memory BFGS 的思想很相似：</p>
+\[\boxed{\text{有限历史有时反而是一种正则化。}}\]<p>Walker–Ni 也专门讨论了 truncation、conditioning 和实现细节。</p>
 
   </div>
 </details>
@@ -592,7 +592,7 @@
 \[0<\beta\le1.\]\[\beta=1\]<p>完全接受 extrapolation。</p>
 \[\beta<1\]<p>更加保守。</p>
 <p>这与 nonlinear solver 里的 line search 有类似目的：</p>
-\[\boxed{\ ext{避免局部线性模型预测得太远。}}\]<p>在强非线性、非光滑、接触切换问题里，这一点尤其重要。</p>
+\[\boxed{\text{避免局部线性模型预测得太远。}}\]<p>在强非线性、非光滑、接触切换问题里，这一点尤其重要。</p>
 <hr>
 <h1 id="10-为什么-aa-对-contact--pbd-类问题很有诱惑力">10. 为什么 AA 对 contact / PBD 类问题很有诱惑力？
 </h1><p>假设每次 constraint sweep 定义：</p>
@@ -604,14 +604,14 @@
 <li>joints。</li>
 </ul>
 <p>Gauss–Seidel 风格传播信息通常需要很多轮：</p>
-\[\boxed{\ ext{局部修正要慢慢穿过整个 constraint graph。}}\]<p>例如一条长链受到端部约束：</p>
+\[\boxed{\text{局部修正要慢慢穿过整个 constraint graph。}}\]<p>例如一条长链受到端部约束：</p>
 <p>第 1 次 sweep：</p>
-\[\ ext{影响传播一点}.\]<p>第 2 次：</p>
-\[\ ext{再传播一点}.\]<p>于是低频 global error 收敛很慢。</p>
+\[\text{影响传播一点}.\]<p>第 2 次：</p>
+\[\text{再传播一点}.\]<p>于是低频 global error 收敛很慢。</p>
 <p>AA 观察最近几轮整个状态的变化趋势，然后尝试：</p>
-\[\boxed{\ ext{直接外推这个慢模态最终会去哪里。}}\]<p>这与 Krylov 方法快速消除 stationary iteration 的慢误差模态具有相似直觉。</p>
+\[\boxed{\text{直接外推这个慢模态最终会去哪里。}}\]<p>这与 Krylov 方法快速消除 stationary iteration 的慢误差模态具有相似直觉。</p>
 <p>因此，如果一个 XPBD 外层迭代表现为：</p>
-\[\boxed{\ ext{稳定，但 constraint residual 缓慢衰减}}\]<p>AA 是很值得测试的 acceleration layer。</p>
+\[\boxed{\text{稳定，但 constraint residual 缓慢衰减}}\]<p>AA 是很值得测试的 acceleration layer。</p>
 <hr>
 <h1 id="11-但这里有一个关键边界aa-不会修复错误的物理模型">11. 但这里有一个关键边界：AA 不会修复错误的物理模型
 </h1><p>假设 XPBD 本身存在：</p>
@@ -624,21 +624,21 @@
 </ul>
 <p>那么 \(G(x)\) 本身就可能不是一个良好的局部 fixed-point map。</p>
 <p>AA 可能反而：</p>
-\[\boxed{\ ext{更快地放大错误趋势。}}\]<p>所以它适合：</p>
-\[\boxed{ \ ext{正确且基本稳定，但收敛太慢的迭代器。} }\]<p>如果 base iteration 本身：</p>
+\[\boxed{\text{更快地放大错误趋势。}}\]<p>所以它适合：</p>
+\[\boxed{ \text{正确且基本稳定，但收敛太慢的迭代器。} }\]<p>如果 base iteration 本身：</p>
 \[\rho(J_G)>1,\]<p>或者频繁发生强非光滑切换，直接套 AA 并没有普遍的稳定保证。后续研究也正因为这一问题发展了 safeguard、regularization 和 globally convergent variants；Toth–Kelley 的收敛分析给出了局部条件下的理论基础。</p>
 <hr>
 <h1 id="12-对接触问题还有一个更具体的危险active-set-改变">12. 对接触问题还有一个更具体的危险：active set 改变
 </h1><p>假设第 \(k\) 步接触集合：</p>
 \[\mathcal C_k.\]<p>下一步：</p>
-\[\mathcal C_{k+1}\ eq\mathcal C_k.\]<p>那么固定点映射：</p>
+\[\mathcal C_{k+1}\neq\mathcal C_k.\]<p>那么固定点映射：</p>
 \[G(x)\]<p>局部可能发生 kink。</p>
 <p>但 AA 的历史：</p>
 \[\Delta x_i,\Delta f_i\]<p>可能来自不同 contact regimes。</p>
 <p>此时用它们共同推断：</p>
 \[J_f^{-1}\]<p>就不再可靠。</p>
 <p>所以一个很自然的工程策略是：</p>
-\[\boxed{ \ ext{active set 大幅变化} \Rightarrow \ ext{清空 Anderson history}. }\]<p>类似情况还包括：</p>
+\[\boxed{ \text{active set 大幅变化} \Rightarrow \text{清空 Anderson history}. }\]<p>类似情况还包括：</p>
 <ul>
 <li>tet inversion/recovery；</li>
 <li>friction stick-slip switching；</li>
@@ -646,7 +646,7 @@
 <li>topology change。</li>
 </ul>
 <p>这不是 AA 特有的问题，本质上是：</p>
-\[\boxed{\ ext{旧的局部线性信息已经过期。}}\]<hr>
+\[\boxed{\text{旧的局部线性信息已经过期。}}\]<hr>
 <h1 id="13-一个非常实用的实现框架">13. 一个非常实用的实现框架
 </h1><details class="reveal">
   <summary>查看代码与实现</summary>
@@ -715,7 +715,7 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>真正做工程版本时，我会优先加入四件东西：</p>
-\[\boxed{\ ext{small history}}\]\[\boxed{\ ext{QR/SVD least-squares}}\]\[\boxed{\ ext{damping}}\]\[\boxed{\ ext{safeguard + restart}}\]<p>而不是一开始追求最大的 \(m\)。</p>
+\[\boxed{\text{small history}}\]\[\boxed{\text{QR/SVD least-squares}}\]\[\boxed{\text{damping}}\]\[\boxed{\text{safeguard + restart}}\]<p>而不是一开始追求最大的 \(m\)。</p>
 
   </div>
 </details>
@@ -738,7 +738,7 @@
 <li>QR filtering。</li>
 </ul>
 <p>所以 AA 本身又和前几张 Randomized SVD / conditioning 卡片发生联系：</p>
-\[\boxed{ \ ext{加速器的质量取决于历史信息是否真正提供独立方向。} }\]
+\[\boxed{ \text{加速器的质量取决于历史信息是否真正提供独立方向。} }\]
   </div>
 </details>
 
@@ -748,12 +748,12 @@
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>考虑 partitioned fluid-structure interaction：</p>
-\[\ ext{fluid} \rightarrow \ ext{interface load} \rightarrow \ ext{structure} \rightarrow \ ext{interface displacement} \rightarrow \ ext{fluid}.\]<p>整个循环就是：</p>
+\[\text{fluid} \rightarrow \text{interface load} \rightarrow \text{structure} \rightarrow \text{interface displacement} \rightarrow \text{fluid}.\]<p>整个循环就是：</p>
 \[x_{k+1}=G(x_k).\]<p>如果不能方便地获得完整 coupled Jacobian：</p>
 \[J= \begin{bmatrix} J_{ff}&J_{fs}\\ J_{sf}&J_{ss} \end{bmatrix},\]<p>Newton coupling 很困难。</p>
 <p>AA 却只需要观察：</p>
-\[\boxed{\ ext{interface input/output history}.}\]<p>因此它特别适合：</p>
-\[\boxed{\ ext{partitioned / legacy / black-box solvers}.}\]<p>已有多物理场和多孔介质工作正是把 AA 作为 fixed-stress / splitting iteration 的后处理加速器，而无需改变底层分裂求解结构。</p>
+\[\boxed{\text{interface input/output history}.}\]<p>因此它特别适合：</p>
+\[\boxed{\text{partitioned / legacy / black-box solvers}.}\]<p>已有多物理场和多孔介质工作正是把 AA 作为 fixed-stress / splitting iteration 的后处理加速器，而无需改变底层分裂求解结构。</p>
 
   </div>
 </details>
@@ -768,10 +768,10 @@
 \[x\mapsto G(x).\]<p>你不知道内部 Jacobian。</p>
 <p>但运行过程中不断产生：</p>
 \[(x_i,G(x_i)).\]<p>那么这些历史本身就是：</p>
-\[\boxed{\ ext{免费的在线训练数据。}}\]<p>AA 做的事情很像：</p>
-\[\boxed{ \ ext{online local system identification} + \ ext{prediction}. }\]<p>它并没有训练一个永久 surrogate，</p>
+\[\boxed{\text{免费的在线训练数据。}}\]<p>AA 做的事情很像：</p>
+\[\boxed{ \text{online local system identification} + \text{prediction}. }\]<p>它并没有训练一个永久 surrogate，</p>
 <p>而是在求解过程中不断建立一个：</p>
-\[\boxed{\ ext{短寿命局部代理}}\]<p>来预测“固定点在哪里”。</p>
+\[\boxed{\text{短寿命局部代理}}\]<p>来预测“固定点在哪里”。</p>
 <p>这种思想在很多系统都可以迁移：</p>
 <ul>
 <li>optimizer acceleration；</li>
@@ -789,7 +789,7 @@
 </h1><p><span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span> 通常学习：</p>
 \[\mu\mapsto y(\mu)\]<p>——一个跨参数空间长期存在的全局/半全局 surrogate。</p>
 <p>AA 学的是：</p>
-\[\boxed{ \ ext{当前这一次 nonlinear solve 附近， residual 和 state increment 的局部关系。} }\]<p>它的模型：</p>
+\[\boxed{ \text{当前这一次 nonlinear solve 附近， residual 和 state increment 的局部关系。} }\]<p>它的模型：</p>
 <ul>
 <li>极小；</li>
 <li>在线建立；</li>
@@ -797,13 +797,13 @@
 <li>目标不是预测输出，而是减少迭代次数。</li>
 </ul>
 <p>这是一种很不同的 surrogate philosophy：</p>
-\[\boxed{ \ ext{代理模型不一定需要保存下来； 有些代理只需要活几十毫秒。} }\]<hr>
+\[\boxed{ \text{代理模型不一定需要保存下来； 有些代理只需要活几十毫秒。} }\]<hr>
 <h1 id="18-对可靠性计算也有直接迁移价值">18. 对可靠性计算也有直接迁移价值
 </h1><p>可靠性往往需要重复求：</p>
 \[F(x;\mu_i)=0.\]<p>对于相邻 Monte Carlo / adaptive samples：</p>
 \[\mu_i\approx\mu_{i+1},\]<p>通常会 warm start：</p>
 \[x_0(\mu_{i+1}) \leftarrow x^*(\mu_i).\]<p>更进一步，还可以思考：</p>
-\[\boxed{\ ext{是否复用局部 secant / subspace information？}}\]<p>这就开始进入：</p>
+\[\boxed{\text{是否复用局部 secant / subspace information？}}\]<p>这就开始进入：</p>
 <ul>
 <li>subspace recycling；</li>
 <li>nonlinear recycling；</li>
@@ -812,7 +812,7 @@
 </ul>
 <p>等更高级的 repeated-solve 方法。</p>
 <p>因此对于百万次参数仿真，优化：</p>
-\[\boxed{\ ext{每一次 nonlinear solve 的迭代次数}}\]<p>可能和训练外部 surrogate 一样重要。</p>
+\[\boxed{\text{每一次 nonlinear solve 的迭代次数}}\]<p>可能和训练外部 surrogate 一样重要。</p>
 <hr>
 <h1 id="19-一个特别适合你自己做的实验">19. 一个特别适合你自己做的实验
 </h1><details class="reveal">
@@ -822,14 +822,14 @@
 <p>构造二维非线性系统：</p>
 \[x=G(x)\]<p>例如：</p>
 \[G \begin{pmatrix}x\\y\end{pmatrix} = \begin{pmatrix} \cos y\\ 0.8\sin x \end{pmatrix}.\]<p>比较：</p>
-\[\ ext{Fixed Point}, \quad AA(1), \quad AA(3), \quad AA(5).\]<p>每步记录：</p>
+\[\text{Fixed Point}, \quad AA(1), \quad AA(3), \quad AA(5).\]<p>每步记录：</p>
 \[\|f_k\|.\]<p>然后第二个实验更有价值：</p>
 <p>故意构造一个线性 fixed point：</p>
 \[x_{k+1}=Bx_k+c\]<p>使：</p>
 \[\rho(B)=0.99.\]<p>普通 fixed point 会极慢。</p>
 <p>再跑 AA。</p>
 <p>你会非常清楚地看到：</p>
-\[\boxed{\ ext{AA 专门杀“慢收敛模态”的能力。}}\]<p>最后再给 \(G\) 加一个 piecewise contact-like kink，观察 aggressive AA 什么时候 overshoot；加入 damping/restart 后再比较。</p>
+\[\boxed{\text{AA 专门杀“慢收敛模态”的能力。}}\]<p>最后再给 \(G\) 加一个 piecewise contact-like kink，观察 aggressive AA 什么时候 overshoot；加入 damping/restart 后再比较。</p>
 <p>这三个实验基本就把 AA 的优点和边界都摸清了。</p>
 
   </div>
@@ -839,9 +839,9 @@
 <h1 id="20-对软体求解器我认为最值得尝试的位置">20. 对软体求解器，我认为最值得尝试的位置
 </h1><p>如果未来在 XPBD/非线性 FEM 中测试 AA，我不会首先把它塞进每一个 constraint 内部。</p>
 <p>更自然的是把：</p>
-\[\boxed{\ ext{完整 constraint sweep}}\]<p>看成：</p>
+\[\boxed{\text{完整 constraint sweep}}\]<p>看成：</p>
 \[G(x).\]<p>即：</p>
-\[x^{(k)} \overset{\ ext{one GS sweep}} {\longrightarrow} G(x^{(k)}).\]<p>AA 位于 sweep 之间：</p>
+\[x^{(k)} \overset{\text{one GS sweep}} {\longrightarrow} G(x^{(k)}).\]<p>AA 位于 sweep 之间：</p>
 \[G \rightarrow AA \rightarrow G \rightarrow AA.\]<p>这样：</p>
 <ul>
 <li>不破坏单个 constraint kernel；</li>
@@ -850,16 +850,16 @@
 <li>GPU kernel 基本不用重写。</li>
 </ul>
 <p>尤其适合诊断这种现象：</p>
-\[\boxed{ \ ext{每轮都稳定下降， 但需要 50–100 个 iterations 才收敛。} }\]<p>如果当前问题属于“前几轮之后突然反转、爆能、NaN”，AA 优先级反而很低，因为那首先说明 base map 的稳定性/物理结构存在问题。</p>
+\[\boxed{ \text{每轮都稳定下降， 但需要 50–100 个 iterations 才收敛。} }\]<p>如果当前问题属于“前几轮之后突然反转、爆能、NaN”，AA 优先级反而很低，因为那首先说明 base map 的稳定性/物理结构存在问题。</p>
 <hr>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
 </h1><p>Anderson Acceleration 最值得记住的不是它那个 constrained least-squares 公式，而是：</p>
-\[\boxed{ \ ext{一个迭代器过去走过的轨迹， 本身就在透露这个非线性系统局部 Jacobian 的信息。} }\]<p>普通 fixed-point iteration：</p>
+\[\boxed{ \text{一个迭代器过去走过的轨迹， 本身就在透露这个非线性系统局部 Jacobian 的信息。} }\]<p>普通 fixed-point iteration：</p>
 \[x_k \rightarrow G(x_k)\]<p>每一步都近乎失忆。</p>
 <p>AA：</p>
-\[\{x_{k-m},\ldots,x_k\}\]\[\downarrow\]\[\boxed{\ ext{extract local secant information}}\]\[\downarrow\]\[\boxed{\ ext{residual-minimizing extrapolation}}\]\[\downarrow\]\[x_{k+1}.\]<p>它在知识体系中的位置尤其漂亮：</p>
-\[\ ext{Fixed Point}\]\[\downarrow\]\[\boxed{\ ext{Anderson Acceleration}}\]\[\begin{array}{ccc} \ ext{GMRES/Krylov} & \leftrightarrow & \ ext{Quasi-Newton} \end{array}\]\[\downarrow\]\[\ ext{nonlinear FEM / multiphysics / physics solvers}.\]<p>对于求解器开发，最有迁移价值的原则可以压缩成一句：</p>
-\[\boxed{ \ ext{在重写整个 solver 之前，先检查它是不是一个“稳定但缓慢”的固定点迭代； 如果是，历史迭代信息可能就是现成的加速器。} }\]<h3 id="拓展阅读">拓展阅读
+\[\{x_{k-m},\ldots,x_k\}\]\[\downarrow\]\[\boxed{\text{extract local secant information}}\]\[\downarrow\]\[\boxed{\text{residual-minimizing extrapolation}}\]\[\downarrow\]\[x_{k+1}.\]<p>它在知识体系中的位置尤其漂亮：</p>
+\[\text{Fixed Point}\]\[\downarrow\]\[\boxed{\text{Anderson Acceleration}}\]\[\begin{array}{ccc} \text{GMRES/Krylov} & \leftrightarrow & \text{Quasi-Newton} \end{array}\]\[\downarrow\]\[\text{nonlinear FEM / multiphysics / physics solvers}.\]<p>对于求解器开发，最有迁移价值的原则可以压缩成一句：</p>
+\[\boxed{ \text{在重写整个 solver 之前，先检查它是不是一个“稳定但缓慢”的固定点迭代； 如果是，历史迭代信息可能就是现成的加速器。} }\]<h3 id="拓展阅读">拓展阅读
 </h3><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
