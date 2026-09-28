@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Shapley Effects（Shapley 敏感度）\n领域：可靠性 × 全局敏感度分析 × 代理模型 × 相关不确定性\n推荐阅读时间：约 8–10 分钟\n今天选 Shapley Effects，因为它补上可靠性分析里一个很容易被低估的漏洞：实际工程参数经常并不独立。\n例如：\n\\[X=(L_1,L_2,c,E,F,\\ldots)\\]其中加工尺寸可能共享制造偏差，载荷之间可能来自同一工况，材料参数之间存在统计相关。如果直接套独立输入下的 Sobol 分解，“某变量贡献了多少不确定性”这个问题会开始变得含糊。\nShapley Effects 的思想很漂亮：\n\\[\\boxed{\\text{把输出方差看成一笔需要在所有输入之间公平分账的“资产”。}}\\]而“公平”来自合作博弈论中的 Shapley value。Owen 将这一思想引入全局敏感度分析，Song、Nelson 与 Staum 在 2016 年系统研究了相关输入情况下的理论和计算。\n1. 先看 Sobol 为什么会遇到麻烦 经典方差分解在输入独立时非常漂亮：\n\\[Y=f(X_1,\\ldots,X_d)\\]可以分解：\n\\[\\operatorname{Var}(Y) = \\sum_iV_i + \\sum_{i">
+<title>Shapley Effects：当输入变量彼此相关时，“谁导致了输出不确定性”为什么突然变成一个博弈论问题？</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/44-shapley-effects/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Shapley Effects：当输入变量彼此相关时，“谁导致了输出不确定性”为什么突然变成一个博弈论问题？">
+<meta property='og:description' content="主题：Shapley Effects（Shapley 敏感度）\n领域：可靠性 × 全局敏感度分析 × 代理模型 × 相关不确定性\n推荐阅读时间：约 8–10 分钟\n今天选 Shapley Effects，因为它补上可靠性分析里一个很容易被低估的漏洞：实际工程参数经常并不独立。\n例如：\n\\[X=(L_1,L_2,c,E,F,\\ldots)\\]其中加工尺寸可能共享制造偏差，载荷之间可能来自同一工况，材料参数之间存在统计相关。如果直接套独立输入下的 Sobol 分解，“某变量贡献了多少不确定性”这个问题会开始变得含糊。\nShapley Effects 的思想很漂亮：\n\\[\\boxed{\\text{把输出方差看成一笔需要在所有输入之间公平分账的“资产”。}}\\]而“公平”来自合作博弈论中的 Shapley value。Owen 将这一思想引入全局敏感度分析，Song、Nelson 与 Staum 在 2016 年系统研究了相关输入情况下的理论和计算。\n1. 先看 Sobol 为什么会遇到麻烦 经典方差分解在输入独立时非常漂亮：\n\\[Y=f(X_1,\\ldots,X_d)\\]可以分解：\n\\[\\operatorname{Var}(Y) = \\sum_iV_i + \\sum_{i">
+<meta property='og:url' content='https://assranai.github.io/cards/44-shapley-effects/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='不确定性量化' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='数值优化' /><meta property='article:published_time' content='2026-09-26T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-26T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Shapley Effects：当输入变量彼此相关时，“谁导致了输出不确定性”为什么突然变成一个博弈论问题？">
+<meta name="twitter:description" content="主题：Shapley Effects（Shapley 敏感度）\n领域：可靠性 × 全局敏感度分析 × 代理模型 × 相关不确定性\n推荐阅读时间：约 8–10 分钟\n今天选 Shapley Effects，因为它补上可靠性分析里一个很容易被低估的漏洞：实际工程参数经常并不独立。\n例如：\n\\[X=(L_1,L_2,c,E,F,\\ldots)\\]其中加工尺寸可能共享制造偏差，载荷之间可能来自同一工况，材料参数之间存在统计相关。如果直接套独立输入下的 Sobol 分解，“某变量贡献了多少不确定性”这个问题会开始变得含糊。\nShapley Effects 的思想很漂亮：\n\\[\\boxed{\\text{把输出方差看成一笔需要在所有输入之间公平分账的“资产”。}}\\]而“公平”来自合作博弈论中的 Shapley value。Owen 将这一思想引入全局敏感度分析，Song、Nelson 与 Staum 在 2016 年系统研究了相关输入情况下的理论和计算。\n1. 先看 Sobol 为什么会遇到麻烦 经典方差分解在输入独立时非常漂亮：\n\\[Y=f(X_1,\\ldots,X_d)\\]可以分解：\n\\[\\operatorname{Var}(Y) = \\sum_iV_i + \\sum_{i">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先看-sobol-为什么会遇到麻烦">1. 先看 Sobol 为什么会遇到麻烦</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/44-shapley-effects/">Shapley Effects：当输入变量彼此相关时，“谁导致了输出不确定性”为什么突然变成一个博弈论问题？</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-26T00:00:00Z'>Sep 26, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 1 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <p><strong>主题：Shapley Effects（Shapley 敏感度）</strong><br>
+<strong>领域：可靠性 × 全局敏感度分析 × 代理模型 × 相关不确定性</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天选 Shapley Effects，因为它补上可靠性分析里一个很容易被低估的漏洞：实际工程参数经常<strong>并不独立</strong>。</p>
+<p>例如：</p>
+\[X=(L_1,L_2,c,E,F,\ldots)\]<p>其中加工尺寸可能共享制造偏差，载荷之间可能来自同一工况，材料参数之间存在统计相关。如果直接套独立输入下的 <span class="term-anchor" data-term="sobol" tabindex="0">Sobol</span> 分解，“某变量贡献了多少不确定性”这个问题会开始变得含糊。</p>
+<p>Shapley Effects 的思想很漂亮：</p>
+\[\boxed{\text{把输出方差看成一笔需要在所有输入之间公平分账的“资产”。}}\]<p>而“公平”来自合作博弈论中的 Shapley value。Owen 将这一思想引入全局敏感度分析，Song、Nelson 与 Staum 在 2016 年系统研究了相关输入情况下的理论和计算。</p>
+<hr>
+<h2 id="1-先看-sobol-为什么会遇到麻烦">1. 先看 Sobol 为什么会遇到麻烦
+</h2><p>经典方差分解在输入独立时非常漂亮：</p>
+\[Y=f(X_1,\ldots,X_d)\]<p>可以分解：</p>
+\[\operatorname{Var}(Y) = \sum_iV_i + \sum_{i<j}V_{ij} +\cdots\]<p>其中：</p>
+\[V_i=\operatorname{Var}(\mathbb E[Y|X_i]).\]<p>于是第一阶 Sobol：</p>
+\[S_i=\frac{V_i}{\operatorname{Var}(Y)}.\]<p>总效应：</p>
+\[S_{T_i}\]<p>则把与 \(X_i\) 有关的所有交互也算进去。</p>
+<p>例如：</p>
+\[Y=X_1+X_2+X_1X_2.\]<p>我们可以问：</p>
+<ul>
+<li>\(X_1\) 单独贡献多少？</li>
+<li>\(X_2\) 单独贡献多少？</li>
+<li>\(X_1X_2\) 的 interaction 算多少？</li>
+</ul>
+<p>输入独立时，这套体系非常自然。</p>
+<p>麻烦出现在：</p>
+\[\boxed{X_1\not\!\perp X_2.}\]<hr>
+<h1 id="2-一个极端例子">2. 一个极端例子
+</h1><p>假设：</p>
+\[X_2=X_1\]<p>而模型：</p>
+\[Y=X_1.\]<p>从<strong>结构方程</strong>看：</p>
+\[Y\]<p>根本没有使用 \(X_2\)。</p>
+<p>所以你可能认为：</p>
+\[X_1:100\%,\qquad X_2:0\%.\]<p>但从<strong>信息角度</strong>看：</p>
+<p>只知道 \(X_2\)，就已经知道：</p>
+\[X_1=X_2\]<p>于是也完全知道：</p>
+\[Y.\]<p>所以又可以说：</p>
+\[X_2\]<p>非常有解释力。</p>
+<p>这暴露了一个深层问题：</p>
+\[\boxed{ \text{“变量重要性”到底指因果作用， 还是它携带了多少关于输出的信息？} }\]<p>对于独立变量，这两个问题经常不冲突。</p>
+<p>一旦存在相关性，它们就分开了。</p>
+<hr>
+<h1 id="3-shapley-effects-选择的是信息贡献视角">3. Shapley Effects 选择的是“信息贡献”视角
+</h1><p>定义一组输入：</p>
+\[N=\{1,\ldots,d\}.\]<p>对任意子集：</p>
+\[S\subseteq N\]<p>定义价值函数，例如：</p>
+\[\boxed{ v(S) = \operatorname{Var} \left( \mathbb E[Y|X_S] \right). }\]<p>它表示：</p>
+<blockquote>
+<p>如果已经知道变量集合 \(S\)，能够解释多少输出方差？</p>
+</blockquote>
+<p>空集：</p>
+\[v(\varnothing)=0.\]<p>所有变量都知道：</p>
+\[v(N)=\operatorname{Var}(Y).\]<p>现在假设已经知道：</p>
+\[S.\]<p>再加入变量 \(i\)。</p>
+<p>新增信息价值：</p>
+\[\boxed{ v(S\cup\{i\})-v(S). }\]<p>这就是变量 \(i\) 在这个“合作联盟”中的<strong>边际贡献</strong>。</p>
+<hr>
+<h1 id="4-但边际贡献取决于加入顺序">4. 但边际贡献取决于加入顺序
+</h1><p>假设：</p>
+\[X_1,X_2,X_3.\]<p>一种顺序：</p>
+\[X_2\rightarrow X_1\rightarrow X_3.\]<p>当 \(X_1\) 加入时，已有：</p>
+\[S=\{X_2\}.\]<p>它的贡献：</p>
+\[v(\{1,2\})-v(\{2\}).\]<p>另一种顺序：</p>
+\[X_3\rightarrow X_2\rightarrow X_1.\]<p>此时 \(X_1\) 最后加入：</p>
+\[v(\{1,2,3\})-v(\{2,3\}).\]<p>两个值一般不同。</p>
+<p>Shapley 的解决办法极其直接：</p>
+\[\boxed{\text{把所有可能加入顺序都考虑进去，然后取平均。}}\]<p>于是：</p>
+\[\phi_i = \sum_{S\subseteq N\setminus\{i\}} \frac{|S|!(d-|S|-1)!}{d!} \left[ v(S\cup\{i\})-v(S) \right].\]<p>归一化后：</p>
+\[\boxed{ Sh_i=\frac{\phi_i}{\operatorname{Var}(Y)}. }\]<p>这就是 Shapley Effect。</p>
+<hr>
+<h1 id="5-为什么这种分账方式很特殊">5. 为什么这种“分账”方式很特殊？
+</h1><p>它满足：</p>
+\[\boxed{ \sum_{i=1}^{d}Sh_i=1. }\]<p>也就是说：</p>
+\[100\%\]<p>的输出方差最终全部分给各变量。</p>
+<p>没有：</p>
+\[\text{“还有 23% interaction 不知道该算谁的”}\]<p>这种剩余项。</p>
+<p>更重要的是，变量相关时仍然可以定义和计算这种分配。Song 等人的核心工作之一，就是分析相关输入下 Shapley Effects 的性质，并展示普通一阶/总效应指标在概率依赖或结构交互存在时可能难以正确表达变量重要性。</p>
+<hr>
+<h1 id="6-interaction-去哪里了">6. Interaction 去哪里了？
+</h1><p>这是理解 Shapley Effects 最关键的一步。</p>
+<p>假设：</p>
+\[Y=X_1X_2\]<p>而：</p>
+\[X_1,X_2\]<p>独立、零均值、同分布。</p>
+<p>这个输出完全来自 interaction。</p>
+<p>经典 Sobol 会得到：</p>
+\[S_1=0, \qquad S_2=0,\]<p>以及：</p>
+\[S_{12}=1.\]<p>Shapley 则问：</p>
+<p>这份：</p>
+\[100\%\]<p>interaction 方差应该怎么归属？</p>
+<p>由于系统完全对称：</p>
+\[\boxed{ Sh_1=0.5,\qquad Sh_2=0.5. }\]<p>也就是说：</p>
+\[\boxed{\text{Shapley 不消灭 interaction，而是把 interaction 公平分摊给参与者。}}\]<p>因此它回答的问题和 Sobol 有细微但重要的差别。</p>
+<p>Sobol：</p>
+\[\boxed{\text{方差结构是什么？}}\]<p>Shapley：</p>
+\[\boxed{\text{最终每个输入应该承担多少方差责任？}}\]<hr>
+<h1 id="7-这在工程可靠性里为什么很有价值">7. 这在工程可靠性里为什么很有价值？
+</h1><p>考虑机翼机构中的：</p>
+\[X_1=\text{左侧杆长误差}\]\[X_2=\text{右侧杆长误差}.\]<p>如果两侧零件来自同一加工批次，可以构造：</p>
+\[X_1=B+\epsilon_1,\]\[X_2=B+\epsilon_2,\]<p>其中：</p>
+\[B\]<p>是批次级系统误差。</p>
+<p>于是：</p>
+\[\operatorname{Corr}(X_1,X_2)>0.\]<p>现在运动精度：</p>
+\[Y=f(X_1,X_2,\ldots).\]<p>如果强行假定独立：</p>
+\[p(X_1,X_2)=p(X_1)p(X_2),\]<p>你其实改变了物理问题本身。</p>
+<p>Shapley Effects 可以直接在相关联合分布：</p>
+\[p(X)\]<p>下回答：</p>
+\[\boxed{\text{观察到的输出不确定性应当怎样在这些相关参数之间分配？}}\]<p>这比“为了能做 Sobol，先把相关性删掉”合理得多。</p>
+<hr>
+<h1 id="8-但这里藏着一个非常重要的陷阱">8. 但这里藏着一个非常重要的陷阱
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>回到：</p>
+\[X_2=X_1, \qquad Y=X_1.\]<p>由于 \(X_2\) 完全携带 \(X_1\) 的信息，Shapley 会给 \(X_2\) 正的重要性。</p>
+<p>可是模型公式：</p>
+\[Y=f(X_1)\]<p>里根本没有 \(X_2\)。</p>
+<p>因此：</p>
+\[\boxed{ Shapley importance \neq causal importance. }\]<p>这是使用 Shapley Effects 时必须牢记的限制。</p>
+<p>2024 年 Herin、Il Idrissi、Chabridon 与 Iooss 的工作专门讨论了这个问题：在相关输入下，一个结构方程中并未直接出现的 <strong>exogenous input</strong> 仍可能由于相关性获得正 Shapley Effect；他们据此提出 Proportional Marginal Effects，希望更好地区分这种情形。</p>
+<p>所以 Shapley 更准确的解释是：</p>
+\[\boxed{\text{uncertainty attribution}}\]<p>而不要轻易解释成：</p>
+\[\boxed{\text{causal attribution}.}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="9-这和机器学习里的-shap-是亲戚但不是完全一回事">9. 这和机器学习里的 SHAP 是亲戚，但不是完全一回事
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>你可能已经见过：</p>
+\[\text{SHAP}.\]<p>两者都来自：</p>
+\[\boxed{\text{Shapley value}.}\]<p>但目标不同。</p>
+<p>机器学习 SHAP 通常解释某一个预测：</p>
+\[f(x^\star)\]<p>为什么是这个值。</p>
+<p>属于：</p>
+\[\boxed{\text{local prediction attribution}.}\]<p>Shapley Effects 则研究整个随机输入空间：</p>
+\[X\sim p(X)\]<p>并分配：</p>
+\[\operatorname{Var}(Y).\]<p>属于：</p>
+\[\boxed{\text{global uncertainty attribution}.}\]<p>所以：</p>
+\[\text{SHAP}\]<p>更像：</p>
+<blockquote>
+<p>这个样本为什么预测成 0.93？</p>
+</blockquote>
+<p>而：</p>
+\[\text{Shapley Effects}\]<p>问：</p>
+<blockquote>
+<p>整个模型输出的不确定性究竟由哪些输入贡献？</p>
+</blockquote>
+<p>名字相似，问题层级不同。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="10-为什么它计算起来很贵">10. 为什么它计算起来很贵？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>公式中有：</p>
+\[S\subseteq N.\]<p>子集数量：</p>
+\[2^d.\]<p>如果：</p>
+\[d=30,\]<p>就已经超过：</p>
+\[10^9\]<p>个 subsets。</p>
+<p>显然不能全部枚举。</p>
+<p>因此实际算法通常利用一个等价视角：</p>
+\[\boxed{\text{随机抽取变量排列 permutation}.}\]<p>例如随机排列：</p>
+\[\pi=(4,1,3,2).\]<p>沿着：</p>
+\[\varnothing \rightarrow \{4\} \rightarrow \{4,1\} \rightarrow \{4,1,3\} \rightarrow N\]<p>计算每个变量加入时的 marginal contribution。</p>
+<p>然后对大量 permutations 求平均。</p>
+<p>Song–Nelson–Staum 提出的 Monte Carlo 方法正是沿这个方向降低计算负担；R 的 <code>sensitivity</code> 包也实现了随机 permutation 版本，并支持相关输入。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="11-这里代理模型突然变得很有价值">11. 这里代理模型突然变得很有价值
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>因为计算：</p>
+\[v(S) = \operatorname{Var}(\mathbb E[Y|X_S])\]<p>通常需要大量 conditional sampling。</p>
+<p>如果每次：</p>
+\[Y=f(X)\]<p>都是一次：</p>
+\[30\text{ min FEM},\]<p>直接 Shapley 几乎不可接受。</p>
+<p>于是自然形成：</p>
+\[\boxed{ \text{高保真仿真} \rightarrow \text{Kriging / GP} \rightarrow \text{大量廉价 conditional samples} \rightarrow \text{Shapley Effects}. }\]<p>这其实是代理模型一个很有价值、但容易被忽视的角色：</p>
+\[\boxed{\text{代理模型未必最终用来预测；它也可以作为统计积分器。}}\]<p>很多 UQ 任务真正昂贵的是：</p>
+\[\mathbb E[\cdot],\quad P_f,\quad S_i,\quad Sh_i,\]<p>而 surrogate 只是让这些积分变得可计算。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="12-对可靠性还要再推进一步输出方差未必是你真正关心的东西">12. 对可靠性还要再推进一步：输出方差未必是你真正关心的东西
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>普通 Shapley Effects 分解：</p>
+\[\operatorname{Var}(Y).\]<p>但可靠性真正关心：</p>
+\[P_f=P[g(X)<0].\]<p>假设某变量：</p>
+\[X_1\]<p>造成大量正常区域波动，却几乎不改变：</p>
+\[g=0\]<p>附近的行为。</p>
+<p>另一个变量：</p>
+\[X_2\]<p>整体方差贡献很小，却决定极少数样本是否跨越失效边界。</p>
+<p>那么普通 variance-based Shapley 可能认为：</p>
+\[X_1>X_2.\]<p>但可靠性工程师真正想知道的可能是：</p>
+\[X_2>X_1.\]<p>所以必须区分：</p>
+\[\boxed{\text{output sensitivity}}\]<p>与：</p>
+\[\boxed{\text{reliability-oriented sensitivity}.}\]<p>2023 年 Demange-Chryst、Bachoc 与 Morio 专门研究了<strong>相关输入下、面向可靠性的 Shapley effect</strong>，并使用 importance sampling 处理失效相关量的计算。</p>
+<p>这与最近几张卡片已经形成一个反复出现的主题：</p>
+\[\boxed{\text{敏感度必须和最终任务对齐。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="13-一个值得自己实现的最小实验">13. 一个值得自己实现的最小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>生成：</p>
+\[X_1\sim N(0,1)\]<p>并令：</p>
+\[X_2=\rho X_1+\sqrt{1-\rho^2}\epsilon, \qquad \epsilon\sim N(0,1).\]<p>模型：</p>
+\[Y=X_1+0.2X_2.\]<p>让：</p>
+\[\rho: 0\rightarrow0.5\rightarrow0.9\rightarrow0.99.\]<p>然后分别计算：</p>
+<ul>
+<li>first-order Sobol；</li>
+<li>total Sobol；</li>
+<li>Shapley Effects。</li>
+</ul>
+<p>观察随着：</p>
+\[\rho\uparrow,\]<p>“哪个变量重要”开始不再只是模型系数：</p>
+\[1,\quad0.2\]<p>的问题。</p>
+<p>接着把模型改成：</p>
+\[Y=X_1,\]<p>仍保持：</p>
+\[X_2\approx X_1.\]<p>你会看到：</p>
+\[X_2\]<p>仍然获得 Shapley importance。</p>
+<p>这一实验会非常清楚地建立：</p>
+\[\boxed{\text{结构影响}}\]<p>和：</p>
+\[\boxed{\text{信息归因}}\]<p>之间的区别。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="14-一个工程实现提醒不要默认软件替你处理相关输入">14. 一个工程实现提醒：不要默认软件替你处理相关输入
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>截至 2026 年 9 月，<a class="link" href="https://salib.readthedocs.io/en/main/"  target="_blank" rel="noopener"
+    >SALib 官方文档</a> 已经包含 Shapley Effects，并采用 Goda 2021 的 Monte Carlo 算法。</p>
+<p>但当前 SALib 的 Shapley estimator 明确假设：</p>
+\[\boxed{\text{mutually independent inputs}.}\]<p>它并不支持相关输入。</p>
+<p>所以一个很危险的工作流是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">我的变量相关
+</span></span><span class="line"><span class="cl">→ 看到 SALib 有 Shapley
+</span></span><span class="line"><span class="cl">→ 直接调用
+</span></span><span class="line"><span class="cl">→ 得到漂亮柱状图
+</span></span><span class="line"><span class="cl">→ 认为已经解决 dependent-input GSA
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>没有。</p>
+<p>如果真正需要 correlated-input Shapley，需要显式处理：</p>
+\[p(X_{\bar S}|X_S),\]<p>或者使用支持 dependent inputs 的实现，例如 R <code>sensitivity</code> 中基于 Song 等方法的 permutation estimator。</p>
+<p>这是一个典型例子：</p>
+\[\boxed{\text{“库里有这个算法”不等于“库实现的是你正在研究的数学问题”。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="15-它在知识体系中的位置">15. 它在知识体系中的位置
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>可以把全局敏感度方法粗略放成：</p>
+\[\text{Derivative-based}\]<p>回答：</p>
+\[\boxed{\text{局部/平均斜率有多大？}}\]\[\downarrow\]\[\text{Morris}\]<p>回答：</p>
+\[\boxed{\text{哪些变量值得筛掉？}}\]\[\downarrow\]\[\text{Sobol}\]<p>回答：</p>
+\[\boxed{\text{输出方差具有怎样的主效应/交互结构？}}\]\[\downarrow\]\[\boxed{\text{Shapley Effects}}\]<p>回答：</p>
+\[\boxed{ \text{如果最终必须把全部不确定性分给各个输入， 尤其输入还相关，应当怎样分？} }\]<p>再往可靠性方向走：</p>
+\[\boxed{\text{Target / reliability-oriented Shapley}}\]<p>回答：</p>
+\[\boxed{\text{谁真正解释了“为什么会失效”？}}\]<p>这是它最合适的位置。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Shapley Effects 最值得理解的并不是那条阶乘权重公式，而是：</p>
+\[\boxed{ \text{一旦输入变量彼此相关， “变量重要性”就不再是一个天然唯一的物理量， 而变成了一个需要明确归因规则的问题。} }\]<p>Shapley 给出的规则是：</p>
+\[\boxed{ \text{观察一个变量在所有可能信息背景下加入系统时， 平均能增加多少解释能力。} }\]<p>这使它特别适合：</p>
+\[\text{相关制造误差} + \text{相关材料参数} + \text{相关工况} + \text{复杂交互}\]<p>存在的工程 UQ。</p>
+<p>但同时也必须记住：</p>
+\[\boxed{ \text{Shapley 分配的是“可归因的不确定性”， 不能自动解释成“物理因果责任”。} }\]<p>对可靠性研究而言，还有最后一层：</p>
+\[\boxed{ \text{解释整个输出方差的变量， 也未必是控制失效边界的变量。} }\]<p>因此真正成熟的工作流更接近：</p>
+\[\text{联合概率模型} \rightarrow \text{任务相关 QoI} \rightarrow \text{代理/采样} \rightarrow \boxed{\text{匹配任务的敏感度指标}},\]<p>而不是先决定“我要做 Sobol”，再强迫问题适应指标。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p>Eunhye Song、Barry L. Nelson 与 Jeremy Staum，<strong>Shapley Effects for Global Sensitivity Analysis: Theory and Computation</strong>, <em>SIAM/ASA Journal on Uncertainty Quantification</em>, 2016。这是最推荐的理论入口，尤其值得看 dependent inputs 与 Monte Carlo permutation estimator。<br>
+<a class="link" href="https://epubs.siam.org/doi/10.1137/15M1048070"  target="_blank" rel="noopener"
+    >SIAM 论文页</a></p>
+<p><a class="link" href="https://salib.readthedocs.io/en/main/api/SALib.analyze.html"  target="_blank" rel="noopener"
+    >SALib 官方 Shapley API 文档</a> —— 适合快速做 independent-input 数值实验；当前文档明确给出 Goda 2021 estimator、方差单位/归一化输出以及独立输入假设。</p>
+<p>Demange-Chryst、Bachoc 与 Morio，<strong>Shapley Effect Estimation in Reliability-Oriented Sensitivity Analysis with Correlated Inputs by Importance Sampling</strong>, <em>International Journal for Uncertainty Quantification</em>, 2023。如果下一步想把今天的概念真正接到失效概率分析，这是最值得看的方向之一。</p>
+<p>Herin、Il Idrissi、Chabridon 与 Iooss，<strong>Proportional Marginal Effects for Global Sensitivity Analysis</strong>, <em>SIAM/ASA Journal on Uncertainty Quantification</em>, 2024。它值得读的原因不是要立即换掉 Shapley，而是它非常清楚地暴露了 Shapley 在“相关但结构上无作用的变量”上的解释边界。</p>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/">可靠性</a>
+        
+            <a href="/tags/%E4%B8%8D%E7%A1%AE%E5%AE%9A%E6%80%A7%E9%87%8F%E5%8C%96/">不确定性量化</a>
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/">数值优化</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-44<span class="card-badge card-badge--role" title="认知分型">概念基石</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/16-active-subspaces/">Active Subspaces：真正该降的维，可能不是“变量”，而是“变量的方向组合”<span class="dep-radar-meta"> · card-16</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-44<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/23-distributionally-robust-reliability/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Distributionally Robust Reliability：可靠性分析里更危险的，往往不是随机性，而是“你把随机性认错了”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/46-conformal-prediction-2/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Conformal Prediction：给任意代理模型加一层“有限样本覆盖保证”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/45-stepwise-uncertainty-reduction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Stepwise Uncertainty Reduction：主动学习真正该优化的，未必是“下一个点最准”，而是“做完这次实验后，最终答案还剩多少不确定性”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/42-control-variates/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Control Variates：低保真模型真正“提供”的不是答案，而是可被抵消的随机波动</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/39-active-subspaces-2/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

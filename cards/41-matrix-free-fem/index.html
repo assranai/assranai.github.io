@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Matrix-Free / Partial Assembly 与 Sum Factorization\n领域：有限元 × GPU/HPC × 求解器架构\n推荐阅读时间：约 8 分钟\n今天选一个和前几张 PD、AVI、DWR 都不同，但对“以后自己写真正高性能求解器”很关键的概念：Matrix-Free FEM（无矩阵有限元）。\n传统有限元的标准流程几乎已经形成条件反射：\n\\[\\text{单元积分}\\rightarrow K_e \\rightarrow\\text{组装全局 }K \\rightarrow Ku.\\]Matrix-Free 方法却问：\n\\[\\boxed{\\text{如果最终只是想计算 }y=Ku,\\text{ 为什么一定要先把 }K\\text{ 存下来？}}\\]它直接从弱形式重新计算 \\(Ku\\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。\n这背后的原因很值得理解：现代计算机越来越经常不是“算不动”，而是“搬不动数据”。\n1. 传统 FEM 真正在存什么？ 以线性弹性为例：\n\\[Ku=f.\\]传统 assembly：\n\\[K=\\sum_e R_e^TK_eR_e.\\]其中 \\(R_e\\) 从全局自由度抽取单元自由度。\n之后迭代求解器反复计算：\n\\[y=Kx.\\]看起来非常合理。\n但注意 sparse matrix-vector multiplication（SpMV）做了什么：\n1 2 3 4 5 读取 K 的非零值 读取列索引 读取 x 做少量乘加 写回 y 每读取一个矩阵元素，往往只对应：\n">
+<title>Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/41-matrix-free-fem/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？">
+<meta property='og:description' content="主题：Matrix-Free / Partial Assembly 与 Sum Factorization\n领域：有限元 × GPU/HPC × 求解器架构\n推荐阅读时间：约 8 分钟\n今天选一个和前几张 PD、AVI、DWR 都不同，但对“以后自己写真正高性能求解器”很关键的概念：Matrix-Free FEM（无矩阵有限元）。\n传统有限元的标准流程几乎已经形成条件反射：\n\\[\\text{单元积分}\\rightarrow K_e \\rightarrow\\text{组装全局 }K \\rightarrow Ku.\\]Matrix-Free 方法却问：\n\\[\\boxed{\\text{如果最终只是想计算 }y=Ku,\\text{ 为什么一定要先把 }K\\text{ 存下来？}}\\]它直接从弱形式重新计算 \\(Ku\\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。\n这背后的原因很值得理解：现代计算机越来越经常不是“算不动”，而是“搬不动数据”。\n1. 传统 FEM 真正在存什么？ 以线性弹性为例：\n\\[Ku=f.\\]传统 assembly：\n\\[K=\\sum_e R_e^TK_eR_e.\\]其中 \\(R_e\\) 从全局自由度抽取单元自由度。\n之后迭代求解器反复计算：\n\\[y=Kx.\\]看起来非常合理。\n但注意 sparse matrix-vector multiplication（SpMV）做了什么：\n1 2 3 4 5 读取 K 的非零值 读取列索引 读取 x 做少量乘加 写回 y 每读取一个矩阵元素，往往只对应：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/41-matrix-free-fem/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='高性能计算' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='GPU 系统' /><meta property='article:published_time' content='2026-09-23T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-23T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？">
+<meta name="twitter:description" content="主题：Matrix-Free / Partial Assembly 与 Sum Factorization\n领域：有限元 × GPU/HPC × 求解器架构\n推荐阅读时间：约 8 分钟\n今天选一个和前几张 PD、AVI、DWR 都不同，但对“以后自己写真正高性能求解器”很关键的概念：Matrix-Free FEM（无矩阵有限元）。\n传统有限元的标准流程几乎已经形成条件反射：\n\\[\\text{单元积分}\\rightarrow K_e \\rightarrow\\text{组装全局 }K \\rightarrow Ku.\\]Matrix-Free 方法却问：\n\\[\\boxed{\\text{如果最终只是想计算 }y=Ku,\\text{ 为什么一定要先把 }K\\text{ 存下来？}}\\]它直接从弱形式重新计算 \\(Ku\\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。\n这背后的原因很值得理解：现代计算机越来越经常不是“算不动”，而是“搬不动数据”。\n1. 传统 FEM 真正在存什么？ 以线性弹性为例：\n\\[Ku=f.\\]传统 assembly：\n\\[K=\\sum_e R_e^TK_eR_e.\\]其中 \\(R_e\\) 从全局自由度抽取单元自由度。\n之后迭代求解器反复计算：\n\\[y=Kx.\\]看起来非常合理。\n但注意 sparse matrix-vector multiplication（SpMV）做了什么：\n1 2 3 4 5 读取 K 的非零值 读取列索引 读取 x 做少量乘加 写回 y 每读取一个矩阵元素，往往只对应：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-传统-fem-真正在存什么">1. 传统 FEM 真正在存什么？</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/41-matrix-free-fem/">Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-23T00:00:00Z'>Sep 23, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 5 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <p><strong>主题：Matrix-Free / Partial Assembly 与 Sum Factorization</strong><br>
+<strong>领域：有限元 × GPU/HPC × 求解器架构</strong><br>
+<strong>推荐阅读时间：约 8 分钟</strong></p>
+<p>今天选一个和前几张 <span class="term-anchor" data-term="pd" tabindex="0">PD</span>、AVI、<span class="term-anchor" data-term="dwr" tabindex="0">DWR</span> 都不同，但对“以后自己写真正高性能求解器”很关键的概念：<strong>Matrix-Free FEM（无矩阵有限元）</strong>。</p>
+<p>传统有限元的标准流程几乎已经形成条件反射：</p>
+\[\text{单元积分}\rightarrow K_e \rightarrow\text{组装全局 }K \rightarrow Ku.\]<p>Matrix-Free 方法却问：</p>
+\[\boxed{\text{如果最终只是想计算 }y=Ku,\text{ 为什么一定要先把 }K\text{ 存下来？}}\]<p>它直接从弱形式重新计算 \(Ku\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。</p>
+<p>这背后的原因很值得理解：<strong>现代计算机越来越经常不是“算不动”，而是“搬不动数据”。</strong></p>
+<hr>
+<h2 id="1-传统-fem-真正在存什么">1. 传统 FEM 真正在存什么？
+</h2><p>以线性弹性为例：</p>
+\[Ku=f.\]<p>传统 assembly：</p>
+\[K=\sum_e R_e^TK_eR_e.\]<p>其中 \(R_e\) 从全局自由度抽取单元自由度。</p>
+<p>之后迭代求解器反复计算：</p>
+\[y=Kx.\]<p>看起来非常合理。</p>
+<p>但注意 sparse matrix-vector multiplication（SpMV）做了什么：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">读取 K 的非零值
+</span></span><span class="line"><span class="cl">读取列索引
+</span></span><span class="line"><span class="cl">读取 x
+</span></span><span class="line"><span class="cl">做少量乘加
+</span></span><span class="line"><span class="cl">写回 y
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>每读取一个矩阵元素，往往只对应：</p>
+\[1\text{ multiply}+1\text{ add}.\]<p>因此计算强度：</p>
+\[\boxed{ I=\frac{\text{FLOPs}}{\text{bytes moved}} }\]<p>很低。</p>
+<p>现代 CPU/GPU 的浮点吞吐增长速度远快于内存带宽，于是 SpMV 很容易成为：</p>
+\[\boxed{\text{memory-bandwidth bound}.}\]<p>Kronbichler 与 Kormann 对 matrix-free DG 的性能分析甚至发现，完整 operator evaluation 的性能经常已经接近机器可用 memory bandwidth 的极限。</p>
+<hr>
+<h1 id="2-matrix-free-做了一件看起来反效率的事">2. Matrix-Free 做了一件看起来“反效率”的事
+</h1><p>不存：</p>
+\[K.\]<p>每次需要：</p>
+\[y=Kx\]<p>时，重新执行有限元积分。</p>
+<p>对于一个典型双线性型：</p>
+\[a(u,v) = \int_\Omega \nabla v^T D(x)\nabla u\,d\Omega,\]<p>传统方法先算：</p>
+\[K_{ij} = \int_\Omega \nabla N_i^TD\nabla N_j\,d\Omega.\]<p>Matrix-Free 则直接：</p>
+\[x \rightarrow u_h \rightarrow \nabla u_h \rightarrow D\nabla u_h \rightarrow \int\nabla N_i^TD\nabla u_h.\]<p>于是：</p>
+\[\boxed{ Kx\text{ 被重新解释为一次有限元算子评价。} }\]<p>这意味着更多 FLOPs。</p>
+<p>但数据搬运大幅减少。</p>
+<p>在现代硬件上：</p>
+\[\boxed{\text{多算一点，可能比多读一点更便宜。}}\]<p>这正是 Matrix-Free 最反直觉也最重要的地方。</p>
+<hr>
+<h1 id="3-更准确地说有限元算子本来就不是一块矩阵">3. 更准确地说，有限元算子本来就不是“一块矩阵”
+</h1><p><a class="link" href="https://mfem.org/performance/"  target="_blank" rel="noopener"
+    >MFEM 官方 Partial Assembly 文档</a> 把有限元算子分解得非常漂亮：</p>
+\[\boxed{ A=P^TG^TB^TDBG P. }\]<p>这里可以粗略理解为：</p>
+\[P:\text{全局/并行自由度映射}\]\[G:\text{global DOF}\rightarrow\text{element DOF}\]\[B:\text{element DOF}\rightarrow\text{quadrature point}\]\[D:\text{积分点上的几何与物理作用}.\]<p>所以一个 FEM operator 实际上是：</p>
+\[\boxed{ \text{global} \rightarrow \text{element} \rightarrow \text{quadrature} \rightarrow \text{physics} \rightarrow \text{element} \rightarrow \text{global}. }\]<p>全局 sparse matrix \(A\) 只是把整个计算过程<strong>提前展开并缓存后的结果</strong>。</p>
+<hr>
+<h1 id="4-partial-assembly-是中间路线">4. Partial Assembly 是中间路线
+</h1><p>这里有一个很重要的层次：</p>
+\[\text{Full Assembly}\]<p>存整个：</p>
+\[A.\]<p>Element Assembly：</p>
+<p>存：</p>
+\[K_e.\]<p>Partial Assembly：</p>
+<p>只存积分点上的：</p>
+\[D.\]<p>Matrix-Free：</p>
+<p>连更多中间量也动态计算。</p>
+<p>所以你可以把 assembly 看成一条连续谱：</p>
+\[\boxed{ \text{更多预计算/更多内存} \longleftrightarrow \text{更少存储/更多在线计算}. }\]<p>MFEM 当前明确提供 FULL、ELEMENT、PARTIAL 等不同 assembly level；其 partial assembly 的核心就是只保存 \(D\) 或其一部分，而把 \(P,G,B\) 等操作在线执行。</p>
+<p>这其实与昨天 PD 的思想形成一个很漂亮的反差：</p>
+<p>PD：</p>
+\[\boxed{\text{尽量预计算固定结构}}\]<p>Matrix-Free：</p>
+\[\boxed{\text{当预计算结果太大时，宁愿重算}}\]<p>两者并不矛盾。</p>
+<p>真正原则是：</p>
+\[\boxed{\text{缓存那些“重算比搬运贵”的东西。}}\]<hr>
+<h1 id="5-但如果每次都老老实实算高阶-fem计算量不会爆炸吗">5. 但如果每次都老老实实算高阶 FEM，计算量不会爆炸吗？
+</h1><p>会。</p>
+<p>所以 Matrix-Free 高阶 FEM 的另一个核心技术叫：</p>
+\[\boxed{\text{Sum Factorization}.}\]<p>考虑三维六面体高阶单元。</p>
+<p>每个方向有：</p>
+\[p+1\]<p>个基函数，因此单元自由度：</p>
+\[n\sim(p+1)^3.\]<p>如果直接计算三维插值：</p>
+\[u(q_x,q_y,q_z) = \sum_{i,j,k} B_{q_xi}B_{q_yj}B_{q_zk}u_{ijk},\]<p>这是一个巨大的三维求和。</p>
+<p>但由于六面体基函数是 tensor product：</p>
+\[N_{ijk}(x,y,z) = N_i(x)N_j(y)N_k(z),\]<p>可以分三次一维 contraction。</p>
+<p>先：</p>
+\[v_{q_xjk} = \sum_iB_{q_xi}u_{ijk},\]<p>再：</p>
+\[w_{q_xq_yk} = \sum_jB_{q_yj}v_{q_xjk},\]<p>最后：</p>
+\[u_{q_xq_yq_z} = \sum_kB_{q_zk}w_{q_xq_yk}.\]<p>这就是 sum factorization。</p>
+<hr>
+<h1 id="6-它改变了高阶-fem-的复杂度">6. 它改变了高阶 FEM 的复杂度
+</h1><p>三维情况下，直接 dense element operation 的复杂度大致会随：</p>
+\[O(p^6)\]<p>增长。</p>
+<p>利用 tensor-product sum factorization 后，可降到大约：</p>
+\[\boxed{O(p^4)}.\]<p>这两个幂次的差距在：</p>
+\[p=8,\;10,\;12\]<p>时已经非常巨大。</p>
+<p>所以：</p>
+\[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} }\]<p>才真正构成现代 high-order FEM 的高性能组合。</p>
+<p>Kronbichler 与 Kormann 的工作正是系统研究这种 matrix-free + sum-factorization operator evaluation，并展示经过向量化的一维 tensor kernels 可以达到很高的 CPU 算术吞吐。</p>
+<hr>
+<h1 id="7-一个直观类比">7. 一个直观类比
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设你每天需要：</p>
+\[f(x)=Ax.\]<p>传统 sparse FEM 的思路相当于：</p>
+<blockquote>
+<p>把一个复杂食谱的所有可能中间结果做完，装进巨大冰箱，以后每次拿出来。</p>
+</blockquote>
+<p>Matrix-Free：</p>
+<blockquote>
+<p>只保存原料和非常紧凑的配方，需要时现场做。</p>
+</blockquote>
+<p>旧机器：</p>
+\[\text{做饭慢，冰箱读取快}\]<p>于是缓存占优。</p>
+<p>现代 GPU：</p>
+\[\boxed{\text{“做饭”极快，但从显存搬东西相对昂贵}}\]<p>于是现场重算越来越划算。</p>
+<p>这也是为什么 MFEM 官方明确指出 Partial Assembly 对 GPU 尤其重要：高阶 fully assembled matrix 同时要求大量存储和大量数据传输。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="8-这会产生一个很重要的-roofline-视角">8. 这会产生一个很重要的 Roofline 视角
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>性能不应该只看 FLOPs。</p>
+<p>定义 arithmetic intensity：</p>
+\[I= \frac{\text{FLOPs}}{\text{Byte}}.\]<p>硬件理论性能近似受：</p>
+\[P \le \min ( P_{\rm peak}, I B_{\rm memory} )\]<p>约束。</p>
+<p>这就是经典 Roofline 思想。</p>
+<p>如果 sparse matvec：</p>
+\[I\ll1,\]<p>即使 GPU 有：</p>
+\[50\text{ TFLOP/s},\]<p>也根本吃不到这些算力。</p>
+<p>Matrix-Free 通过“重新计算”提高：</p>
+\[I.\]<p>所以有一个很值得记住的 HPC 规律：</p>
+\[\boxed{ \text{减少 FLOPs} \neq \text{提高性能}. }\]<p>有时候应该主动：</p>
+\[\boxed{\text{用 FLOPs 换 memory traffic}.}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="9-这对-gpu-求解器架构特别重要">9. 这对 GPU 求解器架构特别重要
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>Matrix-Free 的典型 kernel 很适合 GPU：</p>
+<ol>
+<li>gather element DOFs；</li>
+<li>tensor interpolation；</li>
+<li>quadrature-point physics；</li>
+<li>tensor integration；</li>
+<li>scatter。</li>
+</ol>
+<p>积分点上的：</p>
+\[D(q)\]<p>通常彼此独立。</p>
+<p>因此：</p>
+\[\boxed{\text{quadrature physics 天然数据并行}.}\]<p>而 \(B\) 的 tensor contraction 又可以做：</p>
+<ul>
+<li>SIMD；</li>
+<li>warp-level parallelism；</li>
+<li>shared-memory reuse。</li>
+</ul>
+<p>这也是 MFEM、<a class="link" href="https://libceed.org/"  target="_blank" rel="noopener"
+    >libCEED</a>、deal.II 等现代高阶 FEM 软件都高度重视 matrix-free operator decomposition 的原因。CEED 甚至专门定义 Bakeoff Problems 来比较不同库中 mass/Laplace 等高阶算子的性能实现。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="10-那为什么低阶四面体-fem-不一定值得-matrix-free">10. 那为什么低阶四面体 FEM 不一定值得 Matrix-Free？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这是一个重要边界。</p>
+<p>假设：</p>
+\[P_1\]<p>线性四面体。</p>
+<p>每个 tet 只有：</p>
+\[4\]<p>个节点。</p>
+<p>单元矩阵很小，计算：</p>
+\[K_e\]<p>本身也不复杂。</p>
+<p>此时：</p>
+<ul>
+<li>tensor-product 结构弱；</li>
+<li>sum factorization 优势不存在；</li>
+<li>gather/scatter 成本占比更高。</li>
+</ul>
+<p>所以 Matrix-Free 最耀眼的场景通常是：</p>
+\[\boxed{\text{高阶 quad/hex tensor-product elements}.}\]<p>MFEM 当前官方 partial assembly 实现也主要针对 quadrilateral/hexahedral tensor-product elements。</p>
+<p>但这并不意味着 simplex 完全做不了。Moxey、Amici 与 Kirby 已展示 triangle、tetrahedron、prism 等 simplex/prismatic 高阶单元也可以获得高效 matrix-free 实现，只是性能结构更复杂。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="11-matrix-free-最大的问题预条件器怎么办">11. Matrix-Free 最大的问题：预条件器怎么办？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>如果你有：</p>
+\[A,\]<p>可以直接构造：</p>
+<ul>
+<li>ILU；</li>
+<li>AMG；</li>
+<li>sparse approximate inverse。</li>
+</ul>
+<p>但 Matrix-Free 中：</p>
+\[\boxed{A\text{ 根本不存在。}}\]<p>Krylov 方法只需要：</p>
+\[v\mapsto Av,\]<p>所以 CG/GMRES 没问题。</p>
+<p>但好的 preconditioner：</p>
+\[P^{-1}\]<p>怎么办？</p>
+<p>这恰恰是 matrix-free 方法最重要的工程难点之一。</p>
+<p>MFEM 的解决路线包括：</p>
+<ul>
+<li>matrix-free Jacobi；</li>
+<li>Chebyshev smoother；</li>
+<li>\(h\)-multigrid；</li>
+<li>\(p\)-multigrid。</li>
+</ul>
+<p>因此一个真正完整的 matrix-free solver 并不是：</p>
+\[\boxed{\text{“把矩阵删掉”}}\]<p>这么简单。</p>
+<p>而是：</p>
+\[\boxed{ \text{operator evaluation} + \text{matrix-free-friendly preconditioning} }\]<p>必须一起设计。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="12-这和-multigrid-的结合尤其漂亮">12. 这和 Multigrid 的结合尤其漂亮
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>高阶问题：</p>
+\[p=8.\]<p>可以构造：</p>
+\[p=8 \rightarrow4 \rightarrow2 \rightarrow1.\]<p>高阶层：</p>
+\[\boxed{\text{matrix-free}}\]<p>负责便宜 operator application。</p>
+<p>到了：</p>
+\[p=1\]<p>低阶层，矩阵已经足够小，可以：</p>
+\[\boxed{\text{真正 assemble}}\]<p>然后使用 AMG/direct solver。</p>
+<p>于是形成：</p>
+\[\boxed{ \text{high order: compute-rich matrix-free} }\]\[\downarrow\]\[\boxed{ \text{low order: matrix-based robust coarse solve}. }\]<p>这是一种很典型的现代 HPC 思维：</p>
+\[\boxed{\text{不同层级不必坚持同一种数据表示。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="13-对非线性软体-fem-更有意思">13. 对非线性软体 FEM 更有意思
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>考虑 Neo-Hookean：</p>
+\[P=P(F).\]<p>传统 Newton FEM：</p>
+\[K(x)=\frac{\partial f}{\partial x}.\]<p>显式形成：</p>
+\[K\]<p>可能非常昂贵。</p>
+<p>但 Newton-Krylov 只真正需要：</p>
+\[\boxed{K(x)v.}\]<p>这可以直接通过：</p>
+<ul>
+<li>analytic directional derivative；</li>
+<li>automatic differentiation；</li>
+<li>finite-difference Jacobian-vector product；</li>
+</ul>
+<p>得到。</p>
+<p>于是：</p>
+\[\boxed{ \text{Matrix-Free} + \text{Newton-Krylov} }\]<p>允许：</p>
+\[\boxed{\text{从头到尾不显式形成 tangent stiffness matrix}.}\]<p>这对复杂 constitutive model、GPU FEM、differentiable simulation 都非常重要。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="14-这里还能和上一张-pd-卡片形成一个很有价值的对照">14. 这里还能和上一张 PD 卡片形成一个很有价值的对照
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>PD 的核心优势：</p>
+\[\boxed{K\text{ 固定}}\]<p>所以：</p>
+\[K=LL^T\]<p>一次 factorization，反复使用。</p>
+<p>Matrix-Free Newton-Krylov：</p>
+\[\boxed{K(x)\text{ 可以不断变化}}\]<p>但我们根本不存它，只提供：</p>
+\[v\rightarrow K(x)v.\]<p>所以面对 nonlinear elasticity，有两条完全不同的求解器哲学：</p>
+\[\boxed{ \text{PD：改变模型结构，让矩阵固定} }\]<p>与</p>
+\[\boxed{ \text{Matrix-Free：接受矩阵变化，但永远不把它实体化}. }\]<p>两条路线都在避免：</p>
+\[\boxed{\text{反复构造巨大 sparse matrix}.}\]<p>只是解决方式完全不同。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="15-对自研软体求解器最值得迁移的思想">15. 对自研软体求解器最值得迁移的思想
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>即使当前使用 <span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span>，而不是 FEM，Matrix-Free 的思想仍然非常有价值。</p>
+<p>假设系统有：</p>
+\[10^6\]<p>个 tet constraints。</p>
+<p>一种设计是提前存大量：</p>
+<ul>
+<li>constraint Jacobian；</li>
+<li>local Hessian；</li>
+<li>stiffness block。</li>
+</ul>
+<p>另一种设计：</p>
+<p>每次 kernel 内根据：</p>
+\[x_i,x_j,x_k,x_l\]<p>现场重构：</p>
+\[F,\quad J,\quad \nabla C.\]<p>如果重构只需要几十到几百 FLOPs，却能少读取几十字节甚至数百字节，那么 GPU 上后者可能更快。</p>
+<p>因此 profiler 不应该只统计：</p>
+\[\boxed{\text{FLOPs}.}\]<p>更应该统计：</p>
+\[\boxed{ \text{bytes moved per constraint} }\]<p>以及：</p>
+\[\boxed{ \text{arithmetic intensity}. }\]<p>这对 GPU physics solver 是一个非常实用的性能视角。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="16-一个值得自己做的小实验">16. 一个值得自己做的小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>做一个规则六面体 Poisson 问题。</p>
+<p>比较：</p>
+<h3 id="a-full-assembly">A. Full assembly
+</h3><p>构造：</p>
+\[K\]<p>然后反复：</p>
+\[y=Kx.\]<h3 id="b-matrix-free-naive">B. Matrix-free naive
+</h3><p>每次重新做 quadrature。</p>
+<h3 id="c-matrix-free--sum-factorization">C. Matrix-free + sum factorization
+</h3><p>利用 tensor product。</p>
+<p>测试：</p>
+\[p=1,2,4,6,8.\]<p>记录：</p>
+\[\boxed{\text{DOF/s}}\]\[\boxed{\text{GB/s}}\]\[\boxed{\text{GFLOP/s}}\]<p>以及：</p>
+\[\boxed{\text{bytes/DOF}.}\]<p>最值得观察的现象很可能是：</p>
+<p>低阶时：</p>
+\[\text{assembled}\]<p>并不差。</p>
+<p>随着：</p>
+\[p\uparrow,\]<p>matrix-free + sum-factorization 会越来越占优势。</p>
+<p>这比只读理论复杂度更容易真正理解高阶 FEM 为什么重新流行起来。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="17-它还给-ai-工程一个很强的迁移原则">17. 它还给 AI 工程一个很强的迁移原则
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>现代 LLM 推理也越来越受：</p>
+\[\boxed{\text{memory bandwidth}}\]<p>限制。</p>
+<p>很多 kernel fusion、FlashAttention、activation recomputation，本质上都在做类似交易：</p>
+\[\boxed{\text{多做计算，少搬数据}.}\]<p>所以 Matrix-Free FEM、FlashAttention、checkpoint recomputation 看起来属于完全不同领域，却共享一个现代计算原则：</p>
+\[\boxed{ \text{在算力相对便宜、内存流量昂贵的机器上， “避免重复计算”已经不再是无条件正确的优化目标。}\]<p>这是 Matrix-Free FEM 最值得迁移出去的一层认识。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Matrix-Free FEM 最值得记住的并不是：</p>
+\[\boxed{\text{“不存刚度矩阵”}.}\]<p>真正重要的是：</p>
+\[\boxed{ \text{矩阵只是一个算子的某种物化形式； 如果物化后的数据比重新执行算子本身更昂贵， 那就没有必要把它物化。} }\]<p>它在知识体系中的位置可以画成：</p>
+\[\text{Weak Form}\]\[\downarrow\]\[\text{Finite Element Operator}\]\[\begin{array}{ccc} \swarrow && \searrow\\ \text{Assembly} && \text{Matrix-Free} \end{array}\]\[\begin{array}{ccc} K\text{ sparse} && P^TG^TB^TDBG P \end{array}\]<p>而高阶 FEM 再加入：</p>
+\[\boxed{\text{tensor product}}\]\[\downarrow\]\[\boxed{\text{sum factorization}}\]<p>最终得到：</p>
+\[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} + \text{Multigrid} }\]<p>这已经成为现代高性能高阶有限元的一条核心技术路线。</p>
+<p>对于以后真正写 GPU 物理求解器，这张卡片最值得留下的工程判断是：</p>
+\[\boxed{ \text{看到一个可以预计算并缓存的大数组时， 先不要问“怎么把它存得更紧凑”， 先问“我真的需要存它吗？”} }\]<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p><a class="link" href="https://mfem.org/performance/"  target="_blank" rel="noopener"
+    >MFEM：Performance and Partial Assembly</a> —— 我最推荐的入门材料。它把 \(P,G,B,D\) 的 operator decomposition、partial assembly、GPU 与 multigrid 的关系讲得非常清楚，而且对应真实工业级 C++ 实现。</p>
+</li>
+<li>
+<p>Martin Kronbichler &amp; Katharina Kormann, <strong>Fast Matrix-Free Evaluation of Discontinuous Galerkin Finite Element Operators</strong>, <em>ACM TOMS</em>, 2019。想真正理解 sum factorization、SIMD、memory bandwidth 和 operator kernel 性能，这是核心论文。<br>
+<a class="link" href="https://doi.org/10.1145/3325864"  target="_blank" rel="noopener"
+    >ACM 论文页</a></p>
+</li>
+<li>
+<p><a class="link" href="https://libceed.org/en/latest/examples/bps/"  target="_blank" rel="noopener"
+    >libCEED 官方 CEED Bakeoff Problems</a> —— 如果以后自己写 FEM kernel，非常值得照这些标准问题 benchmark；它直接提供 mass、Laplace 等算子的跨 MFEM、deal.II、PETSc 等实现比较入口。</p>
+</li>
+<li>
+<p>Moxey, Amici &amp; Kirby, <strong>Efficient Matrix-Free High-Order Finite Element Evaluation for Simplicial Elements</strong>, <em>SIAM Journal on Scientific Computing</em>, 2020。适合继续追问一个与你更相关的问题：**四面体网格没有标准 hex tensor-product 结构后，matrix-free 还能做到多快？**论文展示了 triangle/tet/prism 上仍可获得高效实现。</p>
+</li>
+<li>
+<p>Arndt et al., <strong>ExaDG: High-Order Discontinuous Galerkin for the Exa-scale</strong>。如果想看这一整套技术怎样组成真正的大规模求解器：matrix-free operator + sum factorization + massively parallel multigrid + optimized smoothers，就是很好的系统案例；相关工作报告实际软件贡献在不同硬件上带来约 3–4× 加速。</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E9%AB%98%E6%80%A7%E8%83%BD%E8%AE%A1%E7%AE%97/">高性能计算</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/gpu-%E7%B3%BB%E7%BB%9F/">GPU 系统</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-41<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/01-ipc/">IPC：把“碰撞处理”改写成一个优化问题<span class="dep-radar-meta"> · card-01</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-41<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/20-multigrid/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/38-dual-weighted-residual-2/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Dual-Weighted Residual：有限元网格为什么要追着“你真正关心的输出”加密？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/37-asynchronous-variational-integrators/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/35-anderson-acceleration-2/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Anderson Acceleration：把一个普通固定点迭代器，几乎“外挂”成准牛顿求解器</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/34-certified-reduced-order-modeling/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Certified Reduced-Order Modeling：代理模型除了“预测值”，能不能同时给出一个数学上保证不会错过真值的误差界？</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

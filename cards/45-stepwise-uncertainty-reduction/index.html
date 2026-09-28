@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Stepwise Uncertainty Reduction（SUR，逐步不确定性缩减）\n领域：代理模型 × 主动学习 × 可靠性分析 × 贝叶斯实验设计\n推荐阅读时间：约 8–10 分钟\n今天选 SUR，是因为它处在 Kriging 主动学习知识体系中一个很关键的位置，而且能解释很多 acquisition function 为什么看起来彼此不同。\n设昂贵极限状态函数\n\\[g(x),\\]失效域为\n\\[\\Gamma=\\{x:g(x)\\le0\\},\\]最终真正想得到：\n\\[P_f=P_X(\\Gamma) = \\int \\mathbf 1[g(x)\\le0]p_X(x)\\,dx.\\]普通 Kriging 主动学习经常问：\n\\[\\boxed{\\text{“当前哪里最不确定？”}}\\]SUR 问的是更接近最终科研目标的问题：\n\\[\\boxed{ \\text{“如果下一次昂贵仿真放在 }x\\text{， 得到结果并更新 GP 后， 关于 }P_f\\text{ 的不确定性预计会减少多少？”} }\\]Bect、Ginsbourger、Li、Picheny 与 Vazquez 的经典工作正是从贝叶斯决策论角度推导用于失效概率估计的 SUR 策略，而非先拍脑袋定义一个“边界附近采样分数”。\n1. 先看普通主动 Kriging 在做什么 已有数据：\n\\[\\mathcal D_n=\\{(x_i,g(x_i))\\}_{i=1}^n.\\]GP 给出：\n\\[G(x)\\mid\\mathcal D_n \\sim \\mathcal N(m_n(x),s_n^2(x)).\\]对于失效阈值 \\(0\\)，一个常见指标是：\n\\[U(x)=\\frac{|m_n(x)|}{s_n(x)}.\\]小 \\(U\\) 表示：\n均值靠近失效边界； 或预测方差较大。 于是 AK-MCS 一类方法倾向寻找：\n\\[x_{n+1}=\\arg\\min_x U(x).\\]这个逻辑非常合理。\n">
+<title>Stepwise Uncertainty Reduction：主动学习真正该优化的，未必是“下一个点最准”，而是“做完这次实验后，最终答案还剩多少不确定性”</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/45-stepwise-uncertainty-reduction/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Stepwise Uncertainty Reduction：主动学习真正该优化的，未必是“下一个点最准”，而是“做完这次实验后，最终答案还剩多少不确定性”">
+<meta property='og:description' content="主题：Stepwise Uncertainty Reduction（SUR，逐步不确定性缩减）\n领域：代理模型 × 主动学习 × 可靠性分析 × 贝叶斯实验设计\n推荐阅读时间：约 8–10 分钟\n今天选 SUR，是因为它处在 Kriging 主动学习知识体系中一个很关键的位置，而且能解释很多 acquisition function 为什么看起来彼此不同。\n设昂贵极限状态函数\n\\[g(x),\\]失效域为\n\\[\\Gamma=\\{x:g(x)\\le0\\},\\]最终真正想得到：\n\\[P_f=P_X(\\Gamma) = \\int \\mathbf 1[g(x)\\le0]p_X(x)\\,dx.\\]普通 Kriging 主动学习经常问：\n\\[\\boxed{\\text{“当前哪里最不确定？”}}\\]SUR 问的是更接近最终科研目标的问题：\n\\[\\boxed{ \\text{“如果下一次昂贵仿真放在 }x\\text{， 得到结果并更新 GP 后， 关于 }P_f\\text{ 的不确定性预计会减少多少？”} }\\]Bect、Ginsbourger、Li、Picheny 与 Vazquez 的经典工作正是从贝叶斯决策论角度推导用于失效概率估计的 SUR 策略，而非先拍脑袋定义一个“边界附近采样分数”。\n1. 先看普通主动 Kriging 在做什么 已有数据：\n\\[\\mathcal D_n=\\{(x_i,g(x_i))\\}_{i=1}^n.\\]GP 给出：\n\\[G(x)\\mid\\mathcal D_n \\sim \\mathcal N(m_n(x),s_n^2(x)).\\]对于失效阈值 \\(0\\)，一个常见指标是：\n\\[U(x)=\\frac{|m_n(x)|}{s_n(x)}.\\]小 \\(U\\) 表示：\n均值靠近失效边界； 或预测方差较大。 于是 AK-MCS 一类方法倾向寻找：\n\\[x_{n+1}=\\arg\\min_x U(x).\\]这个逻辑非常合理。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/45-stepwise-uncertainty-reduction/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='科学机器学习' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='不确定性量化' /><meta property='article:published_time' content='2026-09-27T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-27T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Stepwise Uncertainty Reduction：主动学习真正该优化的，未必是“下一个点最准”，而是“做完这次实验后，最终答案还剩多少不确定性”">
+<meta name="twitter:description" content="主题：Stepwise Uncertainty Reduction（SUR，逐步不确定性缩减）\n领域：代理模型 × 主动学习 × 可靠性分析 × 贝叶斯实验设计\n推荐阅读时间：约 8–10 分钟\n今天选 SUR，是因为它处在 Kriging 主动学习知识体系中一个很关键的位置，而且能解释很多 acquisition function 为什么看起来彼此不同。\n设昂贵极限状态函数\n\\[g(x),\\]失效域为\n\\[\\Gamma=\\{x:g(x)\\le0\\},\\]最终真正想得到：\n\\[P_f=P_X(\\Gamma) = \\int \\mathbf 1[g(x)\\le0]p_X(x)\\,dx.\\]普通 Kriging 主动学习经常问：\n\\[\\boxed{\\text{“当前哪里最不确定？”}}\\]SUR 问的是更接近最终科研目标的问题：\n\\[\\boxed{ \\text{“如果下一次昂贵仿真放在 }x\\text{， 得到结果并更新 GP 后， 关于 }P_f\\text{ 的不确定性预计会减少多少？”} }\\]Bect、Ginsbourger、Li、Picheny 与 Vazquez 的经典工作正是从贝叶斯决策论角度推导用于失效概率估计的 SUR 策略，而非先拍脑袋定义一个“边界附近采样分数”。\n1. 先看普通主动 Kriging 在做什么 已有数据：\n\\[\\mathcal D_n=\\{(x_i,g(x_i))\\}_{i=1}^n.\\]GP 给出：\n\\[G(x)\\mid\\mathcal D_n \\sim \\mathcal N(m_n(x),s_n^2(x)).\\]对于失效阈值 \\(0\\)，一个常见指标是：\n\\[U(x)=\\frac{|m_n(x)|}{s_n(x)}.\\]小 \\(U\\) 表示：\n均值靠近失效边界； 或预测方差较大。 于是 AK-MCS 一类方法倾向寻找：\n\\[x_{n+1}=\\arg\\min_x U(x).\\]这个逻辑非常合理。\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先看普通主动-kriging-在做什么">1. 先看普通主动 Kriging 在做什么</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/45-stepwise-uncertainty-reduction/">Stepwise Uncertainty Reduction：主动学习真正该优化的，未必是“下一个点最准”，而是“做完这次实验后，最终答案还剩多少不确定性”</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-27T00:00:00Z'>Sep 27, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 4 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <p><strong>主题：Stepwise Uncertainty Reduction（SUR，逐步不确定性缩减）</strong><br>
+<strong>领域：代理模型 × 主动学习 × 可靠性分析 × 贝叶斯实验设计</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天选 SUR，是因为它处在 <span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span> 主动学习知识体系中一个很关键的位置，而且能解释很多 acquisition function 为什么看起来彼此不同。</p>
+<p>设昂贵极限状态函数</p>
+\[g(x),\]<p>失效域为</p>
+\[\Gamma=\{x:g(x)\le0\},\]<p>最终真正想得到：</p>
+\[P_f=P_X(\Gamma) = \int \mathbf 1[g(x)\le0]p_X(x)\,dx.\]<p>普通 Kriging 主动学习经常问：</p>
+\[\boxed{\text{“当前哪里最不确定？”}}\]<p>SUR 问的是更接近最终科研目标的问题：</p>
+\[\boxed{ \text{“如果下一次昂贵仿真放在 }x\text{， 得到结果并更新 GP 后， 关于 }P_f\text{ 的不确定性预计会减少多少？”} }\]<p>Bect、Ginsbourger、Li、Picheny 与 Vazquez 的经典工作正是从贝叶斯决策论角度推导用于失效概率估计的 SUR 策略，而非先拍脑袋定义一个“边界附近采样分数”。</p>
+<hr>
+<h2 id="1-先看普通主动-kriging-在做什么">1. 先看普通主动 Kriging 在做什么
+</h2><p>已有数据：</p>
+\[\mathcal D_n=\{(x_i,g(x_i))\}_{i=1}^n.\]<p>GP 给出：</p>
+\[G(x)\mid\mathcal D_n \sim \mathcal N(m_n(x),s_n^2(x)).\]<p>对于失效阈值 \(0\)，一个常见指标是：</p>
+\[U(x)=\frac{|m_n(x)|}{s_n(x)}.\]<p>小 \(U\) 表示：</p>
+<ul>
+<li>均值靠近失效边界；</li>
+<li>或预测方差较大。</li>
+</ul>
+<p>于是 <span class="term-anchor" data-term="ak-mcs" tabindex="0">AK-MCS</span> 一类方法倾向寻找：</p>
+\[x_{n+1}=\arg\min_x U(x).\]<p>这个逻辑非常合理。</p>
+<p>但它存在一个隐含问题：</p>
+\[\boxed{\text{它主要评价候选点“自己”有多值得采。}}\]<p>它没有完整考虑：</p>
+<blockquote>
+<p>在 \(x\) 做一次观测以后，由于 GP 的空间相关结构，<strong>整个输入空间</strong>的不确定性会怎样变化？</p>
+</blockquote>
+<p>SUR 恰好从这里向前走一步。</p>
+<hr>
+<h1 id="2-gp-的一次观测并不只减少一个点的不确定性">2. GP 的一次观测并不只减少一个点的不确定性
+</h1><p>假设下一点选择：</p>
+\[x_{n+1}=x.\]<p>观测：</p>
+\[Y=G(x).\]<p>GP 更新以后，任意位置 \(z\) 的方差都会发生变化：</p>
+\[s_{n+1}^2(z) = s_n^2(z) - \frac{k_n(z,x)^2} {s_n^2(x)}\]<p>（这里先忽略 observation noise）。</p>
+<p>所以在：</p>
+\[x\]<p>采一次样，本质上会影响一整个相关区域。</p>
+<p>如果 \(x\) 与失效边界上大片区域高度相关，这一次计算可能非常值钱。</p>
+<p>如果 \(x\) 虽然自身：</p>
+\[U(x)\]<p>很低，但只解决一个概率质量极小、空间相关范围又很短的角落，那么它对：</p>
+\[P_f\]<p>可能几乎没帮助。</p>
+<p>因此 SUR 的第一层思想就是：</p>
+\[\boxed{ \text{样本价值应该评价它对整个 posterior 的影响， 而不只评价候选点自身。} }\]<hr>
+<h1 id="3-sur-先定义我到底还不知道多少">3. SUR 先定义“我到底还不知道多少”
+</h1><p>这是整个方法最漂亮的一步。</p>
+<p>定义一个 uncertainty functional：</p>
+\[H_n = H(\mathcal D_n).\]<p>它表示当前 GP 下，对最终目标剩余的不确定性。</p>
+<p>例如，对于 excursion set：</p>
+\[\Gamma=\{x:g(x)\le0\},\]<p>可以考虑每个位置的分类不确定性。</p>
+<p>GP 给出的失效概率：</p>
+\[p_n(x) = P(G(x)\le0\mid\mathcal D_n) = \Phi\left( -\frac{m_n(x)}{s_n(x)} \right).\]<p>如果：</p>
+\[p_n(x)\approx0\]<p>或：</p>
+\[p_n(x)\approx1,\]<p>我们已经基本知道这个点属于安全还是失效域。</p>
+<p>最不确定的是：</p>
+\[p_n(x)\approx0.5.\]<p>一种自然的局部误分类概率：</p>
+\[\tau_n(x) = \min\{p_n(x),1-p_n(x)\}.\]<p>再在整个输入空间积分：</p>
+\[\boxed{ H_n = \int \tau_n(x)\,dP_X(x). }\]<p>它可以理解为：</p>
+\[\boxed{\text{当前还有多少概率质量处于“安全/失效判断不清”的状态。}}\]<p>这已经和单纯最小化 Kriging RMSE 很不一样了。</p>
+<hr>
+<h1 id="4-接下来问如果在--做一次实验未来的--会是多少">4. 接下来问：如果在 \(x\) 做一次实验，未来的 \(H\) 会是多少？
+</h1><p>问题是：</p>
+<p>我们还不知道：</p>
+\[G(x)\]<p>真正会返回什么。</p>
+<p>GP 给出它的预测分布：</p>
+\[Y_x\sim \mathcal N(m_n(x),s_n^2(x)).\]<p>因此可以计算：</p>
+\[\mathbb E_n[ H_{n+1} \mid X_{n+1}=x ].\]<p>SUR acquisition 就选择：</p>
+\[\boxed{ x_{n+1} = \arg\min_x \mathbb E_n[ H_{n+1} \mid X_{n+1}=x ]. }\]<p>等价地，也可以最大化：</p>
+\[\boxed{ H_n- \mathbb E_n[H_{n+1}\mid x]. }\]<p>也就是：</p>
+\[\boxed{\text{Expected Uncertainty Reduction}.}\]<p>这就是 Stepwise Uncertainty Reduction 这个名字真正的含义。经典工作把这种思想直接用于昂贵计算模型的 failure probability estimation。</p>
+<hr>
+<h1 id="5-一个二维例子能说明它和-u-learning-的差别">5. 一个二维例子能说明它和 U-learning 的差别
+</h1><p>假设存在两段尚未确定的失效边界：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl"> probability density
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">     HIGH
+</span></span><span class="line"><span class="cl">      █████
+</span></span><span class="line"><span class="cl">     █     █          ? boundary A
+</span></span><span class="line"><span class="cl">    █       █      × × × ×
+</span></span><span class="line"><span class="cl">───█─────────█────────────────
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">                            ? boundary B
+</span></span><span class="line"><span class="cl">                          × × ×
+</span></span><span class="line"><span class="cl">                         very low p(x)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>A 位于：</p>
+\[p_X(x)\]<p>很高的区域。</p>
+<p>B 位于输入分布尾部。</p>
+<p>假设两个位置都有：</p>
+\[U(x)=0.3.\]<p>单纯 U-learning 看起来：</p>
+\[\boxed{\text{差不多值得采样。}}\]<p>但如果目标是：</p>
+\[P_f,\]<p>A 附近边界位置的一点变化可能让：</p>
+\[P_f\]<p>明显变化。</p>
+<p>B 即使边界判断错一大片，概率质量可能只有：</p>
+\[10^{-8}.\]<p>SUR 会自然倾向：</p>
+\[\boxed{\text{A}.}\]<p>因为它优化的是：</p>
+\[\boxed{\text{目标量的不确定性}}\]<p>而不是：</p>
+\[\boxed{\text{几何边界本身的均匀精度}.}\]<hr>
+<h1 id="6-这揭示一个非常重要的代理模型原则">6. 这揭示一个非常重要的代理模型原则
+</h1><p>假设两个 Kriging：</p>
+\[\mathcal M_A,\quad\mathcal M_B.\]<p>A 的全局：</p>
+\[R^2=0.999.\]<p>但：</p>
+\[g(x)\approx0\]<p>附近有一点偏差。</p>
+<p>B 的全局：</p>
+\[R^2=0.96,\]<p>但把高概率区域的失效边界学得很好。</p>
+<p>如果最终任务是：</p>
+\[P_f,\]<p>那么：</p>
+\[\boxed{\mathcal M_B\text{ 完全可能更好。}}\]<p>因此可靠性代理模型真正需要优化的是：</p>
+\[\boxed{\text{decision-relevant uncertainty}}\]<p>而不一定是：</p>
+\[\boxed{\text{global prediction error}.}\]<p>这和最近几张卡片中反复出现的 <span class="term-anchor" data-term="mfmc" tabindex="0">MFMC</span>、reliability-oriented Shapley 其实属于同一个更大的原则：</p>
+\[\boxed{\text{模型评价指标必须与最终任务对齐。}}\]<hr>
+<h1 id="7-sur-和贝叶斯优化有什么关系">7. SUR 和贝叶斯优化有什么关系？
+</h1><p>关系非常近。</p>
+<p>贝叶斯优化通常目标：</p>
+\[x^\star=\arg\min_x f(x).\]<p>Expected Improvement 问：</p>
+\[\boxed{\text{这个点预计能把当前最优值改善多少？}}\]<p>SUR 则问：</p>
+\[\boxed{\text{这个点预计能把目标不确定性减少多少？}}\]<p>所以两者都属于：</p>
+\[\boxed{\text{Bayesian sequential design}.}\]<p>但 acquisition 的设计目标不同。</p>
+<p>Bayesian optimization：</p>
+\[\boxed{\text{找到极值}}\]<p>Reliability SUR：</p>
+\[\boxed{\text{估计 excursion set / failure probability}.}\]<p>Contour SUR：</p>
+\[\boxed{\text{识别 }g(x)=c\text{ 的边界}.}\]<p>这说明 acquisition function 并不是一个附属技巧。</p>
+<p>它实际上定义了：</p>
+\[\boxed{\text{“什么信息值得花下一次仿真预算购买”。}}\]<hr>
+<h1 id="8-sur-更深的一层它实际上是一步贝叶斯决策">8. SUR 更深的一层：它实际上是一步贝叶斯决策
+</h1><p>假设一次高保真 FEM 成本：</p>
+\[C_{\rm HF}.\]<p>你现在只有一次计算机会。</p>
+<p>每个候选点：</p>
+\[x\]<p>都是一个决策。</p>
+<p>计算完成后，会得到随机结果：</p>
+\[Y_x.\]<p>然后 posterior：</p>
+\[p(g\mid\mathcal D_n)\]<p>更新。</p>
+<p>所以理性的决策就是：</p>
+\[\boxed{ \text{选择能够使“未来预期损失”最小的实验。} }\]<p>这就是：</p>
+\[x^\star = \arg\min_x \mathbb E[ L(\text{posterior after observing }x) ].\]<p>SUR 只是把：</p>
+\[L\]<p>选择成：</p>
+\[\boxed{\text{剩余不确定性}.}\]<p>因此 SUR 其实是：</p>
+\[\boxed{\text{Bayesian experimental design}}\]<p>在昂贵计算模型上的具体实现。</p>
+<p>Bect 等人的论文明确从贝叶斯理论框架出发推导这类 failure-probability sequential strategies。</p>
+<hr>
+<h1 id="9-为什么叫-stepwise而不是-globally-optimal">9. 为什么叫 Stepwise，而不是 globally optimal？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>因为它通常只看：</p>
+\[\boxed{\text{下一步}.}\]<p>真正的最优实验规划应该考虑：</p>
+\[x_{n+1},x_{n+2},\ldots,x_{n+B}\]<p>整个未来序列：</p>
+\[\arg\min_{x_{n+1:n+B}} \mathbb E[ H_{n+B} ].\]<p>这实际上是一个：</p>
+\[\boxed{\text{动态规划 / POMDP 式问题}.}\]<p>计算成本迅速爆炸。</p>
+<p>SUR 使用：</p>
+\[\boxed{\text{one-step lookahead}}\]<p>即：</p>
+\[x_{n+1} = \arg\min_x \mathbb E[H_{n+1}|x].\]<p>所以它是一种：</p>
+\[\boxed{\text{myopic Bayesian optimal design}.}\]<p>这也是它的一个基本局限：下一步最优并不保证整个有限预算下全局最优。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="10-sur-为什么比-u-function-贵很多">10. SUR 为什么比 U-function 贵很多？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>因为 U-function：</p>
+\[U(x)=\frac{|m(x)|}{s(x)}\]<p>只需要当前 GP 的：</p>
+\[m(x),s(x).\]<p>SUR 对每个候选：</p>
+\[x\]<p>还要想象：</p>
+<blockquote>
+<p>“如果我在这里观测以后，整个 GP 会怎样？”</p>
+</blockquote>
+<p>然后对未知观测：</p>
+\[Y_x\]<p>再做期望。</p>
+<p>概念上接近：</p>
+\[\text{candidate }x\]\[\downarrow\]\[\text{possible observations }Y_x\]\[\downarrow\]\[\text{updated GP}\]\[\downarrow\]\[H_{n+1}\]\[\downarrow\]\[\mathbb E[H_{n+1}].\]<p>所以 naive SUR 可能非常贵。</p>
+<p>Chevalier、Bect、Ginsbourger、Vazquez、Picheny 与 Richet 后续专门研究了 <strong>Fast Kriging-Based Stepwise Uncertainty Reduction</strong>，推导可高效计算的公式用于 excursion-set identification；该工作后来发表于 <em>Technometrics</em>。</p>
+<p>这说明一个经常被忽略的现实：</p>
+\[\boxed{ \text{acquisition function 自己也必须具有好的计算复杂度。} }\]<p>否则你可能为了决定：</p>
+\[\text{下一次 30 分钟 FEM 算哪里}\]<p>先花：</p>
+\[\text{3 小时优化 acquisition}.\]
+  </div>
+</details>
+
+<hr>
+<h1 id="11-从估计失效概率继续走可以得到更丰富的目标">11. 从“估计失效概率”继续走，可以得到更丰富的目标
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>Excursion set：</p>
+\[\Gamma=\{x:g(x)\le0\}\]<p>本身也是一个随机集合，因为 GP posterior 下：</p>
+\[g\]<p>仍然未知。</p>
+<p>因此：</p>
+\[\Gamma\]<p>也存在 posterior distribution。</p>
+<p>Azzimonti、Bect、Chevalier 与 Ginsbourger 从 random-set 视角研究了如何量化 excursion-set uncertainty，包括集合重构、条件高斯场模拟以及安全工程中的 contour estimation。</p>
+<p>这带来一个很有价值的视角：</p>
+<p>传统 Kriging 给：</p>
+\[\boxed{\text{函数的不确定性}}\]<p>但工程师真正关心的可能是：</p>
+\[\boxed{\text{失效区域形状的不确定性}.}\]<p>进一步：</p>
+\[\boxed{\text{失效概率的不确定性}.}\]<p>甚至：</p>
+\[\boxed{\text{保守安全域的不确定性}.}\]<p>不同目标应该对应不同 acquisition。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="12-保守失效域是-sur-很自然的下一步">12. “保守失效域”是 SUR 很自然的下一步
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>很多安全问题不允许：</p>
+\[\text{false safe}.\]<p>假设真实危险域：</p>
+\[\Gamma.\]<p>我们可能希望构造一个 conservative estimate：</p>
+\[\Gamma_c\]<p>并控制：</p>
+\[P(\Gamma_c\subseteq\Gamma)\]<p>或相关覆盖概率。</p>
+<p>此时采样目标就不再是单纯让平均分类误差最小，而可能是：</p>
+\[\boxed{\text{在保证保守性的同时尽量减少 false negatives}.}\]<p>Azzimonti、Ginsbourger、Chevalier、Bect 与 Richet 后续正是沿这个方向提出了 conservative excursion-set estimation 的 adaptive SUR 策略，并在可靠性工程案例上测试。</p>
+<p>这非常接近真实工程决策：</p>
+\[\boxed{\text{不同错误的代价并不对称。}}\]<p>把危险点判断成安全：</p>
+\[\text{代价极高}.\]<p>把安全点暂时判断成危险：</p>
+\[\text{可能只是增加设计裕度}.\]<p>因此 acquisition function 最终甚至可以编码：</p>
+\[\boxed{\text{工程风险偏好}.}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="13-对你做-kriging-可靠性研究最值得迁移的一点">13. 对你做 Kriging 可靠性研究最值得迁移的一点
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设当前有两个失效模式：</p>
+\[g_1(x)=\text{运动精度裕量},\]\[g_2(x)=\text{卡滞裕量}.\]<p>系统失效：</p>
+\[g_1(x)<0 \quad\lor\quad g_2(x)<0.\]<p>一个简单主动学习器可能分别寻找：</p>
+\[U_1(x),U_2(x)\]<p>最小的位置。</p>
+<p>但真正目标是系统失效概率：</p>
+\[P_f = P[g_1<0\lor g_2<0].\]<p>于是更成熟的问题应该变成：</p>
+\[\boxed{ \text{在哪个 }x\text{ 做一次高保真仿真， 预计最能降低系统 }P_f\text{ 的不确定性？} }\]<p>这可能导致一个很反直觉的结果：</p>
+<p>某个点对：</p>
+\[g_1\]<p>预测精度帮助很大；</p>
+<p>但由于该区域：</p>
+\[g_2\]<p>已经必然失效，它对系统失效分类没有任何新信息。</p>
+<p>那么：</p>
+\[\boxed{\text{这个样本几乎没有系统可靠性价值。}}\]<p>SUR 的任务级思维正好能识别这种冗余。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="14-它还可以自然推广到仿真-fidelity-也作为决策变量">14. 它还可以自然推广到“仿真 fidelity 也作为决策变量”
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设同时拥有：</p>
+\[f_H(x),\quad f_M(x),\quad f_L(x)\]<p>三种保真度。</p>
+<p>下一次实验决策就不只有：</p>
+\[x.\]<p>而是：</p>
+\[(x,\ell)\]<p>其中：</p>
+\[\ell\in\{H,M,L\}.\]<p>如果成本分别：</p>
+\[C_H,C_M,C_L,\]<p>就可以考虑：</p>
+\[\boxed{ \frac{ \mathbb E[H_n-H_{n+1}\mid x,\ell] }{ C_\ell } }\]<p>即：</p>
+\[\boxed{\text{每单位计算成本能购买多少不确定性下降？}}\]<p>这样，SUR、MFMC、多保真 GP、active learning 就开始汇合到同一个更大的框架：</p>
+\[\boxed{\text{value of information per unit cost}.}\]<p>这比“哪个 surrogate 的 \(R^2\) 最高”已经高了一个方法论层级。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="15-一个很值得自己实现的最小实验">15. 一个很值得自己实现的最小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>取二维函数：</p>
+\[g(x_1,x_2) = (x_1-1)^2 + (x_2+0.5)^2 -1.\]<p>令：</p>
+\[X\sim N(0,I).\]<p>失效定义：</p>
+\[g(X)<0.\]<p>初始只采：</p>
+\[10\]<p>个 Latin Hypercube 点。</p>
+<p>建立 GP。</p>
+<p>然后比较两个 sequential learner：</p>
+<h3 id="方法-au-learning">方法 A：U-learning
+</h3>\[x^\star=\arg\min \frac{|m(x)|}{s(x)}.\]<h3 id="方法-b近似-sur">方法 B：近似 SUR
+</h3><p>在一个固定 Monte Carlo pool：</p>
+\[\{z_j\}_{j=1}^{10^5}\]<p>上计算：</p>
+\[H_n = \frac1N \sum_j \min[ p_n(z_j),1-p_n(z_j) ].\]<p>对于每个候选 \(x\)，利用 GP update 公式估计：</p>
+\[\mathbb E[H_{n+1}|x].\]<p>每轮各加入一个真实函数点。</p>
+<p>然后不要只画：</p>
+\[R^2.\]<p>重点画：</p>
+\[\boxed{|P_f^{est}-P_f^{true}|}\]<p>对：</p>
+\[\boxed{\text{number of expensive evaluations}.}\]<p>你会真正看到：</p>
+\[\boxed{\text{“最会拟合函数”与“最快解决可靠性问题”不是同一件事。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="16-它在整个知识体系中卡在哪里">16. 它在整个知识体系中卡在哪里？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>可以把主动代理模型分成四个层次：</p>
+\[\text{Space Filling}\]<p>问：</p>
+\[\boxed{\text{哪里还没采过？}}\]<p>↓</p>
+\[\text{Prediction-oriented Active Learning}\]<p>问：</p>
+\[\boxed{\text{哪里预测误差可能最大？}}\]<p>↓</p>
+\[\text{Boundary-oriented Learning}\]<p>问：</p>
+\[\boxed{\text{哪里最可能把安全/失效分错？}}\]<p>↓</p>
+\[\boxed{\text{Stepwise Uncertainty Reduction}}\]<p>问：</p>
+\[\boxed{ \text{哪次实验最能降低“最终任务”的 posterior uncertainty？ }\]<p>再向上其实还有：</p>
+\[\boxed{\text{multi-step Bayesian experimental design}}\]<p>问：</p>
+\[\boxed{ \text{有限预算下，整个实验序列怎样规划才最值？ }\]<p>SUR 正好位于：</p>
+\[\boxed{\text{启发式主动学习}}\]<p>与</p>
+\[\boxed{\text{完整贝叶斯决策论}}\]<p>之间。</p>
+<p>这就是它在知识体系里最重要的位置。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>SUR 最值得记住的不是某一个 acquisition 公式，而是一个问题转换：</p>
+\[\boxed{ \text{不要问“下一个样本点哪里最不确定？”} }\]<p>更应该问：</p>
+\[\boxed{ \text{“如果我把下一次昂贵实验花在这里， 做完以后，我真正关心的答案预计会确定多少？”} }\]<p>于是主动学习从：</p>
+\[\text{sample the model}\]<p>变成：</p>
+\[\boxed{\text{buy information about the decision}.}\]<p>这条思想可以从可靠性直接迁移到：</p>
+<ul>
+<li>极限状态识别；</li>
+<li>多失效模式；</li>
+<li>代理模型；</li>
+<li>多保真仿真；</li>
+<li>参数辨识；</li>
+<li>FEM 自适应实验；</li>
+<li>AI Agent 的工具调用。</li>
+</ul>
+<p>甚至对 AI Agent 也一样：如果一次昂贵工具调用的目标只是“获得更多信息”，最合理的选择未必是搜索当前最陌生的地方，而是：</p>
+\[\boxed{\text{选择最可能改变最终结论的那次调用。}}\]<p>这就是 SUR 最值得学的地方。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p>Julien Bect、David Ginsbourger、Li、Picheny &amp; Vazquez, <strong>Sequential Design of Computer Experiments for the Estimation of a Probability of Failure</strong>, <em>Statistics and Computing</em> 22, 773–793 (2012), DOI 10.1007/s11222-011-9241-4。这是今天最值得精读的论文：它直接从贝叶斯 formulation 推导 failure-probability SUR。<br>
+Springer 论文页</p>
+</li>
+<li>
+<p>Chevalier, Bect, Ginsbourger, Vazquez, Picheny &amp; Richet, <strong>Fast Kriging-Based Stepwise Uncertainty Reduction with Application to the Identification of an Excursion Set</strong>, <em>Technometrics</em> 56 (2014), 455–465。适合继续研究“理论上漂亮的 SUR 怎样做到计算上可用”；该论文被后续 excursion-set 工作列为核心快速 SUR 方法。</p>
+</li>
+<li>
+<p>Azzimonti, Bect, Chevalier &amp; Ginsbourger, <strong>Quantifying Uncertainties on Excursion Sets Under a Gaussian Random Field Prior</strong>, <em>SIAM/ASA Journal on Uncertainty Quantification</em> 4 (2016), 850–874, DOI 10.1137/141000749。适合把“函数 posterior”提升到“随机失效区域 posterior”的层面。<br>
+SIAM 论文页</p>
+</li>
+<li>
+<p>Azzimonti, Ginsbourger, Chevalier, Bect &amp; Richet, <strong>Adaptive Design of Experiments for Conservative Estimation of Excursion Sets</strong>, <em>Technometrics</em> 63(1), 2021。值得看的重点是：当 false-safe 与 false-alarm 的工程代价不对称时，SUR 如何从“准确识别边界”进一步变成“保守地识别安全/危险域”。<br>
+Technometrics 论文页</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+            <a href="/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/">可靠性</a>
+        
+            <a href="/tags/%E4%B8%8D%E7%A1%AE%E5%AE%9A%E6%80%A7%E9%87%8F%E5%8C%96/">不确定性量化</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-45<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/02-ak-mcs/">AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界<span class="dep-radar-meta"> · card-02</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-45<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/46-conformal-prediction-2/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Conformal Prediction：给任意代理模型加一层“有限样本覆盖保证”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/39-active-subspaces-2/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/44-shapley-effects/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Shapley Effects：当输入变量彼此相关时，“谁导致了输出不确定性”为什么突然变成一个博弈论问题？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/42-control-variates/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Control Variates：低保真模型真正“提供”的不是答案，而是可被抵消的随机波动</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/33-probabilistic-numerics/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

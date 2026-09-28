@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Mon, 21 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Mon, 28 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
         <link>https://assranai.github.io/cards/02-ak-mcs/</link>
         <pubDate>Sat, 15 Aug 2026 00:00:00 +0000</pubDate>
@@ -3362,6 +3362,1218 @@ SIAM 论文页&lt;/p&gt;
 &lt;p&gt;Kim, Wang &amp;amp; Junho Song, &lt;strong&gt;&lt;em&gt;Adaptive Active Subspace-Based Metamodeling for High-Dimensional Reliability Analysis&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Structural Safety&lt;/em&gt;, 2023。把 Active Subspace、heteroscedastic GP 和 active learning 联合起来，最直接对应高维可靠性代理问题。&lt;br&gt;
 &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2304.06252&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;公开预印本&lt;/a&gt;&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Projective Dynamics：为什么把非线性有限元“拆成局部投影 &#43; 固定全局线性系统”会快得惊人？</title>
+        <link>https://assranai.github.io/cards/40-projective-dynamics-2/</link>
+        <pubDate>Tue, 22 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/40-projective-dynamics-2/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;Projective Dynamics&lt;/span&gt;（PD，投影动力学）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 软体动力学 × &lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;/&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; × 非线性优化 × 可微物理&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 Projective Dynamics，因为它正好卡在一个很有价值的交叉点：&lt;/p&gt;
+\[\boxed{\text{FEM 的能量建模}} \quad+\quad \boxed{\text{PBD 的局部投影}} \quad+\quad \boxed{\text{预分解线性求解器}}\]&lt;p&gt;它解决的是软体模拟里一个很现实的问题：&lt;strong&gt;隐式 FEM 稳定，但每一步都解非线性系统很贵；PBD 很快，但约束投影与严格能量模型之间存在距离。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;PD 的做法相当聪明：专门选择一类可以写成“到某个约束流形的平方距离”的势能，把一次复杂的非线性优化拆成：&lt;/p&gt;
+\[\boxed{\text{Local：很多便宜的小投影}}\]&lt;p&gt;和&lt;/p&gt;
+\[\boxed{\text{Global：一个矩阵恒定的线性系统}}\]&lt;p&gt;反复交替。&lt;/p&gt;
+&lt;p&gt;2014 年 Bouaziz、Martin、Liu、Ladislav Kavan 与 Mark Pauly 的原始工作将它明确定位为 nodal FEM 与 PBD 之间的桥梁，并展示于 solids、cloth、shell 等问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看普通隐式软体为什么贵&#34;&gt;1. 先看普通隐式软体为什么贵
+&lt;/h2&gt;&lt;p&gt;考虑离散弹性系统&lt;/p&gt;
+\[M\ddot x=-\nabla E(x)+f_{\rm ext}.\]&lt;p&gt;隐式 Euler 可以改写成最小化问题：&lt;/p&gt;
+\[\boxed{ x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-y\|_M^2 + E(x) \right] }\]&lt;p&gt;其中&lt;/p&gt;
+\[y=x^n+h v^n+h^2M^{-1}f_{\rm ext}.\]&lt;p&gt;如果 \(E(x)\) 是一般 Neo-Hookean 超弹性能，通常需要 Newton：&lt;/p&gt;
+\[H(x_k)\Delta x=-g(x_k).\]&lt;p&gt;麻烦在于：&lt;/p&gt;
+\[\boxed{H(x_k)\text{ 随形变变化。}}\]&lt;p&gt;于是每个时间步、甚至每个 Newton iteration，都可能涉及：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;单元 Hessian；&lt;/li&gt;
+&lt;li&gt;sparse matrix assembly；&lt;/li&gt;
+&lt;li&gt;factorization / iterative linear solve；&lt;/li&gt;
+&lt;li&gt;line search。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;大模型中真正贵的经常不是算力本身，而是不断变化的全局线性系统。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-pd-的关键动作限制势能的形式&#34;&gt;2. PD 的关键动作：限制势能的形式
+&lt;/h1&gt;&lt;p&gt;PD 考虑一类势能：&lt;/p&gt;
+\[\boxed{ E_i(x) = \frac{w_i}{2} \min_{p_i\in\mathcal M_i} \|A_i x-p_i\|^2 }\]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(A_i x\)：从全局节点状态提取出的局部形变量；&lt;/li&gt;
+&lt;li&gt;\(\mathcal M_i\)：该局部量希望满足的“合法集合”；&lt;/li&gt;
+&lt;li&gt;\(p_i\)：这个集合上的最近点；&lt;/li&gt;
+&lt;li&gt;\(w_i\)：刚度权重。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[E(x)=\sum_iE_i(x).\]&lt;p&gt;这一步非常重要。&lt;/p&gt;
+&lt;p&gt;PD 没有试图让&lt;strong&gt;任意&lt;/strong&gt;复杂能量都变简单，而是选择了一类特别适合优化的能量。原论文将这些称为 specially designed energy potentials，并进一步从连续介质力学构造了适合固体、薄壳等模型的势能。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-local-step先假设--不动&#34;&gt;3. Local step：先假设 \(x\) 不动
+&lt;/h1&gt;&lt;p&gt;固定当前节点位置：&lt;/p&gt;
+\[x=x_k.\]&lt;p&gt;每个约束独立求：&lt;/p&gt;
+\[\boxed{ p_i = \arg\min_{p\in\mathcal M_i} \|A_ix_k-p\|^2. }\]&lt;p&gt;这通常就是一个&lt;strong&gt;几何投影&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;例如弹簧：&lt;/p&gt;
+\[d=x_i-x_j\]&lt;p&gt;希望长度：&lt;/p&gt;
+\[\|d\|=L.\]&lt;p&gt;那么局部投影就是：&lt;/p&gt;
+\[\boxed{ p=L\frac{d}{\|d\|}. }\]&lt;p&gt;这和 PBD 极其相似：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;当前约束状态不合法，就求最近的合法状态。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;更重要的是，各个 \(p_i\) 在给定 \(x\) 后通常相互独立，因此 local step 天然适合并行。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-global-step再固定所有&#34;&gt;4. Global step：再固定所有 \(p_i\)
+&lt;/h1&gt;&lt;p&gt;现在：&lt;/p&gt;
+\[p_i\]&lt;p&gt;已知。&lt;/p&gt;
+&lt;p&gt;求：&lt;/p&gt;
+\[\min_x \frac{1}{2h^2} \|x-y\|_M^2 + \sum_i \frac{w_i}{2} \|A_ix-p_i\|^2.\]&lt;p&gt;这是纯二次问题。&lt;/p&gt;
+&lt;p&gt;求导：&lt;/p&gt;
+\[\frac1{h^2}M(x-y) + \sum_iw_iA_i^T(A_ix-p_i)=0.\]&lt;p&gt;整理：&lt;/p&gt;
+\[\boxed{ \left( \frac{M}{h^2} + \sum_iw_iA_i^TA_i \right)x = \frac{M}{h^2}y + \sum_iw_iA_i^Tp_i. }\]&lt;p&gt;记：&lt;/p&gt;
+\[\boxed{ K= \frac{M}{h^2} + \sum_iw_iA_i^TA_i. }\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{Kx=b(p).}\]&lt;p&gt;现在出现了 PD 最重要的工程性质：&lt;/p&gt;
+\[\boxed{K\text{ 与当前形变 }x\text{ 无关。}}\]&lt;p&gt;只要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;拓扑不变；&lt;/li&gt;
+&lt;li&gt;\(h\) 不变；&lt;/li&gt;
+&lt;li&gt;权重不变；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;就可以在初始化阶段：&lt;/p&gt;
+\[\boxed{K=LL^T}\]&lt;p&gt;做一次 Cholesky factorization。&lt;/p&gt;
+&lt;p&gt;之后每一次 global solve 只是：&lt;/p&gt;
+\[Lz=b, \qquad L^Tx=z.\]&lt;p&gt;这就是 PD 快的核心来源。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-所以整个求解器只有这个循环&#34;&gt;5. 所以整个求解器只有这个循环
+&lt;/h1&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;prefactorize K
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;for each timestep:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    predict y
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x = y
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    repeat several iterations:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        # local
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        for each element/constraint in parallel:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            p_i = project(A_i x)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        # global
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        b = M y / h² + Σ w_i A_iᵀ p_i
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        solve K x = b using prefactorized K
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;可以把它压缩成：&lt;/p&gt;
+\[\boxed{ x \rightarrow p \rightarrow x \rightarrow p \rightarrow\cdots }\]&lt;p&gt;这是 alternating minimization / local-global optimization。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-它和-pbd-到底差在哪里&#34;&gt;6. 它和 PBD 到底差在哪里？
+&lt;/h1&gt;&lt;p&gt;表面上二者都做 projection。&lt;/p&gt;
+&lt;p&gt;PBD 更接近：&lt;/p&gt;
+\[C_i(x)=0\]&lt;p&gt;然后逐约束修改：&lt;/p&gt;
+\[x\leftarrow x+\Delta x_i.\]&lt;p&gt;多个约束往往通过 Gauss-Seidel/Jacobi 反复传播。&lt;/p&gt;
+&lt;p&gt;PD 的 local projection 只产生：&lt;/p&gt;
+\[p_i.\]&lt;p&gt;它&lt;strong&gt;不直接修改全局节点&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;所有局部要求最终统一送进：&lt;/p&gt;
+\[\boxed{Kx=b}\]&lt;p&gt;一次全局协调。&lt;/p&gt;
+&lt;p&gt;因此可以把两者直观地区分成：&lt;/p&gt;
+\[\text{PBD:} \quad \boxed{\text{约束逐个拉节点}}\]&lt;p&gt;而&lt;/p&gt;
+\[\text{PD:} \quad \boxed{\text{约束先提出自己的理想状态，再由全局系统统一折中。}}\]&lt;p&gt;这也是为什么原论文称它为 FEM 与 PBD 之间的桥梁。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-一个特别重要的理解global-step-本质上在传播信息&#34;&gt;7. 一个特别重要的理解：Global step 本质上在传播信息
+&lt;/h1&gt;&lt;p&gt;考虑长条软体：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[contact] ---- tet ---- tet ---- tet ---- tet
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;某个局部单元发生很大形变。&lt;/p&gt;
+&lt;p&gt;如果完全使用局部约束迭代，影响需要：&lt;/p&gt;
+\[\text{constraint} \rightarrow \text{neighbor} \rightarrow \text{neighbor} \rightarrow\cdots\]&lt;p&gt;慢慢传播。&lt;/p&gt;
+&lt;p&gt;PD 的 global solve：&lt;/p&gt;
+\[Kx=b\]&lt;p&gt;一次就让整个连通系统响应。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{local step 解决材料非线性； global step 解决长程耦合。} }\]&lt;p&gt;这个分工是 PD 很深的一点。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-它和普通-newton-fem-的区别可以看得更清楚&#34;&gt;8. 它和普通 Newton FEM 的区别可以看得更清楚
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Newton：&lt;/p&gt;
+\[H(x_k)\Delta x=-g(x_k).\]&lt;p&gt;每一步都构造当前局部曲率：&lt;/p&gt;
+\[H(x_k).\]&lt;p&gt;因此单次 iteration 很贵，但通常具有更强的局部收敛能力。&lt;/p&gt;
+&lt;p&gt;PD：&lt;/p&gt;
+\[Kx=b(p_k).\]&lt;p&gt;把复杂非线性主要藏在：&lt;/p&gt;
+\[p_k=\Pi_{\mathcal M}(A x_k)\]&lt;p&gt;里，而全局矩阵：&lt;/p&gt;
+\[K\]&lt;p&gt;固定。&lt;/p&gt;
+&lt;p&gt;于是它做了一个很明确的交易：&lt;/p&gt;
+\[\boxed{ \text{牺牲 Newton 的精确局部 Hessian} }\]&lt;p&gt;换取：&lt;/p&gt;
+\[\boxed{ \text{一个可以永久复用的全局线性算子。} }\]&lt;p&gt;对于需要每秒重复几十到几百个时间步的动画/游戏物理，这个交易非常有价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么这与-anderson-acceleration-那张卡片能连起来&#34;&gt;9. 为什么这与 Anderson Acceleration 那张卡片能连起来？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;PD 的 local-global iteration 本身就是：&lt;/p&gt;
+\[\boxed{x_{k+1}=G(x_k).}\]&lt;p&gt;因此它仍可能出现：&lt;/p&gt;
+\[\text{稳定，但迭代很多次才收敛。}\]&lt;p&gt;尤其在：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;高刚度；&lt;/li&gt;
+&lt;li&gt;材料强异质；&lt;/li&gt;
+&lt;li&gt;强非线性；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;情况下。&lt;/p&gt;
+&lt;p&gt;所以 PD 后续研究中出现各种：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Chebyshev acceleration；&lt;/li&gt;
+&lt;li&gt;quasi-Newton；&lt;/li&gt;
+&lt;li&gt;Anderson acceleration；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;并不偶然。&lt;/p&gt;
+&lt;p&gt;甚至 2026 年的新工作 DiffPhD 仍在研究强异质材料下 PD fixed-point iteration 的稳定性，并使用 Type-II Anderson acceleration 等技术增强收敛。&lt;/p&gt;
+&lt;p&gt;这说明前面两张知识卡其实可以接成：&lt;/p&gt;
+\[\boxed{ \text{PD 提供便宜的 fixed-point map} \rightarrow \text{AA 加速这个 map}. }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-pd-最大的限制也正来自它最大的优点&#34;&gt;10. PD 最大的限制也正来自它最大的优点
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;固定：&lt;/p&gt;
+\[K\]&lt;p&gt;之所以可能，是因为势能被限制成：&lt;/p&gt;
+\[\frac{w_i}{2} \|A_ix-p_i\|^2.\]&lt;p&gt;因此对于一般超弹性：&lt;/p&gt;
+\[W(F)\]&lt;p&gt;尤其复杂：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Neo-Hookean；&lt;/li&gt;
+&lt;li&gt;Mooney-Rivlin；&lt;/li&gt;
+&lt;li&gt;anisotropic material；&lt;/li&gt;
+&lt;li&gt;plasticity；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;你不能无条件期待它们都天然具有漂亮的 projective form。&lt;/p&gt;
+&lt;p&gt;这意味着：&lt;/p&gt;
+\[\boxed{ \text{PD 的速度来自对能量结构的利用， 不是一种免费的通用非线性 FEM 加速器。} }\]&lt;p&gt;因此如果追求严格 constitutive accuracy，一般 Newton FEM 仍有重要优势。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这其实是一种非常普遍的算法设计哲学&#34;&gt;11. 这其实是一种非常普遍的算法设计哲学
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设原问题：&lt;/p&gt;
+\[\min_x E(x)\]&lt;p&gt;很难。&lt;/p&gt;
+&lt;p&gt;PD 引入辅助变量：&lt;/p&gt;
+\[p.\]&lt;p&gt;把它变成：&lt;/p&gt;
+\[\min_{x,p} E(x,p).\]&lt;p&gt;然后：&lt;/p&gt;
+&lt;p&gt;固定 \(x\)：&lt;/p&gt;
+\[p\leftarrow\arg\min_pE(x,p)\]&lt;p&gt;很容易。&lt;/p&gt;
+&lt;p&gt;固定 \(p\)：&lt;/p&gt;
+\[x\leftarrow\arg\min_xE(x,p)\]&lt;p&gt;也很容易。&lt;/p&gt;
+&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{\text{variable splitting}.}\]&lt;p&gt;同一思想大量存在于：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ADMM；&lt;/li&gt;
+&lt;li&gt;alternating minimization；&lt;/li&gt;
+&lt;li&gt;proximal methods；&lt;/li&gt;
+&lt;li&gt;EM；&lt;/li&gt;
+&lt;li&gt;block coordinate descent。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以 PD 真正值得学的不只是一个软体算法。&lt;/p&gt;
+&lt;p&gt;它展示了一种很强的计算思想：&lt;/p&gt;
+\[\boxed{ \text{如果整体非线性太难， 引入辅助变量，让困难的结构局部化， 再让剩余的全局问题变成可重复求解的简单结构。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-更进一步为什么固定矩阵如此值钱&#34;&gt;12. 更进一步：为什么“固定矩阵”如此值钱？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;设一个软体有：&lt;/p&gt;
+\[n=10^5\]&lt;p&gt;自由度。&lt;/p&gt;
+&lt;p&gt;如果每个 Newton iteration 都需要：&lt;/p&gt;
+\[H_k\]&lt;p&gt;重新 factorize，成本很高。&lt;/p&gt;
+&lt;p&gt;而 PD：&lt;/p&gt;
+\[K=LL^T\]&lt;p&gt;一次预分解后，之后几千帧都可能复用。&lt;/p&gt;
+&lt;p&gt;于是昂贵工作从：&lt;/p&gt;
+\[\boxed{\text{per iteration}}\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{\text{one-time preprocessing}.}\]&lt;p&gt;这实际上是在利用游戏/动画模拟的一个重要性质：&lt;/p&gt;
+\[\boxed{\text{拓扑通常长期不变。}}\]&lt;p&gt;所以 PD 并非只利用数学结构，还利用了&lt;strong&gt;应用工作负载结构&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;这条原则对工程开发很重要：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;优化算法时，不只看一次 solve 的复杂度，还要看哪些昂贵结构能够跨时间步缓存。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这也解释了为什么-pd-很适合可微物理&#34;&gt;13. 这也解释了为什么 PD 很适合可微物理
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设要优化材料参数：&lt;/p&gt;
+\[\theta\]&lt;p&gt;使：&lt;/p&gt;
+\[L(x(\theta))\]&lt;p&gt;最小。&lt;/p&gt;
+&lt;p&gt;需要：&lt;/p&gt;
+\[\frac{dL}{d\theta}.\]&lt;p&gt;一般隐式 FEM 的 backward pass 又需要解线性化动力学。&lt;/p&gt;
+&lt;p&gt;DiffPD 的关键观察是：&lt;/p&gt;
+\[\boxed{\text{forward PD 已经拥有一个预分解的全局矩阵。}}\]&lt;p&gt;可以继续利用这种结构加速 backward solve。&lt;/p&gt;
+&lt;p&gt;Tao Du 等人的 DiffPD 因此把 PD 扩展成 differentiable soft-body simulator，并在其论文实验中报告，相比标准 Newton 方法，在 system identification、inverse design、trajectory optimization 和 control 等任务中达到约 &lt;strong&gt;4–19×&lt;/strong&gt; 加速。&lt;/p&gt;
+&lt;p&gt;这是一条很漂亮的路线：&lt;/p&gt;
+\[\boxed{ \text{forward solver 的结构设计} \rightarrow \text{决定 backward 是否也便宜。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-对-ai--physics-来说这一点越来越重要&#34;&gt;14. 对 AI + Physics 来说，这一点越来越重要
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;过去我们设计 simulator，通常只问：&lt;/p&gt;
+\[\boxed{\text{forward 快不快？}}\]&lt;p&gt;进入 differentiable simulation 后，需要同时问：&lt;/p&gt;
+\[\boxed{ \text{forward 快不快？} }\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{ \text{Jacobian-vector / adjoint solve 快不快？} }\]&lt;p&gt;一个 forward 极快、但 backward 结构极差的求解器，并不一定适合：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;system identification；&lt;/li&gt;
+&lt;li&gt;reinforcement learning；&lt;/li&gt;
+&lt;li&gt;inverse design；&lt;/li&gt;
+&lt;li&gt;Real2Sim；&lt;/li&gt;
+&lt;li&gt;parameter fitting。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;DiffPD 展示了一个很值得迁移的工程原则：&lt;/p&gt;
+\[\boxed{ \text{如果未来需要 differentiability， solver architecture 最好从一开始就考虑可复用的线性结构。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-接触会破坏这个漂亮结构吗&#34;&gt;15. 接触会破坏这个漂亮结构吗？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这正是实际 PD 的难点之一。&lt;/p&gt;
+&lt;p&gt;普通 PD 的优势来自：&lt;/p&gt;
+\[K=\text{constant}.\]&lt;p&gt;但接触集合：&lt;/p&gt;
+\[\mathcal C(x)\]&lt;p&gt;不断变化。&lt;/p&gt;
+&lt;p&gt;如果每出现一个 contact 都修改：&lt;/p&gt;
+\[K,\]&lt;p&gt;就会失去预分解优势。&lt;/p&gt;
+&lt;p&gt;因此 PD 接触算法往往想办法让 contact：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;进入 RHS；&lt;/li&gt;
+&lt;li&gt;进入独立 local solve；&lt;/li&gt;
+&lt;li&gt;或仅影响很小的自由度子集；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;尽量避免重构整个 global matrix。&lt;/p&gt;
+&lt;p&gt;例如 DiffCloth 在 PD 框架中加入 Signorini–Coulomb dry friction contact，并把 contact 处理设计成额外 local step，从而继续利用 PD 的 global-local 结构。&lt;/p&gt;
+&lt;p&gt;这也是一个非常一般的求解器设计目标：&lt;/p&gt;
+\[\boxed{ \text{动态变化的物理，尽量不要破坏静态可缓存的线性骨架。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-对你自研-xpbd-求解器最有价值的迁移点&#34;&gt;16. 对你自研 XPBD 求解器最有价值的迁移点
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;我认为重点不在于“把 XPBD 全部换成 PD”。&lt;/p&gt;
+&lt;p&gt;更值得实验的是：&lt;/p&gt;
+\[\boxed{\text{local-global hybrid architecture}.}\]&lt;p&gt;当前 XPBD 中，每个 constraint：&lt;/p&gt;
+\[C_i(x)\]&lt;p&gt;独立计算：&lt;/p&gt;
+\[\Delta\lambda_i,\quad\Delta x_i.\]&lt;p&gt;如果发现某些低频全局误差需要很多 sweep 才能传播，可以考虑：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;local constraint kernels 保留；&lt;/li&gt;
+&lt;li&gt;把部分 elastic constraints 解释为 local target \(p_i\)；&lt;/li&gt;
+&lt;li&gt;构造固定 global operator；&lt;/li&gt;
+&lt;li&gt;每若干 local iterations 做一次 global correction。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这相当于问：&lt;/p&gt;
+\[\boxed{ \text{哪些物理必须逐约束解决， 哪些耦合其实适合交给一个全局线性传播器？} }\]&lt;p&gt;这比单纯增加：&lt;/p&gt;
+\[\text{solver iterations}\]&lt;p&gt;更值得研究。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-一个很适合自己实现的小实验&#34;&gt;17. 一个很适合自己实现的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;不需要四面体 FEM。&lt;/p&gt;
+&lt;p&gt;先做：&lt;/p&gt;
+\[20\times20\]&lt;p&gt;二维 mass-spring cloth。&lt;/p&gt;
+&lt;p&gt;弹簧势能：&lt;/p&gt;
+\[E_{ij} = \frac{k}{2} (\|x_i-x_j\|-L_{ij})^2.\]&lt;p&gt;PD local step：&lt;/p&gt;
+\[p_{ij} = L_{ij} \frac{x_i-x_j}{\|x_i-x_j\|}.\]&lt;p&gt;预构造：&lt;/p&gt;
+\[K= \frac{M}{h^2} + \sum_{ij}kA_{ij}^TA_{ij}.\]&lt;p&gt;Cholesky：&lt;/p&gt;
+\[K=LL^T.\]&lt;p&gt;然后比较：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PBD / XPBD Gauss-Seidel；&lt;/li&gt;
+&lt;li&gt;PD local-global；&lt;/li&gt;
+&lt;li&gt;PD + Anderson。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;记录：&lt;/p&gt;
+\[\text{constraint/energy residual}\]&lt;p&gt;随：&lt;/p&gt;
+\[\text{iteration}\]&lt;p&gt;和：&lt;/p&gt;
+\[\text{wall-clock time}\]&lt;p&gt;的变化。&lt;/p&gt;
+&lt;p&gt;尤其观察长程扰动：&lt;/p&gt;
+&lt;p&gt;只拖动 cloth 一个角。&lt;/p&gt;
+&lt;p&gt;你很可能会清楚看到：&lt;/p&gt;
+\[\boxed{ \text{局部方法与 global solve 在误差传播速度上的结构差异。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;18-为什么今天值得专门学-pd&#34;&gt;18. 为什么今天值得专门学 PD？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为它能纠正一种常见的算法直觉：&lt;/p&gt;
+&lt;p&gt;面对非线性有限元，人们容易把选择理解成：&lt;/p&gt;
+\[\boxed{ \text{便宜但不够物理的 PBD} }\]&lt;p&gt;或者：&lt;/p&gt;
+\[\boxed{ \text{物理准确但昂贵的 Newton FEM}. }\]&lt;p&gt;PD 展示了第三条路：&lt;/p&gt;
+\[\boxed{ \text{重新设计能量表达，使物理模型主动适应高效数值算法。} }\]&lt;p&gt;这其实是计算物理中非常高级的一种思维。&lt;/p&gt;
+&lt;p&gt;模型形式和 solver 并非完全独立。&lt;/p&gt;
+&lt;p&gt;有时：&lt;/p&gt;
+\[\boxed{\text{选择一种“可解性更好”的物理离散}}\]&lt;p&gt;比：&lt;/p&gt;
+\[\boxed{\text{对一个任意离散疯狂优化 solver}}\]&lt;p&gt;收益更大。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Projective Dynamics 最值得记住的不是 local/global 两个步骤，而是：&lt;/p&gt;
+\[\boxed{ \text{把随状态变化的非线性尽可能压进廉价的局部操作， 让昂贵的全局耦合保持固定、线性、可缓存。} }\]&lt;p&gt;它在知识体系中的位置很漂亮：&lt;/p&gt;
+\[\text{Continuum / FEM energy}\]\[\downarrow\]\[\boxed{\text{projective potentials}}\]\[\begin{array}{ccc} \swarrow&amp;&amp;\searrow\\ \text{local projection}&amp;&amp;\text{global linear coupling} \end{array}\]\[\downarrow\]\[\boxed{\text{Projective Dynamics}}\]&lt;p&gt;再向外延伸：&lt;/p&gt;
+\[\text{PD} \rightarrow \text{Anderson / quasi-Newton acceleration}\]\[\text{PD} \rightarrow \text{contact mechanics}\]\[\text{PD} \rightarrow \boxed{\text{DiffPD / differentiable physics}}.\]&lt;p&gt;所以 PD 真正值得学的地方已经超出软体模拟本身：&lt;/p&gt;
+\[\boxed{ \text{一个高性能 solver 的关键， 经常不是“把每一步算得更快”， 而是重新组织问题，使最昂贵的结构能够跨迭代、跨时间步反复复用。} }\]&lt;p&gt;这条原则对 FEM、物理引擎、ROM，甚至 AI 推理系统里的缓存和固定算子设计都有很强的迁移价值。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Bouaziz, Martin, Liu, Kavan &amp;amp; Pauly, &lt;strong&gt;&lt;em&gt;Projective Dynamics: Fusing Constraint Projections for Fast Simulation&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG / SIGGRAPH 2014&lt;/em&gt;。原始论文，也是最推荐的入口。&lt;br&gt;
+Projective Dynamics 官方项目页与论文/视频&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Tao Du et al., &lt;strong&gt;&lt;em&gt;DiffPD: Differentiable Projective Dynamics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2022。重点看如何复用 PD 的 prefactorization 加速 backward/&lt;span class=&#34;term-anchor&#34; data-term=&#34;adjoint&#34; tabindex=&#34;0&#34;&gt;adjoint&lt;/span&gt;，以及 system identification、inverse design 和 control。&lt;br&gt;
+DiffPD 官方项目、论文与代码&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Ly et al. 路线上的 &lt;strong&gt;PD + dry frictional contact&lt;/strong&gt; 可从 Li et al., &lt;strong&gt;&lt;em&gt;DiffCloth: Differentiable Cloth Simulation with Dry Frictional Contact&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2022 入手。论文完整解释了 velocity-based PD global solve 与 Signorini–Coulomb contact local step 如何结合。&lt;br&gt;
+ACM DiffCloth 论文&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果想看这条路线截至 &lt;strong&gt;2026 年&lt;/strong&gt;仍在解决什么，可以关注 &lt;strong&gt;DiffPhD: A Unified Differentiable Solver for Projective Heterogeneous Materials in Elastodynamics with Contact-Rich GPU-Acceleration&lt;/strong&gt;。它把强材料异质性、超弹性、GPU contact、Anderson acceleration 与可微 PD 放到同一框架里，是理解 PD 当前工程边界很有价值的新工作。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Stepwise Uncertainty Reduction：主动学习真正该优化的，未必是“下一个点最准”，而是“做完这次实验后，最终答案还剩多少不确定性”</title>
+        <link>https://assranai.github.io/cards/45-stepwise-uncertainty-reduction/</link>
+        <pubDate>Sun, 27 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/45-stepwise-uncertainty-reduction/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Stepwise Uncertainty Reduction（SUR，逐步不确定性缩减）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：代理模型 × 主动学习 × 可靠性分析 × 贝叶斯实验设计&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 SUR，是因为它处在 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; 主动学习知识体系中一个很关键的位置，而且能解释很多 acquisition function 为什么看起来彼此不同。&lt;/p&gt;
+&lt;p&gt;设昂贵极限状态函数&lt;/p&gt;
+\[g(x),\]&lt;p&gt;失效域为&lt;/p&gt;
+\[\Gamma=\{x:g(x)\le0\},\]&lt;p&gt;最终真正想得到：&lt;/p&gt;
+\[P_f=P_X(\Gamma) = \int \mathbf 1[g(x)\le0]p_X(x)\,dx.\]&lt;p&gt;普通 Kriging 主动学习经常问：&lt;/p&gt;
+\[\boxed{\text{“当前哪里最不确定？”}}\]&lt;p&gt;SUR 问的是更接近最终科研目标的问题：&lt;/p&gt;
+\[\boxed{ \text{“如果下一次昂贵仿真放在 }x\text{， 得到结果并更新 GP 后， 关于 }P_f\text{ 的不确定性预计会减少多少？”} }\]&lt;p&gt;Bect、Ginsbourger、Li、Picheny 与 Vazquez 的经典工作正是从贝叶斯决策论角度推导用于失效概率估计的 SUR 策略，而非先拍脑袋定义一个“边界附近采样分数”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看普通主动-kriging-在做什么&#34;&gt;1. 先看普通主动 Kriging 在做什么
+&lt;/h2&gt;&lt;p&gt;已有数据：&lt;/p&gt;
+\[\mathcal D_n=\{(x_i,g(x_i))\}_{i=1}^n.\]&lt;p&gt;GP 给出：&lt;/p&gt;
+\[G(x)\mid\mathcal D_n \sim \mathcal N(m_n(x),s_n^2(x)).\]&lt;p&gt;对于失效阈值 \(0\)，一个常见指标是：&lt;/p&gt;
+\[U(x)=\frac{|m_n(x)|}{s_n(x)}.\]&lt;p&gt;小 \(U\) 表示：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;均值靠近失效边界；&lt;/li&gt;
+&lt;li&gt;或预测方差较大。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;于是 &lt;span class=&#34;term-anchor&#34; data-term=&#34;ak-mcs&#34; tabindex=&#34;0&#34;&gt;AK-MCS&lt;/span&gt; 一类方法倾向寻找：&lt;/p&gt;
+\[x_{n+1}=\arg\min_x U(x).\]&lt;p&gt;这个逻辑非常合理。&lt;/p&gt;
+&lt;p&gt;但它存在一个隐含问题：&lt;/p&gt;
+\[\boxed{\text{它主要评价候选点“自己”有多值得采。}}\]&lt;p&gt;它没有完整考虑：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;在 \(x\) 做一次观测以后，由于 GP 的空间相关结构，&lt;strong&gt;整个输入空间&lt;/strong&gt;的不确定性会怎样变化？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;SUR 恰好从这里向前走一步。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-gp-的一次观测并不只减少一个点的不确定性&#34;&gt;2. GP 的一次观测并不只减少一个点的不确定性
+&lt;/h1&gt;&lt;p&gt;假设下一点选择：&lt;/p&gt;
+\[x_{n+1}=x.\]&lt;p&gt;观测：&lt;/p&gt;
+\[Y=G(x).\]&lt;p&gt;GP 更新以后，任意位置 \(z\) 的方差都会发生变化：&lt;/p&gt;
+\[s_{n+1}^2(z) = s_n^2(z) - \frac{k_n(z,x)^2} {s_n^2(x)}\]&lt;p&gt;（这里先忽略 observation noise）。&lt;/p&gt;
+&lt;p&gt;所以在：&lt;/p&gt;
+\[x\]&lt;p&gt;采一次样，本质上会影响一整个相关区域。&lt;/p&gt;
+&lt;p&gt;如果 \(x\) 与失效边界上大片区域高度相关，这一次计算可能非常值钱。&lt;/p&gt;
+&lt;p&gt;如果 \(x\) 虽然自身：&lt;/p&gt;
+\[U(x)\]&lt;p&gt;很低，但只解决一个概率质量极小、空间相关范围又很短的角落，那么它对：&lt;/p&gt;
+\[P_f\]&lt;p&gt;可能几乎没帮助。&lt;/p&gt;
+&lt;p&gt;因此 SUR 的第一层思想就是：&lt;/p&gt;
+\[\boxed{ \text{样本价值应该评价它对整个 posterior 的影响， 而不只评价候选点自身。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;3-sur-先定义我到底还不知道多少&#34;&gt;3. SUR 先定义“我到底还不知道多少”
+&lt;/h1&gt;&lt;p&gt;这是整个方法最漂亮的一步。&lt;/p&gt;
+&lt;p&gt;定义一个 uncertainty functional：&lt;/p&gt;
+\[H_n = H(\mathcal D_n).\]&lt;p&gt;它表示当前 GP 下，对最终目标剩余的不确定性。&lt;/p&gt;
+&lt;p&gt;例如，对于 excursion set：&lt;/p&gt;
+\[\Gamma=\{x:g(x)\le0\},\]&lt;p&gt;可以考虑每个位置的分类不确定性。&lt;/p&gt;
+&lt;p&gt;GP 给出的失效概率：&lt;/p&gt;
+\[p_n(x) = P(G(x)\le0\mid\mathcal D_n) = \Phi\left( -\frac{m_n(x)}{s_n(x)} \right).\]&lt;p&gt;如果：&lt;/p&gt;
+\[p_n(x)\approx0\]&lt;p&gt;或：&lt;/p&gt;
+\[p_n(x)\approx1,\]&lt;p&gt;我们已经基本知道这个点属于安全还是失效域。&lt;/p&gt;
+&lt;p&gt;最不确定的是：&lt;/p&gt;
+\[p_n(x)\approx0.5.\]&lt;p&gt;一种自然的局部误分类概率：&lt;/p&gt;
+\[\tau_n(x) = \min\{p_n(x),1-p_n(x)\}.\]&lt;p&gt;再在整个输入空间积分：&lt;/p&gt;
+\[\boxed{ H_n = \int \tau_n(x)\,dP_X(x). }\]&lt;p&gt;它可以理解为：&lt;/p&gt;
+\[\boxed{\text{当前还有多少概率质量处于“安全/失效判断不清”的状态。}}\]&lt;p&gt;这已经和单纯最小化 Kriging RMSE 很不一样了。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-接下来问如果在--做一次实验未来的--会是多少&#34;&gt;4. 接下来问：如果在 \(x\) 做一次实验，未来的 \(H\) 会是多少？
+&lt;/h1&gt;&lt;p&gt;问题是：&lt;/p&gt;
+&lt;p&gt;我们还不知道：&lt;/p&gt;
+\[G(x)\]&lt;p&gt;真正会返回什么。&lt;/p&gt;
+&lt;p&gt;GP 给出它的预测分布：&lt;/p&gt;
+\[Y_x\sim \mathcal N(m_n(x),s_n^2(x)).\]&lt;p&gt;因此可以计算：&lt;/p&gt;
+\[\mathbb E_n[ H_{n+1} \mid X_{n+1}=x ].\]&lt;p&gt;SUR acquisition 就选择：&lt;/p&gt;
+\[\boxed{ x_{n+1} = \arg\min_x \mathbb E_n[ H_{n+1} \mid X_{n+1}=x ]. }\]&lt;p&gt;等价地，也可以最大化：&lt;/p&gt;
+\[\boxed{ H_n- \mathbb E_n[H_{n+1}\mid x]. }\]&lt;p&gt;也就是：&lt;/p&gt;
+\[\boxed{\text{Expected Uncertainty Reduction}.}\]&lt;p&gt;这就是 Stepwise Uncertainty Reduction 这个名字真正的含义。经典工作把这种思想直接用于昂贵计算模型的 failure probability estimation。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-一个二维例子能说明它和-u-learning-的差别&#34;&gt;5. 一个二维例子能说明它和 U-learning 的差别
+&lt;/h1&gt;&lt;p&gt;假设存在两段尚未确定的失效边界：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; probability density
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;     HIGH
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      █████
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;     █     █          ? boundary A
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    █       █      × × × ×
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;───█─────────█────────────────
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                            ? boundary B
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                          × × ×
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                         very low p(x)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;A 位于：&lt;/p&gt;
+\[p_X(x)\]&lt;p&gt;很高的区域。&lt;/p&gt;
+&lt;p&gt;B 位于输入分布尾部。&lt;/p&gt;
+&lt;p&gt;假设两个位置都有：&lt;/p&gt;
+\[U(x)=0.3.\]&lt;p&gt;单纯 U-learning 看起来：&lt;/p&gt;
+\[\boxed{\text{差不多值得采样。}}\]&lt;p&gt;但如果目标是：&lt;/p&gt;
+\[P_f,\]&lt;p&gt;A 附近边界位置的一点变化可能让：&lt;/p&gt;
+\[P_f\]&lt;p&gt;明显变化。&lt;/p&gt;
+&lt;p&gt;B 即使边界判断错一大片，概率质量可能只有：&lt;/p&gt;
+\[10^{-8}.\]&lt;p&gt;SUR 会自然倾向：&lt;/p&gt;
+\[\boxed{\text{A}.}\]&lt;p&gt;因为它优化的是：&lt;/p&gt;
+\[\boxed{\text{目标量的不确定性}}\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\boxed{\text{几何边界本身的均匀精度}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;6-这揭示一个非常重要的代理模型原则&#34;&gt;6. 这揭示一个非常重要的代理模型原则
+&lt;/h1&gt;&lt;p&gt;假设两个 Kriging：&lt;/p&gt;
+\[\mathcal M_A,\quad\mathcal M_B.\]&lt;p&gt;A 的全局：&lt;/p&gt;
+\[R^2=0.999.\]&lt;p&gt;但：&lt;/p&gt;
+\[g(x)\approx0\]&lt;p&gt;附近有一点偏差。&lt;/p&gt;
+&lt;p&gt;B 的全局：&lt;/p&gt;
+\[R^2=0.96,\]&lt;p&gt;但把高概率区域的失效边界学得很好。&lt;/p&gt;
+&lt;p&gt;如果最终任务是：&lt;/p&gt;
+\[P_f,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\boxed{\mathcal M_B\text{ 完全可能更好。}}\]&lt;p&gt;因此可靠性代理模型真正需要优化的是：&lt;/p&gt;
+\[\boxed{\text{decision-relevant uncertainty}}\]&lt;p&gt;而不一定是：&lt;/p&gt;
+\[\boxed{\text{global prediction error}.}\]&lt;p&gt;这和最近几张卡片中反复出现的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt;、reliability-oriented Shapley 其实属于同一个更大的原则：&lt;/p&gt;
+\[\boxed{\text{模型评价指标必须与最终任务对齐。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-sur-和贝叶斯优化有什么关系&#34;&gt;7. SUR 和贝叶斯优化有什么关系？
+&lt;/h1&gt;&lt;p&gt;关系非常近。&lt;/p&gt;
+&lt;p&gt;贝叶斯优化通常目标：&lt;/p&gt;
+\[x^\star=\arg\min_x f(x).\]&lt;p&gt;Expected Improvement 问：&lt;/p&gt;
+\[\boxed{\text{这个点预计能把当前最优值改善多少？}}\]&lt;p&gt;SUR 则问：&lt;/p&gt;
+\[\boxed{\text{这个点预计能把目标不确定性减少多少？}}\]&lt;p&gt;所以两者都属于：&lt;/p&gt;
+\[\boxed{\text{Bayesian sequential design}.}\]&lt;p&gt;但 acquisition 的设计目标不同。&lt;/p&gt;
+&lt;p&gt;Bayesian optimization：&lt;/p&gt;
+\[\boxed{\text{找到极值}}\]&lt;p&gt;Reliability SUR：&lt;/p&gt;
+\[\boxed{\text{估计 excursion set / failure probability}.}\]&lt;p&gt;Contour SUR：&lt;/p&gt;
+\[\boxed{\text{识别 }g(x)=c\text{ 的边界}.}\]&lt;p&gt;这说明 acquisition function 并不是一个附属技巧。&lt;/p&gt;
+&lt;p&gt;它实际上定义了：&lt;/p&gt;
+\[\boxed{\text{“什么信息值得花下一次仿真预算购买”。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;8-sur-更深的一层它实际上是一步贝叶斯决策&#34;&gt;8. SUR 更深的一层：它实际上是一步贝叶斯决策
+&lt;/h1&gt;&lt;p&gt;假设一次高保真 FEM 成本：&lt;/p&gt;
+\[C_{\rm HF}.\]&lt;p&gt;你现在只有一次计算机会。&lt;/p&gt;
+&lt;p&gt;每个候选点：&lt;/p&gt;
+\[x\]&lt;p&gt;都是一个决策。&lt;/p&gt;
+&lt;p&gt;计算完成后，会得到随机结果：&lt;/p&gt;
+\[Y_x.\]&lt;p&gt;然后 posterior：&lt;/p&gt;
+\[p(g\mid\mathcal D_n)\]&lt;p&gt;更新。&lt;/p&gt;
+&lt;p&gt;所以理性的决策就是：&lt;/p&gt;
+\[\boxed{ \text{选择能够使“未来预期损失”最小的实验。} }\]&lt;p&gt;这就是：&lt;/p&gt;
+\[x^\star = \arg\min_x \mathbb E[ L(\text{posterior after observing }x) ].\]&lt;p&gt;SUR 只是把：&lt;/p&gt;
+\[L\]&lt;p&gt;选择成：&lt;/p&gt;
+\[\boxed{\text{剩余不确定性}.}\]&lt;p&gt;因此 SUR 其实是：&lt;/p&gt;
+\[\boxed{\text{Bayesian experimental design}}\]&lt;p&gt;在昂贵计算模型上的具体实现。&lt;/p&gt;
+&lt;p&gt;Bect 等人的论文明确从贝叶斯理论框架出发推导这类 failure-probability sequential strategies。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么叫-stepwise而不是-globally-optimal&#34;&gt;9. 为什么叫 Stepwise，而不是 globally optimal？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为它通常只看：&lt;/p&gt;
+\[\boxed{\text{下一步}.}\]&lt;p&gt;真正的最优实验规划应该考虑：&lt;/p&gt;
+\[x_{n+1},x_{n+2},\ldots,x_{n+B}\]&lt;p&gt;整个未来序列：&lt;/p&gt;
+\[\arg\min_{x_{n+1:n+B}} \mathbb E[ H_{n+B} ].\]&lt;p&gt;这实际上是一个：&lt;/p&gt;
+\[\boxed{\text{动态规划 / POMDP 式问题}.}\]&lt;p&gt;计算成本迅速爆炸。&lt;/p&gt;
+&lt;p&gt;SUR 使用：&lt;/p&gt;
+\[\boxed{\text{one-step lookahead}}\]&lt;p&gt;即：&lt;/p&gt;
+\[x_{n+1} = \arg\min_x \mathbb E[H_{n+1}|x].\]&lt;p&gt;所以它是一种：&lt;/p&gt;
+\[\boxed{\text{myopic Bayesian optimal design}.}\]&lt;p&gt;这也是它的一个基本局限：下一步最优并不保证整个有限预算下全局最优。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-sur-为什么比-u-function-贵很多&#34;&gt;10. SUR 为什么比 U-function 贵很多？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为 U-function：&lt;/p&gt;
+\[U(x)=\frac{|m(x)|}{s(x)}\]&lt;p&gt;只需要当前 GP 的：&lt;/p&gt;
+\[m(x),s(x).\]&lt;p&gt;SUR 对每个候选：&lt;/p&gt;
+\[x\]&lt;p&gt;还要想象：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“如果我在这里观测以后，整个 GP 会怎样？”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;然后对未知观测：&lt;/p&gt;
+\[Y_x\]&lt;p&gt;再做期望。&lt;/p&gt;
+&lt;p&gt;概念上接近：&lt;/p&gt;
+\[\text{candidate }x\]\[\downarrow\]\[\text{possible observations }Y_x\]\[\downarrow\]\[\text{updated GP}\]\[\downarrow\]\[H_{n+1}\]\[\downarrow\]\[\mathbb E[H_{n+1}].\]&lt;p&gt;所以 naive SUR 可能非常贵。&lt;/p&gt;
+&lt;p&gt;Chevalier、Bect、Ginsbourger、Vazquez、Picheny 与 Richet 后续专门研究了 &lt;strong&gt;Fast Kriging-Based Stepwise Uncertainty Reduction&lt;/strong&gt;，推导可高效计算的公式用于 excursion-set identification；该工作后来发表于 &lt;em&gt;Technometrics&lt;/em&gt;。&lt;/p&gt;
+&lt;p&gt;这说明一个经常被忽略的现实：&lt;/p&gt;
+\[\boxed{ \text{acquisition function 自己也必须具有好的计算复杂度。} }\]&lt;p&gt;否则你可能为了决定：&lt;/p&gt;
+\[\text{下一次 30 分钟 FEM 算哪里}\]&lt;p&gt;先花：&lt;/p&gt;
+\[\text{3 小时优化 acquisition}.\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-从估计失效概率继续走可以得到更丰富的目标&#34;&gt;11. 从“估计失效概率”继续走，可以得到更丰富的目标
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Excursion set：&lt;/p&gt;
+\[\Gamma=\{x:g(x)\le0\}\]&lt;p&gt;本身也是一个随机集合，因为 GP posterior 下：&lt;/p&gt;
+\[g\]&lt;p&gt;仍然未知。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\Gamma\]&lt;p&gt;也存在 posterior distribution。&lt;/p&gt;
+&lt;p&gt;Azzimonti、Bect、Chevalier 与 Ginsbourger 从 random-set 视角研究了如何量化 excursion-set uncertainty，包括集合重构、条件高斯场模拟以及安全工程中的 contour estimation。&lt;/p&gt;
+&lt;p&gt;这带来一个很有价值的视角：&lt;/p&gt;
+&lt;p&gt;传统 Kriging 给：&lt;/p&gt;
+\[\boxed{\text{函数的不确定性}}\]&lt;p&gt;但工程师真正关心的可能是：&lt;/p&gt;
+\[\boxed{\text{失效区域形状的不确定性}.}\]&lt;p&gt;进一步：&lt;/p&gt;
+\[\boxed{\text{失效概率的不确定性}.}\]&lt;p&gt;甚至：&lt;/p&gt;
+\[\boxed{\text{保守安全域的不确定性}.}\]&lt;p&gt;不同目标应该对应不同 acquisition。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-保守失效域是-sur-很自然的下一步&#34;&gt;12. “保守失效域”是 SUR 很自然的下一步
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;很多安全问题不允许：&lt;/p&gt;
+\[\text{false safe}.\]&lt;p&gt;假设真实危险域：&lt;/p&gt;
+\[\Gamma.\]&lt;p&gt;我们可能希望构造一个 conservative estimate：&lt;/p&gt;
+\[\Gamma_c\]&lt;p&gt;并控制：&lt;/p&gt;
+\[P(\Gamma_c\subseteq\Gamma)\]&lt;p&gt;或相关覆盖概率。&lt;/p&gt;
+&lt;p&gt;此时采样目标就不再是单纯让平均分类误差最小，而可能是：&lt;/p&gt;
+\[\boxed{\text{在保证保守性的同时尽量减少 false negatives}.}\]&lt;p&gt;Azzimonti、Ginsbourger、Chevalier、Bect 与 Richet 后续正是沿这个方向提出了 conservative excursion-set estimation 的 adaptive SUR 策略，并在可靠性工程案例上测试。&lt;/p&gt;
+&lt;p&gt;这非常接近真实工程决策：&lt;/p&gt;
+\[\boxed{\text{不同错误的代价并不对称。}}\]&lt;p&gt;把危险点判断成安全：&lt;/p&gt;
+\[\text{代价极高}.\]&lt;p&gt;把安全点暂时判断成危险：&lt;/p&gt;
+\[\text{可能只是增加设计裕度}.\]&lt;p&gt;因此 acquisition function 最终甚至可以编码：&lt;/p&gt;
+\[\boxed{\text{工程风险偏好}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对你做-kriging-可靠性研究最值得迁移的一点&#34;&gt;13. 对你做 Kriging 可靠性研究最值得迁移的一点
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设当前有两个失效模式：&lt;/p&gt;
+\[g_1(x)=\text{运动精度裕量},\]\[g_2(x)=\text{卡滞裕量}.\]&lt;p&gt;系统失效：&lt;/p&gt;
+\[g_1(x)&lt;0 \quad\lor\quad g_2(x)&lt;0.\]&lt;p&gt;一个简单主动学习器可能分别寻找：&lt;/p&gt;
+\[U_1(x),U_2(x)\]&lt;p&gt;最小的位置。&lt;/p&gt;
+&lt;p&gt;但真正目标是系统失效概率：&lt;/p&gt;
+\[P_f = P[g_1&lt;0\lor g_2&lt;0].\]&lt;p&gt;于是更成熟的问题应该变成：&lt;/p&gt;
+\[\boxed{ \text{在哪个 }x\text{ 做一次高保真仿真， 预计最能降低系统 }P_f\text{ 的不确定性？} }\]&lt;p&gt;这可能导致一个很反直觉的结果：&lt;/p&gt;
+&lt;p&gt;某个点对：&lt;/p&gt;
+\[g_1\]&lt;p&gt;预测精度帮助很大；&lt;/p&gt;
+&lt;p&gt;但由于该区域：&lt;/p&gt;
+\[g_2\]&lt;p&gt;已经必然失效，它对系统失效分类没有任何新信息。&lt;/p&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[\boxed{\text{这个样本几乎没有系统可靠性价值。}}\]&lt;p&gt;SUR 的任务级思维正好能识别这种冗余。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-它还可以自然推广到仿真-fidelity-也作为决策变量&#34;&gt;14. 它还可以自然推广到“仿真 fidelity 也作为决策变量”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设同时拥有：&lt;/p&gt;
+\[f_H(x),\quad f_M(x),\quad f_L(x)\]&lt;p&gt;三种保真度。&lt;/p&gt;
+&lt;p&gt;下一次实验决策就不只有：&lt;/p&gt;
+\[x.\]&lt;p&gt;而是：&lt;/p&gt;
+\[(x,\ell)\]&lt;p&gt;其中：&lt;/p&gt;
+\[\ell\in\{H,M,L\}.\]&lt;p&gt;如果成本分别：&lt;/p&gt;
+\[C_H,C_M,C_L,\]&lt;p&gt;就可以考虑：&lt;/p&gt;
+\[\boxed{ \frac{ \mathbb E[H_n-H_{n+1}\mid x,\ell] }{ C_\ell } }\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{\text{每单位计算成本能购买多少不确定性下降？}}\]&lt;p&gt;这样，SUR、MFMC、多保真 GP、active learning 就开始汇合到同一个更大的框架：&lt;/p&gt;
+\[\boxed{\text{value of information per unit cost}.}\]&lt;p&gt;这比“哪个 surrogate 的 \(R^2\) 最高”已经高了一个方法论层级。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-一个很值得自己实现的最小实验&#34;&gt;15. 一个很值得自己实现的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;取二维函数：&lt;/p&gt;
+\[g(x_1,x_2) = (x_1-1)^2 + (x_2+0.5)^2 -1.\]&lt;p&gt;令：&lt;/p&gt;
+\[X\sim N(0,I).\]&lt;p&gt;失效定义：&lt;/p&gt;
+\[g(X)&lt;0.\]&lt;p&gt;初始只采：&lt;/p&gt;
+\[10\]&lt;p&gt;个 Latin Hypercube 点。&lt;/p&gt;
+&lt;p&gt;建立 GP。&lt;/p&gt;
+&lt;p&gt;然后比较两个 sequential learner：&lt;/p&gt;
+&lt;h3 id=&#34;方法-au-learning&#34;&gt;方法 A：U-learning
+&lt;/h3&gt;\[x^\star=\arg\min \frac{|m(x)|}{s(x)}.\]&lt;h3 id=&#34;方法-b近似-sur&#34;&gt;方法 B：近似 SUR
+&lt;/h3&gt;&lt;p&gt;在一个固定 Monte Carlo pool：&lt;/p&gt;
+\[\{z_j\}_{j=1}^{10^5}\]&lt;p&gt;上计算：&lt;/p&gt;
+\[H_n = \frac1N \sum_j \min[ p_n(z_j),1-p_n(z_j) ].\]&lt;p&gt;对于每个候选 \(x\)，利用 GP update 公式估计：&lt;/p&gt;
+\[\mathbb E[H_{n+1}|x].\]&lt;p&gt;每轮各加入一个真实函数点。&lt;/p&gt;
+&lt;p&gt;然后不要只画：&lt;/p&gt;
+\[R^2.\]&lt;p&gt;重点画：&lt;/p&gt;
+\[\boxed{|P_f^{est}-P_f^{true}|}\]&lt;p&gt;对：&lt;/p&gt;
+\[\boxed{\text{number of expensive evaluations}.}\]&lt;p&gt;你会真正看到：&lt;/p&gt;
+\[\boxed{\text{“最会拟合函数”与“最快解决可靠性问题”不是同一件事。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它在整个知识体系中卡在哪里&#34;&gt;16. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把主动代理模型分成四个层次：&lt;/p&gt;
+\[\text{Space Filling}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{哪里还没采过？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Prediction-oriented Active Learning}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{哪里预测误差可能最大？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Boundary-oriented Learning}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{哪里最可能把安全/失效分错？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\boxed{\text{Stepwise Uncertainty Reduction}}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{ \text{哪次实验最能降低“最终任务”的 posterior uncertainty？ }\]&lt;p&gt;再向上其实还有：&lt;/p&gt;
+\[\boxed{\text{multi-step Bayesian experimental design}}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{ \text{有限预算下，整个实验序列怎样规划才最值？ }\]&lt;p&gt;SUR 正好位于：&lt;/p&gt;
+\[\boxed{\text{启发式主动学习}}\]&lt;p&gt;与&lt;/p&gt;
+\[\boxed{\text{完整贝叶斯决策论}}\]&lt;p&gt;之间。&lt;/p&gt;
+&lt;p&gt;这就是它在知识体系里最重要的位置。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;SUR 最值得记住的不是某一个 acquisition 公式，而是一个问题转换：&lt;/p&gt;
+\[\boxed{ \text{不要问“下一个样本点哪里最不确定？”} }\]&lt;p&gt;更应该问：&lt;/p&gt;
+\[\boxed{ \text{“如果我把下一次昂贵实验花在这里， 做完以后，我真正关心的答案预计会确定多少？”} }\]&lt;p&gt;于是主动学习从：&lt;/p&gt;
+\[\text{sample the model}\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{\text{buy information about the decision}.}\]&lt;p&gt;这条思想可以从可靠性直接迁移到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;极限状态识别；&lt;/li&gt;
+&lt;li&gt;多失效模式；&lt;/li&gt;
+&lt;li&gt;代理模型；&lt;/li&gt;
+&lt;li&gt;多保真仿真；&lt;/li&gt;
+&lt;li&gt;参数辨识；&lt;/li&gt;
+&lt;li&gt;FEM 自适应实验；&lt;/li&gt;
+&lt;li&gt;AI Agent 的工具调用。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;甚至对 AI Agent 也一样：如果一次昂贵工具调用的目标只是“获得更多信息”，最合理的选择未必是搜索当前最陌生的地方，而是：&lt;/p&gt;
+\[\boxed{\text{选择最可能改变最终结论的那次调用。}}\]&lt;p&gt;这就是 SUR 最值得学的地方。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Julien Bect、David Ginsbourger、Li、Picheny &amp;amp; Vazquez, &lt;strong&gt;Sequential Design of Computer Experiments for the Estimation of a Probability of Failure&lt;/strong&gt;, &lt;em&gt;Statistics and Computing&lt;/em&gt; 22, 773–793 (2012), DOI 10.1007/s11222-011-9241-4。这是今天最值得精读的论文：它直接从贝叶斯 formulation 推导 failure-probability SUR。&lt;br&gt;
+Springer 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Chevalier, Bect, Ginsbourger, Vazquez, Picheny &amp;amp; Richet, &lt;strong&gt;Fast Kriging-Based Stepwise Uncertainty Reduction with Application to the Identification of an Excursion Set&lt;/strong&gt;, &lt;em&gt;Technometrics&lt;/em&gt; 56 (2014), 455–465。适合继续研究“理论上漂亮的 SUR 怎样做到计算上可用”；该论文被后续 excursion-set 工作列为核心快速 SUR 方法。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Azzimonti, Bect, Chevalier &amp;amp; Ginsbourger, &lt;strong&gt;Quantifying Uncertainties on Excursion Sets Under a Gaussian Random Field Prior&lt;/strong&gt;, &lt;em&gt;SIAM/ASA Journal on Uncertainty Quantification&lt;/em&gt; 4 (2016), 850–874, DOI 10.1137/141000749。适合把“函数 posterior”提升到“随机失效区域 posterior”的层面。&lt;br&gt;
+SIAM 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Azzimonti, Ginsbourger, Chevalier, Bect &amp;amp; Richet, &lt;strong&gt;Adaptive Design of Experiments for Conservative Estimation of Excursion Sets&lt;/strong&gt;, &lt;em&gt;Technometrics&lt;/em&gt; 63(1), 2021。值得看的重点是：当 false-safe 与 false-alarm 的工程代价不对称时，SUR 如何从“准确识别边界”进一步变成“保守地识别安全/危险域”。&lt;br&gt;
+Technometrics 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Conformal Prediction：给任意代理模型加一层“有限样本覆盖保证”</title>
+        <link>https://assranai.github.io/cards/46-conformal-prediction-2/</link>
+        <pubDate>Mon, 28 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/46-conformal-prediction-2/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;conformal&#34; tabindex=&#34;0&#34;&gt;Conformal Prediction&lt;/span&gt;（保形预测）与代理模型校准&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：代理模型 × 不确定性量化 × 可靠性 × Scientific ML&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选一个和前几张 SUR、Shapley、&lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt; 有明显区别、但能直接接到代理模型研究的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;一个 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt;、神经网络或 ROM 给出了“95% 预测区间”，这个 &lt;strong&gt;95% 到底凭什么可信？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;对于 Gaussian Process，区间通常来自：&lt;/p&gt;
+\[f(x)\mid\mathcal D \sim\mathcal N(\mu(x),\sigma^2(x)).\]&lt;p&gt;但这里的 \(\sigma(x)\) 是在&lt;strong&gt;模型假设成立&lt;/strong&gt;条件下的 posterior uncertainty。如果核函数错了、超参数估计有偏、模型存在结构误差，那么&lt;/p&gt;
+\[\mu(x)\pm1.96\sigma(x)\]&lt;p&gt;未必真的覆盖 95% 的新观测。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Conformal Prediction（CP）做了一件很不同的事：它不尝试证明你的代理模型是正确的，而是用一批校准数据测量“这个模型实际会错多少”，再把预测区间修正到具有有限样本覆盖保证。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;2026 年发表于 &lt;em&gt;Machine Learning: Science and Technology&lt;/em&gt; 的工作已经把这一思想系统用于 PDE、磁流体、天气、聚变诊断等 scientific surrogate，并覆盖 MLP、U-Net、&lt;span class=&#34;term-anchor&#34; data-term=&#34;fno&#34; tabindex=&#34;0&#34;&gt;Fourier Neural Operator&lt;/span&gt;、ViT、GNN 等模型。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先区分两个经常混淆的问题&#34;&gt;1. 先区分两个经常混淆的问题
+&lt;/h2&gt;&lt;p&gt;假设代理模型：&lt;/p&gt;
+\[\hat y=f_\theta(x).\]&lt;p&gt;第一个问题是：&lt;/p&gt;
+\[\boxed{\hat y\text{ 准不准？}}\]&lt;p&gt;可以用：&lt;/p&gt;
+\[R^2,\quad RMSE,\quad MAE\]&lt;p&gt;回答。&lt;/p&gt;
+&lt;p&gt;第二个问题是：&lt;/p&gt;
+\[\boxed{\text{我说“95%可信”时，它真的至少有约95%的覆盖率吗？}}\]&lt;p&gt;这是 &lt;strong&gt;calibration&lt;/strong&gt; 问题。&lt;/p&gt;
+&lt;p&gt;一个模型完全可能：&lt;/p&gt;
+\[R^2=0.99\]&lt;p&gt;却严重过度自信。&lt;/p&gt;
+&lt;p&gt;例如真实误差经常达到：&lt;/p&gt;
+\[|y-\hat y|=0.3,\]&lt;p&gt;但模型给出的标准差始终只有：&lt;/p&gt;
+\[\sigma(x)=0.02.\]&lt;p&gt;那么它预测得总体不错，却：&lt;/p&gt;
+\[\boxed{\text{不知道自己什么时候会错。}}\]&lt;p&gt;对于可靠性问题，这比 RMSE 稍大往往危险得多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-conformal-prediction-的基本操作极其简单&#34;&gt;2. Conformal Prediction 的基本操作极其简单
+&lt;/h1&gt;&lt;p&gt;假设已经训练好了任意模型：&lt;/p&gt;
+\[\hat f(x).\]&lt;p&gt;另外留出一组 calibration data：&lt;/p&gt;
+\[\mathcal D_{\rm cal} = \{(x_i,y_i)\}_{i=1}^{n}.\]&lt;p&gt;计算每个样本的误差：&lt;/p&gt;
+\[\boxed{ s_i=|y_i-\hat f(x_i)|. }\]&lt;p&gt;这里 \(s_i\) 叫 &lt;strong&gt;nonconformity score&lt;/strong&gt;：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;这个样本和模型预测有多“不合群”。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;假设希望得到：&lt;/p&gt;
+\[1-\alpha=95\%\]&lt;p&gt;预测区间。&lt;/p&gt;
+&lt;p&gt;取这些误差的适当高分位数：&lt;/p&gt;
+\[\hat q = \operatorname{Quantile}_{\lceil(n+1)(1-\alpha)\rceil/n} (s_1,\ldots,s_n).\]&lt;p&gt;然后对一个新输入：&lt;/p&gt;
+\[x_{\rm new}\]&lt;p&gt;输出：&lt;/p&gt;
+\[\boxed{ C(x_{\rm new}) = [ \hat f(x_{\rm new})-\hat q,\; \hat f(x_{\rm new})+\hat q ]. }\]&lt;p&gt;就这么简单。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-神奇之处在于它有一个真正的有限样本保证&#34;&gt;3. 神奇之处在于：它有一个真正的有限样本保证
+&lt;/h1&gt;&lt;p&gt;在 calibration 样本与未来 test sample &lt;strong&gt;exchangeable&lt;/strong&gt; 的条件下：&lt;/p&gt;
+\[\boxed{ P \left( Y_{\rm new}\in C(X_{\rm new}) \right) \ge1-\alpha. }\]&lt;p&gt;而且这个结论：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;不要求误差是 Gaussian；&lt;/li&gt;
+&lt;li&gt;不要求模型是 GP；&lt;/li&gt;
+&lt;li&gt;不要求模型正确；&lt;/li&gt;
+&lt;li&gt;不要求 \(n\to\infty\)；&lt;/li&gt;
+&lt;li&gt;不要求神经网络经过 Bayesian training。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这正是 conformal prediction 最重要的理论价值。Lei、G&amp;rsquo;Sell、Rinaldo、Tibshirani 与 Wasserman 的经典 regression conformal 工作系统证明并比较了 full conformal、split conformal 等方法的有限样本 marginal coverage 性质。&lt;/p&gt;
+&lt;p&gt;所以 CP 的世界观很有意思：&lt;/p&gt;
+\[\boxed{ \text{我不相信模型对自己的 uncertainty 描述； 我相信它在独立校准样本上实际犯过的错误。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;4-为什么这能成立&#34;&gt;4. 为什么这能成立？
+&lt;/h1&gt;&lt;p&gt;核心不是 Gaussian assumption，而是：&lt;/p&gt;
+\[\boxed{\text{rank symmetry}.}\]&lt;p&gt;把 calibration errors：&lt;/p&gt;
+\[s_1,\ldots,s_n\]&lt;p&gt;和未来未知 error：&lt;/p&gt;
+\[s_{n+1}\]&lt;p&gt;放在一起。&lt;/p&gt;
+&lt;p&gt;如果这些样本 exchangeable，那么：&lt;/p&gt;
+\[s_{n+1}\]&lt;p&gt;在：&lt;/p&gt;
+\[n+1\]&lt;p&gt;个 score 中的排名没有特殊地位。&lt;/p&gt;
+&lt;p&gt;因此它落在最大的：&lt;/p&gt;
+\[\alpha\]&lt;p&gt;比例之外的概率至多约为：&lt;/p&gt;
+\[\alpha.\]&lt;p&gt;换句话说：&lt;/p&gt;
+\[\boxed{\text{CP 的保证来自排序，而不是分布拟合。}}\]&lt;p&gt;这是一个非常深的区别。&lt;/p&gt;
+&lt;p&gt;传统 UQ：&lt;/p&gt;
+\[\boxed{\text{先假设概率模型，再推出区间。}}\]&lt;p&gt;Conformal：&lt;/p&gt;
+\[\boxed{\text{直接利用样本交换性，把误差排名转化为覆盖保证。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;5-这意味着它可以直接包在-kriging-外面&#34;&gt;5. 这意味着它可以直接包在 Kriging 外面
+&lt;/h1&gt;&lt;p&gt;假设已有：&lt;/p&gt;
+\[\mu(x),\quad\sigma(x).\]&lt;p&gt;可以定义：&lt;/p&gt;
+\[\boxed{ s_i= \frac{|y_i-\mu(x_i)|} {\sigma(x_i)}. }\]&lt;p&gt;然后计算：&lt;/p&gt;
+\[\hat q.\]&lt;p&gt;最终区间变成：&lt;/p&gt;
+\[\boxed{ [ \mu(x)-\hat q\sigma(x), \; \mu(x)+\hat q\sigma(x) ]. }\]&lt;p&gt;注意这里：&lt;/p&gt;
+\[\hat q\]&lt;p&gt;是数据校准出来的。&lt;/p&gt;
+&lt;p&gt;如果 GP 完美 calibrated，可能：&lt;/p&gt;
+\[\hat q\approx1.96.\]&lt;p&gt;但如果 GP 严重低估 uncertainty：&lt;/p&gt;
+\[\hat q=4.3\]&lt;p&gt;也完全可能。&lt;/p&gt;
+&lt;p&gt;这实际上相当于问：&lt;/p&gt;
+\[\boxed{ \text{你的 Kriging }\sigma(x)\text{ 虽然不一定是正确概率尺度， 但它至少能不能正确描述“哪里容易错”？} }\]&lt;p&gt;2026 年的 surrogate-UQ 工作正比较了 absolute residual、quantile regression 和标准差归一化等多种 nonconformity score，并在多类 PDE surrogate 上验证 coverage。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-这里有一个非常值得理解的分工&#34;&gt;6. 这里有一个非常值得理解的分工
+&lt;/h1&gt;&lt;p&gt;GP 提供：&lt;/p&gt;
+\[\boxed{\text{relative uncertainty structure}}\]&lt;p&gt;例如：&lt;/p&gt;
+\[\sigma(x_A)&gt;\sigma(x_B).\]&lt;p&gt;Conformal calibration 提供：&lt;/p&gt;
+\[\boxed{\text{absolute error scale calibration}.}\]&lt;p&gt;于是两者可以组合成：&lt;/p&gt;
+\[\text{GP} \rightarrow \text{哪里可能更不确定}\]\[+\]\[\text{CP} \rightarrow \text{到底应该放大多少才能达到目标覆盖率}.\]&lt;p&gt;这和完全抛弃 Kriging variance 不同。&lt;/p&gt;
+&lt;p&gt;更合理的理解是：&lt;/p&gt;
+\[\boxed{\text{CP 可以校准一个“不完全可信但仍有信息”的 uncertainty estimator。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-普通-absolute-residual-cp-有一个明显缺陷&#34;&gt;7. 普通 absolute residual CP 有一个明显缺陷
+&lt;/h1&gt;&lt;p&gt;如果直接：&lt;/p&gt;
+\[s_i=|y_i-\hat f(x_i)|,\]&lt;p&gt;最终所有地方区间宽度相同：&lt;/p&gt;
+\[\hat f(x)\pm\hat q.\]&lt;p&gt;但工程模型通常是 heteroscedastic 的。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;低载荷区          接触转变区           高载荷区
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;误差小              误差巨大              误差中等
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;───────        ───────────────        ─────────
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;一个统一：&lt;/p&gt;
+\[\pm0.5\]&lt;p&gt;的区间可能导致：&lt;/p&gt;
+&lt;p&gt;低误差区域：&lt;/p&gt;
+\[\boxed{\text{过于保守}}\]&lt;p&gt;高误差区域：&lt;/p&gt;
+\[\boxed{\text{仍然不够灵活。}}\]&lt;p&gt;这就引出 &lt;strong&gt;Conformalized Quantile Regression（CQR）&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-cqr先学习局部区间形状再让-conformal-负责兜底&#34;&gt;8. CQR：先学习局部区间形状，再让 conformal 负责兜底
+&lt;/h1&gt;&lt;p&gt;训练两个 quantile regressors：&lt;/p&gt;
+\[\hat q_{\alpha/2}(x), \qquad \hat q_{1-\alpha/2}(x).\]&lt;p&gt;它们先预测：&lt;/p&gt;
+\[\boxed{\text{这个 }x\text{ 本来应该有多宽的区间。}}\]&lt;p&gt;然后在 calibration set 上定义：&lt;/p&gt;
+\[s_i = \max \{ \hat q_L(x_i)-y_i,\; y_i-\hat q_U(x_i) \}.\]&lt;p&gt;再取 conformal quantile：&lt;/p&gt;
+\[\hat q.\]&lt;p&gt;最终：&lt;/p&gt;
+\[\boxed{ [ \hat q_L(x)-\hat q,\; \hat q_U(x)+\hat q ]. }\]&lt;p&gt;所以：&lt;/p&gt;
+&lt;p&gt;Quantile Regression：&lt;/p&gt;
+\[\boxed{\text{负责 adaptivity}}\]&lt;p&gt;Conformal：&lt;/p&gt;
+\[\boxed{\text{负责 coverage calibration}.}\]&lt;p&gt;Romano、Patterson 与 Emmanuel Candès 在 NeurIPS 2019 提出的 CQR 正是为解决传统 conformal 区间难以适应 heteroscedasticity 的问题；实验显示它通常能在维持有效覆盖的同时产生更短的区间。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-但这里有一个必须牢记的限制95-marginal-coverage--每个位置都有95&#34;&gt;9. 但这里有一个必须牢记的限制：95% marginal coverage ≠ 每个位置都有95%
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Conformal 的经典保证是：&lt;/p&gt;
+\[\boxed{ P(Y\in C(X))\ge0.95. }\]&lt;p&gt;注意概率同时对：&lt;/p&gt;
+\[X,Y\]&lt;p&gt;取平均。&lt;/p&gt;
+&lt;p&gt;它并不意味着：&lt;/p&gt;
+\[\boxed{ P(Y\in C(X)\mid X=x)\ge0.95 \quad\forall x. }\]&lt;p&gt;这是 &lt;strong&gt;marginal coverage&lt;/strong&gt; 和 &lt;strong&gt;conditional coverage&lt;/strong&gt; 的区别。&lt;/p&gt;
+&lt;p&gt;例如可能存在：&lt;/p&gt;
+&lt;p&gt;高概率普通区域：&lt;/p&gt;
+\[98\%\text{ coverage}\]&lt;p&gt;极端接触区域：&lt;/p&gt;
+\[70\%\text{ coverage}\]&lt;p&gt;整体平均：&lt;/p&gt;
+\[95\%.\]&lt;p&gt;CP 的理论保证仍然成立。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{\text{Conformal prediction 并不会魔法般解决所有局部 OOD 风险。}}\]&lt;p&gt;2026 年的 surrogate-UQ 工作也明确把 marginal 而非 conditional coverage，以及 calibration/test exchangeability，列为该方法的重要限制。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-这对可靠性尤其重要&#34;&gt;10. 这对可靠性尤其重要
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设极限状态：&lt;/p&gt;
+\[g(x)=0.\]&lt;p&gt;代理预测：&lt;/p&gt;
+\[\hat g(x).\]&lt;p&gt;Conformal 区间：&lt;/p&gt;
+\[[L(x),U(x)].\]&lt;p&gt;那么可以把输入空间分成三类：&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[U(x)&lt;0,\]&lt;p&gt;整个预测区间都在失效侧：&lt;/p&gt;
+\[\boxed{\text{high-confidence failure}.}\]&lt;p&gt;如果：&lt;/p&gt;
+\[L(x)&gt;0,\]&lt;p&gt;整个区间都在安全侧：&lt;/p&gt;
+\[\boxed{\text{high-confidence safe}.}\]&lt;p&gt;如果：&lt;/p&gt;
+\[L(x)\le0\le U(x),\]&lt;p&gt;则：&lt;/p&gt;
+\[\boxed{\text{classification unresolved}.}\]&lt;p&gt;这就给可靠性主动学习一个非常自然的信号：&lt;/p&gt;
+\[\boxed{ 0\in C(x) \Rightarrow \text{这个样本值得进一步求高保真。} }\]&lt;p&gt;和传统：&lt;/p&gt;
+\[U(x)=\frac{|\mu(x)|}{\sigma(x)}\]&lt;p&gt;相比，区别在于 conformal interval 的尺度经过&lt;strong&gt;真实误差校准&lt;/strong&gt;。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这甚至可以变成一个失效概率上下界思路&#34;&gt;11. 这甚至可以变成一个“失效概率上下界”思路
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;在 Monte Carlo pool：&lt;/p&gt;
+\[x_1,\ldots,x_N\]&lt;p&gt;上计算 conformal intervals。&lt;/p&gt;
+&lt;p&gt;定义：&lt;/p&gt;
+&lt;p&gt;确定失效：&lt;/p&gt;
+\[\mathcal F^-= \{x:U(x)&lt;0\}.\]&lt;p&gt;可能失效：&lt;/p&gt;
+\[\mathcal F^+= \{x:L(x)\le0\}.\]&lt;p&gt;于是可以形成：&lt;/p&gt;
+\[\hat P_f^- = \frac{|\mathcal F^-|}{N},\]\[\hat P_f^+ = \frac{|\mathcal F^+|}{N}.\]&lt;p&gt;得到：&lt;/p&gt;
+\[\boxed{ \hat P_f^- \le \hat P_f \le \hat P_f^+. }\]&lt;p&gt;这里必须非常谨慎：&lt;strong&gt;普通 marginal conformal coverage 本身并不能自动把这两个量升级成严格的 simultaneous \(P_f\) confidence bounds。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;但它提供了一个很有价值的工程诊断量：&lt;/p&gt;
+\[\boxed{ \hat P_f^+-\hat P_f^- }\]&lt;p&gt;表示：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;当前 surrogate uncertainty 对失效分类究竟留下了多大的模糊概率质量？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这与昨天 SUR 的思想可以自然连接起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-sur--conformal-是一个很有意思的研究组合&#34;&gt;12. SUR + Conformal 是一个很有意思的研究组合
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;昨天的 SUR 问：&lt;/p&gt;
+\[\boxed{\text{下一个样本怎样最大程度减少可靠性不确定性？}}\]&lt;p&gt;今天 CP 提供：&lt;/p&gt;
+\[\boxed{\text{哪些区域的 surrogate classification 经过真实误差校准后仍然不确定？}}\]&lt;p&gt;于是可以构造一个思路：&lt;/p&gt;
+\[\text{GP / surrogate}\]\[\downarrow\]\[\text{Conformal calibration}\]\[\downarrow\]\[\text{failure-boundary ambiguity}\]\[\downarrow\]\[\text{SUR / active learning}.\]&lt;p&gt;这比单纯使用：&lt;/p&gt;
+\[\sigma_{\rm GP}(x)\]&lt;p&gt;更稳健，因为：&lt;/p&gt;
+\[\boxed{\sigma_{\rm GP}\text{ 可以 model-misspecified，conformal layer 则利用真实残差重新标尺。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对你现在做的核函数问题也有一个很直接的启发&#34;&gt;13. 对你现在做的核函数问题也有一个很直接的启发
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设两个 Kriging：&lt;/p&gt;
+&lt;p&gt;高斯核：&lt;/p&gt;
+\[R^2=0.94\]&lt;p&gt;指数核：&lt;/p&gt;
+\[R^2=0.90.\]&lt;p&gt;通常会直接宣布：&lt;/p&gt;
+\[\boxed{\text{高斯核更好。}}\]&lt;p&gt;但如果最终用于可靠性，还可以比较：&lt;/p&gt;
+\[\text{coverage},\]\[\text{interval width},\]\[\text{boundary misclassification},\]&lt;p&gt;以及 conformal calibration factor：&lt;/p&gt;
+\[\hat q.\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;Kernel&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;\(R^2\)&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;nominal 95% coverage&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;conformal factor&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Gaussian&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.94&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;71%&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;3.8&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Exponential&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.90&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;92%&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;2.1&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;那么高斯核虽然点预测更准，却：&lt;/p&gt;
+\[\boxed{\text{uncertainty model 严重过度自信。}}\]&lt;p&gt;对于主动可靠性分析，指数核可能反而更可靠。&lt;/p&gt;
+&lt;p&gt;这会把“核函数优劣”的判断从：&lt;/p&gt;
+\[\boxed{\text{谁拟合得最准}}\]&lt;p&gt;提升到：&lt;/p&gt;
+\[\boxed{\text{谁既能预测，又知道自己什么时候可能预测错。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-对-scientific-ml-的迁移更明显&#34;&gt;14. 对 Scientific ML 的迁移更明显
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;2026 年 Gopakumar 等人的工作把 CP 用到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PDE surrogate；&lt;/li&gt;
+&lt;li&gt;magnetohydrodynamics；&lt;/li&gt;
+&lt;li&gt;weather forecasting；&lt;/li&gt;
+&lt;li&gt;fusion diagnostics；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;模型则包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;MLP；&lt;/li&gt;
+&lt;li&gt;U-Net；&lt;/li&gt;
+&lt;li&gt;Fourier &lt;span class=&#34;term-anchor&#34; data-term=&#34;neural-operator&#34; tabindex=&#34;0&#34;&gt;Neural Operator&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;ViT；&lt;/li&gt;
+&lt;li&gt;GNN。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;输出维度从几十一直到超过：&lt;/p&gt;
+\[2\times10^7.\]&lt;p&gt;他们报告 conformal calibration 本身只需要秒到分钟级，并且预测阶段增加的计算成本很小。&lt;/p&gt;
+&lt;p&gt;这非常适合未来的：&lt;/p&gt;
+\[\boxed{\text{ROM / neural operator + physics solver}}\]&lt;p&gt;架构。&lt;/p&gt;
+&lt;p&gt;昂贵 solver：&lt;/p&gt;
+\[f_H(x)\]&lt;p&gt;训练 surrogate：&lt;/p&gt;
+\[\hat f_\theta(x)\]&lt;p&gt;然后 CP 作为：&lt;/p&gt;
+\[\boxed{\text{deployment-time reliability wrapper}.}\]&lt;p&gt;也就是说，你甚至可以：&lt;/p&gt;
+\[\boxed{\text{不重新训练 surrogate，就给它增加统计校准层。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-但-distribution-shift-会破坏核心假设&#34;&gt;15. 但 distribution shift 会破坏核心假设
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Conformal 最核心的条件不是：&lt;/p&gt;
+\[\text{Gaussianity}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\text{exchangeability}.}\]&lt;p&gt;直观理解：&lt;/p&gt;
+&lt;p&gt;calibration data 和未来 deployment data 应该来自同一个统计机制。&lt;/p&gt;
+&lt;p&gt;假设训练/校准：&lt;/p&gt;
+\[Mach\in[0.1,0.4],\]&lt;p&gt;真正部署：&lt;/p&gt;
+\[Mach\in[0.8,1.2].\]&lt;p&gt;此时：&lt;/p&gt;
+\[\boxed{\text{95% coverage guarantee 不再自动成立。}}\]&lt;p&gt;这也是为什么 CP 不是 OOD 检测的替代品。&lt;/p&gt;
+&lt;p&gt;更准确的架构是：&lt;/p&gt;
+\[\boxed{ \text{distribution monitoring} + \text{conformal calibration} + \text{surrogate} }\]&lt;p&gt;三者各司其职。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-一个非常值得自己做的小实验&#34;&gt;16. 一个非常值得自己做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;用你已有的 Kriging 案例即可。&lt;/p&gt;
+&lt;p&gt;把样本随机分成：&lt;/p&gt;
+\[60\%\text{ train}\]\[20\%\text{ calibration}\]\[20\%\text{ test}.\]&lt;p&gt;第一步，用 train：&lt;/p&gt;
+\[\mathcal D_{\rm train}\]&lt;p&gt;训练 Gaussian-kernel Kriging。&lt;/p&gt;
+&lt;p&gt;第二步，在 calibration 上计算：&lt;/p&gt;
+\[s_i= \frac{|y_i-\mu(x_i)|}{\sigma(x_i)}.\]&lt;p&gt;第三步求：&lt;/p&gt;
+\[\hat q_{0.95}.\]&lt;p&gt;第四步构造：&lt;/p&gt;
+\[C(x) = [ \mu(x)-\hat q\sigma(x), \mu(x)+\hat q\sigma(x) ].\]&lt;p&gt;最后比较：&lt;/p&gt;
+&lt;p&gt;原始 GP interval：&lt;/p&gt;
+\[\mu(x)\pm1.96\sigma(x)\]&lt;p&gt;和 conformalized interval：&lt;/p&gt;
+\[\mu(x)\pm\hat q\sigma(x).\]&lt;p&gt;不要只比较 RMSE。&lt;/p&gt;
+&lt;p&gt;重点记录：&lt;/p&gt;
+\[\boxed{\text{empirical coverage}}\]\[\boxed{\text{mean interval width}}\]\[\boxed{\text{failure-boundary coverage}}\]\[\boxed{\text{false-safe rate}}.\]&lt;p&gt;然后换：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Gaussian kernel；&lt;/li&gt;
+&lt;li&gt;Matérn；&lt;/li&gt;
+&lt;li&gt;exponential kernel；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;重新比较。&lt;/p&gt;
+&lt;p&gt;这会得到一个比单纯：&lt;/p&gt;
+\[R^2\]&lt;p&gt;丰富得多的 surrogate 评价体系。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-它在整个知识体系中卡在哪里&#34;&gt;17. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把代理模型 UQ 粗略理解成：&lt;/p&gt;
+\[\text{Point surrogate}\]&lt;p&gt;只给：&lt;/p&gt;
+\[\hat y.\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Probabilistic surrogate}\]&lt;p&gt;例如 GP：&lt;/p&gt;
+\[\hat y+\sigma(x).\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Calibration}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\sigma(x)\text{ 真的可信吗？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\boxed{\text{Conformal Prediction}}\]&lt;p&gt;用 empirical residual ranks 给：&lt;/p&gt;
+\[\boxed{\text{finite-sample marginal coverage guarantee}.}\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Decision / Reliability}\]&lt;p&gt;再把区间用于：&lt;/p&gt;
+\[P_f,\quad \text{active learning},\quad \text{safety decisions}.\]&lt;p&gt;因此 CP 的定位并不是另一种 surrogate。&lt;/p&gt;
+&lt;p&gt;它更像：&lt;/p&gt;
+\[\boxed{\text{surrogate 外面的一层 statistical safety wrapper}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Conformal Prediction 最值得理解的并不是那个 quantile 公式，而是一种完全不同的不确定性观：&lt;/p&gt;
+\[\boxed{ \text{模型声称自己有多确定，并不重要； 重要的是它过去在可比数据上实际错了多少。} }\]&lt;p&gt;GP/Kriging 试图通过：&lt;/p&gt;
+\[\boxed{\text{模型结构}}\]&lt;p&gt;推导 uncertainty。&lt;/p&gt;
+&lt;p&gt;Conformal Prediction 则通过：&lt;/p&gt;
+\[\boxed{\text{真实预测误差的排名}}\]&lt;p&gt;校准 uncertainty。&lt;/p&gt;
+&lt;p&gt;所以两者很适合组合：&lt;/p&gt;
+\[\boxed{ \text{Kriging tells you where uncertainty varies} }\]\[+\]\[\boxed{ \text{Conformal tells you how much uncertainty to trust}. }\]&lt;p&gt;对于可靠性代理模型，这比继续把 \(R^2\) 从：&lt;/p&gt;
+\[0.96\rightarrow0.98\]&lt;p&gt;再抠两个百分点，往往更值得研究：&lt;strong&gt;一个预测稍微差一点但经过良好校准的模型，在安全相关决策中可能比一个点预测极准、却严重过度自信的模型更有价值。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Lei, G&amp;rsquo;Sell, Rinaldo, Ryan Tibshirani &amp;amp; Larry Wasserman, &lt;strong&gt;Distribution-Free Predictive Inference for Regression&lt;/strong&gt;, &lt;em&gt;JASA&lt;/em&gt;, 2018。理解 split conformal、full conformal 和 finite-sample coverage 的经典入口。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/1604.04173&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文预印本&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Romano, Patterson &amp;amp; Emmanuel Candès, &lt;strong&gt;Conformalized Quantile Regression&lt;/strong&gt;, NeurIPS 2019。理解 heteroscedastic conformal prediction 最值得读的一篇。&lt;br&gt;
+NeurIPS 官方论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Gopakumar et al., &lt;strong&gt;Uncertainty Quantification of Surrogate Models using Conformal Prediction&lt;/strong&gt;, &lt;em&gt;Machine Learning: Science and Technology&lt;/em&gt;, 2026, DOI 10.1088/2632-2153/ae2e7b。这篇尤其推荐：它直接把 conformal prediction 放进 scientific surrogate/PDE/neural operator 的语境，并系统讨论 marginal coverage、exchangeability 和高维输出。&lt;br&gt;
+IOP 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Dan Giles 的作者项目页与公开预印本入口 —— 如果希望沿“物理代理模型 + conformal UQ”继续跟踪作者团队，这是比泛泛阅读 CP 教程更贴近 Scientific ML 的入口。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;

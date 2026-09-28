@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Mon, 21 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Mon, 28 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
         <link>https://assranai.github.io/cards/02-ak-mcs/</link>
         <pubDate>Sat, 15 Aug 2026 00:00:00 +0000</pubDate>
@@ -6675,6 +6675,1470 @@ SIAM 论文页&lt;/p&gt;
 &lt;p&gt;Kim, Wang &amp;amp; Junho Song, &lt;strong&gt;&lt;em&gt;Adaptive Active Subspace-Based Metamodeling for High-Dimensional Reliability Analysis&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Structural Safety&lt;/em&gt;, 2023。把 Active Subspace、heteroscedastic GP 和 active learning 联合起来，最直接对应高维可靠性代理问题。&lt;br&gt;
 &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2304.06252&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;公开预印本&lt;/a&gt;&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Control Variates：低保真模型真正“提供”的不是答案，而是可被抵消的随机波动</title>
+        <link>https://assranai.github.io/cards/42-control-variates/</link>
+        <pubDate>Thu, 24 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/42-control-variates/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Control Variates（控制变量）与 Multifidelity Monte Carlo&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：可靠性 × 多保真建模 × Monte Carlo × 代理模型&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选这个主题，是因为它能回答一个很容易卡住的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;低保真模型明明有系统误差，为什么还能帮助高保真 Monte Carlo？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;关键在于，多保真 Monte Carlo（&lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt;）通常&lt;strong&gt;不要求低保真模型给出正确答案&lt;/strong&gt;。它真正需要低保真模型提供的是：&lt;/p&gt;
+\[\boxed{\text{与高保真输出同步变化的“波动模式”}}\]&lt;p&gt;然后利用这种相关性，把高保真 Monte Carlo 中昂贵的随机波动抵消掉。&lt;/p&gt;
+&lt;p&gt;这也是理解 MFMC、&lt;span class=&#34;term-anchor&#34; data-term=&#34;mlmc&#34; tabindex=&#34;0&#34;&gt;MLMC&lt;/span&gt;、Approximate Control Variates 乃至大量多保真 UQ 方法的核心入口。Peherstorfer、Willcox 与 Gunzburger 的 MFMC 工作正是利用不同模型之间的相关性与成本差异，优化各模型的采样数量；后来的 ACV 框架又把这种思想推广到多个低保真模型及其均值未知的现实情况。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-monte-carlo-真正昂贵的东西是什么&#34;&gt;1. Monte Carlo 真正昂贵的东西是什么？
+&lt;/h2&gt;&lt;p&gt;假设高保真模型：&lt;/p&gt;
+\[Y_H=f_H(X)\]&lt;p&gt;我们要估计：&lt;/p&gt;
+\[\mu_H=\mathbb E[Y_H].\]&lt;p&gt;普通 Monte Carlo：&lt;/p&gt;
+\[\hat\mu_H = \frac1N\sum_{i=1}^N Y_H^{(i)}.\]&lt;p&gt;它是无偏的，而且：&lt;/p&gt;
+\[\operatorname{Var}(\hat\mu_H) = \frac{\sigma_H^2}{N}.\]&lt;p&gt;所以标准误差：&lt;/p&gt;
+\[\mathrm{SE} = \frac{\sigma_H}{\sqrt N}.\]&lt;p&gt;这意味着想让误差缩小 10 倍：&lt;/p&gt;
+\[N\rightarrow100N.\]&lt;p&gt;如果一次高保真 FEM 要：&lt;/p&gt;
+\[30\text{ min},\]&lt;p&gt;Monte Carlo 真正的问题就出现了：&lt;/p&gt;
+\[\boxed{\text{我们需要大量昂贵样本，才能平均掉输出自身的随机波动。}}\]&lt;p&gt;Control Variate 的思路是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;能不能找到一个便宜变量，提前解释掉这些波动？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-假设我们有一个很便宜但明显不准确的模型&#34;&gt;2. 假设我们有一个很便宜、但明显不准确的模型
+&lt;/h1&gt;&lt;p&gt;低保真模型：&lt;/p&gt;
+\[Y_L=f_L(X).\]&lt;p&gt;比如：&lt;/p&gt;
+&lt;p&gt;高保真：&lt;/p&gt;
+\[\text{非线性接触 + 柔性 FEM}\]&lt;p&gt;低保真：&lt;/p&gt;
+\[\text{刚体机构模型}.\]&lt;p&gt;假设真实关系大概是：&lt;/p&gt;
+\[Y_H=100+2Y_L+\epsilon.\]&lt;p&gt;注意：&lt;/p&gt;
+\[Y_L\]&lt;p&gt;甚至可能和 \(Y_H\) 数值尺度完全不同。&lt;/p&gt;
+&lt;p&gt;它可能严重 biased。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[\mathbb E[Y_H]=300,\]&lt;p&gt;但：&lt;/p&gt;
+\[\mathbb E[Y_L]=80.\]&lt;p&gt;如果把低保真结果直接当高保真近似：&lt;/p&gt;
+\[\boxed{\text{当然很差。}}\]&lt;p&gt;但这并不意味着：&lt;/p&gt;
+\[Y_L\]&lt;p&gt;没有价值。&lt;/p&gt;
+&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{\operatorname{Corr}(Y_H,Y_L).}\]&lt;p&gt;如果：&lt;/p&gt;
+\[\rho=0.98,\]&lt;p&gt;那么当某组参数让低保真模型输出偏高时，高保真通常也偏高。&lt;/p&gt;
+&lt;p&gt;低保真已经告诉我们：&lt;/p&gt;
+\[\boxed{\text{这次随机输入大概会把输出往哪个方向推。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;3-control-variate-的核心公式&#34;&gt;3. Control Variate 的核心公式
+&lt;/h1&gt;&lt;p&gt;假设我们知道：&lt;/p&gt;
+\[\mu_L=\mathbb E[Y_L].\]&lt;p&gt;构造新变量：&lt;/p&gt;
+\[\boxed{ Z = Y_H-\beta(Y_L-\mu_L). }\]&lt;p&gt;因为：&lt;/p&gt;
+\[\mathbb E[Y_L-\mu_L]=0,\]&lt;p&gt;所以：&lt;/p&gt;
+\[\mathbb E[Z] = \mathbb E[Y_H].\]&lt;p&gt;因此 estimator：&lt;/p&gt;
+\[\hat\mu_{\rm CV} = \frac1N \sum_i \left[ Y_H^{(i)} -\beta(Y_L^{(i)}-\mu_L) \right]\]&lt;p&gt;仍然估计：&lt;/p&gt;
+\[\mu_H.\]&lt;p&gt;关键变化发生在方差：&lt;/p&gt;
+\[\operatorname{Var}(Z) = \sigma_H^2 + \beta^2\sigma_L^2 - 2\beta\operatorname{Cov}(Y_H,Y_L).\]&lt;p&gt;选择最佳：&lt;/p&gt;
+\[\boxed{ \beta^\star = \frac{\operatorname{Cov}(Y_H,Y_L)} {\sigma_L^2} }\]&lt;p&gt;得到：&lt;/p&gt;
+\[\boxed{ \operatorname{Var}(Z) = \sigma_H^2(1-\rho^2). }\]&lt;p&gt;这就是整个方法最值得记住的公式。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-如果相关系数-099会发生什么&#34;&gt;4. 如果相关系数 0.99，会发生什么？
+&lt;/h1&gt;\[\rho=0.99.\]&lt;p&gt;那么：&lt;/p&gt;
+\[1-\rho^2 = 0.0199.\]&lt;p&gt;也就是说剩余方差只有原来的：&lt;/p&gt;
+\[\boxed{1.99\%}.\]&lt;p&gt;为了达到相同 Monte Carlo 精度，理论上高保真样本数大约可以缩小：&lt;/p&gt;
+\[\frac1{1-\rho^2} \approx50.\]&lt;p&gt;这里出现了一个很反直觉的结论：&lt;/p&gt;
+&lt;p&gt;低保真模型可以有明显 bias。&lt;/p&gt;
+&lt;p&gt;它甚至不需要：&lt;/p&gt;
+\[Y_L\approx Y_H.\]&lt;p&gt;真正需要的是：&lt;/p&gt;
+\[\boxed{ Y_L-\mu_L \quad\text{与}\quad Y_H-\mu_H \text{高度相关}. }\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{\text{预测准确度和 variance-reduction usefulness 是两个不同指标。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;5-一个极端例子能把这件事说明白&#34;&gt;5. 一个极端例子能把这件事说明白
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[Y_H=X,\]&lt;p&gt;而低保真：&lt;/p&gt;
+\[Y_L=1000X+500.\]&lt;p&gt;作为 surrogate：&lt;/p&gt;
+\[Y_L\]&lt;p&gt;看起来荒谬。&lt;/p&gt;
+&lt;p&gt;RMSE 会非常大。&lt;/p&gt;
+&lt;p&gt;但：&lt;/p&gt;
+\[\rho(Y_H,Y_L)=1.\]&lt;p&gt;如果：&lt;/p&gt;
+\[\mu_L\]&lt;p&gt;已知，最佳 &lt;span class=&#34;term-anchor&#34; data-term=&#34;control-variate&#34; tabindex=&#34;0&#34;&gt;control variate&lt;/span&gt; 可以理论上把：&lt;/p&gt;
+\[\boxed{\text{Monte Carlo variance 降到 0}.}\]&lt;p&gt;因为低保真模型完美描述了：&lt;/p&gt;
+\[\boxed{\text{高保真模型随随机输入如何涨落}.}\]&lt;p&gt;这就是 Control Variate 与传统 surrogate modeling 思维最深的区别之一。&lt;/p&gt;
+&lt;p&gt;传统 surrogate：&lt;/p&gt;
+\[\boxed{\text{我要预测 }Y_H.}\]&lt;p&gt;Control Variate：&lt;/p&gt;
+\[\boxed{\text{我要解释 }Y_H\text{ 的随机变化}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;6-所以低保真模型到底给了什么信息&#34;&gt;6. 所以低保真模型到底“给了什么信息”？
+&lt;/h1&gt;&lt;p&gt;可以把高保真输出写成：&lt;/p&gt;
+\[Y_H = \underbrace{\beta Y_L}_{\text{低保真可解释部分}} + \underbrace{\epsilon}_{\text{低保真解释不了的部分}}.\]&lt;p&gt;普通 Monte Carlo 在估计整个：&lt;/p&gt;
+\[Y_H.\]&lt;p&gt;Control Variate 实际上只需要高保真 Monte Carlo 去估计：&lt;/p&gt;
+\[\boxed{\epsilon.}\]&lt;p&gt;如果低保真解释能力很好：&lt;/p&gt;
+\[\operatorname{Var}(\epsilon) \ll \operatorname{Var}(Y_H).\]&lt;p&gt;于是高保真采样问题就简单很多。&lt;/p&gt;
+&lt;p&gt;这和机器学习回归有一个非常漂亮的对应：&lt;/p&gt;
+\[\boxed{\text{低保真模型承担 explainable variation，高保真样本负责 residual correction}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-但现实中--通常根本不知道&#34;&gt;7. 但现实中 \(\mu_L\) 通常根本不知道
+&lt;/h1&gt;&lt;p&gt;这正是从经典 Control Variates 走向 MFMC 的关键一步。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[\mu_L\]&lt;p&gt;未知，我们可以因为低保真模型便宜，大量运行它：&lt;/p&gt;
+\[N_L\gg N_H.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\hat\mu_L = \frac1{N_L} \sum_{i=1}^{N_L}Y_L^{(i)}\]&lt;p&gt;可以非常准确。&lt;/p&gt;
+&lt;p&gt;同时在高保真样本对应的输入上计算：&lt;/p&gt;
+\[Y_H^{(i)},Y_L^{(i)}.\]&lt;p&gt;一个典型 MFMC estimator 可以理解为：&lt;/p&gt;
+\[\boxed{ \hat\mu_H^{MF} = \hat\mu_H + \alpha ( \hat\mu_L^{\rm many} - \hat\mu_L^{\rm paired} ) }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\hat\mu_L^{\rm paired}\]&lt;p&gt;使用与高保真完全相同的随机输入。&lt;/p&gt;
+&lt;p&gt;为什么一定要 paired？&lt;/p&gt;
+&lt;p&gt;因为只有这样：&lt;/p&gt;
+\[Y_H(X_i)\]&lt;p&gt;和：&lt;/p&gt;
+\[Y_L(X_i)\]&lt;p&gt;之间的 correlation 才能被利用。&lt;/p&gt;
+&lt;p&gt;Peherstorfer、Willcox 与 Gunzburger 的 MFMC 方法进一步根据模型成本和相关系数联合决定各保真模型应运行多少次，而且允许低保真来源是 ROM、data-fit surrogate、简化物理模型等，不要求形成严格的离散层级。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-于是好的低保真模型的定义变了&#34;&gt;8. 于是“好的低保真模型”的定义变了
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果目标是替代高保真模型：&lt;/p&gt;
+\[\boxed{\text{低 RMSE 很重要}.}\]&lt;p&gt;如果目标是 control variate：&lt;/p&gt;
+\[\boxed{\text{高相关 + 极低成本更重要}.}\]&lt;p&gt;所以可能出现：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;模型&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;相对成本&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;RMSE&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;与 HF 的相关系数&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;ROM A&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.1&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;很低&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.97&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;简化模型 B&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.001&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;较高&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.93&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;作为 surrogate：&lt;/p&gt;
+\[A\]&lt;p&gt;显然更好。&lt;/p&gt;
+&lt;p&gt;但用于 MFMC：&lt;/p&gt;
+\[B\]&lt;p&gt;可能更划算。&lt;/p&gt;
+&lt;p&gt;因为你可以运行：&lt;/p&gt;
+\[1000\]&lt;p&gt;次 B，而只能运行：&lt;/p&gt;
+\[10\]&lt;p&gt;次 A。&lt;/p&gt;
+&lt;p&gt;MFMC 的核心因此不是单纯追求：&lt;/p&gt;
+\[\boxed{\text{fidelity}}\]&lt;p&gt;而是优化：&lt;/p&gt;
+\[\boxed{\text{correlation / cost}.}\]&lt;p&gt;这也是“多保真”这个名字有时会造成误导的地方——所谓 fidelity 不必严格按准确度排成整齐层级。原始 MFMC 工作明确允许 arbitrary collections of surrogate models。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-这和-mlmc-有什么关系&#34;&gt;9. 这和 MLMC 有什么关系？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Michael B. Giles 的 Multilevel Monte Carlo（MLMC）采用：&lt;/p&gt;
+\[\mathbb E[Y_L] = \mathbb E[Y_0] + \sum_{\ell=1}^{L} \mathbb E[Y_\ell-Y_{\ell-1}].\]&lt;p&gt;这是一个 telescoping identity。&lt;/p&gt;
+&lt;p&gt;关键在于：&lt;/p&gt;
+\[Y_\ell\]&lt;p&gt;与：&lt;/p&gt;
+\[Y_{\ell-1}\]&lt;p&gt;要用&lt;strong&gt;耦合的随机输入&lt;/strong&gt;计算。&lt;/p&gt;
+&lt;p&gt;如果细粗模型高度相关：&lt;/p&gt;
+\[\operatorname{Var} (Y_\ell-Y_{\ell-1}) \ll \operatorname{Var}(Y_\ell).\]&lt;p&gt;于是：&lt;/p&gt;
+&lt;p&gt;粗模型大量算；&lt;/p&gt;
+&lt;p&gt;昂贵的细模型只负责估计：&lt;/p&gt;
+\[\boxed{\text{粗模型遗漏的小修正}.}\]&lt;p&gt;Giles 本人也明确把 MLMC 描述为一种受 multigrid 启发的 &lt;strong&gt;recursive control variate approach&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;在经典 SDE 示例中，他证明普通方法达到 RMS error \(O(\epsilon)\) 的成本可从 \(O(\epsilon^{-3})\) 降至：&lt;/p&gt;
+\[O\left( \epsilon^{-2}(\log\epsilon)^2 \right).\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{MLMC 本质上也在让昂贵模型只计算“模型间差值”.} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-mfmc-与-mlmc-最值得区分的一点&#34;&gt;10. MFMC 与 MLMC 最值得区分的一点
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;MLMC 通常具有天然层级：&lt;/p&gt;
+\[h_0&gt;h_1&gt;\cdots&gt;h_L,\]&lt;p&gt;例如：&lt;/p&gt;
+\[16^3 \rightarrow32^3 \rightarrow64^3 \rightarrow128^3\]&lt;p&gt;网格。&lt;/p&gt;
+&lt;p&gt;误差和成本通常随：&lt;/p&gt;
+\[h\]&lt;p&gt;有规律地变化。&lt;/p&gt;
+&lt;p&gt;MFMC 更自由：&lt;/p&gt;
+\[\boxed{ \text{HF FEM} + \text{ROM} + \text{Kriging} + \text{刚体模型} + \text{经验公式} }\]&lt;p&gt;都可以放进同一个 estimator。&lt;/p&gt;
+&lt;p&gt;只要它们：&lt;/p&gt;
+\[\boxed{\text{便宜并且与 HF 有相关性}.}\]&lt;p&gt;因此，如果研究中已经存在很多历史模型、代理模型、不同软件模型，MFMC 的适用性尤其高。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-但多个低保真模型并不意味着收益自动叠加&#34;&gt;11. 但多个低保真模型并不意味着收益自动叠加
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[Y_{L1},Y_{L2},Y_{L3}\]&lt;p&gt;都和高保真高度相关。&lt;/p&gt;
+&lt;p&gt;如果它们彼此也高度相关：&lt;/p&gt;
+\[\rho(L_1,L_2)\approx1,\]&lt;p&gt;那么它们提供的可能基本是：&lt;/p&gt;
+\[\boxed{\text{同一份信息}.}\]&lt;p&gt;这就像三个传感器都测同一个东西。&lt;/p&gt;
+&lt;p&gt;增加模型数量并不自动增加独立信息。&lt;/p&gt;
+&lt;p&gt;这也是后来 Approximate Control Variates（ACV）研究的重要动机。&lt;/p&gt;
+&lt;p&gt;Gorodetsky 等人在 2020 年的 JCP 工作证明，一些递归/嵌套的多模型策略存在理论上的 variance-reduction 上限；通过更一般的采样共享结构，可以更充分地利用多个模型提供的信息，在某些例子中与单一低保真控制变量相比出现数量级上的差距。&lt;/p&gt;
+&lt;p&gt;所以现代问题已经从：&lt;/p&gt;
+\[\boxed{\text{“有哪些低保真模型？”}}\]&lt;p&gt;进一步变成：&lt;/p&gt;
+\[\boxed{\text{“哪些模型共享哪些样本，怎样组合这些相关信息？”}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-一个非常值得迁移到可靠性的问题&#34;&gt;12. 一个非常值得迁移到可靠性的问题
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可靠性通常估计：&lt;/p&gt;
+\[P_f=P[g(X)&lt;0].\]&lt;p&gt;定义高保真 indicator：&lt;/p&gt;
+\[Y_H= \mathbf 1[g_H(X)&lt;0].\]&lt;p&gt;原则上仍然可以构造低保真：&lt;/p&gt;
+\[Y_L.\]&lt;p&gt;但这里会出现一个重要困难：&lt;/p&gt;
+&lt;p&gt;indicator 是：&lt;/p&gt;
+\[0/1.\]&lt;p&gt;即使：&lt;/p&gt;
+\[g_L(X)\]&lt;p&gt;与：&lt;/p&gt;
+\[g_H(X)\]&lt;p&gt;整体拟合很好，只要在：&lt;/p&gt;
+\[g=0\]&lt;p&gt;附近判断错误，failure indicator correlation 就会迅速下降。&lt;/p&gt;
+&lt;p&gt;所以可靠性问题再次提醒：&lt;/p&gt;
+\[\boxed{\text{全局 surrogate accuracy 并不等于 reliability usefulness}.}\]&lt;p&gt;真正值得优化的是：&lt;/p&gt;
+\[\boxed{\text{失效边界附近 HF/LF 的一致性}.}\]&lt;p&gt;这与昨天 &lt;span class=&#34;term-anchor&#34; data-term=&#34;active-subspace&#34; tabindex=&#34;0&#34;&gt;Active Subspace&lt;/span&gt; 卡片里的 failure-aware dimension reduction 是同一个深层规律。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对代理模型研究有一个很强的启发&#34;&gt;13. 对代理模型研究有一个很强的启发
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;通常训练 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; 时目标是：&lt;/p&gt;
+\[\min \text{RMSE}.\]&lt;p&gt;但如果 Kriging 最终用途只是作为 MFMC control variate，那么目标函数完全可以换成：&lt;/p&gt;
+\[\boxed{\max\rho(f_H,\hat f_L)}\]&lt;p&gt;同时考虑：&lt;/p&gt;
+\[\boxed{\min C_L}.\]&lt;p&gt;这会改变模型选择。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;少一点 hyperparameter optimization；&lt;/li&gt;
+&lt;li&gt;更小的网络；&lt;/li&gt;
+&lt;li&gt;更粗的 ROM；&lt;/li&gt;
+&lt;li&gt;更低精度数值求解；&lt;/li&gt;
+&lt;li&gt;更少的迭代次数；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;只要：&lt;/p&gt;
+\[\rho\]&lt;p&gt;下降得不多，低保真模型反而可能更有价值。&lt;/p&gt;
+&lt;p&gt;因此可以出现一个很有意思的工程策略：&lt;/p&gt;
+\[\boxed{ \text{故意让低保真模型“不那么准”， 换取大幅速度提升， 只要它仍然保留正确的涨落趋势。} }\]&lt;p&gt;这是一种和传统 surrogate accuracy optimization 很不同的设计哲学。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-对物理仿真也有一个非常具体的迁移&#34;&gt;14. 对物理仿真也有一个非常具体的迁移
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设高保真软体模型：&lt;/p&gt;
+\[\text{Neo-Hookean FEM} + \text{精确 contact} + \text{小 }dt.\]&lt;p&gt;低保真模型可以是：&lt;/p&gt;
+\[\text{corotated FEM} + \text{简化 contact} + \text{大 }dt.\]&lt;p&gt;甚至：&lt;/p&gt;
+\[\text{XPBD}.\]&lt;p&gt;如果目标只是估计：&lt;/p&gt;
+\[\mathbb E[F_{\rm impact}]\]&lt;p&gt;或者某种统计量，那么低保真模型无需逐帧逼真复现高保真轨迹。&lt;/p&gt;
+&lt;p&gt;真正需要验证的是：&lt;/p&gt;
+\[\boxed{ \operatorname{Corr} ( F_{\rm impact}^{HF}, F_{\rm impact}^{LF} ). }\]&lt;p&gt;这给出了一个很实用的模型评估标准：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;低保真模型值不值得保留，不能只看“和 HF 差多少”，还应该看“它是否知道哪些样本会高、哪些会低”。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-一个极小的实验就能真正理解-mfmc&#34;&gt;15. 一个极小的实验就能真正理解 MFMC
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;构造：&lt;/p&gt;
+\[X\sim\mathcal N(0,1).\]&lt;p&gt;高保真：&lt;/p&gt;
+\[Y_H=\exp(X)+0.1\sin(10X).\]&lt;p&gt;低保真：&lt;/p&gt;
+\[Y_L=3\exp(X)+20.\]&lt;p&gt;故意让：&lt;/p&gt;
+\[Y_L\]&lt;p&gt;数值尺度严重错误。&lt;/p&gt;
+&lt;p&gt;比较：&lt;/p&gt;
+&lt;p&gt;普通 MC：&lt;/p&gt;
+\[\hat\mu_{MC} = \frac1N\sum Y_H.\]&lt;p&gt;和 control variate：&lt;/p&gt;
+\[\hat\mu_{CV} = \frac1N \sum [ Y_H-\beta(Y_L-\mu_L) ].\]&lt;p&gt;然后画：&lt;/p&gt;
+\[\boxed{\text{Estimator RMSE vs HF evaluations}.}\]&lt;p&gt;再逐渐往低保真加入噪声：&lt;/p&gt;
+\[Y_L = 3e^X+20+\sigma\epsilon.\]&lt;p&gt;观察：&lt;/p&gt;
+\[\rho\downarrow\]&lt;p&gt;时：&lt;/p&gt;
+\[1-\rho^2\uparrow.\]&lt;p&gt;这个实验会非常直观地建立：&lt;/p&gt;
+\[\boxed{\text{MFMC 的收益来自 correlation，而不是 bias 小}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它在整个知识体系中卡在哪里&#34;&gt;16. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把多保真方法粗略分成两类。&lt;/p&gt;
+&lt;p&gt;第一类：&lt;/p&gt;
+\[\boxed{\text{预测型}}\]&lt;p&gt;目标：&lt;/p&gt;
+\[x\rightarrow f_H(x).\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;co-Kriging；&lt;/li&gt;
+&lt;li&gt;multi-fidelity GP；&lt;/li&gt;
+&lt;li&gt;neural surrogate；&lt;/li&gt;
+&lt;li&gt;ROM correction。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;第二类：&lt;/p&gt;
+\[\boxed{\text{统计估计型}}\]&lt;p&gt;目标：&lt;/p&gt;
+\[\mathbb E[f_H],\quad P_f,\quad \operatorname{Var}(f_H).\]&lt;p&gt;Control Variates / MFMC 属于第二类。&lt;/p&gt;
+&lt;p&gt;所以如果最终只想得到：&lt;/p&gt;
+\[P_f=2.7\times10^{-5},\]&lt;p&gt;未必需要训练一个在整个参数空间都极其准确的 surrogate。&lt;/p&gt;
+&lt;p&gt;可能只需要：&lt;/p&gt;
+\[\boxed{\text{构造一个便宜、与高保真统计波动高度相关的信息源}.}\]&lt;p&gt;这是两种完全不同的计算目标。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Control Variates 最值得记住的不是：&lt;/p&gt;
+\[Z=Y_H-\beta(Y_L-\mu_L).\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \text{低保真模型的价值， 可以不在于告诉你“答案是多少”， 而在于告诉你“这一次随机样本为什么比平均值高或低”。} }\]&lt;p&gt;只要它能够解释高保真输出的大部分随机波动：&lt;/p&gt;
+\[Y_H = \underbrace{\text{LF-explainable variation}}_{\text{便宜}} + \underbrace{\text{residual}}_{\text{昂贵}},\]&lt;p&gt;高保真模型就只需要负责后面那个小 residual。&lt;/p&gt;
+&lt;p&gt;因此 MFMC 的核心逻辑可以浓缩成：&lt;/p&gt;
+\[\boxed{ \text{cheap model learns variation} \quad+\quad \text{expensive model corrects what remains}. }\]&lt;p&gt;这也是它对可靠性、ROM、代理模型和仿真工程都很有迁移价值的原因：&lt;strong&gt;模型的“有用性”取决于任务。一个不够准确的模型，仍然可能是极好的信息源。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Peherstorfer, Karen E. Willcox &amp;amp; Gunzburger, &lt;strong&gt;&lt;em&gt;Optimal Model Management for Multifidelity Monte Carlo Estimation&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Scientific Computing&lt;/em&gt;, 2016。MFMC 的核心论文；重点看“cost + correlation 如何决定最优样本分配”。&lt;br&gt;
+MIT 开放论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Michael B. Giles, &lt;strong&gt;&lt;em&gt;Multilevel Monte Carlo Path Simulation&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Operations Research&lt;/em&gt;, 2008。MLMC 奠基论文。&lt;br&gt;
+Michael Giles 的 MLMC 主页、论文与 MATLAB 实现&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Gorodetsky, Geraci, Eldred &amp;amp; Jakeman, &lt;strong&gt;&lt;em&gt;A Generalized Approximate Control Variate Framework for Multifidelity Uncertainty Quantification&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Journal of Computational Physics&lt;/em&gt;, 408, 109257, 2020。适合继续理解“多个低保真模型为什么不能简单堆起来”以及采样共享结构为什么重要。&lt;br&gt;
+作者公开 PDF&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Oden Institute / Willcox 团队 Multifidelity UQ 项目页 —— 很适合从方法论转向实际应用；项目覆盖均值、方差、全局敏感度、失效概率、统计推断与不确定性优化等任务。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果继续追当前发展，可以看 Gorodetsky、Jakeman 与 Eldred 的 &lt;strong&gt;Grouped Approximate Control Variate Estimators&lt;/strong&gt;（2024）：它进一步把“哪些模型共享哪些样本”统一成 generalized linear estimator，并连接 ACV 与 ML-BLUE。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Shapley Effects：当输入变量彼此相关时，“谁导致了输出不确定性”为什么突然变成一个博弈论问题？</title>
+        <link>https://assranai.github.io/cards/44-shapley-effects/</link>
+        <pubDate>Sat, 26 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/44-shapley-effects/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Shapley Effects（Shapley 敏感度）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：可靠性 × 全局敏感度分析 × 代理模型 × 相关不确定性&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 Shapley Effects，因为它补上可靠性分析里一个很容易被低估的漏洞：实际工程参数经常&lt;strong&gt;并不独立&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[X=(L_1,L_2,c,E,F,\ldots)\]&lt;p&gt;其中加工尺寸可能共享制造偏差，载荷之间可能来自同一工况，材料参数之间存在统计相关。如果直接套独立输入下的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;sobol&#34; tabindex=&#34;0&#34;&gt;Sobol&lt;/span&gt; 分解，“某变量贡献了多少不确定性”这个问题会开始变得含糊。&lt;/p&gt;
+&lt;p&gt;Shapley Effects 的思想很漂亮：&lt;/p&gt;
+\[\boxed{\text{把输出方差看成一笔需要在所有输入之间公平分账的“资产”。}}\]&lt;p&gt;而“公平”来自合作博弈论中的 Shapley value。Owen 将这一思想引入全局敏感度分析，Song、Nelson 与 Staum 在 2016 年系统研究了相关输入情况下的理论和计算。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看-sobol-为什么会遇到麻烦&#34;&gt;1. 先看 Sobol 为什么会遇到麻烦
+&lt;/h2&gt;&lt;p&gt;经典方差分解在输入独立时非常漂亮：&lt;/p&gt;
+\[Y=f(X_1,\ldots,X_d)\]&lt;p&gt;可以分解：&lt;/p&gt;
+\[\operatorname{Var}(Y) = \sum_iV_i + \sum_{i&lt;j}V_{ij} +\cdots\]&lt;p&gt;其中：&lt;/p&gt;
+\[V_i=\operatorname{Var}(\mathbb E[Y|X_i]).\]&lt;p&gt;于是第一阶 Sobol：&lt;/p&gt;
+\[S_i=\frac{V_i}{\operatorname{Var}(Y)}.\]&lt;p&gt;总效应：&lt;/p&gt;
+\[S_{T_i}\]&lt;p&gt;则把与 \(X_i\) 有关的所有交互也算进去。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[Y=X_1+X_2+X_1X_2.\]&lt;p&gt;我们可以问：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(X_1\) 单独贡献多少？&lt;/li&gt;
+&lt;li&gt;\(X_2\) 单独贡献多少？&lt;/li&gt;
+&lt;li&gt;\(X_1X_2\) 的 interaction 算多少？&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;输入独立时，这套体系非常自然。&lt;/p&gt;
+&lt;p&gt;麻烦出现在：&lt;/p&gt;
+\[\boxed{X_1\not\!\perp X_2.}\]&lt;hr&gt;
+&lt;h1 id=&#34;2-一个极端例子&#34;&gt;2. 一个极端例子
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[X_2=X_1\]&lt;p&gt;而模型：&lt;/p&gt;
+\[Y=X_1.\]&lt;p&gt;从&lt;strong&gt;结构方程&lt;/strong&gt;看：&lt;/p&gt;
+\[Y\]&lt;p&gt;根本没有使用 \(X_2\)。&lt;/p&gt;
+&lt;p&gt;所以你可能认为：&lt;/p&gt;
+\[X_1:100\%,\qquad X_2:0\%.\]&lt;p&gt;但从&lt;strong&gt;信息角度&lt;/strong&gt;看：&lt;/p&gt;
+&lt;p&gt;只知道 \(X_2\)，就已经知道：&lt;/p&gt;
+\[X_1=X_2\]&lt;p&gt;于是也完全知道：&lt;/p&gt;
+\[Y.\]&lt;p&gt;所以又可以说：&lt;/p&gt;
+\[X_2\]&lt;p&gt;非常有解释力。&lt;/p&gt;
+&lt;p&gt;这暴露了一个深层问题：&lt;/p&gt;
+\[\boxed{ \text{“变量重要性”到底指因果作用， 还是它携带了多少关于输出的信息？} }\]&lt;p&gt;对于独立变量，这两个问题经常不冲突。&lt;/p&gt;
+&lt;p&gt;一旦存在相关性，它们就分开了。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-shapley-effects-选择的是信息贡献视角&#34;&gt;3. Shapley Effects 选择的是“信息贡献”视角
+&lt;/h1&gt;&lt;p&gt;定义一组输入：&lt;/p&gt;
+\[N=\{1,\ldots,d\}.\]&lt;p&gt;对任意子集：&lt;/p&gt;
+\[S\subseteq N\]&lt;p&gt;定义价值函数，例如：&lt;/p&gt;
+\[\boxed{ v(S) = \operatorname{Var} \left( \mathbb E[Y|X_S] \right). }\]&lt;p&gt;它表示：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;如果已经知道变量集合 \(S\)，能够解释多少输出方差？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;空集：&lt;/p&gt;
+\[v(\varnothing)=0.\]&lt;p&gt;所有变量都知道：&lt;/p&gt;
+\[v(N)=\operatorname{Var}(Y).\]&lt;p&gt;现在假设已经知道：&lt;/p&gt;
+\[S.\]&lt;p&gt;再加入变量 \(i\)。&lt;/p&gt;
+&lt;p&gt;新增信息价值：&lt;/p&gt;
+\[\boxed{ v(S\cup\{i\})-v(S). }\]&lt;p&gt;这就是变量 \(i\) 在这个“合作联盟”中的&lt;strong&gt;边际贡献&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-但边际贡献取决于加入顺序&#34;&gt;4. 但边际贡献取决于加入顺序
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[X_1,X_2,X_3.\]&lt;p&gt;一种顺序：&lt;/p&gt;
+\[X_2\rightarrow X_1\rightarrow X_3.\]&lt;p&gt;当 \(X_1\) 加入时，已有：&lt;/p&gt;
+\[S=\{X_2\}.\]&lt;p&gt;它的贡献：&lt;/p&gt;
+\[v(\{1,2\})-v(\{2\}).\]&lt;p&gt;另一种顺序：&lt;/p&gt;
+\[X_3\rightarrow X_2\rightarrow X_1.\]&lt;p&gt;此时 \(X_1\) 最后加入：&lt;/p&gt;
+\[v(\{1,2,3\})-v(\{2,3\}).\]&lt;p&gt;两个值一般不同。&lt;/p&gt;
+&lt;p&gt;Shapley 的解决办法极其直接：&lt;/p&gt;
+\[\boxed{\text{把所有可能加入顺序都考虑进去，然后取平均。}}\]&lt;p&gt;于是：&lt;/p&gt;
+\[\phi_i = \sum_{S\subseteq N\setminus\{i\}} \frac{|S|!(d-|S|-1)!}{d!} \left[ v(S\cup\{i\})-v(S) \right].\]&lt;p&gt;归一化后：&lt;/p&gt;
+\[\boxed{ Sh_i=\frac{\phi_i}{\operatorname{Var}(Y)}. }\]&lt;p&gt;这就是 Shapley Effect。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么这种分账方式很特殊&#34;&gt;5. 为什么这种“分账”方式很特殊？
+&lt;/h1&gt;&lt;p&gt;它满足：&lt;/p&gt;
+\[\boxed{ \sum_{i=1}^{d}Sh_i=1. }\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[100\%\]&lt;p&gt;的输出方差最终全部分给各变量。&lt;/p&gt;
+&lt;p&gt;没有：&lt;/p&gt;
+\[\text{“还有 23% interaction 不知道该算谁的”}\]&lt;p&gt;这种剩余项。&lt;/p&gt;
+&lt;p&gt;更重要的是，变量相关时仍然可以定义和计算这种分配。Song 等人的核心工作之一，就是分析相关输入下 Shapley Effects 的性质，并展示普通一阶/总效应指标在概率依赖或结构交互存在时可能难以正确表达变量重要性。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-interaction-去哪里了&#34;&gt;6. Interaction 去哪里了？
+&lt;/h1&gt;&lt;p&gt;这是理解 Shapley Effects 最关键的一步。&lt;/p&gt;
+&lt;p&gt;假设：&lt;/p&gt;
+\[Y=X_1X_2\]&lt;p&gt;而：&lt;/p&gt;
+\[X_1,X_2\]&lt;p&gt;独立、零均值、同分布。&lt;/p&gt;
+&lt;p&gt;这个输出完全来自 interaction。&lt;/p&gt;
+&lt;p&gt;经典 Sobol 会得到：&lt;/p&gt;
+\[S_1=0, \qquad S_2=0,\]&lt;p&gt;以及：&lt;/p&gt;
+\[S_{12}=1.\]&lt;p&gt;Shapley 则问：&lt;/p&gt;
+&lt;p&gt;这份：&lt;/p&gt;
+\[100\%\]&lt;p&gt;interaction 方差应该怎么归属？&lt;/p&gt;
+&lt;p&gt;由于系统完全对称：&lt;/p&gt;
+\[\boxed{ Sh_1=0.5,\qquad Sh_2=0.5. }\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{\text{Shapley 不消灭 interaction，而是把 interaction 公平分摊给参与者。}}\]&lt;p&gt;因此它回答的问题和 Sobol 有细微但重要的差别。&lt;/p&gt;
+&lt;p&gt;Sobol：&lt;/p&gt;
+\[\boxed{\text{方差结构是什么？}}\]&lt;p&gt;Shapley：&lt;/p&gt;
+\[\boxed{\text{最终每个输入应该承担多少方差责任？}}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-这在工程可靠性里为什么很有价值&#34;&gt;7. 这在工程可靠性里为什么很有价值？
+&lt;/h1&gt;&lt;p&gt;考虑机翼机构中的：&lt;/p&gt;
+\[X_1=\text{左侧杆长误差}\]\[X_2=\text{右侧杆长误差}.\]&lt;p&gt;如果两侧零件来自同一加工批次，可以构造：&lt;/p&gt;
+\[X_1=B+\epsilon_1,\]\[X_2=B+\epsilon_2,\]&lt;p&gt;其中：&lt;/p&gt;
+\[B\]&lt;p&gt;是批次级系统误差。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\operatorname{Corr}(X_1,X_2)&gt;0.\]&lt;p&gt;现在运动精度：&lt;/p&gt;
+\[Y=f(X_1,X_2,\ldots).\]&lt;p&gt;如果强行假定独立：&lt;/p&gt;
+\[p(X_1,X_2)=p(X_1)p(X_2),\]&lt;p&gt;你其实改变了物理问题本身。&lt;/p&gt;
+&lt;p&gt;Shapley Effects 可以直接在相关联合分布：&lt;/p&gt;
+\[p(X)\]&lt;p&gt;下回答：&lt;/p&gt;
+\[\boxed{\text{观察到的输出不确定性应当怎样在这些相关参数之间分配？}}\]&lt;p&gt;这比“为了能做 Sobol，先把相关性删掉”合理得多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-但这里藏着一个非常重要的陷阱&#34;&gt;8. 但这里藏着一个非常重要的陷阱
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;回到：&lt;/p&gt;
+\[X_2=X_1, \qquad Y=X_1.\]&lt;p&gt;由于 \(X_2\) 完全携带 \(X_1\) 的信息，Shapley 会给 \(X_2\) 正的重要性。&lt;/p&gt;
+&lt;p&gt;可是模型公式：&lt;/p&gt;
+\[Y=f(X_1)\]&lt;p&gt;里根本没有 \(X_2\)。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ Shapley importance \neq causal importance. }\]&lt;p&gt;这是使用 Shapley Effects 时必须牢记的限制。&lt;/p&gt;
+&lt;p&gt;2024 年 Herin、Il Idrissi、Chabridon 与 Iooss 的工作专门讨论了这个问题：在相关输入下，一个结构方程中并未直接出现的 &lt;strong&gt;exogenous input&lt;/strong&gt; 仍可能由于相关性获得正 Shapley Effect；他们据此提出 Proportional Marginal Effects，希望更好地区分这种情形。&lt;/p&gt;
+&lt;p&gt;所以 Shapley 更准确的解释是：&lt;/p&gt;
+\[\boxed{\text{uncertainty attribution}}\]&lt;p&gt;而不要轻易解释成：&lt;/p&gt;
+\[\boxed{\text{causal attribution}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-这和机器学习里的-shap-是亲戚但不是完全一回事&#34;&gt;9. 这和机器学习里的 SHAP 是亲戚，但不是完全一回事
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;你可能已经见过：&lt;/p&gt;
+\[\text{SHAP}.\]&lt;p&gt;两者都来自：&lt;/p&gt;
+\[\boxed{\text{Shapley value}.}\]&lt;p&gt;但目标不同。&lt;/p&gt;
+&lt;p&gt;机器学习 SHAP 通常解释某一个预测：&lt;/p&gt;
+\[f(x^\star)\]&lt;p&gt;为什么是这个值。&lt;/p&gt;
+&lt;p&gt;属于：&lt;/p&gt;
+\[\boxed{\text{local prediction attribution}.}\]&lt;p&gt;Shapley Effects 则研究整个随机输入空间：&lt;/p&gt;
+\[X\sim p(X)\]&lt;p&gt;并分配：&lt;/p&gt;
+\[\operatorname{Var}(Y).\]&lt;p&gt;属于：&lt;/p&gt;
+\[\boxed{\text{global uncertainty attribution}.}\]&lt;p&gt;所以：&lt;/p&gt;
+\[\text{SHAP}\]&lt;p&gt;更像：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;这个样本为什么预测成 0.93？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;而：&lt;/p&gt;
+\[\text{Shapley Effects}\]&lt;p&gt;问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;整个模型输出的不确定性究竟由哪些输入贡献？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;名字相似，问题层级不同。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-为什么它计算起来很贵&#34;&gt;10. 为什么它计算起来很贵？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;公式中有：&lt;/p&gt;
+\[S\subseteq N.\]&lt;p&gt;子集数量：&lt;/p&gt;
+\[2^d.\]&lt;p&gt;如果：&lt;/p&gt;
+\[d=30,\]&lt;p&gt;就已经超过：&lt;/p&gt;
+\[10^9\]&lt;p&gt;个 subsets。&lt;/p&gt;
+&lt;p&gt;显然不能全部枚举。&lt;/p&gt;
+&lt;p&gt;因此实际算法通常利用一个等价视角：&lt;/p&gt;
+\[\boxed{\text{随机抽取变量排列 permutation}.}\]&lt;p&gt;例如随机排列：&lt;/p&gt;
+\[\pi=(4,1,3,2).\]&lt;p&gt;沿着：&lt;/p&gt;
+\[\varnothing \rightarrow \{4\} \rightarrow \{4,1\} \rightarrow \{4,1,3\} \rightarrow N\]&lt;p&gt;计算每个变量加入时的 marginal contribution。&lt;/p&gt;
+&lt;p&gt;然后对大量 permutations 求平均。&lt;/p&gt;
+&lt;p&gt;Song–Nelson–Staum 提出的 Monte Carlo 方法正是沿这个方向降低计算负担；R 的 &lt;code&gt;sensitivity&lt;/code&gt; 包也实现了随机 permutation 版本，并支持相关输入。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这里代理模型突然变得很有价值&#34;&gt;11. 这里代理模型突然变得很有价值
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为计算：&lt;/p&gt;
+\[v(S) = \operatorname{Var}(\mathbb E[Y|X_S])\]&lt;p&gt;通常需要大量 conditional sampling。&lt;/p&gt;
+&lt;p&gt;如果每次：&lt;/p&gt;
+\[Y=f(X)\]&lt;p&gt;都是一次：&lt;/p&gt;
+\[30\text{ min FEM},\]&lt;p&gt;直接 Shapley 几乎不可接受。&lt;/p&gt;
+&lt;p&gt;于是自然形成：&lt;/p&gt;
+\[\boxed{ \text{高保真仿真} \rightarrow \text{Kriging / GP} \rightarrow \text{大量廉价 conditional samples} \rightarrow \text{Shapley Effects}. }\]&lt;p&gt;这其实是代理模型一个很有价值、但容易被忽视的角色：&lt;/p&gt;
+\[\boxed{\text{代理模型未必最终用来预测；它也可以作为统计积分器。}}\]&lt;p&gt;很多 UQ 任务真正昂贵的是：&lt;/p&gt;
+\[\mathbb E[\cdot],\quad P_f,\quad S_i,\quad Sh_i,\]&lt;p&gt;而 surrogate 只是让这些积分变得可计算。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-对可靠性还要再推进一步输出方差未必是你真正关心的东西&#34;&gt;12. 对可靠性还要再推进一步：输出方差未必是你真正关心的东西
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;普通 Shapley Effects 分解：&lt;/p&gt;
+\[\operatorname{Var}(Y).\]&lt;p&gt;但可靠性真正关心：&lt;/p&gt;
+\[P_f=P[g(X)&lt;0].\]&lt;p&gt;假设某变量：&lt;/p&gt;
+\[X_1\]&lt;p&gt;造成大量正常区域波动，却几乎不改变：&lt;/p&gt;
+\[g=0\]&lt;p&gt;附近的行为。&lt;/p&gt;
+&lt;p&gt;另一个变量：&lt;/p&gt;
+\[X_2\]&lt;p&gt;整体方差贡献很小，却决定极少数样本是否跨越失效边界。&lt;/p&gt;
+&lt;p&gt;那么普通 variance-based Shapley 可能认为：&lt;/p&gt;
+\[X_1&gt;X_2.\]&lt;p&gt;但可靠性工程师真正想知道的可能是：&lt;/p&gt;
+\[X_2&gt;X_1.\]&lt;p&gt;所以必须区分：&lt;/p&gt;
+\[\boxed{\text{output sensitivity}}\]&lt;p&gt;与：&lt;/p&gt;
+\[\boxed{\text{reliability-oriented sensitivity}.}\]&lt;p&gt;2023 年 Demange-Chryst、Bachoc 与 Morio 专门研究了&lt;strong&gt;相关输入下、面向可靠性的 Shapley effect&lt;/strong&gt;，并使用 importance sampling 处理失效相关量的计算。&lt;/p&gt;
+&lt;p&gt;这与最近几张卡片已经形成一个反复出现的主题：&lt;/p&gt;
+\[\boxed{\text{敏感度必须和最终任务对齐。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-一个值得自己实现的最小实验&#34;&gt;13. 一个值得自己实现的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;生成：&lt;/p&gt;
+\[X_1\sim N(0,1)\]&lt;p&gt;并令：&lt;/p&gt;
+\[X_2=\rho X_1+\sqrt{1-\rho^2}\epsilon, \qquad \epsilon\sim N(0,1).\]&lt;p&gt;模型：&lt;/p&gt;
+\[Y=X_1+0.2X_2.\]&lt;p&gt;让：&lt;/p&gt;
+\[\rho: 0\rightarrow0.5\rightarrow0.9\rightarrow0.99.\]&lt;p&gt;然后分别计算：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;first-order Sobol；&lt;/li&gt;
+&lt;li&gt;total Sobol；&lt;/li&gt;
+&lt;li&gt;Shapley Effects。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;观察随着：&lt;/p&gt;
+\[\rho\uparrow,\]&lt;p&gt;“哪个变量重要”开始不再只是模型系数：&lt;/p&gt;
+\[1,\quad0.2\]&lt;p&gt;的问题。&lt;/p&gt;
+&lt;p&gt;接着把模型改成：&lt;/p&gt;
+\[Y=X_1,\]&lt;p&gt;仍保持：&lt;/p&gt;
+\[X_2\approx X_1.\]&lt;p&gt;你会看到：&lt;/p&gt;
+\[X_2\]&lt;p&gt;仍然获得 Shapley importance。&lt;/p&gt;
+&lt;p&gt;这一实验会非常清楚地建立：&lt;/p&gt;
+\[\boxed{\text{结构影响}}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{\text{信息归因}}\]&lt;p&gt;之间的区别。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-一个工程实现提醒不要默认软件替你处理相关输入&#34;&gt;14. 一个工程实现提醒：不要默认软件替你处理相关输入
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;截至 2026 年 9 月，&lt;a class=&#34;link&#34; href=&#34;https://salib.readthedocs.io/en/main/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SALib 官方文档&lt;/a&gt; 已经包含 Shapley Effects，并采用 Goda 2021 的 Monte Carlo 算法。&lt;/p&gt;
+&lt;p&gt;但当前 SALib 的 Shapley estimator 明确假设：&lt;/p&gt;
+\[\boxed{\text{mutually independent inputs}.}\]&lt;p&gt;它并不支持相关输入。&lt;/p&gt;
+&lt;p&gt;所以一个很危险的工作流是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;我的变量相关
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;→ 看到 SALib 有 Shapley
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;→ 直接调用
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;→ 得到漂亮柱状图
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;→ 认为已经解决 dependent-input GSA
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;没有。&lt;/p&gt;
+&lt;p&gt;如果真正需要 correlated-input Shapley，需要显式处理：&lt;/p&gt;
+\[p(X_{\bar S}|X_S),\]&lt;p&gt;或者使用支持 dependent inputs 的实现，例如 R &lt;code&gt;sensitivity&lt;/code&gt; 中基于 Song 等方法的 permutation estimator。&lt;/p&gt;
+&lt;p&gt;这是一个典型例子：&lt;/p&gt;
+\[\boxed{\text{“库里有这个算法”不等于“库实现的是你正在研究的数学问题”。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-它在知识体系中的位置&#34;&gt;15. 它在知识体系中的位置
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把全局敏感度方法粗略放成：&lt;/p&gt;
+\[\text{Derivative-based}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\boxed{\text{局部/平均斜率有多大？}}\]\[\downarrow\]\[\text{Morris}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\boxed{\text{哪些变量值得筛掉？}}\]\[\downarrow\]\[\text{Sobol}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\boxed{\text{输出方差具有怎样的主效应/交互结构？}}\]\[\downarrow\]\[\boxed{\text{Shapley Effects}}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\boxed{ \text{如果最终必须把全部不确定性分给各个输入， 尤其输入还相关，应当怎样分？} }\]&lt;p&gt;再往可靠性方向走：&lt;/p&gt;
+\[\boxed{\text{Target / reliability-oriented Shapley}}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\boxed{\text{谁真正解释了“为什么会失效”？}}\]&lt;p&gt;这是它最合适的位置。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Shapley Effects 最值得理解的并不是那条阶乘权重公式，而是：&lt;/p&gt;
+\[\boxed{ \text{一旦输入变量彼此相关， “变量重要性”就不再是一个天然唯一的物理量， 而变成了一个需要明确归因规则的问题。} }\]&lt;p&gt;Shapley 给出的规则是：&lt;/p&gt;
+\[\boxed{ \text{观察一个变量在所有可能信息背景下加入系统时， 平均能增加多少解释能力。} }\]&lt;p&gt;这使它特别适合：&lt;/p&gt;
+\[\text{相关制造误差} + \text{相关材料参数} + \text{相关工况} + \text{复杂交互}\]&lt;p&gt;存在的工程 UQ。&lt;/p&gt;
+&lt;p&gt;但同时也必须记住：&lt;/p&gt;
+\[\boxed{ \text{Shapley 分配的是“可归因的不确定性”， 不能自动解释成“物理因果责任”。} }\]&lt;p&gt;对可靠性研究而言，还有最后一层：&lt;/p&gt;
+\[\boxed{ \text{解释整个输出方差的变量， 也未必是控制失效边界的变量。} }\]&lt;p&gt;因此真正成熟的工作流更接近：&lt;/p&gt;
+\[\text{联合概率模型} \rightarrow \text{任务相关 QoI} \rightarrow \text{代理/采样} \rightarrow \boxed{\text{匹配任务的敏感度指标}},\]&lt;p&gt;而不是先决定“我要做 Sobol”，再强迫问题适应指标。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Eunhye Song、Barry L. Nelson 与 Jeremy Staum，&lt;strong&gt;Shapley Effects for Global Sensitivity Analysis: Theory and Computation&lt;/strong&gt;, &lt;em&gt;SIAM/ASA Journal on Uncertainty Quantification&lt;/em&gt;, 2016。这是最推荐的理论入口，尤其值得看 dependent inputs 与 Monte Carlo permutation estimator。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://epubs.siam.org/doi/10.1137/15M1048070&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SIAM 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://salib.readthedocs.io/en/main/api/SALib.analyze.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;SALib 官方 Shapley API 文档&lt;/a&gt; —— 适合快速做 independent-input 数值实验；当前文档明确给出 Goda 2021 estimator、方差单位/归一化输出以及独立输入假设。&lt;/p&gt;
+&lt;p&gt;Demange-Chryst、Bachoc 与 Morio，&lt;strong&gt;Shapley Effect Estimation in Reliability-Oriented Sensitivity Analysis with Correlated Inputs by Importance Sampling&lt;/strong&gt;, &lt;em&gt;International Journal for Uncertainty Quantification&lt;/em&gt;, 2023。如果下一步想把今天的概念真正接到失效概率分析，这是最值得看的方向之一。&lt;/p&gt;
+&lt;p&gt;Herin、Il Idrissi、Chabridon 与 Iooss，&lt;strong&gt;Proportional Marginal Effects for Global Sensitivity Analysis&lt;/strong&gt;, &lt;em&gt;SIAM/ASA Journal on Uncertainty Quantification&lt;/em&gt;, 2024。它值得读的原因不是要立即换掉 Shapley，而是它非常清楚地暴露了 Shapley 在“相关但结构上无作用的变量”上的解释边界。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Stepwise Uncertainty Reduction：主动学习真正该优化的，未必是“下一个点最准”，而是“做完这次实验后，最终答案还剩多少不确定性”</title>
+        <link>https://assranai.github.io/cards/45-stepwise-uncertainty-reduction/</link>
+        <pubDate>Sun, 27 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/45-stepwise-uncertainty-reduction/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Stepwise Uncertainty Reduction（SUR，逐步不确定性缩减）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：代理模型 × 主动学习 × 可靠性分析 × 贝叶斯实验设计&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 SUR，是因为它处在 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; 主动学习知识体系中一个很关键的位置，而且能解释很多 acquisition function 为什么看起来彼此不同。&lt;/p&gt;
+&lt;p&gt;设昂贵极限状态函数&lt;/p&gt;
+\[g(x),\]&lt;p&gt;失效域为&lt;/p&gt;
+\[\Gamma=\{x:g(x)\le0\},\]&lt;p&gt;最终真正想得到：&lt;/p&gt;
+\[P_f=P_X(\Gamma) = \int \mathbf 1[g(x)\le0]p_X(x)\,dx.\]&lt;p&gt;普通 Kriging 主动学习经常问：&lt;/p&gt;
+\[\boxed{\text{“当前哪里最不确定？”}}\]&lt;p&gt;SUR 问的是更接近最终科研目标的问题：&lt;/p&gt;
+\[\boxed{ \text{“如果下一次昂贵仿真放在 }x\text{， 得到结果并更新 GP 后， 关于 }P_f\text{ 的不确定性预计会减少多少？”} }\]&lt;p&gt;Bect、Ginsbourger、Li、Picheny 与 Vazquez 的经典工作正是从贝叶斯决策论角度推导用于失效概率估计的 SUR 策略，而非先拍脑袋定义一个“边界附近采样分数”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看普通主动-kriging-在做什么&#34;&gt;1. 先看普通主动 Kriging 在做什么
+&lt;/h2&gt;&lt;p&gt;已有数据：&lt;/p&gt;
+\[\mathcal D_n=\{(x_i,g(x_i))\}_{i=1}^n.\]&lt;p&gt;GP 给出：&lt;/p&gt;
+\[G(x)\mid\mathcal D_n \sim \mathcal N(m_n(x),s_n^2(x)).\]&lt;p&gt;对于失效阈值 \(0\)，一个常见指标是：&lt;/p&gt;
+\[U(x)=\frac{|m_n(x)|}{s_n(x)}.\]&lt;p&gt;小 \(U\) 表示：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;均值靠近失效边界；&lt;/li&gt;
+&lt;li&gt;或预测方差较大。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;于是 &lt;span class=&#34;term-anchor&#34; data-term=&#34;ak-mcs&#34; tabindex=&#34;0&#34;&gt;AK-MCS&lt;/span&gt; 一类方法倾向寻找：&lt;/p&gt;
+\[x_{n+1}=\arg\min_x U(x).\]&lt;p&gt;这个逻辑非常合理。&lt;/p&gt;
+&lt;p&gt;但它存在一个隐含问题：&lt;/p&gt;
+\[\boxed{\text{它主要评价候选点“自己”有多值得采。}}\]&lt;p&gt;它没有完整考虑：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;在 \(x\) 做一次观测以后，由于 GP 的空间相关结构，&lt;strong&gt;整个输入空间&lt;/strong&gt;的不确定性会怎样变化？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;SUR 恰好从这里向前走一步。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-gp-的一次观测并不只减少一个点的不确定性&#34;&gt;2. GP 的一次观测并不只减少一个点的不确定性
+&lt;/h1&gt;&lt;p&gt;假设下一点选择：&lt;/p&gt;
+\[x_{n+1}=x.\]&lt;p&gt;观测：&lt;/p&gt;
+\[Y=G(x).\]&lt;p&gt;GP 更新以后，任意位置 \(z\) 的方差都会发生变化：&lt;/p&gt;
+\[s_{n+1}^2(z) = s_n^2(z) - \frac{k_n(z,x)^2} {s_n^2(x)}\]&lt;p&gt;（这里先忽略 observation noise）。&lt;/p&gt;
+&lt;p&gt;所以在：&lt;/p&gt;
+\[x\]&lt;p&gt;采一次样，本质上会影响一整个相关区域。&lt;/p&gt;
+&lt;p&gt;如果 \(x\) 与失效边界上大片区域高度相关，这一次计算可能非常值钱。&lt;/p&gt;
+&lt;p&gt;如果 \(x\) 虽然自身：&lt;/p&gt;
+\[U(x)\]&lt;p&gt;很低，但只解决一个概率质量极小、空间相关范围又很短的角落，那么它对：&lt;/p&gt;
+\[P_f\]&lt;p&gt;可能几乎没帮助。&lt;/p&gt;
+&lt;p&gt;因此 SUR 的第一层思想就是：&lt;/p&gt;
+\[\boxed{ \text{样本价值应该评价它对整个 posterior 的影响， 而不只评价候选点自身。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;3-sur-先定义我到底还不知道多少&#34;&gt;3. SUR 先定义“我到底还不知道多少”
+&lt;/h1&gt;&lt;p&gt;这是整个方法最漂亮的一步。&lt;/p&gt;
+&lt;p&gt;定义一个 uncertainty functional：&lt;/p&gt;
+\[H_n = H(\mathcal D_n).\]&lt;p&gt;它表示当前 GP 下，对最终目标剩余的不确定性。&lt;/p&gt;
+&lt;p&gt;例如，对于 excursion set：&lt;/p&gt;
+\[\Gamma=\{x:g(x)\le0\},\]&lt;p&gt;可以考虑每个位置的分类不确定性。&lt;/p&gt;
+&lt;p&gt;GP 给出的失效概率：&lt;/p&gt;
+\[p_n(x) = P(G(x)\le0\mid\mathcal D_n) = \Phi\left( -\frac{m_n(x)}{s_n(x)} \right).\]&lt;p&gt;如果：&lt;/p&gt;
+\[p_n(x)\approx0\]&lt;p&gt;或：&lt;/p&gt;
+\[p_n(x)\approx1,\]&lt;p&gt;我们已经基本知道这个点属于安全还是失效域。&lt;/p&gt;
+&lt;p&gt;最不确定的是：&lt;/p&gt;
+\[p_n(x)\approx0.5.\]&lt;p&gt;一种自然的局部误分类概率：&lt;/p&gt;
+\[\tau_n(x) = \min\{p_n(x),1-p_n(x)\}.\]&lt;p&gt;再在整个输入空间积分：&lt;/p&gt;
+\[\boxed{ H_n = \int \tau_n(x)\,dP_X(x). }\]&lt;p&gt;它可以理解为：&lt;/p&gt;
+\[\boxed{\text{当前还有多少概率质量处于“安全/失效判断不清”的状态。}}\]&lt;p&gt;这已经和单纯最小化 Kriging RMSE 很不一样了。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-接下来问如果在--做一次实验未来的--会是多少&#34;&gt;4. 接下来问：如果在 \(x\) 做一次实验，未来的 \(H\) 会是多少？
+&lt;/h1&gt;&lt;p&gt;问题是：&lt;/p&gt;
+&lt;p&gt;我们还不知道：&lt;/p&gt;
+\[G(x)\]&lt;p&gt;真正会返回什么。&lt;/p&gt;
+&lt;p&gt;GP 给出它的预测分布：&lt;/p&gt;
+\[Y_x\sim \mathcal N(m_n(x),s_n^2(x)).\]&lt;p&gt;因此可以计算：&lt;/p&gt;
+\[\mathbb E_n[ H_{n+1} \mid X_{n+1}=x ].\]&lt;p&gt;SUR acquisition 就选择：&lt;/p&gt;
+\[\boxed{ x_{n+1} = \arg\min_x \mathbb E_n[ H_{n+1} \mid X_{n+1}=x ]. }\]&lt;p&gt;等价地，也可以最大化：&lt;/p&gt;
+\[\boxed{ H_n- \mathbb E_n[H_{n+1}\mid x]. }\]&lt;p&gt;也就是：&lt;/p&gt;
+\[\boxed{\text{Expected Uncertainty Reduction}.}\]&lt;p&gt;这就是 Stepwise Uncertainty Reduction 这个名字真正的含义。经典工作把这种思想直接用于昂贵计算模型的 failure probability estimation。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-一个二维例子能说明它和-u-learning-的差别&#34;&gt;5. 一个二维例子能说明它和 U-learning 的差别
+&lt;/h1&gt;&lt;p&gt;假设存在两段尚未确定的失效边界：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; probability density
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;     HIGH
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      █████
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;     █     █          ? boundary A
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    █       █      × × × ×
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;───█─────────█────────────────
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                            ? boundary B
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                          × × ×
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                         very low p(x)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;A 位于：&lt;/p&gt;
+\[p_X(x)\]&lt;p&gt;很高的区域。&lt;/p&gt;
+&lt;p&gt;B 位于输入分布尾部。&lt;/p&gt;
+&lt;p&gt;假设两个位置都有：&lt;/p&gt;
+\[U(x)=0.3.\]&lt;p&gt;单纯 U-learning 看起来：&lt;/p&gt;
+\[\boxed{\text{差不多值得采样。}}\]&lt;p&gt;但如果目标是：&lt;/p&gt;
+\[P_f,\]&lt;p&gt;A 附近边界位置的一点变化可能让：&lt;/p&gt;
+\[P_f\]&lt;p&gt;明显变化。&lt;/p&gt;
+&lt;p&gt;B 即使边界判断错一大片，概率质量可能只有：&lt;/p&gt;
+\[10^{-8}.\]&lt;p&gt;SUR 会自然倾向：&lt;/p&gt;
+\[\boxed{\text{A}.}\]&lt;p&gt;因为它优化的是：&lt;/p&gt;
+\[\boxed{\text{目标量的不确定性}}\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\boxed{\text{几何边界本身的均匀精度}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;6-这揭示一个非常重要的代理模型原则&#34;&gt;6. 这揭示一个非常重要的代理模型原则
+&lt;/h1&gt;&lt;p&gt;假设两个 Kriging：&lt;/p&gt;
+\[\mathcal M_A,\quad\mathcal M_B.\]&lt;p&gt;A 的全局：&lt;/p&gt;
+\[R^2=0.999.\]&lt;p&gt;但：&lt;/p&gt;
+\[g(x)\approx0\]&lt;p&gt;附近有一点偏差。&lt;/p&gt;
+&lt;p&gt;B 的全局：&lt;/p&gt;
+\[R^2=0.96,\]&lt;p&gt;但把高概率区域的失效边界学得很好。&lt;/p&gt;
+&lt;p&gt;如果最终任务是：&lt;/p&gt;
+\[P_f,\]&lt;p&gt;那么：&lt;/p&gt;
+\[\boxed{\mathcal M_B\text{ 完全可能更好。}}\]&lt;p&gt;因此可靠性代理模型真正需要优化的是：&lt;/p&gt;
+\[\boxed{\text{decision-relevant uncertainty}}\]&lt;p&gt;而不一定是：&lt;/p&gt;
+\[\boxed{\text{global prediction error}.}\]&lt;p&gt;这和最近几张卡片中反复出现的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt;、reliability-oriented Shapley 其实属于同一个更大的原则：&lt;/p&gt;
+\[\boxed{\text{模型评价指标必须与最终任务对齐。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-sur-和贝叶斯优化有什么关系&#34;&gt;7. SUR 和贝叶斯优化有什么关系？
+&lt;/h1&gt;&lt;p&gt;关系非常近。&lt;/p&gt;
+&lt;p&gt;贝叶斯优化通常目标：&lt;/p&gt;
+\[x^\star=\arg\min_x f(x).\]&lt;p&gt;Expected Improvement 问：&lt;/p&gt;
+\[\boxed{\text{这个点预计能把当前最优值改善多少？}}\]&lt;p&gt;SUR 则问：&lt;/p&gt;
+\[\boxed{\text{这个点预计能把目标不确定性减少多少？}}\]&lt;p&gt;所以两者都属于：&lt;/p&gt;
+\[\boxed{\text{Bayesian sequential design}.}\]&lt;p&gt;但 acquisition 的设计目标不同。&lt;/p&gt;
+&lt;p&gt;Bayesian optimization：&lt;/p&gt;
+\[\boxed{\text{找到极值}}\]&lt;p&gt;Reliability SUR：&lt;/p&gt;
+\[\boxed{\text{估计 excursion set / failure probability}.}\]&lt;p&gt;Contour SUR：&lt;/p&gt;
+\[\boxed{\text{识别 }g(x)=c\text{ 的边界}.}\]&lt;p&gt;这说明 acquisition function 并不是一个附属技巧。&lt;/p&gt;
+&lt;p&gt;它实际上定义了：&lt;/p&gt;
+\[\boxed{\text{“什么信息值得花下一次仿真预算购买”。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;8-sur-更深的一层它实际上是一步贝叶斯决策&#34;&gt;8. SUR 更深的一层：它实际上是一步贝叶斯决策
+&lt;/h1&gt;&lt;p&gt;假设一次高保真 FEM 成本：&lt;/p&gt;
+\[C_{\rm HF}.\]&lt;p&gt;你现在只有一次计算机会。&lt;/p&gt;
+&lt;p&gt;每个候选点：&lt;/p&gt;
+\[x\]&lt;p&gt;都是一个决策。&lt;/p&gt;
+&lt;p&gt;计算完成后，会得到随机结果：&lt;/p&gt;
+\[Y_x.\]&lt;p&gt;然后 posterior：&lt;/p&gt;
+\[p(g\mid\mathcal D_n)\]&lt;p&gt;更新。&lt;/p&gt;
+&lt;p&gt;所以理性的决策就是：&lt;/p&gt;
+\[\boxed{ \text{选择能够使“未来预期损失”最小的实验。} }\]&lt;p&gt;这就是：&lt;/p&gt;
+\[x^\star = \arg\min_x \mathbb E[ L(\text{posterior after observing }x) ].\]&lt;p&gt;SUR 只是把：&lt;/p&gt;
+\[L\]&lt;p&gt;选择成：&lt;/p&gt;
+\[\boxed{\text{剩余不确定性}.}\]&lt;p&gt;因此 SUR 其实是：&lt;/p&gt;
+\[\boxed{\text{Bayesian experimental design}}\]&lt;p&gt;在昂贵计算模型上的具体实现。&lt;/p&gt;
+&lt;p&gt;Bect 等人的论文明确从贝叶斯理论框架出发推导这类 failure-probability sequential strategies。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么叫-stepwise而不是-globally-optimal&#34;&gt;9. 为什么叫 Stepwise，而不是 globally optimal？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为它通常只看：&lt;/p&gt;
+\[\boxed{\text{下一步}.}\]&lt;p&gt;真正的最优实验规划应该考虑：&lt;/p&gt;
+\[x_{n+1},x_{n+2},\ldots,x_{n+B}\]&lt;p&gt;整个未来序列：&lt;/p&gt;
+\[\arg\min_{x_{n+1:n+B}} \mathbb E[ H_{n+B} ].\]&lt;p&gt;这实际上是一个：&lt;/p&gt;
+\[\boxed{\text{动态规划 / POMDP 式问题}.}\]&lt;p&gt;计算成本迅速爆炸。&lt;/p&gt;
+&lt;p&gt;SUR 使用：&lt;/p&gt;
+\[\boxed{\text{one-step lookahead}}\]&lt;p&gt;即：&lt;/p&gt;
+\[x_{n+1} = \arg\min_x \mathbb E[H_{n+1}|x].\]&lt;p&gt;所以它是一种：&lt;/p&gt;
+\[\boxed{\text{myopic Bayesian optimal design}.}\]&lt;p&gt;这也是它的一个基本局限：下一步最优并不保证整个有限预算下全局最优。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-sur-为什么比-u-function-贵很多&#34;&gt;10. SUR 为什么比 U-function 贵很多？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为 U-function：&lt;/p&gt;
+\[U(x)=\frac{|m(x)|}{s(x)}\]&lt;p&gt;只需要当前 GP 的：&lt;/p&gt;
+\[m(x),s(x).\]&lt;p&gt;SUR 对每个候选：&lt;/p&gt;
+\[x\]&lt;p&gt;还要想象：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“如果我在这里观测以后，整个 GP 会怎样？”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;然后对未知观测：&lt;/p&gt;
+\[Y_x\]&lt;p&gt;再做期望。&lt;/p&gt;
+&lt;p&gt;概念上接近：&lt;/p&gt;
+\[\text{candidate }x\]\[\downarrow\]\[\text{possible observations }Y_x\]\[\downarrow\]\[\text{updated GP}\]\[\downarrow\]\[H_{n+1}\]\[\downarrow\]\[\mathbb E[H_{n+1}].\]&lt;p&gt;所以 naive SUR 可能非常贵。&lt;/p&gt;
+&lt;p&gt;Chevalier、Bect、Ginsbourger、Vazquez、Picheny 与 Richet 后续专门研究了 &lt;strong&gt;Fast Kriging-Based Stepwise Uncertainty Reduction&lt;/strong&gt;，推导可高效计算的公式用于 excursion-set identification；该工作后来发表于 &lt;em&gt;Technometrics&lt;/em&gt;。&lt;/p&gt;
+&lt;p&gt;这说明一个经常被忽略的现实：&lt;/p&gt;
+\[\boxed{ \text{acquisition function 自己也必须具有好的计算复杂度。} }\]&lt;p&gt;否则你可能为了决定：&lt;/p&gt;
+\[\text{下一次 30 分钟 FEM 算哪里}\]&lt;p&gt;先花：&lt;/p&gt;
+\[\text{3 小时优化 acquisition}.\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-从估计失效概率继续走可以得到更丰富的目标&#34;&gt;11. 从“估计失效概率”继续走，可以得到更丰富的目标
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Excursion set：&lt;/p&gt;
+\[\Gamma=\{x:g(x)\le0\}\]&lt;p&gt;本身也是一个随机集合，因为 GP posterior 下：&lt;/p&gt;
+\[g\]&lt;p&gt;仍然未知。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\Gamma\]&lt;p&gt;也存在 posterior distribution。&lt;/p&gt;
+&lt;p&gt;Azzimonti、Bect、Chevalier 与 Ginsbourger 从 random-set 视角研究了如何量化 excursion-set uncertainty，包括集合重构、条件高斯场模拟以及安全工程中的 contour estimation。&lt;/p&gt;
+&lt;p&gt;这带来一个很有价值的视角：&lt;/p&gt;
+&lt;p&gt;传统 Kriging 给：&lt;/p&gt;
+\[\boxed{\text{函数的不确定性}}\]&lt;p&gt;但工程师真正关心的可能是：&lt;/p&gt;
+\[\boxed{\text{失效区域形状的不确定性}.}\]&lt;p&gt;进一步：&lt;/p&gt;
+\[\boxed{\text{失效概率的不确定性}.}\]&lt;p&gt;甚至：&lt;/p&gt;
+\[\boxed{\text{保守安全域的不确定性}.}\]&lt;p&gt;不同目标应该对应不同 acquisition。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-保守失效域是-sur-很自然的下一步&#34;&gt;12. “保守失效域”是 SUR 很自然的下一步
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;很多安全问题不允许：&lt;/p&gt;
+\[\text{false safe}.\]&lt;p&gt;假设真实危险域：&lt;/p&gt;
+\[\Gamma.\]&lt;p&gt;我们可能希望构造一个 conservative estimate：&lt;/p&gt;
+\[\Gamma_c\]&lt;p&gt;并控制：&lt;/p&gt;
+\[P(\Gamma_c\subseteq\Gamma)\]&lt;p&gt;或相关覆盖概率。&lt;/p&gt;
+&lt;p&gt;此时采样目标就不再是单纯让平均分类误差最小，而可能是：&lt;/p&gt;
+\[\boxed{\text{在保证保守性的同时尽量减少 false negatives}.}\]&lt;p&gt;Azzimonti、Ginsbourger、Chevalier、Bect 与 Richet 后续正是沿这个方向提出了 conservative excursion-set estimation 的 adaptive SUR 策略，并在可靠性工程案例上测试。&lt;/p&gt;
+&lt;p&gt;这非常接近真实工程决策：&lt;/p&gt;
+\[\boxed{\text{不同错误的代价并不对称。}}\]&lt;p&gt;把危险点判断成安全：&lt;/p&gt;
+\[\text{代价极高}.\]&lt;p&gt;把安全点暂时判断成危险：&lt;/p&gt;
+\[\text{可能只是增加设计裕度}.\]&lt;p&gt;因此 acquisition function 最终甚至可以编码：&lt;/p&gt;
+\[\boxed{\text{工程风险偏好}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对你做-kriging-可靠性研究最值得迁移的一点&#34;&gt;13. 对你做 Kriging 可靠性研究最值得迁移的一点
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设当前有两个失效模式：&lt;/p&gt;
+\[g_1(x)=\text{运动精度裕量},\]\[g_2(x)=\text{卡滞裕量}.\]&lt;p&gt;系统失效：&lt;/p&gt;
+\[g_1(x)&lt;0 \quad\lor\quad g_2(x)&lt;0.\]&lt;p&gt;一个简单主动学习器可能分别寻找：&lt;/p&gt;
+\[U_1(x),U_2(x)\]&lt;p&gt;最小的位置。&lt;/p&gt;
+&lt;p&gt;但真正目标是系统失效概率：&lt;/p&gt;
+\[P_f = P[g_1&lt;0\lor g_2&lt;0].\]&lt;p&gt;于是更成熟的问题应该变成：&lt;/p&gt;
+\[\boxed{ \text{在哪个 }x\text{ 做一次高保真仿真， 预计最能降低系统 }P_f\text{ 的不确定性？} }\]&lt;p&gt;这可能导致一个很反直觉的结果：&lt;/p&gt;
+&lt;p&gt;某个点对：&lt;/p&gt;
+\[g_1\]&lt;p&gt;预测精度帮助很大；&lt;/p&gt;
+&lt;p&gt;但由于该区域：&lt;/p&gt;
+\[g_2\]&lt;p&gt;已经必然失效，它对系统失效分类没有任何新信息。&lt;/p&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[\boxed{\text{这个样本几乎没有系统可靠性价值。}}\]&lt;p&gt;SUR 的任务级思维正好能识别这种冗余。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-它还可以自然推广到仿真-fidelity-也作为决策变量&#34;&gt;14. 它还可以自然推广到“仿真 fidelity 也作为决策变量”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设同时拥有：&lt;/p&gt;
+\[f_H(x),\quad f_M(x),\quad f_L(x)\]&lt;p&gt;三种保真度。&lt;/p&gt;
+&lt;p&gt;下一次实验决策就不只有：&lt;/p&gt;
+\[x.\]&lt;p&gt;而是：&lt;/p&gt;
+\[(x,\ell)\]&lt;p&gt;其中：&lt;/p&gt;
+\[\ell\in\{H,M,L\}.\]&lt;p&gt;如果成本分别：&lt;/p&gt;
+\[C_H,C_M,C_L,\]&lt;p&gt;就可以考虑：&lt;/p&gt;
+\[\boxed{ \frac{ \mathbb E[H_n-H_{n+1}\mid x,\ell] }{ C_\ell } }\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{\text{每单位计算成本能购买多少不确定性下降？}}\]&lt;p&gt;这样，SUR、MFMC、多保真 GP、active learning 就开始汇合到同一个更大的框架：&lt;/p&gt;
+\[\boxed{\text{value of information per unit cost}.}\]&lt;p&gt;这比“哪个 surrogate 的 \(R^2\) 最高”已经高了一个方法论层级。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-一个很值得自己实现的最小实验&#34;&gt;15. 一个很值得自己实现的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;取二维函数：&lt;/p&gt;
+\[g(x_1,x_2) = (x_1-1)^2 + (x_2+0.5)^2 -1.\]&lt;p&gt;令：&lt;/p&gt;
+\[X\sim N(0,I).\]&lt;p&gt;失效定义：&lt;/p&gt;
+\[g(X)&lt;0.\]&lt;p&gt;初始只采：&lt;/p&gt;
+\[10\]&lt;p&gt;个 Latin Hypercube 点。&lt;/p&gt;
+&lt;p&gt;建立 GP。&lt;/p&gt;
+&lt;p&gt;然后比较两个 sequential learner：&lt;/p&gt;
+&lt;h3 id=&#34;方法-au-learning&#34;&gt;方法 A：U-learning
+&lt;/h3&gt;\[x^\star=\arg\min \frac{|m(x)|}{s(x)}.\]&lt;h3 id=&#34;方法-b近似-sur&#34;&gt;方法 B：近似 SUR
+&lt;/h3&gt;&lt;p&gt;在一个固定 Monte Carlo pool：&lt;/p&gt;
+\[\{z_j\}_{j=1}^{10^5}\]&lt;p&gt;上计算：&lt;/p&gt;
+\[H_n = \frac1N \sum_j \min[ p_n(z_j),1-p_n(z_j) ].\]&lt;p&gt;对于每个候选 \(x\)，利用 GP update 公式估计：&lt;/p&gt;
+\[\mathbb E[H_{n+1}|x].\]&lt;p&gt;每轮各加入一个真实函数点。&lt;/p&gt;
+&lt;p&gt;然后不要只画：&lt;/p&gt;
+\[R^2.\]&lt;p&gt;重点画：&lt;/p&gt;
+\[\boxed{|P_f^{est}-P_f^{true}|}\]&lt;p&gt;对：&lt;/p&gt;
+\[\boxed{\text{number of expensive evaluations}.}\]&lt;p&gt;你会真正看到：&lt;/p&gt;
+\[\boxed{\text{“最会拟合函数”与“最快解决可靠性问题”不是同一件事。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它在整个知识体系中卡在哪里&#34;&gt;16. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把主动代理模型分成四个层次：&lt;/p&gt;
+\[\text{Space Filling}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{哪里还没采过？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Prediction-oriented Active Learning}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{哪里预测误差可能最大？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Boundary-oriented Learning}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{哪里最可能把安全/失效分错？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\boxed{\text{Stepwise Uncertainty Reduction}}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{ \text{哪次实验最能降低“最终任务”的 posterior uncertainty？ }\]&lt;p&gt;再向上其实还有：&lt;/p&gt;
+\[\boxed{\text{multi-step Bayesian experimental design}}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{ \text{有限预算下，整个实验序列怎样规划才最值？ }\]&lt;p&gt;SUR 正好位于：&lt;/p&gt;
+\[\boxed{\text{启发式主动学习}}\]&lt;p&gt;与&lt;/p&gt;
+\[\boxed{\text{完整贝叶斯决策论}}\]&lt;p&gt;之间。&lt;/p&gt;
+&lt;p&gt;这就是它在知识体系里最重要的位置。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;SUR 最值得记住的不是某一个 acquisition 公式，而是一个问题转换：&lt;/p&gt;
+\[\boxed{ \text{不要问“下一个样本点哪里最不确定？”} }\]&lt;p&gt;更应该问：&lt;/p&gt;
+\[\boxed{ \text{“如果我把下一次昂贵实验花在这里， 做完以后，我真正关心的答案预计会确定多少？”} }\]&lt;p&gt;于是主动学习从：&lt;/p&gt;
+\[\text{sample the model}\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{\text{buy information about the decision}.}\]&lt;p&gt;这条思想可以从可靠性直接迁移到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;极限状态识别；&lt;/li&gt;
+&lt;li&gt;多失效模式；&lt;/li&gt;
+&lt;li&gt;代理模型；&lt;/li&gt;
+&lt;li&gt;多保真仿真；&lt;/li&gt;
+&lt;li&gt;参数辨识；&lt;/li&gt;
+&lt;li&gt;FEM 自适应实验；&lt;/li&gt;
+&lt;li&gt;AI Agent 的工具调用。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;甚至对 AI Agent 也一样：如果一次昂贵工具调用的目标只是“获得更多信息”，最合理的选择未必是搜索当前最陌生的地方，而是：&lt;/p&gt;
+\[\boxed{\text{选择最可能改变最终结论的那次调用。}}\]&lt;p&gt;这就是 SUR 最值得学的地方。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Julien Bect、David Ginsbourger、Li、Picheny &amp;amp; Vazquez, &lt;strong&gt;Sequential Design of Computer Experiments for the Estimation of a Probability of Failure&lt;/strong&gt;, &lt;em&gt;Statistics and Computing&lt;/em&gt; 22, 773–793 (2012), DOI 10.1007/s11222-011-9241-4。这是今天最值得精读的论文：它直接从贝叶斯 formulation 推导 failure-probability SUR。&lt;br&gt;
+Springer 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Chevalier, Bect, Ginsbourger, Vazquez, Picheny &amp;amp; Richet, &lt;strong&gt;Fast Kriging-Based Stepwise Uncertainty Reduction with Application to the Identification of an Excursion Set&lt;/strong&gt;, &lt;em&gt;Technometrics&lt;/em&gt; 56 (2014), 455–465。适合继续研究“理论上漂亮的 SUR 怎样做到计算上可用”；该论文被后续 excursion-set 工作列为核心快速 SUR 方法。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Azzimonti, Bect, Chevalier &amp;amp; Ginsbourger, &lt;strong&gt;Quantifying Uncertainties on Excursion Sets Under a Gaussian Random Field Prior&lt;/strong&gt;, &lt;em&gt;SIAM/ASA Journal on Uncertainty Quantification&lt;/em&gt; 4 (2016), 850–874, DOI 10.1137/141000749。适合把“函数 posterior”提升到“随机失效区域 posterior”的层面。&lt;br&gt;
+SIAM 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Azzimonti, Ginsbourger, Chevalier, Bect &amp;amp; Richet, &lt;strong&gt;Adaptive Design of Experiments for Conservative Estimation of Excursion Sets&lt;/strong&gt;, &lt;em&gt;Technometrics&lt;/em&gt; 63(1), 2021。值得看的重点是：当 false-safe 与 false-alarm 的工程代价不对称时，SUR 如何从“准确识别边界”进一步变成“保守地识别安全/危险域”。&lt;br&gt;
+Technometrics 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Conformal Prediction：给任意代理模型加一层“有限样本覆盖保证”</title>
+        <link>https://assranai.github.io/cards/46-conformal-prediction-2/</link>
+        <pubDate>Mon, 28 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/46-conformal-prediction-2/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;conformal&#34; tabindex=&#34;0&#34;&gt;Conformal Prediction&lt;/span&gt;（保形预测）与代理模型校准&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：代理模型 × 不确定性量化 × 可靠性 × Scientific ML&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选一个和前几张 SUR、Shapley、&lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt; 有明显区别、但能直接接到代理模型研究的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;一个 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt;、神经网络或 ROM 给出了“95% 预测区间”，这个 &lt;strong&gt;95% 到底凭什么可信？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;对于 Gaussian Process，区间通常来自：&lt;/p&gt;
+\[f(x)\mid\mathcal D \sim\mathcal N(\mu(x),\sigma^2(x)).\]&lt;p&gt;但这里的 \(\sigma(x)\) 是在&lt;strong&gt;模型假设成立&lt;/strong&gt;条件下的 posterior uncertainty。如果核函数错了、超参数估计有偏、模型存在结构误差，那么&lt;/p&gt;
+\[\mu(x)\pm1.96\sigma(x)\]&lt;p&gt;未必真的覆盖 95% 的新观测。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Conformal Prediction（CP）做了一件很不同的事：它不尝试证明你的代理模型是正确的，而是用一批校准数据测量“这个模型实际会错多少”，再把预测区间修正到具有有限样本覆盖保证。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;2026 年发表于 &lt;em&gt;Machine Learning: Science and Technology&lt;/em&gt; 的工作已经把这一思想系统用于 PDE、磁流体、天气、聚变诊断等 scientific surrogate，并覆盖 MLP、U-Net、&lt;span class=&#34;term-anchor&#34; data-term=&#34;fno&#34; tabindex=&#34;0&#34;&gt;Fourier Neural Operator&lt;/span&gt;、ViT、GNN 等模型。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先区分两个经常混淆的问题&#34;&gt;1. 先区分两个经常混淆的问题
+&lt;/h2&gt;&lt;p&gt;假设代理模型：&lt;/p&gt;
+\[\hat y=f_\theta(x).\]&lt;p&gt;第一个问题是：&lt;/p&gt;
+\[\boxed{\hat y\text{ 准不准？}}\]&lt;p&gt;可以用：&lt;/p&gt;
+\[R^2,\quad RMSE,\quad MAE\]&lt;p&gt;回答。&lt;/p&gt;
+&lt;p&gt;第二个问题是：&lt;/p&gt;
+\[\boxed{\text{我说“95%可信”时，它真的至少有约95%的覆盖率吗？}}\]&lt;p&gt;这是 &lt;strong&gt;calibration&lt;/strong&gt; 问题。&lt;/p&gt;
+&lt;p&gt;一个模型完全可能：&lt;/p&gt;
+\[R^2=0.99\]&lt;p&gt;却严重过度自信。&lt;/p&gt;
+&lt;p&gt;例如真实误差经常达到：&lt;/p&gt;
+\[|y-\hat y|=0.3,\]&lt;p&gt;但模型给出的标准差始终只有：&lt;/p&gt;
+\[\sigma(x)=0.02.\]&lt;p&gt;那么它预测得总体不错，却：&lt;/p&gt;
+\[\boxed{\text{不知道自己什么时候会错。}}\]&lt;p&gt;对于可靠性问题，这比 RMSE 稍大往往危险得多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-conformal-prediction-的基本操作极其简单&#34;&gt;2. Conformal Prediction 的基本操作极其简单
+&lt;/h1&gt;&lt;p&gt;假设已经训练好了任意模型：&lt;/p&gt;
+\[\hat f(x).\]&lt;p&gt;另外留出一组 calibration data：&lt;/p&gt;
+\[\mathcal D_{\rm cal} = \{(x_i,y_i)\}_{i=1}^{n}.\]&lt;p&gt;计算每个样本的误差：&lt;/p&gt;
+\[\boxed{ s_i=|y_i-\hat f(x_i)|. }\]&lt;p&gt;这里 \(s_i\) 叫 &lt;strong&gt;nonconformity score&lt;/strong&gt;：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;这个样本和模型预测有多“不合群”。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;假设希望得到：&lt;/p&gt;
+\[1-\alpha=95\%\]&lt;p&gt;预测区间。&lt;/p&gt;
+&lt;p&gt;取这些误差的适当高分位数：&lt;/p&gt;
+\[\hat q = \operatorname{Quantile}_{\lceil(n+1)(1-\alpha)\rceil/n} (s_1,\ldots,s_n).\]&lt;p&gt;然后对一个新输入：&lt;/p&gt;
+\[x_{\rm new}\]&lt;p&gt;输出：&lt;/p&gt;
+\[\boxed{ C(x_{\rm new}) = [ \hat f(x_{\rm new})-\hat q,\; \hat f(x_{\rm new})+\hat q ]. }\]&lt;p&gt;就这么简单。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-神奇之处在于它有一个真正的有限样本保证&#34;&gt;3. 神奇之处在于：它有一个真正的有限样本保证
+&lt;/h1&gt;&lt;p&gt;在 calibration 样本与未来 test sample &lt;strong&gt;exchangeable&lt;/strong&gt; 的条件下：&lt;/p&gt;
+\[\boxed{ P \left( Y_{\rm new}\in C(X_{\rm new}) \right) \ge1-\alpha. }\]&lt;p&gt;而且这个结论：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;不要求误差是 Gaussian；&lt;/li&gt;
+&lt;li&gt;不要求模型是 GP；&lt;/li&gt;
+&lt;li&gt;不要求模型正确；&lt;/li&gt;
+&lt;li&gt;不要求 \(n\to\infty\)；&lt;/li&gt;
+&lt;li&gt;不要求神经网络经过 Bayesian training。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这正是 conformal prediction 最重要的理论价值。Lei、G&amp;rsquo;Sell、Rinaldo、Tibshirani 与 Wasserman 的经典 regression conformal 工作系统证明并比较了 full conformal、split conformal 等方法的有限样本 marginal coverage 性质。&lt;/p&gt;
+&lt;p&gt;所以 CP 的世界观很有意思：&lt;/p&gt;
+\[\boxed{ \text{我不相信模型对自己的 uncertainty 描述； 我相信它在独立校准样本上实际犯过的错误。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;4-为什么这能成立&#34;&gt;4. 为什么这能成立？
+&lt;/h1&gt;&lt;p&gt;核心不是 Gaussian assumption，而是：&lt;/p&gt;
+\[\boxed{\text{rank symmetry}.}\]&lt;p&gt;把 calibration errors：&lt;/p&gt;
+\[s_1,\ldots,s_n\]&lt;p&gt;和未来未知 error：&lt;/p&gt;
+\[s_{n+1}\]&lt;p&gt;放在一起。&lt;/p&gt;
+&lt;p&gt;如果这些样本 exchangeable，那么：&lt;/p&gt;
+\[s_{n+1}\]&lt;p&gt;在：&lt;/p&gt;
+\[n+1\]&lt;p&gt;个 score 中的排名没有特殊地位。&lt;/p&gt;
+&lt;p&gt;因此它落在最大的：&lt;/p&gt;
+\[\alpha\]&lt;p&gt;比例之外的概率至多约为：&lt;/p&gt;
+\[\alpha.\]&lt;p&gt;换句话说：&lt;/p&gt;
+\[\boxed{\text{CP 的保证来自排序，而不是分布拟合。}}\]&lt;p&gt;这是一个非常深的区别。&lt;/p&gt;
+&lt;p&gt;传统 UQ：&lt;/p&gt;
+\[\boxed{\text{先假设概率模型，再推出区间。}}\]&lt;p&gt;Conformal：&lt;/p&gt;
+\[\boxed{\text{直接利用样本交换性，把误差排名转化为覆盖保证。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;5-这意味着它可以直接包在-kriging-外面&#34;&gt;5. 这意味着它可以直接包在 Kriging 外面
+&lt;/h1&gt;&lt;p&gt;假设已有：&lt;/p&gt;
+\[\mu(x),\quad\sigma(x).\]&lt;p&gt;可以定义：&lt;/p&gt;
+\[\boxed{ s_i= \frac{|y_i-\mu(x_i)|} {\sigma(x_i)}. }\]&lt;p&gt;然后计算：&lt;/p&gt;
+\[\hat q.\]&lt;p&gt;最终区间变成：&lt;/p&gt;
+\[\boxed{ [ \mu(x)-\hat q\sigma(x), \; \mu(x)+\hat q\sigma(x) ]. }\]&lt;p&gt;注意这里：&lt;/p&gt;
+\[\hat q\]&lt;p&gt;是数据校准出来的。&lt;/p&gt;
+&lt;p&gt;如果 GP 完美 calibrated，可能：&lt;/p&gt;
+\[\hat q\approx1.96.\]&lt;p&gt;但如果 GP 严重低估 uncertainty：&lt;/p&gt;
+\[\hat q=4.3\]&lt;p&gt;也完全可能。&lt;/p&gt;
+&lt;p&gt;这实际上相当于问：&lt;/p&gt;
+\[\boxed{ \text{你的 Kriging }\sigma(x)\text{ 虽然不一定是正确概率尺度， 但它至少能不能正确描述“哪里容易错”？} }\]&lt;p&gt;2026 年的 surrogate-UQ 工作正比较了 absolute residual、quantile regression 和标准差归一化等多种 nonconformity score，并在多类 PDE surrogate 上验证 coverage。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-这里有一个非常值得理解的分工&#34;&gt;6. 这里有一个非常值得理解的分工
+&lt;/h1&gt;&lt;p&gt;GP 提供：&lt;/p&gt;
+\[\boxed{\text{relative uncertainty structure}}\]&lt;p&gt;例如：&lt;/p&gt;
+\[\sigma(x_A)&gt;\sigma(x_B).\]&lt;p&gt;Conformal calibration 提供：&lt;/p&gt;
+\[\boxed{\text{absolute error scale calibration}.}\]&lt;p&gt;于是两者可以组合成：&lt;/p&gt;
+\[\text{GP} \rightarrow \text{哪里可能更不确定}\]\[+\]\[\text{CP} \rightarrow \text{到底应该放大多少才能达到目标覆盖率}.\]&lt;p&gt;这和完全抛弃 Kriging variance 不同。&lt;/p&gt;
+&lt;p&gt;更合理的理解是：&lt;/p&gt;
+\[\boxed{\text{CP 可以校准一个“不完全可信但仍有信息”的 uncertainty estimator。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-普通-absolute-residual-cp-有一个明显缺陷&#34;&gt;7. 普通 absolute residual CP 有一个明显缺陷
+&lt;/h1&gt;&lt;p&gt;如果直接：&lt;/p&gt;
+\[s_i=|y_i-\hat f(x_i)|,\]&lt;p&gt;最终所有地方区间宽度相同：&lt;/p&gt;
+\[\hat f(x)\pm\hat q.\]&lt;p&gt;但工程模型通常是 heteroscedastic 的。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;低载荷区          接触转变区           高载荷区
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;误差小              误差巨大              误差中等
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;───────        ───────────────        ─────────
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;一个统一：&lt;/p&gt;
+\[\pm0.5\]&lt;p&gt;的区间可能导致：&lt;/p&gt;
+&lt;p&gt;低误差区域：&lt;/p&gt;
+\[\boxed{\text{过于保守}}\]&lt;p&gt;高误差区域：&lt;/p&gt;
+\[\boxed{\text{仍然不够灵活。}}\]&lt;p&gt;这就引出 &lt;strong&gt;Conformalized Quantile Regression（CQR）&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-cqr先学习局部区间形状再让-conformal-负责兜底&#34;&gt;8. CQR：先学习局部区间形状，再让 conformal 负责兜底
+&lt;/h1&gt;&lt;p&gt;训练两个 quantile regressors：&lt;/p&gt;
+\[\hat q_{\alpha/2}(x), \qquad \hat q_{1-\alpha/2}(x).\]&lt;p&gt;它们先预测：&lt;/p&gt;
+\[\boxed{\text{这个 }x\text{ 本来应该有多宽的区间。}}\]&lt;p&gt;然后在 calibration set 上定义：&lt;/p&gt;
+\[s_i = \max \{ \hat q_L(x_i)-y_i,\; y_i-\hat q_U(x_i) \}.\]&lt;p&gt;再取 conformal quantile：&lt;/p&gt;
+\[\hat q.\]&lt;p&gt;最终：&lt;/p&gt;
+\[\boxed{ [ \hat q_L(x)-\hat q,\; \hat q_U(x)+\hat q ]. }\]&lt;p&gt;所以：&lt;/p&gt;
+&lt;p&gt;Quantile Regression：&lt;/p&gt;
+\[\boxed{\text{负责 adaptivity}}\]&lt;p&gt;Conformal：&lt;/p&gt;
+\[\boxed{\text{负责 coverage calibration}.}\]&lt;p&gt;Romano、Patterson 与 Emmanuel Candès 在 NeurIPS 2019 提出的 CQR 正是为解决传统 conformal 区间难以适应 heteroscedasticity 的问题；实验显示它通常能在维持有效覆盖的同时产生更短的区间。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-但这里有一个必须牢记的限制95-marginal-coverage--每个位置都有95&#34;&gt;9. 但这里有一个必须牢记的限制：95% marginal coverage ≠ 每个位置都有95%
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Conformal 的经典保证是：&lt;/p&gt;
+\[\boxed{ P(Y\in C(X))\ge0.95. }\]&lt;p&gt;注意概率同时对：&lt;/p&gt;
+\[X,Y\]&lt;p&gt;取平均。&lt;/p&gt;
+&lt;p&gt;它并不意味着：&lt;/p&gt;
+\[\boxed{ P(Y\in C(X)\mid X=x)\ge0.95 \quad\forall x. }\]&lt;p&gt;这是 &lt;strong&gt;marginal coverage&lt;/strong&gt; 和 &lt;strong&gt;conditional coverage&lt;/strong&gt; 的区别。&lt;/p&gt;
+&lt;p&gt;例如可能存在：&lt;/p&gt;
+&lt;p&gt;高概率普通区域：&lt;/p&gt;
+\[98\%\text{ coverage}\]&lt;p&gt;极端接触区域：&lt;/p&gt;
+\[70\%\text{ coverage}\]&lt;p&gt;整体平均：&lt;/p&gt;
+\[95\%.\]&lt;p&gt;CP 的理论保证仍然成立。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{\text{Conformal prediction 并不会魔法般解决所有局部 OOD 风险。}}\]&lt;p&gt;2026 年的 surrogate-UQ 工作也明确把 marginal 而非 conditional coverage，以及 calibration/test exchangeability，列为该方法的重要限制。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-这对可靠性尤其重要&#34;&gt;10. 这对可靠性尤其重要
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设极限状态：&lt;/p&gt;
+\[g(x)=0.\]&lt;p&gt;代理预测：&lt;/p&gt;
+\[\hat g(x).\]&lt;p&gt;Conformal 区间：&lt;/p&gt;
+\[[L(x),U(x)].\]&lt;p&gt;那么可以把输入空间分成三类：&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[U(x)&lt;0,\]&lt;p&gt;整个预测区间都在失效侧：&lt;/p&gt;
+\[\boxed{\text{high-confidence failure}.}\]&lt;p&gt;如果：&lt;/p&gt;
+\[L(x)&gt;0,\]&lt;p&gt;整个区间都在安全侧：&lt;/p&gt;
+\[\boxed{\text{high-confidence safe}.}\]&lt;p&gt;如果：&lt;/p&gt;
+\[L(x)\le0\le U(x),\]&lt;p&gt;则：&lt;/p&gt;
+\[\boxed{\text{classification unresolved}.}\]&lt;p&gt;这就给可靠性主动学习一个非常自然的信号：&lt;/p&gt;
+\[\boxed{ 0\in C(x) \Rightarrow \text{这个样本值得进一步求高保真。} }\]&lt;p&gt;和传统：&lt;/p&gt;
+\[U(x)=\frac{|\mu(x)|}{\sigma(x)}\]&lt;p&gt;相比，区别在于 conformal interval 的尺度经过&lt;strong&gt;真实误差校准&lt;/strong&gt;。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这甚至可以变成一个失效概率上下界思路&#34;&gt;11. 这甚至可以变成一个“失效概率上下界”思路
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;在 Monte Carlo pool：&lt;/p&gt;
+\[x_1,\ldots,x_N\]&lt;p&gt;上计算 conformal intervals。&lt;/p&gt;
+&lt;p&gt;定义：&lt;/p&gt;
+&lt;p&gt;确定失效：&lt;/p&gt;
+\[\mathcal F^-= \{x:U(x)&lt;0\}.\]&lt;p&gt;可能失效：&lt;/p&gt;
+\[\mathcal F^+= \{x:L(x)\le0\}.\]&lt;p&gt;于是可以形成：&lt;/p&gt;
+\[\hat P_f^- = \frac{|\mathcal F^-|}{N},\]\[\hat P_f^+ = \frac{|\mathcal F^+|}{N}.\]&lt;p&gt;得到：&lt;/p&gt;
+\[\boxed{ \hat P_f^- \le \hat P_f \le \hat P_f^+. }\]&lt;p&gt;这里必须非常谨慎：&lt;strong&gt;普通 marginal conformal coverage 本身并不能自动把这两个量升级成严格的 simultaneous \(P_f\) confidence bounds。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;但它提供了一个很有价值的工程诊断量：&lt;/p&gt;
+\[\boxed{ \hat P_f^+-\hat P_f^- }\]&lt;p&gt;表示：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;当前 surrogate uncertainty 对失效分类究竟留下了多大的模糊概率质量？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这与昨天 SUR 的思想可以自然连接起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-sur--conformal-是一个很有意思的研究组合&#34;&gt;12. SUR + Conformal 是一个很有意思的研究组合
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;昨天的 SUR 问：&lt;/p&gt;
+\[\boxed{\text{下一个样本怎样最大程度减少可靠性不确定性？}}\]&lt;p&gt;今天 CP 提供：&lt;/p&gt;
+\[\boxed{\text{哪些区域的 surrogate classification 经过真实误差校准后仍然不确定？}}\]&lt;p&gt;于是可以构造一个思路：&lt;/p&gt;
+\[\text{GP / surrogate}\]\[\downarrow\]\[\text{Conformal calibration}\]\[\downarrow\]\[\text{failure-boundary ambiguity}\]\[\downarrow\]\[\text{SUR / active learning}.\]&lt;p&gt;这比单纯使用：&lt;/p&gt;
+\[\sigma_{\rm GP}(x)\]&lt;p&gt;更稳健，因为：&lt;/p&gt;
+\[\boxed{\sigma_{\rm GP}\text{ 可以 model-misspecified，conformal layer 则利用真实残差重新标尺。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对你现在做的核函数问题也有一个很直接的启发&#34;&gt;13. 对你现在做的核函数问题也有一个很直接的启发
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设两个 Kriging：&lt;/p&gt;
+&lt;p&gt;高斯核：&lt;/p&gt;
+\[R^2=0.94\]&lt;p&gt;指数核：&lt;/p&gt;
+\[R^2=0.90.\]&lt;p&gt;通常会直接宣布：&lt;/p&gt;
+\[\boxed{\text{高斯核更好。}}\]&lt;p&gt;但如果最终用于可靠性，还可以比较：&lt;/p&gt;
+\[\text{coverage},\]\[\text{interval width},\]\[\text{boundary misclassification},\]&lt;p&gt;以及 conformal calibration factor：&lt;/p&gt;
+\[\hat q.\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;Kernel&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;\(R^2\)&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;nominal 95% coverage&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;conformal factor&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Gaussian&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.94&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;71%&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;3.8&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Exponential&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.90&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;92%&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;2.1&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;那么高斯核虽然点预测更准，却：&lt;/p&gt;
+\[\boxed{\text{uncertainty model 严重过度自信。}}\]&lt;p&gt;对于主动可靠性分析，指数核可能反而更可靠。&lt;/p&gt;
+&lt;p&gt;这会把“核函数优劣”的判断从：&lt;/p&gt;
+\[\boxed{\text{谁拟合得最准}}\]&lt;p&gt;提升到：&lt;/p&gt;
+\[\boxed{\text{谁既能预测，又知道自己什么时候可能预测错。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-对-scientific-ml-的迁移更明显&#34;&gt;14. 对 Scientific ML 的迁移更明显
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;2026 年 Gopakumar 等人的工作把 CP 用到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PDE surrogate；&lt;/li&gt;
+&lt;li&gt;magnetohydrodynamics；&lt;/li&gt;
+&lt;li&gt;weather forecasting；&lt;/li&gt;
+&lt;li&gt;fusion diagnostics；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;模型则包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;MLP；&lt;/li&gt;
+&lt;li&gt;U-Net；&lt;/li&gt;
+&lt;li&gt;Fourier &lt;span class=&#34;term-anchor&#34; data-term=&#34;neural-operator&#34; tabindex=&#34;0&#34;&gt;Neural Operator&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;ViT；&lt;/li&gt;
+&lt;li&gt;GNN。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;输出维度从几十一直到超过：&lt;/p&gt;
+\[2\times10^7.\]&lt;p&gt;他们报告 conformal calibration 本身只需要秒到分钟级，并且预测阶段增加的计算成本很小。&lt;/p&gt;
+&lt;p&gt;这非常适合未来的：&lt;/p&gt;
+\[\boxed{\text{ROM / neural operator + physics solver}}\]&lt;p&gt;架构。&lt;/p&gt;
+&lt;p&gt;昂贵 solver：&lt;/p&gt;
+\[f_H(x)\]&lt;p&gt;训练 surrogate：&lt;/p&gt;
+\[\hat f_\theta(x)\]&lt;p&gt;然后 CP 作为：&lt;/p&gt;
+\[\boxed{\text{deployment-time reliability wrapper}.}\]&lt;p&gt;也就是说，你甚至可以：&lt;/p&gt;
+\[\boxed{\text{不重新训练 surrogate，就给它增加统计校准层。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-但-distribution-shift-会破坏核心假设&#34;&gt;15. 但 distribution shift 会破坏核心假设
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Conformal 最核心的条件不是：&lt;/p&gt;
+\[\text{Gaussianity}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\text{exchangeability}.}\]&lt;p&gt;直观理解：&lt;/p&gt;
+&lt;p&gt;calibration data 和未来 deployment data 应该来自同一个统计机制。&lt;/p&gt;
+&lt;p&gt;假设训练/校准：&lt;/p&gt;
+\[Mach\in[0.1,0.4],\]&lt;p&gt;真正部署：&lt;/p&gt;
+\[Mach\in[0.8,1.2].\]&lt;p&gt;此时：&lt;/p&gt;
+\[\boxed{\text{95% coverage guarantee 不再自动成立。}}\]&lt;p&gt;这也是为什么 CP 不是 OOD 检测的替代品。&lt;/p&gt;
+&lt;p&gt;更准确的架构是：&lt;/p&gt;
+\[\boxed{ \text{distribution monitoring} + \text{conformal calibration} + \text{surrogate} }\]&lt;p&gt;三者各司其职。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-一个非常值得自己做的小实验&#34;&gt;16. 一个非常值得自己做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;用你已有的 Kriging 案例即可。&lt;/p&gt;
+&lt;p&gt;把样本随机分成：&lt;/p&gt;
+\[60\%\text{ train}\]\[20\%\text{ calibration}\]\[20\%\text{ test}.\]&lt;p&gt;第一步，用 train：&lt;/p&gt;
+\[\mathcal D_{\rm train}\]&lt;p&gt;训练 Gaussian-kernel Kriging。&lt;/p&gt;
+&lt;p&gt;第二步，在 calibration 上计算：&lt;/p&gt;
+\[s_i= \frac{|y_i-\mu(x_i)|}{\sigma(x_i)}.\]&lt;p&gt;第三步求：&lt;/p&gt;
+\[\hat q_{0.95}.\]&lt;p&gt;第四步构造：&lt;/p&gt;
+\[C(x) = [ \mu(x)-\hat q\sigma(x), \mu(x)+\hat q\sigma(x) ].\]&lt;p&gt;最后比较：&lt;/p&gt;
+&lt;p&gt;原始 GP interval：&lt;/p&gt;
+\[\mu(x)\pm1.96\sigma(x)\]&lt;p&gt;和 conformalized interval：&lt;/p&gt;
+\[\mu(x)\pm\hat q\sigma(x).\]&lt;p&gt;不要只比较 RMSE。&lt;/p&gt;
+&lt;p&gt;重点记录：&lt;/p&gt;
+\[\boxed{\text{empirical coverage}}\]\[\boxed{\text{mean interval width}}\]\[\boxed{\text{failure-boundary coverage}}\]\[\boxed{\text{false-safe rate}}.\]&lt;p&gt;然后换：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Gaussian kernel；&lt;/li&gt;
+&lt;li&gt;Matérn；&lt;/li&gt;
+&lt;li&gt;exponential kernel；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;重新比较。&lt;/p&gt;
+&lt;p&gt;这会得到一个比单纯：&lt;/p&gt;
+\[R^2\]&lt;p&gt;丰富得多的 surrogate 评价体系。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-它在整个知识体系中卡在哪里&#34;&gt;17. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把代理模型 UQ 粗略理解成：&lt;/p&gt;
+\[\text{Point surrogate}\]&lt;p&gt;只给：&lt;/p&gt;
+\[\hat y.\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Probabilistic surrogate}\]&lt;p&gt;例如 GP：&lt;/p&gt;
+\[\hat y+\sigma(x).\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Calibration}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\sigma(x)\text{ 真的可信吗？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\boxed{\text{Conformal Prediction}}\]&lt;p&gt;用 empirical residual ranks 给：&lt;/p&gt;
+\[\boxed{\text{finite-sample marginal coverage guarantee}.}\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Decision / Reliability}\]&lt;p&gt;再把区间用于：&lt;/p&gt;
+\[P_f,\quad \text{active learning},\quad \text{safety decisions}.\]&lt;p&gt;因此 CP 的定位并不是另一种 surrogate。&lt;/p&gt;
+&lt;p&gt;它更像：&lt;/p&gt;
+\[\boxed{\text{surrogate 外面的一层 statistical safety wrapper}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Conformal Prediction 最值得理解的并不是那个 quantile 公式，而是一种完全不同的不确定性观：&lt;/p&gt;
+\[\boxed{ \text{模型声称自己有多确定，并不重要； 重要的是它过去在可比数据上实际错了多少。} }\]&lt;p&gt;GP/Kriging 试图通过：&lt;/p&gt;
+\[\boxed{\text{模型结构}}\]&lt;p&gt;推导 uncertainty。&lt;/p&gt;
+&lt;p&gt;Conformal Prediction 则通过：&lt;/p&gt;
+\[\boxed{\text{真实预测误差的排名}}\]&lt;p&gt;校准 uncertainty。&lt;/p&gt;
+&lt;p&gt;所以两者很适合组合：&lt;/p&gt;
+\[\boxed{ \text{Kriging tells you where uncertainty varies} }\]\[+\]\[\boxed{ \text{Conformal tells you how much uncertainty to trust}. }\]&lt;p&gt;对于可靠性代理模型，这比继续把 \(R^2\) 从：&lt;/p&gt;
+\[0.96\rightarrow0.98\]&lt;p&gt;再抠两个百分点，往往更值得研究：&lt;strong&gt;一个预测稍微差一点但经过良好校准的模型，在安全相关决策中可能比一个点预测极准、却严重过度自信的模型更有价值。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Lei, G&amp;rsquo;Sell, Rinaldo, Ryan Tibshirani &amp;amp; Larry Wasserman, &lt;strong&gt;Distribution-Free Predictive Inference for Regression&lt;/strong&gt;, &lt;em&gt;JASA&lt;/em&gt;, 2018。理解 split conformal、full conformal 和 finite-sample coverage 的经典入口。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/1604.04173&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文预印本&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Romano, Patterson &amp;amp; Emmanuel Candès, &lt;strong&gt;Conformalized Quantile Regression&lt;/strong&gt;, NeurIPS 2019。理解 heteroscedastic conformal prediction 最值得读的一篇。&lt;br&gt;
+NeurIPS 官方论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Gopakumar et al., &lt;strong&gt;Uncertainty Quantification of Surrogate Models using Conformal Prediction&lt;/strong&gt;, &lt;em&gt;Machine Learning: Science and Technology&lt;/em&gt;, 2026, DOI 10.1088/2632-2153/ae2e7b。这篇尤其推荐：它直接把 conformal prediction 放进 scientific surrogate/PDE/neural operator 的语境，并系统讨论 marginal coverage、exchangeability 和高维输出。&lt;br&gt;
+IOP 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Dan Giles 的作者项目页与公开预印本入口 —— 如果希望沿“物理代理模型 + conformal UQ”继续跟踪作者团队，这是比泛泛阅读 CP 教程更贴近 Scientific ML 的入口。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;

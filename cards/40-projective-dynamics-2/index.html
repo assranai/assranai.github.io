@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Projective Dynamics（PD，投影动力学）\n领域：有限元 × 软体动力学 × PBD/XPBD × 非线性优化 × 可微物理\n推荐阅读时间：约 8–10 分钟\n今天选 Projective Dynamics，因为它正好卡在一个很有价值的交叉点：\n\\[\\boxed{\\text{FEM 的能量建模}} \\quad+\\quad \\boxed{\\text{PBD 的局部投影}} \\quad+\\quad \\boxed{\\text{预分解线性求解器}}\\]它解决的是软体模拟里一个很现实的问题：隐式 FEM 稳定，但每一步都解非线性系统很贵；PBD 很快，但约束投影与严格能量模型之间存在距离。\nPD 的做法相当聪明：专门选择一类可以写成“到某个约束流形的平方距离”的势能，把一次复杂的非线性优化拆成：\n\\[\\boxed{\\text{Local：很多便宜的小投影}}\\]和\n\\[\\boxed{\\text{Global：一个矩阵恒定的线性系统}}\\]反复交替。\n2014 年 Bouaziz、Martin、Liu、Ladislav Kavan 与 Mark Pauly 的原始工作将它明确定位为 nodal FEM 与 PBD 之间的桥梁，并展示于 solids、cloth、shell 等问题。\n1. 先看普通隐式软体为什么贵 考虑离散弹性系统\n\\[M\\ddot x=-\\nabla E(x)+f_{\\rm ext}.\\]隐式 Euler 可以改写成最小化问题：\n\\[\\boxed{ x^{n+1} = \\arg\\min_x \\left[ \\frac{1}{2h^2} \\|x-y\\|_M^2 + E(x) \\right] }\\]其中\n\\[y=x^n+h v^n+h^2M^{-1}f_{\\rm ext}.\\]如果 \\(E(x)\\) 是一般 Neo-Hookean 超弹性能，通常需要 Newton：\n">
+<title>Projective Dynamics：为什么把非线性有限元“拆成局部投影 &#43; 固定全局线性系统”会快得惊人？</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/40-projective-dynamics-2/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Projective Dynamics：为什么把非线性有限元“拆成局部投影 + 固定全局线性系统”会快得惊人？">
+<meta property='og:description' content="主题：Projective Dynamics（PD，投影动力学）\n领域：有限元 × 软体动力学 × PBD/XPBD × 非线性优化 × 可微物理\n推荐阅读时间：约 8–10 分钟\n今天选 Projective Dynamics，因为它正好卡在一个很有价值的交叉点：\n\\[\\boxed{\\text{FEM 的能量建模}} \\quad+\\quad \\boxed{\\text{PBD 的局部投影}} \\quad+\\quad \\boxed{\\text{预分解线性求解器}}\\]它解决的是软体模拟里一个很现实的问题：隐式 FEM 稳定，但每一步都解非线性系统很贵；PBD 很快，但约束投影与严格能量模型之间存在距离。\nPD 的做法相当聪明：专门选择一类可以写成“到某个约束流形的平方距离”的势能，把一次复杂的非线性优化拆成：\n\\[\\boxed{\\text{Local：很多便宜的小投影}}\\]和\n\\[\\boxed{\\text{Global：一个矩阵恒定的线性系统}}\\]反复交替。\n2014 年 Bouaziz、Martin、Liu、Ladislav Kavan 与 Mark Pauly 的原始工作将它明确定位为 nodal FEM 与 PBD 之间的桥梁，并展示于 solids、cloth、shell 等问题。\n1. 先看普通隐式软体为什么贵 考虑离散弹性系统\n\\[M\\ddot x=-\\nabla E(x)+f_{\\rm ext}.\\]隐式 Euler 可以改写成最小化问题：\n\\[\\boxed{ x^{n+1} = \\arg\\min_x \\left[ \\frac{1}{2h^2} \\|x-y\\|_M^2 + E(x) \\right] }\\]其中\n\\[y=x^n+h v^n+h^2M^{-1}f_{\\rm ext}.\\]如果 \\(E(x)\\) 是一般 Neo-Hookean 超弹性能，通常需要 Newton：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/40-projective-dynamics-2/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='计算力学' /><meta property='article:tag' content='软体动力学' /><meta property='article:tag' content='数值优化' /><meta property='article:tag' content='科学机器学习' /><meta property='article:published_time' content='2026-09-22T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-22T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Projective Dynamics：为什么把非线性有限元“拆成局部投影 + 固定全局线性系统”会快得惊人？">
+<meta name="twitter:description" content="主题：Projective Dynamics（PD，投影动力学）\n领域：有限元 × 软体动力学 × PBD/XPBD × 非线性优化 × 可微物理\n推荐阅读时间：约 8–10 分钟\n今天选 Projective Dynamics，因为它正好卡在一个很有价值的交叉点：\n\\[\\boxed{\\text{FEM 的能量建模}} \\quad+\\quad \\boxed{\\text{PBD 的局部投影}} \\quad+\\quad \\boxed{\\text{预分解线性求解器}}\\]它解决的是软体模拟里一个很现实的问题：隐式 FEM 稳定，但每一步都解非线性系统很贵；PBD 很快，但约束投影与严格能量模型之间存在距离。\nPD 的做法相当聪明：专门选择一类可以写成“到某个约束流形的平方距离”的势能，把一次复杂的非线性优化拆成：\n\\[\\boxed{\\text{Local：很多便宜的小投影}}\\]和\n\\[\\boxed{\\text{Global：一个矩阵恒定的线性系统}}\\]反复交替。\n2014 年 Bouaziz、Martin、Liu、Ladislav Kavan 与 Mark Pauly 的原始工作将它明确定位为 nodal FEM 与 PBD 之间的桥梁，并展示于 solids、cloth、shell 等问题。\n1. 先看普通隐式软体为什么贵 考虑离散弹性系统\n\\[M\\ddot x=-\\nabla E(x)+f_{\\rm ext}.\\]隐式 Euler 可以改写成最小化问题：\n\\[\\boxed{ x^{n+1} = \\arg\\min_x \\left[ \\frac{1}{2h^2} \\|x-y\\|_M^2 + E(x) \\right] }\\]其中\n\\[y=x^n+h v^n+h^2M^{-1}f_{\\rm ext}.\\]如果 \\(E(x)\\) 是一般 Neo-Hookean 超弹性能，通常需要 Newton：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先看普通隐式软体为什么贵">1. 先看普通隐式软体为什么贵</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/40-projective-dynamics-2/">Projective Dynamics：为什么把非线性有限元“拆成局部投影 &#43; 固定全局线性系统”会快得惊人？</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-22T00:00:00Z'>Sep 22, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 5 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <p><strong>主题：<span class="term-anchor" data-term="pd" tabindex="0">Projective Dynamics</span>（PD，投影动力学）</strong><br>
+<strong>领域：有限元 × 软体动力学 × <span class="term-anchor" data-term="pbd" tabindex="0">PBD</span>/<span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> × 非线性优化 × 可微物理</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天选 Projective Dynamics，因为它正好卡在一个很有价值的交叉点：</p>
+\[\boxed{\text{FEM 的能量建模}} \quad+\quad \boxed{\text{PBD 的局部投影}} \quad+\quad \boxed{\text{预分解线性求解器}}\]<p>它解决的是软体模拟里一个很现实的问题：<strong>隐式 FEM 稳定，但每一步都解非线性系统很贵；PBD 很快，但约束投影与严格能量模型之间存在距离。</strong></p>
+<p>PD 的做法相当聪明：专门选择一类可以写成“到某个约束流形的平方距离”的势能，把一次复杂的非线性优化拆成：</p>
+\[\boxed{\text{Local：很多便宜的小投影}}\]<p>和</p>
+\[\boxed{\text{Global：一个矩阵恒定的线性系统}}\]<p>反复交替。</p>
+<p>2014 年 Bouaziz、Martin、Liu、Ladislav Kavan 与 Mark Pauly 的原始工作将它明确定位为 nodal FEM 与 PBD 之间的桥梁，并展示于 solids、cloth、shell 等问题。</p>
+<hr>
+<h2 id="1-先看普通隐式软体为什么贵">1. 先看普通隐式软体为什么贵
+</h2><p>考虑离散弹性系统</p>
+\[M\ddot x=-\nabla E(x)+f_{\rm ext}.\]<p>隐式 Euler 可以改写成最小化问题：</p>
+\[\boxed{ x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-y\|_M^2 + E(x) \right] }\]<p>其中</p>
+\[y=x^n+h v^n+h^2M^{-1}f_{\rm ext}.\]<p>如果 \(E(x)\) 是一般 Neo-Hookean 超弹性能，通常需要 Newton：</p>
+\[H(x_k)\Delta x=-g(x_k).\]<p>麻烦在于：</p>
+\[\boxed{H(x_k)\text{ 随形变变化。}}\]<p>于是每个时间步、甚至每个 Newton iteration，都可能涉及：</p>
+<ul>
+<li>单元 Hessian；</li>
+<li>sparse matrix assembly；</li>
+<li>factorization / iterative linear solve；</li>
+<li>line search。</li>
+</ul>
+<p>大模型中真正贵的经常不是算力本身，而是不断变化的全局线性系统。</p>
+<hr>
+<h1 id="2-pd-的关键动作限制势能的形式">2. PD 的关键动作：限制势能的形式
+</h1><p>PD 考虑一类势能：</p>
+\[\boxed{ E_i(x) = \frac{w_i}{2} \min_{p_i\in\mathcal M_i} \|A_i x-p_i\|^2 }\]<p>其中：</p>
+<ul>
+<li>\(A_i x\)：从全局节点状态提取出的局部形变量；</li>
+<li>\(\mathcal M_i\)：该局部量希望满足的“合法集合”；</li>
+<li>\(p_i\)：这个集合上的最近点；</li>
+<li>\(w_i\)：刚度权重。</li>
+</ul>
+<p>于是：</p>
+\[E(x)=\sum_iE_i(x).\]<p>这一步非常重要。</p>
+<p>PD 没有试图让<strong>任意</strong>复杂能量都变简单，而是选择了一类特别适合优化的能量。原论文将这些称为 specially designed energy potentials，并进一步从连续介质力学构造了适合固体、薄壳等模型的势能。</p>
+<hr>
+<h1 id="3-local-step先假设--不动">3. Local step：先假设 \(x\) 不动
+</h1><p>固定当前节点位置：</p>
+\[x=x_k.\]<p>每个约束独立求：</p>
+\[\boxed{ p_i = \arg\min_{p\in\mathcal M_i} \|A_ix_k-p\|^2. }\]<p>这通常就是一个<strong>几何投影</strong>。</p>
+<p>例如弹簧：</p>
+\[d=x_i-x_j\]<p>希望长度：</p>
+\[\|d\|=L.\]<p>那么局部投影就是：</p>
+\[\boxed{ p=L\frac{d}{\|d\|}. }\]<p>这和 PBD 极其相似：</p>
+<blockquote>
+<p>当前约束状态不合法，就求最近的合法状态。</p>
+</blockquote>
+<p>更重要的是，各个 \(p_i\) 在给定 \(x\) 后通常相互独立，因此 local step 天然适合并行。</p>
+<hr>
+<h1 id="4-global-step再固定所有">4. Global step：再固定所有 \(p_i\)
+</h1><p>现在：</p>
+\[p_i\]<p>已知。</p>
+<p>求：</p>
+\[\min_x \frac{1}{2h^2} \|x-y\|_M^2 + \sum_i \frac{w_i}{2} \|A_ix-p_i\|^2.\]<p>这是纯二次问题。</p>
+<p>求导：</p>
+\[\frac1{h^2}M(x-y) + \sum_iw_iA_i^T(A_ix-p_i)=0.\]<p>整理：</p>
+\[\boxed{ \left( \frac{M}{h^2} + \sum_iw_iA_i^TA_i \right)x = \frac{M}{h^2}y + \sum_iw_iA_i^Tp_i. }\]<p>记：</p>
+\[\boxed{ K= \frac{M}{h^2} + \sum_iw_iA_i^TA_i. }\]<p>于是：</p>
+\[\boxed{Kx=b(p).}\]<p>现在出现了 PD 最重要的工程性质：</p>
+\[\boxed{K\text{ 与当前形变 }x\text{ 无关。}}\]<p>只要：</p>
+<ul>
+<li>拓扑不变；</li>
+<li>\(h\) 不变；</li>
+<li>权重不变；</li>
+</ul>
+<p>就可以在初始化阶段：</p>
+\[\boxed{K=LL^T}\]<p>做一次 Cholesky factorization。</p>
+<p>之后每一次 global solve 只是：</p>
+\[Lz=b, \qquad L^Tx=z.\]<p>这就是 PD 快的核心来源。</p>
+<hr>
+<h1 id="5-所以整个求解器只有这个循环">5. 所以整个求解器只有这个循环
+</h1><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">prefactorize K
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">for each timestep:
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    predict y
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    x = y
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    repeat several iterations:
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        # local
+</span></span><span class="line"><span class="cl">        for each element/constraint in parallel:
+</span></span><span class="line"><span class="cl">            p_i = project(A_i x)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        # global
+</span></span><span class="line"><span class="cl">        b = M y / h² + Σ w_i A_iᵀ p_i
+</span></span><span class="line"><span class="cl">        solve K x = b using prefactorized K
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>可以把它压缩成：</p>
+\[\boxed{ x \rightarrow p \rightarrow x \rightarrow p \rightarrow\cdots }\]<p>这是 alternating minimization / local-global optimization。</p>
+<hr>
+<h1 id="6-它和-pbd-到底差在哪里">6. 它和 PBD 到底差在哪里？
+</h1><p>表面上二者都做 projection。</p>
+<p>PBD 更接近：</p>
+\[C_i(x)=0\]<p>然后逐约束修改：</p>
+\[x\leftarrow x+\Delta x_i.\]<p>多个约束往往通过 Gauss-Seidel/Jacobi 反复传播。</p>
+<p>PD 的 local projection 只产生：</p>
+\[p_i.\]<p>它<strong>不直接修改全局节点</strong>。</p>
+<p>所有局部要求最终统一送进：</p>
+\[\boxed{Kx=b}\]<p>一次全局协调。</p>
+<p>因此可以把两者直观地区分成：</p>
+\[\text{PBD:} \quad \boxed{\text{约束逐个拉节点}}\]<p>而</p>
+\[\text{PD:} \quad \boxed{\text{约束先提出自己的理想状态，再由全局系统统一折中。}}\]<p>这也是为什么原论文称它为 FEM 与 PBD 之间的桥梁。</p>
+<hr>
+<h1 id="7-一个特别重要的理解global-step-本质上在传播信息">7. 一个特别重要的理解：Global step 本质上在传播信息
+</h1><p>考虑长条软体：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">[contact] ---- tet ---- tet ---- tet ---- tet
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>某个局部单元发生很大形变。</p>
+<p>如果完全使用局部约束迭代，影响需要：</p>
+\[\text{constraint} \rightarrow \text{neighbor} \rightarrow \text{neighbor} \rightarrow\cdots\]<p>慢慢传播。</p>
+<p>PD 的 global solve：</p>
+\[Kx=b\]<p>一次就让整个连通系统响应。</p>
+<p>因此：</p>
+\[\boxed{ \text{local step 解决材料非线性； global step 解决长程耦合。} }\]<p>这个分工是 PD 很深的一点。</p>
+<hr>
+<h1 id="8-它和普通-newton-fem-的区别可以看得更清楚">8. 它和普通 Newton FEM 的区别可以看得更清楚
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>Newton：</p>
+\[H(x_k)\Delta x=-g(x_k).\]<p>每一步都构造当前局部曲率：</p>
+\[H(x_k).\]<p>因此单次 iteration 很贵，但通常具有更强的局部收敛能力。</p>
+<p>PD：</p>
+\[Kx=b(p_k).\]<p>把复杂非线性主要藏在：</p>
+\[p_k=\Pi_{\mathcal M}(A x_k)\]<p>里，而全局矩阵：</p>
+\[K\]<p>固定。</p>
+<p>于是它做了一个很明确的交易：</p>
+\[\boxed{ \text{牺牲 Newton 的精确局部 Hessian} }\]<p>换取：</p>
+\[\boxed{ \text{一个可以永久复用的全局线性算子。} }\]<p>对于需要每秒重复几十到几百个时间步的动画/游戏物理，这个交易非常有价值。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="9-为什么这与-anderson-acceleration-那张卡片能连起来">9. 为什么这与 Anderson Acceleration 那张卡片能连起来？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>PD 的 local-global iteration 本身就是：</p>
+\[\boxed{x_{k+1}=G(x_k).}\]<p>因此它仍可能出现：</p>
+\[\text{稳定，但迭代很多次才收敛。}\]<p>尤其在：</p>
+<ul>
+<li>高刚度；</li>
+<li>材料强异质；</li>
+<li>强非线性；</li>
+</ul>
+<p>情况下。</p>
+<p>所以 PD 后续研究中出现各种：</p>
+<ul>
+<li>Chebyshev acceleration；</li>
+<li>quasi-Newton；</li>
+<li>Anderson acceleration；</li>
+</ul>
+<p>并不偶然。</p>
+<p>甚至 2026 年的新工作 DiffPhD 仍在研究强异质材料下 PD fixed-point iteration 的稳定性，并使用 Type-II Anderson acceleration 等技术增强收敛。</p>
+<p>这说明前面两张知识卡其实可以接成：</p>
+\[\boxed{ \text{PD 提供便宜的 fixed-point map} \rightarrow \text{AA 加速这个 map}. }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="10-pd-最大的限制也正来自它最大的优点">10. PD 最大的限制也正来自它最大的优点
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>固定：</p>
+\[K\]<p>之所以可能，是因为势能被限制成：</p>
+\[\frac{w_i}{2} \|A_ix-p_i\|^2.\]<p>因此对于一般超弹性：</p>
+\[W(F)\]<p>尤其复杂：</p>
+<ul>
+<li>Neo-Hookean；</li>
+<li>Mooney-Rivlin；</li>
+<li>anisotropic material；</li>
+<li>plasticity；</li>
+</ul>
+<p>你不能无条件期待它们都天然具有漂亮的 projective form。</p>
+<p>这意味着：</p>
+\[\boxed{ \text{PD 的速度来自对能量结构的利用， 不是一种免费的通用非线性 FEM 加速器。} }\]<p>因此如果追求严格 constitutive accuracy，一般 Newton FEM 仍有重要优势。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="11-这其实是一种非常普遍的算法设计哲学">11. 这其实是一种非常普遍的算法设计哲学
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设原问题：</p>
+\[\min_x E(x)\]<p>很难。</p>
+<p>PD 引入辅助变量：</p>
+\[p.\]<p>把它变成：</p>
+\[\min_{x,p} E(x,p).\]<p>然后：</p>
+<p>固定 \(x\)：</p>
+\[p\leftarrow\arg\min_pE(x,p)\]<p>很容易。</p>
+<p>固定 \(p\)：</p>
+\[x\leftarrow\arg\min_xE(x,p)\]<p>也很容易。</p>
+<p>这就是：</p>
+\[\boxed{\text{variable splitting}.}\]<p>同一思想大量存在于：</p>
+<ul>
+<li>ADMM；</li>
+<li>alternating minimization；</li>
+<li>proximal methods；</li>
+<li>EM；</li>
+<li>block coordinate descent。</li>
+</ul>
+<p>所以 PD 真正值得学的不只是一个软体算法。</p>
+<p>它展示了一种很强的计算思想：</p>
+\[\boxed{ \text{如果整体非线性太难， 引入辅助变量，让困难的结构局部化， 再让剩余的全局问题变成可重复求解的简单结构。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="12-更进一步为什么固定矩阵如此值钱">12. 更进一步：为什么“固定矩阵”如此值钱？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>设一个软体有：</p>
+\[n=10^5\]<p>自由度。</p>
+<p>如果每个 Newton iteration 都需要：</p>
+\[H_k\]<p>重新 factorize，成本很高。</p>
+<p>而 PD：</p>
+\[K=LL^T\]<p>一次预分解后，之后几千帧都可能复用。</p>
+<p>于是昂贵工作从：</p>
+\[\boxed{\text{per iteration}}\]<p>变成：</p>
+\[\boxed{\text{one-time preprocessing}.}\]<p>这实际上是在利用游戏/动画模拟的一个重要性质：</p>
+\[\boxed{\text{拓扑通常长期不变。}}\]<p>所以 PD 并非只利用数学结构，还利用了<strong>应用工作负载结构</strong>。</p>
+<p>这条原则对工程开发很重要：</p>
+<blockquote>
+<p>优化算法时，不只看一次 solve 的复杂度，还要看哪些昂贵结构能够跨时间步缓存。</p>
+</blockquote>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="13-这也解释了为什么-pd-很适合可微物理">13. 这也解释了为什么 PD 很适合可微物理
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设要优化材料参数：</p>
+\[\theta\]<p>使：</p>
+\[L(x(\theta))\]<p>最小。</p>
+<p>需要：</p>
+\[\frac{dL}{d\theta}.\]<p>一般隐式 FEM 的 backward pass 又需要解线性化动力学。</p>
+<p>DiffPD 的关键观察是：</p>
+\[\boxed{\text{forward PD 已经拥有一个预分解的全局矩阵。}}\]<p>可以继续利用这种结构加速 backward solve。</p>
+<p>Tao Du 等人的 DiffPD 因此把 PD 扩展成 differentiable soft-body simulator，并在其论文实验中报告，相比标准 Newton 方法，在 system identification、inverse design、trajectory optimization 和 control 等任务中达到约 <strong>4–19×</strong> 加速。</p>
+<p>这是一条很漂亮的路线：</p>
+\[\boxed{ \text{forward solver 的结构设计} \rightarrow \text{决定 backward 是否也便宜。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="14-对-ai--physics-来说这一点越来越重要">14. 对 AI + Physics 来说，这一点越来越重要
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>过去我们设计 simulator，通常只问：</p>
+\[\boxed{\text{forward 快不快？}}\]<p>进入 differentiable simulation 后，需要同时问：</p>
+\[\boxed{ \text{forward 快不快？} }\]<p>以及：</p>
+\[\boxed{ \text{Jacobian-vector / adjoint solve 快不快？} }\]<p>一个 forward 极快、但 backward 结构极差的求解器，并不一定适合：</p>
+<ul>
+<li>system identification；</li>
+<li>reinforcement learning；</li>
+<li>inverse design；</li>
+<li>Real2Sim；</li>
+<li>parameter fitting。</li>
+</ul>
+<p>DiffPD 展示了一个很值得迁移的工程原则：</p>
+\[\boxed{ \text{如果未来需要 differentiability， solver architecture 最好从一开始就考虑可复用的线性结构。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="15-接触会破坏这个漂亮结构吗">15. 接触会破坏这个漂亮结构吗？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这正是实际 PD 的难点之一。</p>
+<p>普通 PD 的优势来自：</p>
+\[K=\text{constant}.\]<p>但接触集合：</p>
+\[\mathcal C(x)\]<p>不断变化。</p>
+<p>如果每出现一个 contact 都修改：</p>
+\[K,\]<p>就会失去预分解优势。</p>
+<p>因此 PD 接触算法往往想办法让 contact：</p>
+<ul>
+<li>进入 RHS；</li>
+<li>进入独立 local solve；</li>
+<li>或仅影响很小的自由度子集；</li>
+</ul>
+<p>尽量避免重构整个 global matrix。</p>
+<p>例如 DiffCloth 在 PD 框架中加入 Signorini–Coulomb dry friction contact，并把 contact 处理设计成额外 local step，从而继续利用 PD 的 global-local 结构。</p>
+<p>这也是一个非常一般的求解器设计目标：</p>
+\[\boxed{ \text{动态变化的物理，尽量不要破坏静态可缓存的线性骨架。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="16-对你自研-xpbd-求解器最有价值的迁移点">16. 对你自研 XPBD 求解器最有价值的迁移点
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>我认为重点不在于“把 XPBD 全部换成 PD”。</p>
+<p>更值得实验的是：</p>
+\[\boxed{\text{local-global hybrid architecture}.}\]<p>当前 XPBD 中，每个 constraint：</p>
+\[C_i(x)\]<p>独立计算：</p>
+\[\Delta\lambda_i,\quad\Delta x_i.\]<p>如果发现某些低频全局误差需要很多 sweep 才能传播，可以考虑：</p>
+<ol>
+<li>local constraint kernels 保留；</li>
+<li>把部分 elastic constraints 解释为 local target \(p_i\)；</li>
+<li>构造固定 global operator；</li>
+<li>每若干 local iterations 做一次 global correction。</li>
+</ol>
+<p>这相当于问：</p>
+\[\boxed{ \text{哪些物理必须逐约束解决， 哪些耦合其实适合交给一个全局线性传播器？} }\]<p>这比单纯增加：</p>
+\[\text{solver iterations}\]<p>更值得研究。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="17-一个很适合自己实现的小实验">17. 一个很适合自己实现的小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>不需要四面体 FEM。</p>
+<p>先做：</p>
+\[20\times20\]<p>二维 mass-spring cloth。</p>
+<p>弹簧势能：</p>
+\[E_{ij} = \frac{k}{2} (\|x_i-x_j\|-L_{ij})^2.\]<p>PD local step：</p>
+\[p_{ij} = L_{ij} \frac{x_i-x_j}{\|x_i-x_j\|}.\]<p>预构造：</p>
+\[K= \frac{M}{h^2} + \sum_{ij}kA_{ij}^TA_{ij}.\]<p>Cholesky：</p>
+\[K=LL^T.\]<p>然后比较：</p>
+<ul>
+<li>PBD / XPBD Gauss-Seidel；</li>
+<li>PD local-global；</li>
+<li>PD + Anderson。</li>
+</ul>
+<p>记录：</p>
+\[\text{constraint/energy residual}\]<p>随：</p>
+\[\text{iteration}\]<p>和：</p>
+\[\text{wall-clock time}\]<p>的变化。</p>
+<p>尤其观察长程扰动：</p>
+<p>只拖动 cloth 一个角。</p>
+<p>你很可能会清楚看到：</p>
+\[\boxed{ \text{局部方法与 global solve 在误差传播速度上的结构差异。} }\]
+  </div>
+</details>
+
+<hr>
+<h1 id="18-为什么今天值得专门学-pd">18. 为什么今天值得专门学 PD？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>因为它能纠正一种常见的算法直觉：</p>
+<p>面对非线性有限元，人们容易把选择理解成：</p>
+\[\boxed{ \text{便宜但不够物理的 PBD} }\]<p>或者：</p>
+\[\boxed{ \text{物理准确但昂贵的 Newton FEM}. }\]<p>PD 展示了第三条路：</p>
+\[\boxed{ \text{重新设计能量表达，使物理模型主动适应高效数值算法。} }\]<p>这其实是计算物理中非常高级的一种思维。</p>
+<p>模型形式和 solver 并非完全独立。</p>
+<p>有时：</p>
+\[\boxed{\text{选择一种“可解性更好”的物理离散}}\]<p>比：</p>
+\[\boxed{\text{对一个任意离散疯狂优化 solver}}\]<p>收益更大。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Projective Dynamics 最值得记住的不是 local/global 两个步骤，而是：</p>
+\[\boxed{ \text{把随状态变化的非线性尽可能压进廉价的局部操作， 让昂贵的全局耦合保持固定、线性、可缓存。} }\]<p>它在知识体系中的位置很漂亮：</p>
+\[\text{Continuum / FEM energy}\]\[\downarrow\]\[\boxed{\text{projective potentials}}\]\[\begin{array}{ccc} \swarrow&&\searrow\\ \text{local projection}&&\text{global linear coupling} \end{array}\]\[\downarrow\]\[\boxed{\text{Projective Dynamics}}\]<p>再向外延伸：</p>
+\[\text{PD} \rightarrow \text{Anderson / quasi-Newton acceleration}\]\[\text{PD} \rightarrow \text{contact mechanics}\]\[\text{PD} \rightarrow \boxed{\text{DiffPD / differentiable physics}}.\]<p>所以 PD 真正值得学的地方已经超出软体模拟本身：</p>
+\[\boxed{ \text{一个高性能 solver 的关键， 经常不是“把每一步算得更快”， 而是重新组织问题，使最昂贵的结构能够跨迭代、跨时间步反复复用。} }\]<p>这条原则对 FEM、物理引擎、ROM，甚至 AI 推理系统里的缓存和固定算子设计都有很强的迁移价值。</p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p>Bouaziz, Martin, Liu, Kavan &amp; Pauly, <strong><em>Projective Dynamics: Fusing Constraint Projections for Fast Simulation</em></strong>, <em>ACM TOG / SIGGRAPH 2014</em>。原始论文，也是最推荐的入口。<br>
+Projective Dynamics 官方项目页与论文/视频</p>
+</li>
+<li>
+<p>Tao Du et al., <strong><em>DiffPD: Differentiable Projective Dynamics</em></strong>, <em>ACM TOG</em>, 2022。重点看如何复用 PD 的 prefactorization 加速 backward/<span class="term-anchor" data-term="adjoint" tabindex="0">adjoint</span>，以及 system identification、inverse design 和 control。<br>
+DiffPD 官方项目、论文与代码</p>
+</li>
+<li>
+<p>Ly et al. 路线上的 <strong>PD + dry frictional contact</strong> 可从 Li et al., <strong><em>DiffCloth: Differentiable Cloth Simulation with Dry Frictional Contact</em></strong>, <em>ACM TOG</em>, 2022 入手。论文完整解释了 velocity-based PD global solve 与 Signorini–Coulomb contact local step 如何结合。<br>
+ACM DiffCloth 论文</p>
+</li>
+<li>
+<p>如果想看这条路线截至 <strong>2026 年</strong>仍在解决什么，可以关注 <strong>DiffPhD: A Unified Differentiable Solver for Projective Heterogeneous Materials in Elastodynamics with Contact-Rich GPU-Acceleration</strong>。它把强材料异质性、超弹性、GPU contact、Anderson acceleration 与可微 PD 放到同一框架里，是理解 PD 当前工程边界很有价值的新工作。</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E8%AE%A1%E7%AE%97%E5%8A%9B%E5%AD%A6/">计算力学</a>
+        
+            <a href="/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/">软体动力学</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E4%BC%98%E5%8C%96/">数值优化</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-40<span class="card-badge card-badge--role" title="认知分型">概念基石</span><span class="card-badge" title="次要分型">权衡对比</span><span class="card-badge card-badge--diff" title="难度 2/3">◆◆◇</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/03-projective-dynamics/">Projective Dynamics：把“PBD 的投影”变成真正的能量求解<span class="dep-radar-meta"> · card-03</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-40<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/22-implicit-differentiation/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/15-anderson-acceleration/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Anderson Acceleration：把“过去几次迭代为什么没收敛”变成下一步的搜索方向</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/06-apic/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

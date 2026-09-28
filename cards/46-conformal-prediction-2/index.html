@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Conformal Prediction（保形预测）与代理模型校准\n领域：代理模型 × 不确定性量化 × 可靠性 × Scientific ML\n推荐阅读时间：约 8–10 分钟\n今天选一个和前几张 SUR、Shapley、MFMC 有明显区别、但能直接接到代理模型研究的问题：\n一个 Kriging、神经网络或 ROM 给出了“95% 预测区间”，这个 95% 到底凭什么可信？\n对于 Gaussian Process，区间通常来自：\n\\[f(x)\\mid\\mathcal D \\sim\\mathcal N(\\mu(x),\\sigma^2(x)).\\]但这里的 \\(\\sigma(x)\\) 是在模型假设成立条件下的 posterior uncertainty。如果核函数错了、超参数估计有偏、模型存在结构误差，那么\n\\[\\mu(x)\\pm1.96\\sigma(x)\\]未必真的覆盖 95% 的新观测。\nConformal Prediction（CP）做了一件很不同的事：它不尝试证明你的代理模型是正确的，而是用一批校准数据测量“这个模型实际会错多少”，再把预测区间修正到具有有限样本覆盖保证。\n2026 年发表于 Machine Learning: Science and Technology 的工作已经把这一思想系统用于 PDE、磁流体、天气、聚变诊断等 scientific surrogate，并覆盖 MLP、U-Net、Fourier Neural Operator、ViT、GNN 等模型。\n1. 先区分两个经常混淆的问题 假设代理模型：\n\\[\\hat y=f_\\theta(x).\\]第一个问题是：\n\\[\\boxed{\\hat y\\text{ 准不准？}}\\]可以用：\n\\[R^2,\\quad RMSE,\\quad MAE\\]回答。\n第二个问题是：\n\\[\\boxed{\\text{我说“95%可信”时，它真的至少有约95%的覆盖率吗？}}\\]这是 calibration 问题。\n">
+<title>Conformal Prediction：给任意代理模型加一层“有限样本覆盖保证”</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/46-conformal-prediction-2/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Conformal Prediction：给任意代理模型加一层“有限样本覆盖保证”">
+<meta property='og:description' content="主题：Conformal Prediction（保形预测）与代理模型校准\n领域：代理模型 × 不确定性量化 × 可靠性 × Scientific ML\n推荐阅读时间：约 8–10 分钟\n今天选一个和前几张 SUR、Shapley、MFMC 有明显区别、但能直接接到代理模型研究的问题：\n一个 Kriging、神经网络或 ROM 给出了“95% 预测区间”，这个 95% 到底凭什么可信？\n对于 Gaussian Process，区间通常来自：\n\\[f(x)\\mid\\mathcal D \\sim\\mathcal N(\\mu(x),\\sigma^2(x)).\\]但这里的 \\(\\sigma(x)\\) 是在模型假设成立条件下的 posterior uncertainty。如果核函数错了、超参数估计有偏、模型存在结构误差，那么\n\\[\\mu(x)\\pm1.96\\sigma(x)\\]未必真的覆盖 95% 的新观测。\nConformal Prediction（CP）做了一件很不同的事：它不尝试证明你的代理模型是正确的，而是用一批校准数据测量“这个模型实际会错多少”，再把预测区间修正到具有有限样本覆盖保证。\n2026 年发表于 Machine Learning: Science and Technology 的工作已经把这一思想系统用于 PDE、磁流体、天气、聚变诊断等 scientific surrogate，并覆盖 MLP、U-Net、Fourier Neural Operator、ViT、GNN 等模型。\n1. 先区分两个经常混淆的问题 假设代理模型：\n\\[\\hat y=f_\\theta(x).\\]第一个问题是：\n\\[\\boxed{\\hat y\\text{ 准不准？}}\\]可以用：\n\\[R^2,\\quad RMSE,\\quad MAE\\]回答。\n第二个问题是：\n\\[\\boxed{\\text{我说“95%可信”时，它真的至少有约95%的覆盖率吗？}}\\]这是 calibration 问题。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/46-conformal-prediction-2/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='不确定性量化' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='科学机器学习' /><meta property='article:published_time' content='2026-09-28T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-28T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Conformal Prediction：给任意代理模型加一层“有限样本覆盖保证”">
+<meta name="twitter:description" content="主题：Conformal Prediction（保形预测）与代理模型校准\n领域：代理模型 × 不确定性量化 × 可靠性 × Scientific ML\n推荐阅读时间：约 8–10 分钟\n今天选一个和前几张 SUR、Shapley、MFMC 有明显区别、但能直接接到代理模型研究的问题：\n一个 Kriging、神经网络或 ROM 给出了“95% 预测区间”，这个 95% 到底凭什么可信？\n对于 Gaussian Process，区间通常来自：\n\\[f(x)\\mid\\mathcal D \\sim\\mathcal N(\\mu(x),\\sigma^2(x)).\\]但这里的 \\(\\sigma(x)\\) 是在模型假设成立条件下的 posterior uncertainty。如果核函数错了、超参数估计有偏、模型存在结构误差，那么\n\\[\\mu(x)\\pm1.96\\sigma(x)\\]未必真的覆盖 95% 的新观测。\nConformal Prediction（CP）做了一件很不同的事：它不尝试证明你的代理模型是正确的，而是用一批校准数据测量“这个模型实际会错多少”，再把预测区间修正到具有有限样本覆盖保证。\n2026 年发表于 Machine Learning: Science and Technology 的工作已经把这一思想系统用于 PDE、磁流体、天气、聚变诊断等 scientific surrogate，并覆盖 MLP、U-Net、Fourier Neural Operator、ViT、GNN 等模型。\n1. 先区分两个经常混淆的问题 假设代理模型：\n\\[\\hat y=f_\\theta(x).\\]第一个问题是：\n\\[\\boxed{\\hat y\\text{ 准不准？}}\\]可以用：\n\\[R^2,\\quad RMSE,\\quad MAE\\]回答。\n第二个问题是：\n\\[\\boxed{\\text{我说“95%可信”时，它真的至少有约95%的覆盖率吗？}}\\]这是 calibration 问题。\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先区分两个经常混淆的问题">1. 先区分两个经常混淆的问题</a></li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/46-conformal-prediction-2/">Conformal Prediction：给任意代理模型加一层“有限样本覆盖保证”</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-09-28T00:00:00Z'>Sep 28, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 5 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <p><strong>主题：<span class="term-anchor" data-term="conformal" tabindex="0">Conformal Prediction</span>（保形预测）与代理模型校准</strong><br>
+<strong>领域：代理模型 × 不确定性量化 × 可靠性 × Scientific ML</strong><br>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
+<p>今天选一个和前几张 SUR、Shapley、<span class="term-anchor" data-term="mfmc" tabindex="0">MFMC</span> 有明显区别、但能直接接到代理模型研究的问题：</p>
+<blockquote>
+<p>一个 <span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span>、神经网络或 ROM 给出了“95% 预测区间”，这个 <strong>95% 到底凭什么可信？</strong></p>
+</blockquote>
+<p>对于 Gaussian Process，区间通常来自：</p>
+\[f(x)\mid\mathcal D \sim\mathcal N(\mu(x),\sigma^2(x)).\]<p>但这里的 \(\sigma(x)\) 是在<strong>模型假设成立</strong>条件下的 posterior uncertainty。如果核函数错了、超参数估计有偏、模型存在结构误差，那么</p>
+\[\mu(x)\pm1.96\sigma(x)\]<p>未必真的覆盖 95% 的新观测。</p>
+<p><strong>Conformal Prediction（CP）做了一件很不同的事：它不尝试证明你的代理模型是正确的，而是用一批校准数据测量“这个模型实际会错多少”，再把预测区间修正到具有有限样本覆盖保证。</strong></p>
+<p>2026 年发表于 <em>Machine Learning: Science and Technology</em> 的工作已经把这一思想系统用于 PDE、磁流体、天气、聚变诊断等 scientific surrogate，并覆盖 MLP、U-Net、<span class="term-anchor" data-term="fno" tabindex="0">Fourier Neural Operator</span>、ViT、GNN 等模型。</p>
+<hr>
+<h2 id="1-先区分两个经常混淆的问题">1. 先区分两个经常混淆的问题
+</h2><p>假设代理模型：</p>
+\[\hat y=f_\theta(x).\]<p>第一个问题是：</p>
+\[\boxed{\hat y\text{ 准不准？}}\]<p>可以用：</p>
+\[R^2,\quad RMSE,\quad MAE\]<p>回答。</p>
+<p>第二个问题是：</p>
+\[\boxed{\text{我说“95%可信”时，它真的至少有约95%的覆盖率吗？}}\]<p>这是 <strong>calibration</strong> 问题。</p>
+<p>一个模型完全可能：</p>
+\[R^2=0.99\]<p>却严重过度自信。</p>
+<p>例如真实误差经常达到：</p>
+\[|y-\hat y|=0.3,\]<p>但模型给出的标准差始终只有：</p>
+\[\sigma(x)=0.02.\]<p>那么它预测得总体不错，却：</p>
+\[\boxed{\text{不知道自己什么时候会错。}}\]<p>对于可靠性问题，这比 RMSE 稍大往往危险得多。</p>
+<hr>
+<h1 id="2-conformal-prediction-的基本操作极其简单">2. Conformal Prediction 的基本操作极其简单
+</h1><p>假设已经训练好了任意模型：</p>
+\[\hat f(x).\]<p>另外留出一组 calibration data：</p>
+\[\mathcal D_{\rm cal} = \{(x_i,y_i)\}_{i=1}^{n}.\]<p>计算每个样本的误差：</p>
+\[\boxed{ s_i=|y_i-\hat f(x_i)|. }\]<p>这里 \(s_i\) 叫 <strong>nonconformity score</strong>：</p>
+<blockquote>
+<p>这个样本和模型预测有多“不合群”。</p>
+</blockquote>
+<p>假设希望得到：</p>
+\[1-\alpha=95\%\]<p>预测区间。</p>
+<p>取这些误差的适当高分位数：</p>
+\[\hat q = \operatorname{Quantile}_{\lceil(n+1)(1-\alpha)\rceil/n} (s_1,\ldots,s_n).\]<p>然后对一个新输入：</p>
+\[x_{\rm new}\]<p>输出：</p>
+\[\boxed{ C(x_{\rm new}) = [ \hat f(x_{\rm new})-\hat q,\; \hat f(x_{\rm new})+\hat q ]. }\]<p>就这么简单。</p>
+<hr>
+<h1 id="3-神奇之处在于它有一个真正的有限样本保证">3. 神奇之处在于：它有一个真正的有限样本保证
+</h1><p>在 calibration 样本与未来 test sample <strong>exchangeable</strong> 的条件下：</p>
+\[\boxed{ P \left( Y_{\rm new}\in C(X_{\rm new}) \right) \ge1-\alpha. }\]<p>而且这个结论：</p>
+<ul>
+<li>不要求误差是 Gaussian；</li>
+<li>不要求模型是 GP；</li>
+<li>不要求模型正确；</li>
+<li>不要求 \(n\to\infty\)；</li>
+<li>不要求神经网络经过 Bayesian training。</li>
+</ul>
+<p>这正是 conformal prediction 最重要的理论价值。Lei、G&rsquo;Sell、Rinaldo、Tibshirani 与 Wasserman 的经典 regression conformal 工作系统证明并比较了 full conformal、split conformal 等方法的有限样本 marginal coverage 性质。</p>
+<p>所以 CP 的世界观很有意思：</p>
+\[\boxed{ \text{我不相信模型对自己的 uncertainty 描述； 我相信它在独立校准样本上实际犯过的错误。} }\]<hr>
+<h1 id="4-为什么这能成立">4. 为什么这能成立？
+</h1><p>核心不是 Gaussian assumption，而是：</p>
+\[\boxed{\text{rank symmetry}.}\]<p>把 calibration errors：</p>
+\[s_1,\ldots,s_n\]<p>和未来未知 error：</p>
+\[s_{n+1}\]<p>放在一起。</p>
+<p>如果这些样本 exchangeable，那么：</p>
+\[s_{n+1}\]<p>在：</p>
+\[n+1\]<p>个 score 中的排名没有特殊地位。</p>
+<p>因此它落在最大的：</p>
+\[\alpha\]<p>比例之外的概率至多约为：</p>
+\[\alpha.\]<p>换句话说：</p>
+\[\boxed{\text{CP 的保证来自排序，而不是分布拟合。}}\]<p>这是一个非常深的区别。</p>
+<p>传统 UQ：</p>
+\[\boxed{\text{先假设概率模型，再推出区间。}}\]<p>Conformal：</p>
+\[\boxed{\text{直接利用样本交换性，把误差排名转化为覆盖保证。}}\]<hr>
+<h1 id="5-这意味着它可以直接包在-kriging-外面">5. 这意味着它可以直接包在 Kriging 外面
+</h1><p>假设已有：</p>
+\[\mu(x),\quad\sigma(x).\]<p>可以定义：</p>
+\[\boxed{ s_i= \frac{|y_i-\mu(x_i)|} {\sigma(x_i)}. }\]<p>然后计算：</p>
+\[\hat q.\]<p>最终区间变成：</p>
+\[\boxed{ [ \mu(x)-\hat q\sigma(x), \; \mu(x)+\hat q\sigma(x) ]. }\]<p>注意这里：</p>
+\[\hat q\]<p>是数据校准出来的。</p>
+<p>如果 GP 完美 calibrated，可能：</p>
+\[\hat q\approx1.96.\]<p>但如果 GP 严重低估 uncertainty：</p>
+\[\hat q=4.3\]<p>也完全可能。</p>
+<p>这实际上相当于问：</p>
+\[\boxed{ \text{你的 Kriging }\sigma(x)\text{ 虽然不一定是正确概率尺度， 但它至少能不能正确描述“哪里容易错”？} }\]<p>2026 年的 surrogate-UQ 工作正比较了 absolute residual、quantile regression 和标准差归一化等多种 nonconformity score，并在多类 PDE surrogate 上验证 coverage。</p>
+<hr>
+<h1 id="6-这里有一个非常值得理解的分工">6. 这里有一个非常值得理解的分工
+</h1><p>GP 提供：</p>
+\[\boxed{\text{relative uncertainty structure}}\]<p>例如：</p>
+\[\sigma(x_A)>\sigma(x_B).\]<p>Conformal calibration 提供：</p>
+\[\boxed{\text{absolute error scale calibration}.}\]<p>于是两者可以组合成：</p>
+\[\text{GP} \rightarrow \text{哪里可能更不确定}\]\[+\]\[\text{CP} \rightarrow \text{到底应该放大多少才能达到目标覆盖率}.\]<p>这和完全抛弃 Kriging variance 不同。</p>
+<p>更合理的理解是：</p>
+\[\boxed{\text{CP 可以校准一个“不完全可信但仍有信息”的 uncertainty estimator。}}\]<hr>
+<h1 id="7-普通-absolute-residual-cp-有一个明显缺陷">7. 普通 absolute residual CP 有一个明显缺陷
+</h1><p>如果直接：</p>
+\[s_i=|y_i-\hat f(x_i)|,\]<p>最终所有地方区间宽度相同：</p>
+\[\hat f(x)\pm\hat q.\]<p>但工程模型通常是 heteroscedastic 的。</p>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">低载荷区          接触转变区           高载荷区
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">误差小              误差巨大              误差中等
+</span></span><span class="line"><span class="cl">───────        ───────────────        ─────────
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>一个统一：</p>
+\[\pm0.5\]<p>的区间可能导致：</p>
+<p>低误差区域：</p>
+\[\boxed{\text{过于保守}}\]<p>高误差区域：</p>
+\[\boxed{\text{仍然不够灵活。}}\]<p>这就引出 <strong>Conformalized Quantile Regression（CQR）</strong>。</p>
+<hr>
+<h1 id="8-cqr先学习局部区间形状再让-conformal-负责兜底">8. CQR：先学习局部区间形状，再让 conformal 负责兜底
+</h1><p>训练两个 quantile regressors：</p>
+\[\hat q_{\alpha/2}(x), \qquad \hat q_{1-\alpha/2}(x).\]<p>它们先预测：</p>
+\[\boxed{\text{这个 }x\text{ 本来应该有多宽的区间。}}\]<p>然后在 calibration set 上定义：</p>
+\[s_i = \max \{ \hat q_L(x_i)-y_i,\; y_i-\hat q_U(x_i) \}.\]<p>再取 conformal quantile：</p>
+\[\hat q.\]<p>最终：</p>
+\[\boxed{ [ \hat q_L(x)-\hat q,\; \hat q_U(x)+\hat q ]. }\]<p>所以：</p>
+<p>Quantile Regression：</p>
+\[\boxed{\text{负责 adaptivity}}\]<p>Conformal：</p>
+\[\boxed{\text{负责 coverage calibration}.}\]<p>Romano、Patterson 与 Emmanuel Candès 在 NeurIPS 2019 提出的 CQR 正是为解决传统 conformal 区间难以适应 heteroscedasticity 的问题；实验显示它通常能在维持有效覆盖的同时产生更短的区间。</p>
+<hr>
+<h1 id="9-但这里有一个必须牢记的限制95-marginal-coverage--每个位置都有95">9. 但这里有一个必须牢记的限制：95% marginal coverage ≠ 每个位置都有95%
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>Conformal 的经典保证是：</p>
+\[\boxed{ P(Y\in C(X))\ge0.95. }\]<p>注意概率同时对：</p>
+\[X,Y\]<p>取平均。</p>
+<p>它并不意味着：</p>
+\[\boxed{ P(Y\in C(X)\mid X=x)\ge0.95 \quad\forall x. }\]<p>这是 <strong>marginal coverage</strong> 和 <strong>conditional coverage</strong> 的区别。</p>
+<p>例如可能存在：</p>
+<p>高概率普通区域：</p>
+\[98\%\text{ coverage}\]<p>极端接触区域：</p>
+\[70\%\text{ coverage}\]<p>整体平均：</p>
+\[95\%.\]<p>CP 的理论保证仍然成立。</p>
+<p>因此：</p>
+\[\boxed{\text{Conformal prediction 并不会魔法般解决所有局部 OOD 风险。}}\]<p>2026 年的 surrogate-UQ 工作也明确把 marginal 而非 conditional coverage，以及 calibration/test exchangeability，列为该方法的重要限制。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="10-这对可靠性尤其重要">10. 这对可靠性尤其重要
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设极限状态：</p>
+\[g(x)=0.\]<p>代理预测：</p>
+\[\hat g(x).\]<p>Conformal 区间：</p>
+\[[L(x),U(x)].\]<p>那么可以把输入空间分成三类：</p>
+<p>如果：</p>
+\[U(x)<0,\]<p>整个预测区间都在失效侧：</p>
+\[\boxed{\text{high-confidence failure}.}\]<p>如果：</p>
+\[L(x)>0,\]<p>整个区间都在安全侧：</p>
+\[\boxed{\text{high-confidence safe}.}\]<p>如果：</p>
+\[L(x)\le0\le U(x),\]<p>则：</p>
+\[\boxed{\text{classification unresolved}.}\]<p>这就给可靠性主动学习一个非常自然的信号：</p>
+\[\boxed{ 0\in C(x) \Rightarrow \text{这个样本值得进一步求高保真。} }\]<p>和传统：</p>
+\[U(x)=\frac{|\mu(x)|}{\sigma(x)}\]<p>相比，区别在于 conformal interval 的尺度经过<strong>真实误差校准</strong>。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="11-这甚至可以变成一个失效概率上下界思路">11. 这甚至可以变成一个“失效概率上下界”思路
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>在 Monte Carlo pool：</p>
+\[x_1,\ldots,x_N\]<p>上计算 conformal intervals。</p>
+<p>定义：</p>
+<p>确定失效：</p>
+\[\mathcal F^-= \{x:U(x)<0\}.\]<p>可能失效：</p>
+\[\mathcal F^+= \{x:L(x)\le0\}.\]<p>于是可以形成：</p>
+\[\hat P_f^- = \frac{|\mathcal F^-|}{N},\]\[\hat P_f^+ = \frac{|\mathcal F^+|}{N}.\]<p>得到：</p>
+\[\boxed{ \hat P_f^- \le \hat P_f \le \hat P_f^+. }\]<p>这里必须非常谨慎：<strong>普通 marginal conformal coverage 本身并不能自动把这两个量升级成严格的 simultaneous \(P_f\) confidence bounds。</strong></p>
+<p>但它提供了一个很有价值的工程诊断量：</p>
+\[\boxed{ \hat P_f^+-\hat P_f^- }\]<p>表示：</p>
+<blockquote>
+<p>当前 surrogate uncertainty 对失效分类究竟留下了多大的模糊概率质量？</p>
+</blockquote>
+<p>这与昨天 SUR 的思想可以自然连接起来。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="12-sur--conformal-是一个很有意思的研究组合">12. SUR + Conformal 是一个很有意思的研究组合
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>昨天的 SUR 问：</p>
+\[\boxed{\text{下一个样本怎样最大程度减少可靠性不确定性？}}\]<p>今天 CP 提供：</p>
+\[\boxed{\text{哪些区域的 surrogate classification 经过真实误差校准后仍然不确定？}}\]<p>于是可以构造一个思路：</p>
+\[\text{GP / surrogate}\]\[\downarrow\]\[\text{Conformal calibration}\]\[\downarrow\]\[\text{failure-boundary ambiguity}\]\[\downarrow\]\[\text{SUR / active learning}.\]<p>这比单纯使用：</p>
+\[\sigma_{\rm GP}(x)\]<p>更稳健，因为：</p>
+\[\boxed{\sigma_{\rm GP}\text{ 可以 model-misspecified，conformal layer 则利用真实残差重新标尺。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="13-对你现在做的核函数问题也有一个很直接的启发">13. 对你现在做的核函数问题也有一个很直接的启发
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设两个 Kriging：</p>
+<p>高斯核：</p>
+\[R^2=0.94\]<p>指数核：</p>
+\[R^2=0.90.\]<p>通常会直接宣布：</p>
+\[\boxed{\text{高斯核更好。}}\]<p>但如果最终用于可靠性，还可以比较：</p>
+\[\text{coverage},\]\[\text{interval width},\]\[\text{boundary misclassification},\]<p>以及 conformal calibration factor：</p>
+\[\hat q.\]<p>例如：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>Kernel</th>
+					<th style="text-align: right">\(R^2\)</th>
+					<th style="text-align: right">nominal 95% coverage</th>
+					<th style="text-align: right">conformal factor</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Gaussian</td>
+					<td style="text-align: right">0.94</td>
+					<td style="text-align: right">71%</td>
+					<td style="text-align: right">3.8</td>
+			</tr>
+			<tr>
+					<td>Exponential</td>
+					<td style="text-align: right">0.90</td>
+					<td style="text-align: right">92%</td>
+					<td style="text-align: right">2.1</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>那么高斯核虽然点预测更准，却：</p>
+\[\boxed{\text{uncertainty model 严重过度自信。}}\]<p>对于主动可靠性分析，指数核可能反而更可靠。</p>
+<p>这会把“核函数优劣”的判断从：</p>
+\[\boxed{\text{谁拟合得最准}}\]<p>提升到：</p>
+\[\boxed{\text{谁既能预测，又知道自己什么时候可能预测错。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="14-对-scientific-ml-的迁移更明显">14. 对 Scientific ML 的迁移更明显
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>2026 年 Gopakumar 等人的工作把 CP 用到：</p>
+<ul>
+<li>PDE surrogate；</li>
+<li>magnetohydrodynamics；</li>
+<li>weather forecasting；</li>
+<li>fusion diagnostics；</li>
+</ul>
+<p>模型则包括：</p>
+<ul>
+<li>MLP；</li>
+<li>U-Net；</li>
+<li>Fourier <span class="term-anchor" data-term="neural-operator" tabindex="0">Neural Operator</span>；</li>
+<li>ViT；</li>
+<li>GNN。</li>
+</ul>
+<p>输出维度从几十一直到超过：</p>
+\[2\times10^7.\]<p>他们报告 conformal calibration 本身只需要秒到分钟级，并且预测阶段增加的计算成本很小。</p>
+<p>这非常适合未来的：</p>
+\[\boxed{\text{ROM / neural operator + physics solver}}\]<p>架构。</p>
+<p>昂贵 solver：</p>
+\[f_H(x)\]<p>训练 surrogate：</p>
+\[\hat f_\theta(x)\]<p>然后 CP 作为：</p>
+\[\boxed{\text{deployment-time reliability wrapper}.}\]<p>也就是说，你甚至可以：</p>
+\[\boxed{\text{不重新训练 surrogate，就给它增加统计校准层。}}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="15-但-distribution-shift-会破坏核心假设">15. 但 distribution shift 会破坏核心假设
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>Conformal 最核心的条件不是：</p>
+\[\text{Gaussianity}\]<p>而是：</p>
+\[\boxed{\text{exchangeability}.}\]<p>直观理解：</p>
+<p>calibration data 和未来 deployment data 应该来自同一个统计机制。</p>
+<p>假设训练/校准：</p>
+\[Mach\in[0.1,0.4],\]<p>真正部署：</p>
+\[Mach\in[0.8,1.2].\]<p>此时：</p>
+\[\boxed{\text{95% coverage guarantee 不再自动成立。}}\]<p>这也是为什么 CP 不是 OOD 检测的替代品。</p>
+<p>更准确的架构是：</p>
+\[\boxed{ \text{distribution monitoring} + \text{conformal calibration} + \text{surrogate} }\]<p>三者各司其职。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="16-一个非常值得自己做的小实验">16. 一个非常值得自己做的小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>用你已有的 Kriging 案例即可。</p>
+<p>把样本随机分成：</p>
+\[60\%\text{ train}\]\[20\%\text{ calibration}\]\[20\%\text{ test}.\]<p>第一步，用 train：</p>
+\[\mathcal D_{\rm train}\]<p>训练 Gaussian-kernel Kriging。</p>
+<p>第二步，在 calibration 上计算：</p>
+\[s_i= \frac{|y_i-\mu(x_i)|}{\sigma(x_i)}.\]<p>第三步求：</p>
+\[\hat q_{0.95}.\]<p>第四步构造：</p>
+\[C(x) = [ \mu(x)-\hat q\sigma(x), \mu(x)+\hat q\sigma(x) ].\]<p>最后比较：</p>
+<p>原始 GP interval：</p>
+\[\mu(x)\pm1.96\sigma(x)\]<p>和 conformalized interval：</p>
+\[\mu(x)\pm\hat q\sigma(x).\]<p>不要只比较 RMSE。</p>
+<p>重点记录：</p>
+\[\boxed{\text{empirical coverage}}\]\[\boxed{\text{mean interval width}}\]\[\boxed{\text{failure-boundary coverage}}\]\[\boxed{\text{false-safe rate}}.\]<p>然后换：</p>
+<ul>
+<li>Gaussian kernel；</li>
+<li>Matérn；</li>
+<li>exponential kernel；</li>
+</ul>
+<p>重新比较。</p>
+<p>这会得到一个比单纯：</p>
+\[R^2\]<p>丰富得多的 surrogate 评价体系。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="17-它在整个知识体系中卡在哪里">17. 它在整个知识体系中卡在哪里？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>可以把代理模型 UQ 粗略理解成：</p>
+\[\text{Point surrogate}\]<p>只给：</p>
+\[\hat y.\]<p>↓</p>
+\[\text{Probabilistic surrogate}\]<p>例如 GP：</p>
+\[\hat y+\sigma(x).\]<p>↓</p>
+\[\text{Calibration}\]<p>问：</p>
+\[\boxed{\sigma(x)\text{ 真的可信吗？}}\]<p>↓</p>
+\[\boxed{\text{Conformal Prediction}}\]<p>用 empirical residual ranks 给：</p>
+\[\boxed{\text{finite-sample marginal coverage guarantee}.}\]<p>↓</p>
+\[\text{Decision / Reliability}\]<p>再把区间用于：</p>
+\[P_f,\quad \text{active learning},\quad \text{safety decisions}.\]<p>因此 CP 的定位并不是另一种 surrogate。</p>
+<p>它更像：</p>
+\[\boxed{\text{surrogate 外面的一层 statistical safety wrapper}.}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="今天值得留下的一句话">今天值得留下的一句话
+</h1><p>Conformal Prediction 最值得理解的并不是那个 quantile 公式，而是一种完全不同的不确定性观：</p>
+\[\boxed{ \text{模型声称自己有多确定，并不重要； 重要的是它过去在可比数据上实际错了多少。} }\]<p>GP/Kriging 试图通过：</p>
+\[\boxed{\text{模型结构}}\]<p>推导 uncertainty。</p>
+<p>Conformal Prediction 则通过：</p>
+\[\boxed{\text{真实预测误差的排名}}\]<p>校准 uncertainty。</p>
+<p>所以两者很适合组合：</p>
+\[\boxed{ \text{Kriging tells you where uncertainty varies} }\]\[+\]\[\boxed{ \text{Conformal tells you how much uncertainty to trust}. }\]<p>对于可靠性代理模型，这比继续把 \(R^2\) 从：</p>
+\[0.96\rightarrow0.98\]<p>再抠两个百分点，往往更值得研究：<strong>一个预测稍微差一点但经过良好校准的模型，在安全相关决策中可能比一个点预测极准、却严重过度自信的模型更有价值。</strong></p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p>Lei, G&rsquo;Sell, Rinaldo, Ryan Tibshirani &amp; Larry Wasserman, <strong>Distribution-Free Predictive Inference for Regression</strong>, <em>JASA</em>, 2018。理解 split conformal、full conformal 和 finite-sample coverage 的经典入口。<br>
+<a class="link" href="https://arxiv.org/abs/1604.04173"  target="_blank" rel="noopener"
+    >论文预印本</a></p>
+</li>
+<li>
+<p>Romano, Patterson &amp; Emmanuel Candès, <strong>Conformalized Quantile Regression</strong>, NeurIPS 2019。理解 heteroscedastic conformal prediction 最值得读的一篇。<br>
+NeurIPS 官方论文页</p>
+</li>
+<li>
+<p>Gopakumar et al., <strong>Uncertainty Quantification of Surrogate Models using Conformal Prediction</strong>, <em>Machine Learning: Science and Technology</em>, 2026, DOI 10.1088/2632-2153/ae2e7b。这篇尤其推荐：它直接把 conformal prediction 放进 scientific surrogate/PDE/neural operator 的语境，并系统讨论 marginal coverage、exchangeability 和高维输出。<br>
+IOP 论文页</p>
+</li>
+<li>
+<p>Dan Giles 的作者项目页与公开预印本入口 —— 如果希望沿“物理代理模型 + conformal UQ”继续跟踪作者团队，这是比泛泛阅读 CP 教程更贴近 Scientific ML 的入口。</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+            <a href="/tags/%E4%B8%8D%E7%A1%AE%E5%AE%9A%E6%80%A7%E9%87%8F%E5%8C%96/">不确定性量化</a>
+        
+            <a href="/tags/%E5%8F%AF%E9%9D%A0%E6%80%A7/">可靠性</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-46<span class="card-badge card-badge--role" title="认知分型">概念基石</span><span class="card-badge card-badge--diff" title="难度 2/3">◆◆◇</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/19-conformal-prediction/">Conformal Prediction：代理模型真正缺的，往往不是“置信区间”，而是“覆盖率保证”<span class="dep-radar-meta"> · card-19</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-46<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/45-stepwise-uncertainty-reduction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Stepwise Uncertainty Reduction：主动学习真正该优化的，未必是“下一个点最准”，而是“做完这次实验后，最终答案还剩多少不确定性”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/39-active-subspaces-2/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Active Subspaces：高维问题真正困难的，可能不是“变量太多”，而是你一直沿坐标轴看它</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/44-shapley-effects/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Shapley Effects：当输入变量彼此相关时，“谁导致了输出不确定性”为什么突然变成一个博弈论问题？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/42-control-variates/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Control Variates：低保真模型真正“提供”的不是答案，而是可被抵消的随机波动</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/33-probabilistic-numerics/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

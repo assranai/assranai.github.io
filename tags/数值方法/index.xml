@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Sun, 20 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 24 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Variational Integrators：时间积分器也可以“从力学原理里推出来”</title>
         <link>https://assranai.github.io/cards/04-variational-integrators/</link>
         <pubDate>Mon, 17 Aug 2026 00:00:00 +0000</pubDate>
@@ -8551,6 +8551,771 @@ Disney Research / Animation 论文页&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;Maier &amp;amp; Rannacher, &lt;strong&gt;&lt;em&gt;Duality-based Adaptivity in Finite Element Discretization of Heterogeneous Multiscale Problems&lt;/em&gt;&lt;/strong&gt;。进一步展示 DWR 可以同时区分和权衡 modeling error、macro discretization error 与 micro discretization error，很适合沿着“多保真/多层误差预算”继续深入。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？</title>
+        <link>https://assranai.github.io/cards/41-matrix-free-fem/</link>
+        <pubDate>Wed, 23 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/41-matrix-free-fem/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Matrix-Free / Partial Assembly 与 Sum Factorization&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × GPU/HPC × 求解器架构&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选一个和前几张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;PD&lt;/span&gt;、AVI、&lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt; 都不同，但对“以后自己写真正高性能求解器”很关键的概念：&lt;strong&gt;Matrix-Free FEM（无矩阵有限元）&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;传统有限元的标准流程几乎已经形成条件反射：&lt;/p&gt;
+\[\text{单元积分}\rightarrow K_e \rightarrow\text{组装全局 }K \rightarrow Ku.\]&lt;p&gt;Matrix-Free 方法却问：&lt;/p&gt;
+\[\boxed{\text{如果最终只是想计算 }y=Ku,\text{ 为什么一定要先把 }K\text{ 存下来？}}\]&lt;p&gt;它直接从弱形式重新计算 \(Ku\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。&lt;/p&gt;
+&lt;p&gt;这背后的原因很值得理解：&lt;strong&gt;现代计算机越来越经常不是“算不动”，而是“搬不动数据”。&lt;/strong&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-传统-fem-真正在存什么&#34;&gt;1. 传统 FEM 真正在存什么？
+&lt;/h2&gt;&lt;p&gt;以线性弹性为例：&lt;/p&gt;
+\[Ku=f.\]&lt;p&gt;传统 assembly：&lt;/p&gt;
+\[K=\sum_e R_e^TK_eR_e.\]&lt;p&gt;其中 \(R_e\) 从全局自由度抽取单元自由度。&lt;/p&gt;
+&lt;p&gt;之后迭代求解器反复计算：&lt;/p&gt;
+\[y=Kx.\]&lt;p&gt;看起来非常合理。&lt;/p&gt;
+&lt;p&gt;但注意 sparse matrix-vector multiplication（SpMV）做了什么：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;读取 K 的非零值
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;读取列索引
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;读取 x
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;做少量乘加
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;写回 y
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每读取一个矩阵元素，往往只对应：&lt;/p&gt;
+\[1\text{ multiply}+1\text{ add}.\]&lt;p&gt;因此计算强度：&lt;/p&gt;
+\[\boxed{ I=\frac{\text{FLOPs}}{\text{bytes moved}} }\]&lt;p&gt;很低。&lt;/p&gt;
+&lt;p&gt;现代 CPU/GPU 的浮点吞吐增长速度远快于内存带宽，于是 SpMV 很容易成为：&lt;/p&gt;
+\[\boxed{\text{memory-bandwidth bound}.}\]&lt;p&gt;Kronbichler 与 Kormann 对 matrix-free DG 的性能分析甚至发现，完整 operator evaluation 的性能经常已经接近机器可用 memory bandwidth 的极限。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-matrix-free-做了一件看起来反效率的事&#34;&gt;2. Matrix-Free 做了一件看起来“反效率”的事
+&lt;/h1&gt;&lt;p&gt;不存：&lt;/p&gt;
+\[K.\]&lt;p&gt;每次需要：&lt;/p&gt;
+\[y=Kx\]&lt;p&gt;时，重新执行有限元积分。&lt;/p&gt;
+&lt;p&gt;对于一个典型双线性型：&lt;/p&gt;
+\[a(u,v) = \int_\Omega \nabla v^T D(x)\nabla u\,d\Omega,\]&lt;p&gt;传统方法先算：&lt;/p&gt;
+\[K_{ij} = \int_\Omega \nabla N_i^TD\nabla N_j\,d\Omega.\]&lt;p&gt;Matrix-Free 则直接：&lt;/p&gt;
+\[x \rightarrow u_h \rightarrow \nabla u_h \rightarrow D\nabla u_h \rightarrow \int\nabla N_i^TD\nabla u_h.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ Kx\text{ 被重新解释为一次有限元算子评价。} }\]&lt;p&gt;这意味着更多 FLOPs。&lt;/p&gt;
+&lt;p&gt;但数据搬运大幅减少。&lt;/p&gt;
+&lt;p&gt;在现代硬件上：&lt;/p&gt;
+\[\boxed{\text{多算一点，可能比多读一点更便宜。}}\]&lt;p&gt;这正是 Matrix-Free 最反直觉也最重要的地方。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-更准确地说有限元算子本来就不是一块矩阵&#34;&gt;3. 更准确地说，有限元算子本来就不是“一块矩阵”
+&lt;/h1&gt;&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://mfem.org/performance/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;MFEM 官方 Partial Assembly 文档&lt;/a&gt; 把有限元算子分解得非常漂亮：&lt;/p&gt;
+\[\boxed{ A=P^TG^TB^TDBG P. }\]&lt;p&gt;这里可以粗略理解为：&lt;/p&gt;
+\[P:\text{全局/并行自由度映射}\]\[G:\text{global DOF}\rightarrow\text{element DOF}\]\[B:\text{element DOF}\rightarrow\text{quadrature point}\]\[D:\text{积分点上的几何与物理作用}.\]&lt;p&gt;所以一个 FEM operator 实际上是：&lt;/p&gt;
+\[\boxed{ \text{global} \rightarrow \text{element} \rightarrow \text{quadrature} \rightarrow \text{physics} \rightarrow \text{element} \rightarrow \text{global}. }\]&lt;p&gt;全局 sparse matrix \(A\) 只是把整个计算过程&lt;strong&gt;提前展开并缓存后的结果&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-partial-assembly-是中间路线&#34;&gt;4. Partial Assembly 是中间路线
+&lt;/h1&gt;&lt;p&gt;这里有一个很重要的层次：&lt;/p&gt;
+\[\text{Full Assembly}\]&lt;p&gt;存整个：&lt;/p&gt;
+\[A.\]&lt;p&gt;Element Assembly：&lt;/p&gt;
+&lt;p&gt;存：&lt;/p&gt;
+\[K_e.\]&lt;p&gt;Partial Assembly：&lt;/p&gt;
+&lt;p&gt;只存积分点上的：&lt;/p&gt;
+\[D.\]&lt;p&gt;Matrix-Free：&lt;/p&gt;
+&lt;p&gt;连更多中间量也动态计算。&lt;/p&gt;
+&lt;p&gt;所以你可以把 assembly 看成一条连续谱：&lt;/p&gt;
+\[\boxed{ \text{更多预计算/更多内存} \longleftrightarrow \text{更少存储/更多在线计算}. }\]&lt;p&gt;MFEM 当前明确提供 FULL、ELEMENT、PARTIAL 等不同 assembly level；其 partial assembly 的核心就是只保存 \(D\) 或其一部分，而把 \(P,G,B\) 等操作在线执行。&lt;/p&gt;
+&lt;p&gt;这其实与昨天 PD 的思想形成一个很漂亮的反差：&lt;/p&gt;
+&lt;p&gt;PD：&lt;/p&gt;
+\[\boxed{\text{尽量预计算固定结构}}\]&lt;p&gt;Matrix-Free：&lt;/p&gt;
+\[\boxed{\text{当预计算结果太大时，宁愿重算}}\]&lt;p&gt;两者并不矛盾。&lt;/p&gt;
+&lt;p&gt;真正原则是：&lt;/p&gt;
+\[\boxed{\text{缓存那些“重算比搬运贵”的东西。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;5-但如果每次都老老实实算高阶-fem计算量不会爆炸吗&#34;&gt;5. 但如果每次都老老实实算高阶 FEM，计算量不会爆炸吗？
+&lt;/h1&gt;&lt;p&gt;会。&lt;/p&gt;
+&lt;p&gt;所以 Matrix-Free 高阶 FEM 的另一个核心技术叫：&lt;/p&gt;
+\[\boxed{\text{Sum Factorization}.}\]&lt;p&gt;考虑三维六面体高阶单元。&lt;/p&gt;
+&lt;p&gt;每个方向有：&lt;/p&gt;
+\[p+1\]&lt;p&gt;个基函数，因此单元自由度：&lt;/p&gt;
+\[n\sim(p+1)^3.\]&lt;p&gt;如果直接计算三维插值：&lt;/p&gt;
+\[u(q_x,q_y,q_z) = \sum_{i,j,k} B_{q_xi}B_{q_yj}B_{q_zk}u_{ijk},\]&lt;p&gt;这是一个巨大的三维求和。&lt;/p&gt;
+&lt;p&gt;但由于六面体基函数是 tensor product：&lt;/p&gt;
+\[N_{ijk}(x,y,z) = N_i(x)N_j(y)N_k(z),\]&lt;p&gt;可以分三次一维 contraction。&lt;/p&gt;
+&lt;p&gt;先：&lt;/p&gt;
+\[v_{q_xjk} = \sum_iB_{q_xi}u_{ijk},\]&lt;p&gt;再：&lt;/p&gt;
+\[w_{q_xq_yk} = \sum_jB_{q_yj}v_{q_xjk},\]&lt;p&gt;最后：&lt;/p&gt;
+\[u_{q_xq_yq_z} = \sum_kB_{q_zk}w_{q_xq_yk}.\]&lt;p&gt;这就是 sum factorization。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-它改变了高阶-fem-的复杂度&#34;&gt;6. 它改变了高阶 FEM 的复杂度
+&lt;/h1&gt;&lt;p&gt;三维情况下，直接 dense element operation 的复杂度大致会随：&lt;/p&gt;
+\[O(p^6)\]&lt;p&gt;增长。&lt;/p&gt;
+&lt;p&gt;利用 tensor-product sum factorization 后，可降到大约：&lt;/p&gt;
+\[\boxed{O(p^4)}.\]&lt;p&gt;这两个幂次的差距在：&lt;/p&gt;
+\[p=8,\;10,\;12\]&lt;p&gt;时已经非常巨大。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} }\]&lt;p&gt;才真正构成现代 high-order FEM 的高性能组合。&lt;/p&gt;
+&lt;p&gt;Kronbichler 与 Kormann 的工作正是系统研究这种 matrix-free + sum-factorization operator evaluation，并展示经过向量化的一维 tensor kernels 可以达到很高的 CPU 算术吞吐。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-一个直观类比&#34;&gt;7. 一个直观类比
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设你每天需要：&lt;/p&gt;
+\[f(x)=Ax.\]&lt;p&gt;传统 sparse FEM 的思路相当于：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;把一个复杂食谱的所有可能中间结果做完，装进巨大冰箱，以后每次拿出来。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Matrix-Free：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;只保存原料和非常紧凑的配方，需要时现场做。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;旧机器：&lt;/p&gt;
+\[\text{做饭慢，冰箱读取快}\]&lt;p&gt;于是缓存占优。&lt;/p&gt;
+&lt;p&gt;现代 GPU：&lt;/p&gt;
+\[\boxed{\text{“做饭”极快，但从显存搬东西相对昂贵}}\]&lt;p&gt;于是现场重算越来越划算。&lt;/p&gt;
+&lt;p&gt;这也是为什么 MFEM 官方明确指出 Partial Assembly 对 GPU 尤其重要：高阶 fully assembled matrix 同时要求大量存储和大量数据传输。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;8-这会产生一个很重要的-roofline-视角&#34;&gt;8. 这会产生一个很重要的 Roofline 视角
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;性能不应该只看 FLOPs。&lt;/p&gt;
+&lt;p&gt;定义 arithmetic intensity：&lt;/p&gt;
+\[I= \frac{\text{FLOPs}}{\text{Byte}}.\]&lt;p&gt;硬件理论性能近似受：&lt;/p&gt;
+\[P \le \min ( P_{\rm peak}, I B_{\rm memory} )\]&lt;p&gt;约束。&lt;/p&gt;
+&lt;p&gt;这就是经典 Roofline 思想。&lt;/p&gt;
+&lt;p&gt;如果 sparse matvec：&lt;/p&gt;
+\[I\ll1,\]&lt;p&gt;即使 GPU 有：&lt;/p&gt;
+\[50\text{ TFLOP/s},\]&lt;p&gt;也根本吃不到这些算力。&lt;/p&gt;
+&lt;p&gt;Matrix-Free 通过“重新计算”提高：&lt;/p&gt;
+\[I.\]&lt;p&gt;所以有一个很值得记住的 HPC 规律：&lt;/p&gt;
+\[\boxed{ \text{减少 FLOPs} \neq \text{提高性能}. }\]&lt;p&gt;有时候应该主动：&lt;/p&gt;
+\[\boxed{\text{用 FLOPs 换 memory traffic}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-这对-gpu-求解器架构特别重要&#34;&gt;9. 这对 GPU 求解器架构特别重要
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Matrix-Free 的典型 kernel 很适合 GPU：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;gather element DOFs；&lt;/li&gt;
+&lt;li&gt;tensor interpolation；&lt;/li&gt;
+&lt;li&gt;quadrature-point physics；&lt;/li&gt;
+&lt;li&gt;tensor integration；&lt;/li&gt;
+&lt;li&gt;scatter。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;积分点上的：&lt;/p&gt;
+\[D(q)\]&lt;p&gt;通常彼此独立。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{\text{quadrature physics 天然数据并行}.}\]&lt;p&gt;而 \(B\) 的 tensor contraction 又可以做：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;SIMD；&lt;/li&gt;
+&lt;li&gt;warp-level parallelism；&lt;/li&gt;
+&lt;li&gt;shared-memory reuse。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这也是 MFEM、&lt;a class=&#34;link&#34; href=&#34;https://libceed.org/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;libCEED&lt;/a&gt;、deal.II 等现代高阶 FEM 软件都高度重视 matrix-free operator decomposition 的原因。CEED 甚至专门定义 Bakeoff Problems 来比较不同库中 mass/Laplace 等高阶算子的性能实现。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-那为什么低阶四面体-fem-不一定值得-matrix-free&#34;&gt;10. 那为什么低阶四面体 FEM 不一定值得 Matrix-Free？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这是一个重要边界。&lt;/p&gt;
+&lt;p&gt;假设：&lt;/p&gt;
+\[P_1\]&lt;p&gt;线性四面体。&lt;/p&gt;
+&lt;p&gt;每个 tet 只有：&lt;/p&gt;
+\[4\]&lt;p&gt;个节点。&lt;/p&gt;
+&lt;p&gt;单元矩阵很小，计算：&lt;/p&gt;
+\[K_e\]&lt;p&gt;本身也不复杂。&lt;/p&gt;
+&lt;p&gt;此时：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;tensor-product 结构弱；&lt;/li&gt;
+&lt;li&gt;sum factorization 优势不存在；&lt;/li&gt;
+&lt;li&gt;gather/scatter 成本占比更高。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以 Matrix-Free 最耀眼的场景通常是：&lt;/p&gt;
+\[\boxed{\text{高阶 quad/hex tensor-product elements}.}\]&lt;p&gt;MFEM 当前官方 partial assembly 实现也主要针对 quadrilateral/hexahedral tensor-product elements。&lt;/p&gt;
+&lt;p&gt;但这并不意味着 simplex 完全做不了。Moxey、Amici 与 Kirby 已展示 triangle、tetrahedron、prism 等 simplex/prismatic 高阶单元也可以获得高效 matrix-free 实现，只是性能结构更复杂。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-matrix-free-最大的问题预条件器怎么办&#34;&gt;11. Matrix-Free 最大的问题：预条件器怎么办？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果你有：&lt;/p&gt;
+\[A,\]&lt;p&gt;可以直接构造：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ILU；&lt;/li&gt;
+&lt;li&gt;AMG；&lt;/li&gt;
+&lt;li&gt;sparse approximate inverse。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但 Matrix-Free 中：&lt;/p&gt;
+\[\boxed{A\text{ 根本不存在。}}\]&lt;p&gt;Krylov 方法只需要：&lt;/p&gt;
+\[v\mapsto Av,\]&lt;p&gt;所以 CG/GMRES 没问题。&lt;/p&gt;
+&lt;p&gt;但好的 preconditioner：&lt;/p&gt;
+\[P^{-1}\]&lt;p&gt;怎么办？&lt;/p&gt;
+&lt;p&gt;这恰恰是 matrix-free 方法最重要的工程难点之一。&lt;/p&gt;
+&lt;p&gt;MFEM 的解决路线包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;matrix-free Jacobi；&lt;/li&gt;
+&lt;li&gt;Chebyshev smoother；&lt;/li&gt;
+&lt;li&gt;\(h\)-multigrid；&lt;/li&gt;
+&lt;li&gt;\(p\)-multigrid。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此一个真正完整的 matrix-free solver 并不是：&lt;/p&gt;
+\[\boxed{\text{“把矩阵删掉”}}\]&lt;p&gt;这么简单。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \text{operator evaluation} + \text{matrix-free-friendly preconditioning} }\]&lt;p&gt;必须一起设计。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-这和-multigrid-的结合尤其漂亮&#34;&gt;12. 这和 Multigrid 的结合尤其漂亮
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;高阶问题：&lt;/p&gt;
+\[p=8.\]&lt;p&gt;可以构造：&lt;/p&gt;
+\[p=8 \rightarrow4 \rightarrow2 \rightarrow1.\]&lt;p&gt;高阶层：&lt;/p&gt;
+\[\boxed{\text{matrix-free}}\]&lt;p&gt;负责便宜 operator application。&lt;/p&gt;
+&lt;p&gt;到了：&lt;/p&gt;
+\[p=1\]&lt;p&gt;低阶层，矩阵已经足够小，可以：&lt;/p&gt;
+\[\boxed{\text{真正 assemble}}\]&lt;p&gt;然后使用 AMG/direct solver。&lt;/p&gt;
+&lt;p&gt;于是形成：&lt;/p&gt;
+\[\boxed{ \text{high order: compute-rich matrix-free} }\]\[\downarrow\]\[\boxed{ \text{low order: matrix-based robust coarse solve}. }\]&lt;p&gt;这是一种很典型的现代 HPC 思维：&lt;/p&gt;
+\[\boxed{\text{不同层级不必坚持同一种数据表示。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对非线性软体-fem-更有意思&#34;&gt;13. 对非线性软体 FEM 更有意思
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑 Neo-Hookean：&lt;/p&gt;
+\[P=P(F).\]&lt;p&gt;传统 Newton FEM：&lt;/p&gt;
+\[K(x)=\frac{\partial f}{\partial x}.\]&lt;p&gt;显式形成：&lt;/p&gt;
+\[K\]&lt;p&gt;可能非常昂贵。&lt;/p&gt;
+&lt;p&gt;但 Newton-Krylov 只真正需要：&lt;/p&gt;
+\[\boxed{K(x)v.}\]&lt;p&gt;这可以直接通过：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;analytic directional derivative；&lt;/li&gt;
+&lt;li&gt;automatic differentiation；&lt;/li&gt;
+&lt;li&gt;finite-difference Jacobian-vector product；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;得到。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{Matrix-Free} + \text{Newton-Krylov} }\]&lt;p&gt;允许：&lt;/p&gt;
+\[\boxed{\text{从头到尾不显式形成 tangent stiffness matrix}.}\]&lt;p&gt;这对复杂 constitutive model、GPU FEM、differentiable simulation 都非常重要。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-这里还能和上一张-pd-卡片形成一个很有价值的对照&#34;&gt;14. 这里还能和上一张 PD 卡片形成一个很有价值的对照
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;PD 的核心优势：&lt;/p&gt;
+\[\boxed{K\text{ 固定}}\]&lt;p&gt;所以：&lt;/p&gt;
+\[K=LL^T\]&lt;p&gt;一次 factorization，反复使用。&lt;/p&gt;
+&lt;p&gt;Matrix-Free Newton-Krylov：&lt;/p&gt;
+\[\boxed{K(x)\text{ 可以不断变化}}\]&lt;p&gt;但我们根本不存它，只提供：&lt;/p&gt;
+\[v\rightarrow K(x)v.\]&lt;p&gt;所以面对 nonlinear elasticity，有两条完全不同的求解器哲学：&lt;/p&gt;
+\[\boxed{ \text{PD：改变模型结构，让矩阵固定} }\]&lt;p&gt;与&lt;/p&gt;
+\[\boxed{ \text{Matrix-Free：接受矩阵变化，但永远不把它实体化}. }\]&lt;p&gt;两条路线都在避免：&lt;/p&gt;
+\[\boxed{\text{反复构造巨大 sparse matrix}.}\]&lt;p&gt;只是解决方式完全不同。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-对自研软体求解器最值得迁移的思想&#34;&gt;15. 对自研软体求解器最值得迁移的思想
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;即使当前使用 &lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt;，而不是 FEM，Matrix-Free 的思想仍然非常有价值。&lt;/p&gt;
+&lt;p&gt;假设系统有：&lt;/p&gt;
+\[10^6\]&lt;p&gt;个 tet constraints。&lt;/p&gt;
+&lt;p&gt;一种设计是提前存大量：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;constraint Jacobian；&lt;/li&gt;
+&lt;li&gt;local Hessian；&lt;/li&gt;
+&lt;li&gt;stiffness block。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;另一种设计：&lt;/p&gt;
+&lt;p&gt;每次 kernel 内根据：&lt;/p&gt;
+\[x_i,x_j,x_k,x_l\]&lt;p&gt;现场重构：&lt;/p&gt;
+\[F,\quad J,\quad \nabla C.\]&lt;p&gt;如果重构只需要几十到几百 FLOPs，却能少读取几十字节甚至数百字节，那么 GPU 上后者可能更快。&lt;/p&gt;
+&lt;p&gt;因此 profiler 不应该只统计：&lt;/p&gt;
+\[\boxed{\text{FLOPs}.}\]&lt;p&gt;更应该统计：&lt;/p&gt;
+\[\boxed{ \text{bytes moved per constraint} }\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{ \text{arithmetic intensity}. }\]&lt;p&gt;这对 GPU physics solver 是一个非常实用的性能视角。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-一个值得自己做的小实验&#34;&gt;16. 一个值得自己做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;做一个规则六面体 Poisson 问题。&lt;/p&gt;
+&lt;p&gt;比较：&lt;/p&gt;
+&lt;h3 id=&#34;a-full-assembly&#34;&gt;A. Full assembly
+&lt;/h3&gt;&lt;p&gt;构造：&lt;/p&gt;
+\[K\]&lt;p&gt;然后反复：&lt;/p&gt;
+\[y=Kx.\]&lt;h3 id=&#34;b-matrix-free-naive&#34;&gt;B. Matrix-free naive
+&lt;/h3&gt;&lt;p&gt;每次重新做 quadrature。&lt;/p&gt;
+&lt;h3 id=&#34;c-matrix-free--sum-factorization&#34;&gt;C. Matrix-free + sum factorization
+&lt;/h3&gt;&lt;p&gt;利用 tensor product。&lt;/p&gt;
+&lt;p&gt;测试：&lt;/p&gt;
+\[p=1,2,4,6,8.\]&lt;p&gt;记录：&lt;/p&gt;
+\[\boxed{\text{DOF/s}}\]\[\boxed{\text{GB/s}}\]\[\boxed{\text{GFLOP/s}}\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{\text{bytes/DOF}.}\]&lt;p&gt;最值得观察的现象很可能是：&lt;/p&gt;
+&lt;p&gt;低阶时：&lt;/p&gt;
+\[\text{assembled}\]&lt;p&gt;并不差。&lt;/p&gt;
+&lt;p&gt;随着：&lt;/p&gt;
+\[p\uparrow,\]&lt;p&gt;matrix-free + sum-factorization 会越来越占优势。&lt;/p&gt;
+&lt;p&gt;这比只读理论复杂度更容易真正理解高阶 FEM 为什么重新流行起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-它还给-ai-工程一个很强的迁移原则&#34;&gt;17. 它还给 AI 工程一个很强的迁移原则
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;现代 LLM 推理也越来越受：&lt;/p&gt;
+\[\boxed{\text{memory bandwidth}}\]&lt;p&gt;限制。&lt;/p&gt;
+&lt;p&gt;很多 kernel fusion、FlashAttention、activation recomputation，本质上都在做类似交易：&lt;/p&gt;
+\[\boxed{\text{多做计算，少搬数据}.}\]&lt;p&gt;所以 Matrix-Free FEM、FlashAttention、checkpoint recomputation 看起来属于完全不同领域，却共享一个现代计算原则：&lt;/p&gt;
+\[\boxed{ \text{在算力相对便宜、内存流量昂贵的机器上， “避免重复计算”已经不再是无条件正确的优化目标。}\]&lt;p&gt;这是 Matrix-Free FEM 最值得迁移出去的一层认识。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Matrix-Free FEM 最值得记住的并不是：&lt;/p&gt;
+\[\boxed{\text{“不存刚度矩阵”}.}\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \text{矩阵只是一个算子的某种物化形式； 如果物化后的数据比重新执行算子本身更昂贵， 那就没有必要把它物化。} }\]&lt;p&gt;它在知识体系中的位置可以画成：&lt;/p&gt;
+\[\text{Weak Form}\]\[\downarrow\]\[\text{Finite Element Operator}\]\[\begin{array}{ccc} \swarrow &amp;&amp; \searrow\\ \text{Assembly} &amp;&amp; \text{Matrix-Free} \end{array}\]\[\begin{array}{ccc} K\text{ sparse} &amp;&amp; P^TG^TB^TDBG P \end{array}\]&lt;p&gt;而高阶 FEM 再加入：&lt;/p&gt;
+\[\boxed{\text{tensor product}}\]\[\downarrow\]\[\boxed{\text{sum factorization}}\]&lt;p&gt;最终得到：&lt;/p&gt;
+\[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} + \text{Multigrid} }\]&lt;p&gt;这已经成为现代高性能高阶有限元的一条核心技术路线。&lt;/p&gt;
+&lt;p&gt;对于以后真正写 GPU 物理求解器，这张卡片最值得留下的工程判断是：&lt;/p&gt;
+\[\boxed{ \text{看到一个可以预计算并缓存的大数组时， 先不要问“怎么把它存得更紧凑”， 先问“我真的需要存它吗？”} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://mfem.org/performance/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;MFEM：Performance and Partial Assembly&lt;/a&gt; —— 我最推荐的入门材料。它把 \(P,G,B,D\) 的 operator decomposition、partial assembly、GPU 与 multigrid 的关系讲得非常清楚，而且对应真实工业级 C++ 实现。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Martin Kronbichler &amp;amp; Katharina Kormann, &lt;strong&gt;Fast Matrix-Free Evaluation of Discontinuous Galerkin Finite Element Operators&lt;/strong&gt;, &lt;em&gt;ACM TOMS&lt;/em&gt;, 2019。想真正理解 sum factorization、SIMD、memory bandwidth 和 operator kernel 性能，这是核心论文。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://doi.org/10.1145/3325864&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;ACM 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://libceed.org/en/latest/examples/bps/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;libCEED 官方 CEED Bakeoff Problems&lt;/a&gt; —— 如果以后自己写 FEM kernel，非常值得照这些标准问题 benchmark；它直接提供 mass、Laplace 等算子的跨 MFEM、deal.II、PETSc 等实现比较入口。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Moxey, Amici &amp;amp; Kirby, &lt;strong&gt;Efficient Matrix-Free High-Order Finite Element Evaluation for Simplicial Elements&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Scientific Computing&lt;/em&gt;, 2020。适合继续追问一个与你更相关的问题：**四面体网格没有标准 hex tensor-product 结构后，matrix-free 还能做到多快？**论文展示了 triangle/tet/prism 上仍可获得高效实现。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Arndt et al., &lt;strong&gt;ExaDG: High-Order Discontinuous Galerkin for the Exa-scale&lt;/strong&gt;。如果想看这一整套技术怎样组成真正的大规模求解器：matrix-free operator + sum factorization + massively parallel multigrid + optimized smoothers，就是很好的系统案例；相关工作报告实际软件贡献在不同硬件上带来约 3–4× 加速。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Control Variates：低保真模型真正“提供”的不是答案，而是可被抵消的随机波动</title>
+        <link>https://assranai.github.io/cards/42-control-variates/</link>
+        <pubDate>Thu, 24 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/42-control-variates/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Control Variates（控制变量）与 Multifidelity Monte Carlo&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：可靠性 × 多保真建模 × Monte Carlo × 代理模型&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选这个主题，是因为它能回答一个很容易卡住的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;低保真模型明明有系统误差，为什么还能帮助高保真 Monte Carlo？&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;关键在于，多保真 Monte Carlo（&lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt;）通常&lt;strong&gt;不要求低保真模型给出正确答案&lt;/strong&gt;。它真正需要低保真模型提供的是：&lt;/p&gt;
+\[\boxed{\text{与高保真输出同步变化的“波动模式”}}\]&lt;p&gt;然后利用这种相关性，把高保真 Monte Carlo 中昂贵的随机波动抵消掉。&lt;/p&gt;
+&lt;p&gt;这也是理解 MFMC、&lt;span class=&#34;term-anchor&#34; data-term=&#34;mlmc&#34; tabindex=&#34;0&#34;&gt;MLMC&lt;/span&gt;、Approximate Control Variates 乃至大量多保真 UQ 方法的核心入口。Peherstorfer、Willcox 与 Gunzburger 的 MFMC 工作正是利用不同模型之间的相关性与成本差异，优化各模型的采样数量；后来的 ACV 框架又把这种思想推广到多个低保真模型及其均值未知的现实情况。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-monte-carlo-真正昂贵的东西是什么&#34;&gt;1. Monte Carlo 真正昂贵的东西是什么？
+&lt;/h2&gt;&lt;p&gt;假设高保真模型：&lt;/p&gt;
+\[Y_H=f_H(X)\]&lt;p&gt;我们要估计：&lt;/p&gt;
+\[\mu_H=\mathbb E[Y_H].\]&lt;p&gt;普通 Monte Carlo：&lt;/p&gt;
+\[\hat\mu_H = \frac1N\sum_{i=1}^N Y_H^{(i)}.\]&lt;p&gt;它是无偏的，而且：&lt;/p&gt;
+\[\operatorname{Var}(\hat\mu_H) = \frac{\sigma_H^2}{N}.\]&lt;p&gt;所以标准误差：&lt;/p&gt;
+\[\mathrm{SE} = \frac{\sigma_H}{\sqrt N}.\]&lt;p&gt;这意味着想让误差缩小 10 倍：&lt;/p&gt;
+\[N\rightarrow100N.\]&lt;p&gt;如果一次高保真 FEM 要：&lt;/p&gt;
+\[30\text{ min},\]&lt;p&gt;Monte Carlo 真正的问题就出现了：&lt;/p&gt;
+\[\boxed{\text{我们需要大量昂贵样本，才能平均掉输出自身的随机波动。}}\]&lt;p&gt;Control Variate 的思路是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;能不能找到一个便宜变量，提前解释掉这些波动？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-假设我们有一个很便宜但明显不准确的模型&#34;&gt;2. 假设我们有一个很便宜、但明显不准确的模型
+&lt;/h1&gt;&lt;p&gt;低保真模型：&lt;/p&gt;
+\[Y_L=f_L(X).\]&lt;p&gt;比如：&lt;/p&gt;
+&lt;p&gt;高保真：&lt;/p&gt;
+\[\text{非线性接触 + 柔性 FEM}\]&lt;p&gt;低保真：&lt;/p&gt;
+\[\text{刚体机构模型}.\]&lt;p&gt;假设真实关系大概是：&lt;/p&gt;
+\[Y_H=100+2Y_L+\epsilon.\]&lt;p&gt;注意：&lt;/p&gt;
+\[Y_L\]&lt;p&gt;甚至可能和 \(Y_H\) 数值尺度完全不同。&lt;/p&gt;
+&lt;p&gt;它可能严重 biased。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[\mathbb E[Y_H]=300,\]&lt;p&gt;但：&lt;/p&gt;
+\[\mathbb E[Y_L]=80.\]&lt;p&gt;如果把低保真结果直接当高保真近似：&lt;/p&gt;
+\[\boxed{\text{当然很差。}}\]&lt;p&gt;但这并不意味着：&lt;/p&gt;
+\[Y_L\]&lt;p&gt;没有价值。&lt;/p&gt;
+&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{\operatorname{Corr}(Y_H,Y_L).}\]&lt;p&gt;如果：&lt;/p&gt;
+\[\rho=0.98,\]&lt;p&gt;那么当某组参数让低保真模型输出偏高时，高保真通常也偏高。&lt;/p&gt;
+&lt;p&gt;低保真已经告诉我们：&lt;/p&gt;
+\[\boxed{\text{这次随机输入大概会把输出往哪个方向推。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;3-control-variate-的核心公式&#34;&gt;3. Control Variate 的核心公式
+&lt;/h1&gt;&lt;p&gt;假设我们知道：&lt;/p&gt;
+\[\mu_L=\mathbb E[Y_L].\]&lt;p&gt;构造新变量：&lt;/p&gt;
+\[\boxed{ Z = Y_H-\beta(Y_L-\mu_L). }\]&lt;p&gt;因为：&lt;/p&gt;
+\[\mathbb E[Y_L-\mu_L]=0,\]&lt;p&gt;所以：&lt;/p&gt;
+\[\mathbb E[Z] = \mathbb E[Y_H].\]&lt;p&gt;因此 estimator：&lt;/p&gt;
+\[\hat\mu_{\rm CV} = \frac1N \sum_i \left[ Y_H^{(i)} -\beta(Y_L^{(i)}-\mu_L) \right]\]&lt;p&gt;仍然估计：&lt;/p&gt;
+\[\mu_H.\]&lt;p&gt;关键变化发生在方差：&lt;/p&gt;
+\[\operatorname{Var}(Z) = \sigma_H^2 + \beta^2\sigma_L^2 - 2\beta\operatorname{Cov}(Y_H,Y_L).\]&lt;p&gt;选择最佳：&lt;/p&gt;
+\[\boxed{ \beta^\star = \frac{\operatorname{Cov}(Y_H,Y_L)} {\sigma_L^2} }\]&lt;p&gt;得到：&lt;/p&gt;
+\[\boxed{ \operatorname{Var}(Z) = \sigma_H^2(1-\rho^2). }\]&lt;p&gt;这就是整个方法最值得记住的公式。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-如果相关系数-099会发生什么&#34;&gt;4. 如果相关系数 0.99，会发生什么？
+&lt;/h1&gt;\[\rho=0.99.\]&lt;p&gt;那么：&lt;/p&gt;
+\[1-\rho^2 = 0.0199.\]&lt;p&gt;也就是说剩余方差只有原来的：&lt;/p&gt;
+\[\boxed{1.99\%}.\]&lt;p&gt;为了达到相同 Monte Carlo 精度，理论上高保真样本数大约可以缩小：&lt;/p&gt;
+\[\frac1{1-\rho^2} \approx50.\]&lt;p&gt;这里出现了一个很反直觉的结论：&lt;/p&gt;
+&lt;p&gt;低保真模型可以有明显 bias。&lt;/p&gt;
+&lt;p&gt;它甚至不需要：&lt;/p&gt;
+\[Y_L\approx Y_H.\]&lt;p&gt;真正需要的是：&lt;/p&gt;
+\[\boxed{ Y_L-\mu_L \quad\text{与}\quad Y_H-\mu_H \text{高度相关}. }\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{\text{预测准确度和 variance-reduction usefulness 是两个不同指标。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;5-一个极端例子能把这件事说明白&#34;&gt;5. 一个极端例子能把这件事说明白
+&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+\[Y_H=X,\]&lt;p&gt;而低保真：&lt;/p&gt;
+\[Y_L=1000X+500.\]&lt;p&gt;作为 surrogate：&lt;/p&gt;
+\[Y_L\]&lt;p&gt;看起来荒谬。&lt;/p&gt;
+&lt;p&gt;RMSE 会非常大。&lt;/p&gt;
+&lt;p&gt;但：&lt;/p&gt;
+\[\rho(Y_H,Y_L)=1.\]&lt;p&gt;如果：&lt;/p&gt;
+\[\mu_L\]&lt;p&gt;已知，最佳 &lt;span class=&#34;term-anchor&#34; data-term=&#34;control-variate&#34; tabindex=&#34;0&#34;&gt;control variate&lt;/span&gt; 可以理论上把：&lt;/p&gt;
+\[\boxed{\text{Monte Carlo variance 降到 0}.}\]&lt;p&gt;因为低保真模型完美描述了：&lt;/p&gt;
+\[\boxed{\text{高保真模型随随机输入如何涨落}.}\]&lt;p&gt;这就是 Control Variate 与传统 surrogate modeling 思维最深的区别之一。&lt;/p&gt;
+&lt;p&gt;传统 surrogate：&lt;/p&gt;
+\[\boxed{\text{我要预测 }Y_H.}\]&lt;p&gt;Control Variate：&lt;/p&gt;
+\[\boxed{\text{我要解释 }Y_H\text{ 的随机变化}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;6-所以低保真模型到底给了什么信息&#34;&gt;6. 所以低保真模型到底“给了什么信息”？
+&lt;/h1&gt;&lt;p&gt;可以把高保真输出写成：&lt;/p&gt;
+\[Y_H = \underbrace{\beta Y_L}_{\text{低保真可解释部分}} + \underbrace{\epsilon}_{\text{低保真解释不了的部分}}.\]&lt;p&gt;普通 Monte Carlo 在估计整个：&lt;/p&gt;
+\[Y_H.\]&lt;p&gt;Control Variate 实际上只需要高保真 Monte Carlo 去估计：&lt;/p&gt;
+\[\boxed{\epsilon.}\]&lt;p&gt;如果低保真解释能力很好：&lt;/p&gt;
+\[\operatorname{Var}(\epsilon) \ll \operatorname{Var}(Y_H).\]&lt;p&gt;于是高保真采样问题就简单很多。&lt;/p&gt;
+&lt;p&gt;这和机器学习回归有一个非常漂亮的对应：&lt;/p&gt;
+\[\boxed{\text{低保真模型承担 explainable variation，高保真样本负责 residual correction}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-但现实中--通常根本不知道&#34;&gt;7. 但现实中 \(\mu_L\) 通常根本不知道
+&lt;/h1&gt;&lt;p&gt;这正是从经典 Control Variates 走向 MFMC 的关键一步。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[\mu_L\]&lt;p&gt;未知，我们可以因为低保真模型便宜，大量运行它：&lt;/p&gt;
+\[N_L\gg N_H.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\hat\mu_L = \frac1{N_L} \sum_{i=1}^{N_L}Y_L^{(i)}\]&lt;p&gt;可以非常准确。&lt;/p&gt;
+&lt;p&gt;同时在高保真样本对应的输入上计算：&lt;/p&gt;
+\[Y_H^{(i)},Y_L^{(i)}.\]&lt;p&gt;一个典型 MFMC estimator 可以理解为：&lt;/p&gt;
+\[\boxed{ \hat\mu_H^{MF} = \hat\mu_H + \alpha ( \hat\mu_L^{\rm many} - \hat\mu_L^{\rm paired} ) }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\hat\mu_L^{\rm paired}\]&lt;p&gt;使用与高保真完全相同的随机输入。&lt;/p&gt;
+&lt;p&gt;为什么一定要 paired？&lt;/p&gt;
+&lt;p&gt;因为只有这样：&lt;/p&gt;
+\[Y_H(X_i)\]&lt;p&gt;和：&lt;/p&gt;
+\[Y_L(X_i)\]&lt;p&gt;之间的 correlation 才能被利用。&lt;/p&gt;
+&lt;p&gt;Peherstorfer、Willcox 与 Gunzburger 的 MFMC 方法进一步根据模型成本和相关系数联合决定各保真模型应运行多少次，而且允许低保真来源是 ROM、data-fit surrogate、简化物理模型等，不要求形成严格的离散层级。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-于是好的低保真模型的定义变了&#34;&gt;8. 于是“好的低保真模型”的定义变了
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果目标是替代高保真模型：&lt;/p&gt;
+\[\boxed{\text{低 RMSE 很重要}.}\]&lt;p&gt;如果目标是 control variate：&lt;/p&gt;
+\[\boxed{\text{高相关 + 极低成本更重要}.}\]&lt;p&gt;所以可能出现：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;模型&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;相对成本&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;RMSE&lt;/th&gt;
+					&lt;th style=&#34;text-align: right&#34;&gt;与 HF 的相关系数&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;ROM A&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.1&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;很低&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.97&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;简化模型 B&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.001&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;较高&lt;/td&gt;
+					&lt;td style=&#34;text-align: right&#34;&gt;0.93&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;作为 surrogate：&lt;/p&gt;
+\[A\]&lt;p&gt;显然更好。&lt;/p&gt;
+&lt;p&gt;但用于 MFMC：&lt;/p&gt;
+\[B\]&lt;p&gt;可能更划算。&lt;/p&gt;
+&lt;p&gt;因为你可以运行：&lt;/p&gt;
+\[1000\]&lt;p&gt;次 B，而只能运行：&lt;/p&gt;
+\[10\]&lt;p&gt;次 A。&lt;/p&gt;
+&lt;p&gt;MFMC 的核心因此不是单纯追求：&lt;/p&gt;
+\[\boxed{\text{fidelity}}\]&lt;p&gt;而是优化：&lt;/p&gt;
+\[\boxed{\text{correlation / cost}.}\]&lt;p&gt;这也是“多保真”这个名字有时会造成误导的地方——所谓 fidelity 不必严格按准确度排成整齐层级。原始 MFMC 工作明确允许 arbitrary collections of surrogate models。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-这和-mlmc-有什么关系&#34;&gt;9. 这和 MLMC 有什么关系？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Michael B. Giles 的 Multilevel Monte Carlo（MLMC）采用：&lt;/p&gt;
+\[\mathbb E[Y_L] = \mathbb E[Y_0] + \sum_{\ell=1}^{L} \mathbb E[Y_\ell-Y_{\ell-1}].\]&lt;p&gt;这是一个 telescoping identity。&lt;/p&gt;
+&lt;p&gt;关键在于：&lt;/p&gt;
+\[Y_\ell\]&lt;p&gt;与：&lt;/p&gt;
+\[Y_{\ell-1}\]&lt;p&gt;要用&lt;strong&gt;耦合的随机输入&lt;/strong&gt;计算。&lt;/p&gt;
+&lt;p&gt;如果细粗模型高度相关：&lt;/p&gt;
+\[\operatorname{Var} (Y_\ell-Y_{\ell-1}) \ll \operatorname{Var}(Y_\ell).\]&lt;p&gt;于是：&lt;/p&gt;
+&lt;p&gt;粗模型大量算；&lt;/p&gt;
+&lt;p&gt;昂贵的细模型只负责估计：&lt;/p&gt;
+\[\boxed{\text{粗模型遗漏的小修正}.}\]&lt;p&gt;Giles 本人也明确把 MLMC 描述为一种受 multigrid 启发的 &lt;strong&gt;recursive control variate approach&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;在经典 SDE 示例中，他证明普通方法达到 RMS error \(O(\epsilon)\) 的成本可从 \(O(\epsilon^{-3})\) 降至：&lt;/p&gt;
+\[O\left( \epsilon^{-2}(\log\epsilon)^2 \right).\]&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{MLMC 本质上也在让昂贵模型只计算“模型间差值”.} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-mfmc-与-mlmc-最值得区分的一点&#34;&gt;10. MFMC 与 MLMC 最值得区分的一点
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;MLMC 通常具有天然层级：&lt;/p&gt;
+\[h_0&gt;h_1&gt;\cdots&gt;h_L,\]&lt;p&gt;例如：&lt;/p&gt;
+\[16^3 \rightarrow32^3 \rightarrow64^3 \rightarrow128^3\]&lt;p&gt;网格。&lt;/p&gt;
+&lt;p&gt;误差和成本通常随：&lt;/p&gt;
+\[h\]&lt;p&gt;有规律地变化。&lt;/p&gt;
+&lt;p&gt;MFMC 更自由：&lt;/p&gt;
+\[\boxed{ \text{HF FEM} + \text{ROM} + \text{Kriging} + \text{刚体模型} + \text{经验公式} }\]&lt;p&gt;都可以放进同一个 estimator。&lt;/p&gt;
+&lt;p&gt;只要它们：&lt;/p&gt;
+\[\boxed{\text{便宜并且与 HF 有相关性}.}\]&lt;p&gt;因此，如果研究中已经存在很多历史模型、代理模型、不同软件模型，MFMC 的适用性尤其高。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-但多个低保真模型并不意味着收益自动叠加&#34;&gt;11. 但多个低保真模型并不意味着收益自动叠加
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[Y_{L1},Y_{L2},Y_{L3}\]&lt;p&gt;都和高保真高度相关。&lt;/p&gt;
+&lt;p&gt;如果它们彼此也高度相关：&lt;/p&gt;
+\[\rho(L_1,L_2)\approx1,\]&lt;p&gt;那么它们提供的可能基本是：&lt;/p&gt;
+\[\boxed{\text{同一份信息}.}\]&lt;p&gt;这就像三个传感器都测同一个东西。&lt;/p&gt;
+&lt;p&gt;增加模型数量并不自动增加独立信息。&lt;/p&gt;
+&lt;p&gt;这也是后来 Approximate Control Variates（ACV）研究的重要动机。&lt;/p&gt;
+&lt;p&gt;Gorodetsky 等人在 2020 年的 JCP 工作证明，一些递归/嵌套的多模型策略存在理论上的 variance-reduction 上限；通过更一般的采样共享结构，可以更充分地利用多个模型提供的信息，在某些例子中与单一低保真控制变量相比出现数量级上的差距。&lt;/p&gt;
+&lt;p&gt;所以现代问题已经从：&lt;/p&gt;
+\[\boxed{\text{“有哪些低保真模型？”}}\]&lt;p&gt;进一步变成：&lt;/p&gt;
+\[\boxed{\text{“哪些模型共享哪些样本，怎样组合这些相关信息？”}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-一个非常值得迁移到可靠性的问题&#34;&gt;12. 一个非常值得迁移到可靠性的问题
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可靠性通常估计：&lt;/p&gt;
+\[P_f=P[g(X)&lt;0].\]&lt;p&gt;定义高保真 indicator：&lt;/p&gt;
+\[Y_H= \mathbf 1[g_H(X)&lt;0].\]&lt;p&gt;原则上仍然可以构造低保真：&lt;/p&gt;
+\[Y_L.\]&lt;p&gt;但这里会出现一个重要困难：&lt;/p&gt;
+&lt;p&gt;indicator 是：&lt;/p&gt;
+\[0/1.\]&lt;p&gt;即使：&lt;/p&gt;
+\[g_L(X)\]&lt;p&gt;与：&lt;/p&gt;
+\[g_H(X)\]&lt;p&gt;整体拟合很好，只要在：&lt;/p&gt;
+\[g=0\]&lt;p&gt;附近判断错误，failure indicator correlation 就会迅速下降。&lt;/p&gt;
+&lt;p&gt;所以可靠性问题再次提醒：&lt;/p&gt;
+\[\boxed{\text{全局 surrogate accuracy 并不等于 reliability usefulness}.}\]&lt;p&gt;真正值得优化的是：&lt;/p&gt;
+\[\boxed{\text{失效边界附近 HF/LF 的一致性}.}\]&lt;p&gt;这与昨天 &lt;span class=&#34;term-anchor&#34; data-term=&#34;active-subspace&#34; tabindex=&#34;0&#34;&gt;Active Subspace&lt;/span&gt; 卡片里的 failure-aware dimension reduction 是同一个深层规律。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对代理模型研究有一个很强的启发&#34;&gt;13. 对代理模型研究有一个很强的启发
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;通常训练 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; 时目标是：&lt;/p&gt;
+\[\min \text{RMSE}.\]&lt;p&gt;但如果 Kriging 最终用途只是作为 MFMC control variate，那么目标函数完全可以换成：&lt;/p&gt;
+\[\boxed{\max\rho(f_H,\hat f_L)}\]&lt;p&gt;同时考虑：&lt;/p&gt;
+\[\boxed{\min C_L}.\]&lt;p&gt;这会改变模型选择。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;少一点 hyperparameter optimization；&lt;/li&gt;
+&lt;li&gt;更小的网络；&lt;/li&gt;
+&lt;li&gt;更粗的 ROM；&lt;/li&gt;
+&lt;li&gt;更低精度数值求解；&lt;/li&gt;
+&lt;li&gt;更少的迭代次数；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;只要：&lt;/p&gt;
+\[\rho\]&lt;p&gt;下降得不多，低保真模型反而可能更有价值。&lt;/p&gt;
+&lt;p&gt;因此可以出现一个很有意思的工程策略：&lt;/p&gt;
+\[\boxed{ \text{故意让低保真模型“不那么准”， 换取大幅速度提升， 只要它仍然保留正确的涨落趋势。} }\]&lt;p&gt;这是一种和传统 surrogate accuracy optimization 很不同的设计哲学。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-对物理仿真也有一个非常具体的迁移&#34;&gt;14. 对物理仿真也有一个非常具体的迁移
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设高保真软体模型：&lt;/p&gt;
+\[\text{Neo-Hookean FEM} + \text{精确 contact} + \text{小 }dt.\]&lt;p&gt;低保真模型可以是：&lt;/p&gt;
+\[\text{corotated FEM} + \text{简化 contact} + \text{大 }dt.\]&lt;p&gt;甚至：&lt;/p&gt;
+\[\text{XPBD}.\]&lt;p&gt;如果目标只是估计：&lt;/p&gt;
+\[\mathbb E[F_{\rm impact}]\]&lt;p&gt;或者某种统计量，那么低保真模型无需逐帧逼真复现高保真轨迹。&lt;/p&gt;
+&lt;p&gt;真正需要验证的是：&lt;/p&gt;
+\[\boxed{ \operatorname{Corr} ( F_{\rm impact}^{HF}, F_{\rm impact}^{LF} ). }\]&lt;p&gt;这给出了一个很实用的模型评估标准：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;低保真模型值不值得保留，不能只看“和 HF 差多少”，还应该看“它是否知道哪些样本会高、哪些会低”。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-一个极小的实验就能真正理解-mfmc&#34;&gt;15. 一个极小的实验就能真正理解 MFMC
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;构造：&lt;/p&gt;
+\[X\sim\mathcal N(0,1).\]&lt;p&gt;高保真：&lt;/p&gt;
+\[Y_H=\exp(X)+0.1\sin(10X).\]&lt;p&gt;低保真：&lt;/p&gt;
+\[Y_L=3\exp(X)+20.\]&lt;p&gt;故意让：&lt;/p&gt;
+\[Y_L\]&lt;p&gt;数值尺度严重错误。&lt;/p&gt;
+&lt;p&gt;比较：&lt;/p&gt;
+&lt;p&gt;普通 MC：&lt;/p&gt;
+\[\hat\mu_{MC} = \frac1N\sum Y_H.\]&lt;p&gt;和 control variate：&lt;/p&gt;
+\[\hat\mu_{CV} = \frac1N \sum [ Y_H-\beta(Y_L-\mu_L) ].\]&lt;p&gt;然后画：&lt;/p&gt;
+\[\boxed{\text{Estimator RMSE vs HF evaluations}.}\]&lt;p&gt;再逐渐往低保真加入噪声：&lt;/p&gt;
+\[Y_L = 3e^X+20+\sigma\epsilon.\]&lt;p&gt;观察：&lt;/p&gt;
+\[\rho\downarrow\]&lt;p&gt;时：&lt;/p&gt;
+\[1-\rho^2\uparrow.\]&lt;p&gt;这个实验会非常直观地建立：&lt;/p&gt;
+\[\boxed{\text{MFMC 的收益来自 correlation，而不是 bias 小}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它在整个知识体系中卡在哪里&#34;&gt;16. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把多保真方法粗略分成两类。&lt;/p&gt;
+&lt;p&gt;第一类：&lt;/p&gt;
+\[\boxed{\text{预测型}}\]&lt;p&gt;目标：&lt;/p&gt;
+\[x\rightarrow f_H(x).\]&lt;p&gt;例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;co-Kriging；&lt;/li&gt;
+&lt;li&gt;multi-fidelity GP；&lt;/li&gt;
+&lt;li&gt;neural surrogate；&lt;/li&gt;
+&lt;li&gt;ROM correction。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;第二类：&lt;/p&gt;
+\[\boxed{\text{统计估计型}}\]&lt;p&gt;目标：&lt;/p&gt;
+\[\mathbb E[f_H],\quad P_f,\quad \operatorname{Var}(f_H).\]&lt;p&gt;Control Variates / MFMC 属于第二类。&lt;/p&gt;
+&lt;p&gt;所以如果最终只想得到：&lt;/p&gt;
+\[P_f=2.7\times10^{-5},\]&lt;p&gt;未必需要训练一个在整个参数空间都极其准确的 surrogate。&lt;/p&gt;
+&lt;p&gt;可能只需要：&lt;/p&gt;
+\[\boxed{\text{构造一个便宜、与高保真统计波动高度相关的信息源}.}\]&lt;p&gt;这是两种完全不同的计算目标。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Control Variates 最值得记住的不是：&lt;/p&gt;
+\[Z=Y_H-\beta(Y_L-\mu_L).\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \text{低保真模型的价值， 可以不在于告诉你“答案是多少”， 而在于告诉你“这一次随机样本为什么比平均值高或低”。} }\]&lt;p&gt;只要它能够解释高保真输出的大部分随机波动：&lt;/p&gt;
+\[Y_H = \underbrace{\text{LF-explainable variation}}_{\text{便宜}} + \underbrace{\text{residual}}_{\text{昂贵}},\]&lt;p&gt;高保真模型就只需要负责后面那个小 residual。&lt;/p&gt;
+&lt;p&gt;因此 MFMC 的核心逻辑可以浓缩成：&lt;/p&gt;
+\[\boxed{ \text{cheap model learns variation} \quad+\quad \text{expensive model corrects what remains}. }\]&lt;p&gt;这也是它对可靠性、ROM、代理模型和仿真工程都很有迁移价值的原因：&lt;strong&gt;模型的“有用性”取决于任务。一个不够准确的模型，仍然可能是极好的信息源。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Peherstorfer, Karen E. Willcox &amp;amp; Gunzburger, &lt;strong&gt;&lt;em&gt;Optimal Model Management for Multifidelity Monte Carlo Estimation&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Scientific Computing&lt;/em&gt;, 2016。MFMC 的核心论文；重点看“cost + correlation 如何决定最优样本分配”。&lt;br&gt;
+MIT 开放论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Michael B. Giles, &lt;strong&gt;&lt;em&gt;Multilevel Monte Carlo Path Simulation&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Operations Research&lt;/em&gt;, 2008。MLMC 奠基论文。&lt;br&gt;
+Michael Giles 的 MLMC 主页、论文与 MATLAB 实现&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Gorodetsky, Geraci, Eldred &amp;amp; Jakeman, &lt;strong&gt;&lt;em&gt;A Generalized Approximate Control Variate Framework for Multifidelity Uncertainty Quantification&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Journal of Computational Physics&lt;/em&gt;, 408, 109257, 2020。适合继续理解“多个低保真模型为什么不能简单堆起来”以及采样共享结构为什么重要。&lt;br&gt;
+作者公开 PDF&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Oden Institute / Willcox 团队 Multifidelity UQ 项目页 —— 很适合从方法论转向实际应用；项目覆盖均值、方差、全局敏感度、失效概率、统计推断与不确定性优化等任务。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果继续追当前发展，可以看 Gorodetsky、Jakeman 与 Eldred 的 &lt;strong&gt;Grouped Approximate Control Variate Estimators&lt;/strong&gt;（2024）：它进一步把“哪些模型共享哪些样本”统一成 generalized linear estimator，并连接 ACV 与 ML-BLUE。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

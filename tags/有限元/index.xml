@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Sun, 20 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%9C%89%E9%99%90%E5%85%83/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Fri, 25 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E6%9C%89%E9%99%90%E5%85%83/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>IPC：把“碰撞处理”改写成一个优化问题</title>
         <link>https://assranai.github.io/cards/01-ipc/</link>
         <pubDate>Fri, 14 Aug 2026 00:00:00 +0000</pubDate>
@@ -12225,6 +12225,835 @@ Disney Research / Animation 论文页&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;Maier &amp;amp; Rannacher, &lt;strong&gt;&lt;em&gt;Duality-based Adaptivity in Finite Element Discretization of Heterogeneous Multiscale Problems&lt;/em&gt;&lt;/strong&gt;。进一步展示 DWR 可以同时区分和权衡 modeling error、macro discretization error 与 micro discretization error，很适合沿着“多保真/多层误差预算”继续深入。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？</title>
+        <link>https://assranai.github.io/cards/41-matrix-free-fem/</link>
+        <pubDate>Wed, 23 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/41-matrix-free-fem/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Matrix-Free / Partial Assembly 与 Sum Factorization&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × GPU/HPC × 求解器架构&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选一个和前几张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;PD&lt;/span&gt;、AVI、&lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt; 都不同，但对“以后自己写真正高性能求解器”很关键的概念：&lt;strong&gt;Matrix-Free FEM（无矩阵有限元）&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;传统有限元的标准流程几乎已经形成条件反射：&lt;/p&gt;
+\[\text{单元积分}\rightarrow K_e \rightarrow\text{组装全局 }K \rightarrow Ku.\]&lt;p&gt;Matrix-Free 方法却问：&lt;/p&gt;
+\[\boxed{\text{如果最终只是想计算 }y=Ku,\text{ 为什么一定要先把 }K\text{ 存下来？}}\]&lt;p&gt;它直接从弱形式重新计算 \(Ku\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。&lt;/p&gt;
+&lt;p&gt;这背后的原因很值得理解：&lt;strong&gt;现代计算机越来越经常不是“算不动”，而是“搬不动数据”。&lt;/strong&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-传统-fem-真正在存什么&#34;&gt;1. 传统 FEM 真正在存什么？
+&lt;/h2&gt;&lt;p&gt;以线性弹性为例：&lt;/p&gt;
+\[Ku=f.\]&lt;p&gt;传统 assembly：&lt;/p&gt;
+\[K=\sum_e R_e^TK_eR_e.\]&lt;p&gt;其中 \(R_e\) 从全局自由度抽取单元自由度。&lt;/p&gt;
+&lt;p&gt;之后迭代求解器反复计算：&lt;/p&gt;
+\[y=Kx.\]&lt;p&gt;看起来非常合理。&lt;/p&gt;
+&lt;p&gt;但注意 sparse matrix-vector multiplication（SpMV）做了什么：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;读取 K 的非零值
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;读取列索引
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;读取 x
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;做少量乘加
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;写回 y
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每读取一个矩阵元素，往往只对应：&lt;/p&gt;
+\[1\text{ multiply}+1\text{ add}.\]&lt;p&gt;因此计算强度：&lt;/p&gt;
+\[\boxed{ I=\frac{\text{FLOPs}}{\text{bytes moved}} }\]&lt;p&gt;很低。&lt;/p&gt;
+&lt;p&gt;现代 CPU/GPU 的浮点吞吐增长速度远快于内存带宽，于是 SpMV 很容易成为：&lt;/p&gt;
+\[\boxed{\text{memory-bandwidth bound}.}\]&lt;p&gt;Kronbichler 与 Kormann 对 matrix-free DG 的性能分析甚至发现，完整 operator evaluation 的性能经常已经接近机器可用 memory bandwidth 的极限。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-matrix-free-做了一件看起来反效率的事&#34;&gt;2. Matrix-Free 做了一件看起来“反效率”的事
+&lt;/h1&gt;&lt;p&gt;不存：&lt;/p&gt;
+\[K.\]&lt;p&gt;每次需要：&lt;/p&gt;
+\[y=Kx\]&lt;p&gt;时，重新执行有限元积分。&lt;/p&gt;
+&lt;p&gt;对于一个典型双线性型：&lt;/p&gt;
+\[a(u,v) = \int_\Omega \nabla v^T D(x)\nabla u\,d\Omega,\]&lt;p&gt;传统方法先算：&lt;/p&gt;
+\[K_{ij} = \int_\Omega \nabla N_i^TD\nabla N_j\,d\Omega.\]&lt;p&gt;Matrix-Free 则直接：&lt;/p&gt;
+\[x \rightarrow u_h \rightarrow \nabla u_h \rightarrow D\nabla u_h \rightarrow \int\nabla N_i^TD\nabla u_h.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ Kx\text{ 被重新解释为一次有限元算子评价。} }\]&lt;p&gt;这意味着更多 FLOPs。&lt;/p&gt;
+&lt;p&gt;但数据搬运大幅减少。&lt;/p&gt;
+&lt;p&gt;在现代硬件上：&lt;/p&gt;
+\[\boxed{\text{多算一点，可能比多读一点更便宜。}}\]&lt;p&gt;这正是 Matrix-Free 最反直觉也最重要的地方。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-更准确地说有限元算子本来就不是一块矩阵&#34;&gt;3. 更准确地说，有限元算子本来就不是“一块矩阵”
+&lt;/h1&gt;&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://mfem.org/performance/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;MFEM 官方 Partial Assembly 文档&lt;/a&gt; 把有限元算子分解得非常漂亮：&lt;/p&gt;
+\[\boxed{ A=P^TG^TB^TDBG P. }\]&lt;p&gt;这里可以粗略理解为：&lt;/p&gt;
+\[P:\text{全局/并行自由度映射}\]\[G:\text{global DOF}\rightarrow\text{element DOF}\]\[B:\text{element DOF}\rightarrow\text{quadrature point}\]\[D:\text{积分点上的几何与物理作用}.\]&lt;p&gt;所以一个 FEM operator 实际上是：&lt;/p&gt;
+\[\boxed{ \text{global} \rightarrow \text{element} \rightarrow \text{quadrature} \rightarrow \text{physics} \rightarrow \text{element} \rightarrow \text{global}. }\]&lt;p&gt;全局 sparse matrix \(A\) 只是把整个计算过程&lt;strong&gt;提前展开并缓存后的结果&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-partial-assembly-是中间路线&#34;&gt;4. Partial Assembly 是中间路线
+&lt;/h1&gt;&lt;p&gt;这里有一个很重要的层次：&lt;/p&gt;
+\[\text{Full Assembly}\]&lt;p&gt;存整个：&lt;/p&gt;
+\[A.\]&lt;p&gt;Element Assembly：&lt;/p&gt;
+&lt;p&gt;存：&lt;/p&gt;
+\[K_e.\]&lt;p&gt;Partial Assembly：&lt;/p&gt;
+&lt;p&gt;只存积分点上的：&lt;/p&gt;
+\[D.\]&lt;p&gt;Matrix-Free：&lt;/p&gt;
+&lt;p&gt;连更多中间量也动态计算。&lt;/p&gt;
+&lt;p&gt;所以你可以把 assembly 看成一条连续谱：&lt;/p&gt;
+\[\boxed{ \text{更多预计算/更多内存} \longleftrightarrow \text{更少存储/更多在线计算}. }\]&lt;p&gt;MFEM 当前明确提供 FULL、ELEMENT、PARTIAL 等不同 assembly level；其 partial assembly 的核心就是只保存 \(D\) 或其一部分，而把 \(P,G,B\) 等操作在线执行。&lt;/p&gt;
+&lt;p&gt;这其实与昨天 PD 的思想形成一个很漂亮的反差：&lt;/p&gt;
+&lt;p&gt;PD：&lt;/p&gt;
+\[\boxed{\text{尽量预计算固定结构}}\]&lt;p&gt;Matrix-Free：&lt;/p&gt;
+\[\boxed{\text{当预计算结果太大时，宁愿重算}}\]&lt;p&gt;两者并不矛盾。&lt;/p&gt;
+&lt;p&gt;真正原则是：&lt;/p&gt;
+\[\boxed{\text{缓存那些“重算比搬运贵”的东西。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;5-但如果每次都老老实实算高阶-fem计算量不会爆炸吗&#34;&gt;5. 但如果每次都老老实实算高阶 FEM，计算量不会爆炸吗？
+&lt;/h1&gt;&lt;p&gt;会。&lt;/p&gt;
+&lt;p&gt;所以 Matrix-Free 高阶 FEM 的另一个核心技术叫：&lt;/p&gt;
+\[\boxed{\text{Sum Factorization}.}\]&lt;p&gt;考虑三维六面体高阶单元。&lt;/p&gt;
+&lt;p&gt;每个方向有：&lt;/p&gt;
+\[p+1\]&lt;p&gt;个基函数，因此单元自由度：&lt;/p&gt;
+\[n\sim(p+1)^3.\]&lt;p&gt;如果直接计算三维插值：&lt;/p&gt;
+\[u(q_x,q_y,q_z) = \sum_{i,j,k} B_{q_xi}B_{q_yj}B_{q_zk}u_{ijk},\]&lt;p&gt;这是一个巨大的三维求和。&lt;/p&gt;
+&lt;p&gt;但由于六面体基函数是 tensor product：&lt;/p&gt;
+\[N_{ijk}(x,y,z) = N_i(x)N_j(y)N_k(z),\]&lt;p&gt;可以分三次一维 contraction。&lt;/p&gt;
+&lt;p&gt;先：&lt;/p&gt;
+\[v_{q_xjk} = \sum_iB_{q_xi}u_{ijk},\]&lt;p&gt;再：&lt;/p&gt;
+\[w_{q_xq_yk} = \sum_jB_{q_yj}v_{q_xjk},\]&lt;p&gt;最后：&lt;/p&gt;
+\[u_{q_xq_yq_z} = \sum_kB_{q_zk}w_{q_xq_yk}.\]&lt;p&gt;这就是 sum factorization。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-它改变了高阶-fem-的复杂度&#34;&gt;6. 它改变了高阶 FEM 的复杂度
+&lt;/h1&gt;&lt;p&gt;三维情况下，直接 dense element operation 的复杂度大致会随：&lt;/p&gt;
+\[O(p^6)\]&lt;p&gt;增长。&lt;/p&gt;
+&lt;p&gt;利用 tensor-product sum factorization 后，可降到大约：&lt;/p&gt;
+\[\boxed{O(p^4)}.\]&lt;p&gt;这两个幂次的差距在：&lt;/p&gt;
+\[p=8,\;10,\;12\]&lt;p&gt;时已经非常巨大。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} }\]&lt;p&gt;才真正构成现代 high-order FEM 的高性能组合。&lt;/p&gt;
+&lt;p&gt;Kronbichler 与 Kormann 的工作正是系统研究这种 matrix-free + sum-factorization operator evaluation，并展示经过向量化的一维 tensor kernels 可以达到很高的 CPU 算术吞吐。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-一个直观类比&#34;&gt;7. 一个直观类比
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设你每天需要：&lt;/p&gt;
+\[f(x)=Ax.\]&lt;p&gt;传统 sparse FEM 的思路相当于：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;把一个复杂食谱的所有可能中间结果做完，装进巨大冰箱，以后每次拿出来。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Matrix-Free：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;只保存原料和非常紧凑的配方，需要时现场做。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;旧机器：&lt;/p&gt;
+\[\text{做饭慢，冰箱读取快}\]&lt;p&gt;于是缓存占优。&lt;/p&gt;
+&lt;p&gt;现代 GPU：&lt;/p&gt;
+\[\boxed{\text{“做饭”极快，但从显存搬东西相对昂贵}}\]&lt;p&gt;于是现场重算越来越划算。&lt;/p&gt;
+&lt;p&gt;这也是为什么 MFEM 官方明确指出 Partial Assembly 对 GPU 尤其重要：高阶 fully assembled matrix 同时要求大量存储和大量数据传输。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;8-这会产生一个很重要的-roofline-视角&#34;&gt;8. 这会产生一个很重要的 Roofline 视角
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;性能不应该只看 FLOPs。&lt;/p&gt;
+&lt;p&gt;定义 arithmetic intensity：&lt;/p&gt;
+\[I= \frac{\text{FLOPs}}{\text{Byte}}.\]&lt;p&gt;硬件理论性能近似受：&lt;/p&gt;
+\[P \le \min ( P_{\rm peak}, I B_{\rm memory} )\]&lt;p&gt;约束。&lt;/p&gt;
+&lt;p&gt;这就是经典 Roofline 思想。&lt;/p&gt;
+&lt;p&gt;如果 sparse matvec：&lt;/p&gt;
+\[I\ll1,\]&lt;p&gt;即使 GPU 有：&lt;/p&gt;
+\[50\text{ TFLOP/s},\]&lt;p&gt;也根本吃不到这些算力。&lt;/p&gt;
+&lt;p&gt;Matrix-Free 通过“重新计算”提高：&lt;/p&gt;
+\[I.\]&lt;p&gt;所以有一个很值得记住的 HPC 规律：&lt;/p&gt;
+\[\boxed{ \text{减少 FLOPs} \neq \text{提高性能}. }\]&lt;p&gt;有时候应该主动：&lt;/p&gt;
+\[\boxed{\text{用 FLOPs 换 memory traffic}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-这对-gpu-求解器架构特别重要&#34;&gt;9. 这对 GPU 求解器架构特别重要
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Matrix-Free 的典型 kernel 很适合 GPU：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;gather element DOFs；&lt;/li&gt;
+&lt;li&gt;tensor interpolation；&lt;/li&gt;
+&lt;li&gt;quadrature-point physics；&lt;/li&gt;
+&lt;li&gt;tensor integration；&lt;/li&gt;
+&lt;li&gt;scatter。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;积分点上的：&lt;/p&gt;
+\[D(q)\]&lt;p&gt;通常彼此独立。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{\text{quadrature physics 天然数据并行}.}\]&lt;p&gt;而 \(B\) 的 tensor contraction 又可以做：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;SIMD；&lt;/li&gt;
+&lt;li&gt;warp-level parallelism；&lt;/li&gt;
+&lt;li&gt;shared-memory reuse。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这也是 MFEM、&lt;a class=&#34;link&#34; href=&#34;https://libceed.org/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;libCEED&lt;/a&gt;、deal.II 等现代高阶 FEM 软件都高度重视 matrix-free operator decomposition 的原因。CEED 甚至专门定义 Bakeoff Problems 来比较不同库中 mass/Laplace 等高阶算子的性能实现。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-那为什么低阶四面体-fem-不一定值得-matrix-free&#34;&gt;10. 那为什么低阶四面体 FEM 不一定值得 Matrix-Free？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这是一个重要边界。&lt;/p&gt;
+&lt;p&gt;假设：&lt;/p&gt;
+\[P_1\]&lt;p&gt;线性四面体。&lt;/p&gt;
+&lt;p&gt;每个 tet 只有：&lt;/p&gt;
+\[4\]&lt;p&gt;个节点。&lt;/p&gt;
+&lt;p&gt;单元矩阵很小，计算：&lt;/p&gt;
+\[K_e\]&lt;p&gt;本身也不复杂。&lt;/p&gt;
+&lt;p&gt;此时：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;tensor-product 结构弱；&lt;/li&gt;
+&lt;li&gt;sum factorization 优势不存在；&lt;/li&gt;
+&lt;li&gt;gather/scatter 成本占比更高。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以 Matrix-Free 最耀眼的场景通常是：&lt;/p&gt;
+\[\boxed{\text{高阶 quad/hex tensor-product elements}.}\]&lt;p&gt;MFEM 当前官方 partial assembly 实现也主要针对 quadrilateral/hexahedral tensor-product elements。&lt;/p&gt;
+&lt;p&gt;但这并不意味着 simplex 完全做不了。Moxey、Amici 与 Kirby 已展示 triangle、tetrahedron、prism 等 simplex/prismatic 高阶单元也可以获得高效 matrix-free 实现，只是性能结构更复杂。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-matrix-free-最大的问题预条件器怎么办&#34;&gt;11. Matrix-Free 最大的问题：预条件器怎么办？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果你有：&lt;/p&gt;
+\[A,\]&lt;p&gt;可以直接构造：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ILU；&lt;/li&gt;
+&lt;li&gt;AMG；&lt;/li&gt;
+&lt;li&gt;sparse approximate inverse。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但 Matrix-Free 中：&lt;/p&gt;
+\[\boxed{A\text{ 根本不存在。}}\]&lt;p&gt;Krylov 方法只需要：&lt;/p&gt;
+\[v\mapsto Av,\]&lt;p&gt;所以 CG/GMRES 没问题。&lt;/p&gt;
+&lt;p&gt;但好的 preconditioner：&lt;/p&gt;
+\[P^{-1}\]&lt;p&gt;怎么办？&lt;/p&gt;
+&lt;p&gt;这恰恰是 matrix-free 方法最重要的工程难点之一。&lt;/p&gt;
+&lt;p&gt;MFEM 的解决路线包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;matrix-free Jacobi；&lt;/li&gt;
+&lt;li&gt;Chebyshev smoother；&lt;/li&gt;
+&lt;li&gt;\(h\)-multigrid；&lt;/li&gt;
+&lt;li&gt;\(p\)-multigrid。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此一个真正完整的 matrix-free solver 并不是：&lt;/p&gt;
+\[\boxed{\text{“把矩阵删掉”}}\]&lt;p&gt;这么简单。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{ \text{operator evaluation} + \text{matrix-free-friendly preconditioning} }\]&lt;p&gt;必须一起设计。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-这和-multigrid-的结合尤其漂亮&#34;&gt;12. 这和 Multigrid 的结合尤其漂亮
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;高阶问题：&lt;/p&gt;
+\[p=8.\]&lt;p&gt;可以构造：&lt;/p&gt;
+\[p=8 \rightarrow4 \rightarrow2 \rightarrow1.\]&lt;p&gt;高阶层：&lt;/p&gt;
+\[\boxed{\text{matrix-free}}\]&lt;p&gt;负责便宜 operator application。&lt;/p&gt;
+&lt;p&gt;到了：&lt;/p&gt;
+\[p=1\]&lt;p&gt;低阶层，矩阵已经足够小，可以：&lt;/p&gt;
+\[\boxed{\text{真正 assemble}}\]&lt;p&gt;然后使用 AMG/direct solver。&lt;/p&gt;
+&lt;p&gt;于是形成：&lt;/p&gt;
+\[\boxed{ \text{high order: compute-rich matrix-free} }\]\[\downarrow\]\[\boxed{ \text{low order: matrix-based robust coarse solve}. }\]&lt;p&gt;这是一种很典型的现代 HPC 思维：&lt;/p&gt;
+\[\boxed{\text{不同层级不必坚持同一种数据表示。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对非线性软体-fem-更有意思&#34;&gt;13. 对非线性软体 FEM 更有意思
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑 Neo-Hookean：&lt;/p&gt;
+\[P=P(F).\]&lt;p&gt;传统 Newton FEM：&lt;/p&gt;
+\[K(x)=\frac{\partial f}{\partial x}.\]&lt;p&gt;显式形成：&lt;/p&gt;
+\[K\]&lt;p&gt;可能非常昂贵。&lt;/p&gt;
+&lt;p&gt;但 Newton-Krylov 只真正需要：&lt;/p&gt;
+\[\boxed{K(x)v.}\]&lt;p&gt;这可以直接通过：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;analytic directional derivative；&lt;/li&gt;
+&lt;li&gt;automatic differentiation；&lt;/li&gt;
+&lt;li&gt;finite-difference Jacobian-vector product；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;得到。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{Matrix-Free} + \text{Newton-Krylov} }\]&lt;p&gt;允许：&lt;/p&gt;
+\[\boxed{\text{从头到尾不显式形成 tangent stiffness matrix}.}\]&lt;p&gt;这对复杂 constitutive model、GPU FEM、differentiable simulation 都非常重要。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-这里还能和上一张-pd-卡片形成一个很有价值的对照&#34;&gt;14. 这里还能和上一张 PD 卡片形成一个很有价值的对照
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;PD 的核心优势：&lt;/p&gt;
+\[\boxed{K\text{ 固定}}\]&lt;p&gt;所以：&lt;/p&gt;
+\[K=LL^T\]&lt;p&gt;一次 factorization，反复使用。&lt;/p&gt;
+&lt;p&gt;Matrix-Free Newton-Krylov：&lt;/p&gt;
+\[\boxed{K(x)\text{ 可以不断变化}}\]&lt;p&gt;但我们根本不存它，只提供：&lt;/p&gt;
+\[v\rightarrow K(x)v.\]&lt;p&gt;所以面对 nonlinear elasticity，有两条完全不同的求解器哲学：&lt;/p&gt;
+\[\boxed{ \text{PD：改变模型结构，让矩阵固定} }\]&lt;p&gt;与&lt;/p&gt;
+\[\boxed{ \text{Matrix-Free：接受矩阵变化，但永远不把它实体化}. }\]&lt;p&gt;两条路线都在避免：&lt;/p&gt;
+\[\boxed{\text{反复构造巨大 sparse matrix}.}\]&lt;p&gt;只是解决方式完全不同。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-对自研软体求解器最值得迁移的思想&#34;&gt;15. 对自研软体求解器最值得迁移的思想
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;即使当前使用 &lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt;，而不是 FEM，Matrix-Free 的思想仍然非常有价值。&lt;/p&gt;
+&lt;p&gt;假设系统有：&lt;/p&gt;
+\[10^6\]&lt;p&gt;个 tet constraints。&lt;/p&gt;
+&lt;p&gt;一种设计是提前存大量：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;constraint Jacobian；&lt;/li&gt;
+&lt;li&gt;local Hessian；&lt;/li&gt;
+&lt;li&gt;stiffness block。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;另一种设计：&lt;/p&gt;
+&lt;p&gt;每次 kernel 内根据：&lt;/p&gt;
+\[x_i,x_j,x_k,x_l\]&lt;p&gt;现场重构：&lt;/p&gt;
+\[F,\quad J,\quad \nabla C.\]&lt;p&gt;如果重构只需要几十到几百 FLOPs，却能少读取几十字节甚至数百字节，那么 GPU 上后者可能更快。&lt;/p&gt;
+&lt;p&gt;因此 profiler 不应该只统计：&lt;/p&gt;
+\[\boxed{\text{FLOPs}.}\]&lt;p&gt;更应该统计：&lt;/p&gt;
+\[\boxed{ \text{bytes moved per constraint} }\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{ \text{arithmetic intensity}. }\]&lt;p&gt;这对 GPU physics solver 是一个非常实用的性能视角。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-一个值得自己做的小实验&#34;&gt;16. 一个值得自己做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;做一个规则六面体 Poisson 问题。&lt;/p&gt;
+&lt;p&gt;比较：&lt;/p&gt;
+&lt;h3 id=&#34;a-full-assembly&#34;&gt;A. Full assembly
+&lt;/h3&gt;&lt;p&gt;构造：&lt;/p&gt;
+\[K\]&lt;p&gt;然后反复：&lt;/p&gt;
+\[y=Kx.\]&lt;h3 id=&#34;b-matrix-free-naive&#34;&gt;B. Matrix-free naive
+&lt;/h3&gt;&lt;p&gt;每次重新做 quadrature。&lt;/p&gt;
+&lt;h3 id=&#34;c-matrix-free--sum-factorization&#34;&gt;C. Matrix-free + sum factorization
+&lt;/h3&gt;&lt;p&gt;利用 tensor product。&lt;/p&gt;
+&lt;p&gt;测试：&lt;/p&gt;
+\[p=1,2,4,6,8.\]&lt;p&gt;记录：&lt;/p&gt;
+\[\boxed{\text{DOF/s}}\]\[\boxed{\text{GB/s}}\]\[\boxed{\text{GFLOP/s}}\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{\text{bytes/DOF}.}\]&lt;p&gt;最值得观察的现象很可能是：&lt;/p&gt;
+&lt;p&gt;低阶时：&lt;/p&gt;
+\[\text{assembled}\]&lt;p&gt;并不差。&lt;/p&gt;
+&lt;p&gt;随着：&lt;/p&gt;
+\[p\uparrow,\]&lt;p&gt;matrix-free + sum-factorization 会越来越占优势。&lt;/p&gt;
+&lt;p&gt;这比只读理论复杂度更容易真正理解高阶 FEM 为什么重新流行起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-它还给-ai-工程一个很强的迁移原则&#34;&gt;17. 它还给 AI 工程一个很强的迁移原则
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;现代 LLM 推理也越来越受：&lt;/p&gt;
+\[\boxed{\text{memory bandwidth}}\]&lt;p&gt;限制。&lt;/p&gt;
+&lt;p&gt;很多 kernel fusion、FlashAttention、activation recomputation，本质上都在做类似交易：&lt;/p&gt;
+\[\boxed{\text{多做计算，少搬数据}.}\]&lt;p&gt;所以 Matrix-Free FEM、FlashAttention、checkpoint recomputation 看起来属于完全不同领域，却共享一个现代计算原则：&lt;/p&gt;
+\[\boxed{ \text{在算力相对便宜、内存流量昂贵的机器上， “避免重复计算”已经不再是无条件正确的优化目标。}\]&lt;p&gt;这是 Matrix-Free FEM 最值得迁移出去的一层认识。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Matrix-Free FEM 最值得记住的并不是：&lt;/p&gt;
+\[\boxed{\text{“不存刚度矩阵”}.}\]&lt;p&gt;真正重要的是：&lt;/p&gt;
+\[\boxed{ \text{矩阵只是一个算子的某种物化形式； 如果物化后的数据比重新执行算子本身更昂贵， 那就没有必要把它物化。} }\]&lt;p&gt;它在知识体系中的位置可以画成：&lt;/p&gt;
+\[\text{Weak Form}\]\[\downarrow\]\[\text{Finite Element Operator}\]\[\begin{array}{ccc} \swarrow &amp;&amp; \searrow\\ \text{Assembly} &amp;&amp; \text{Matrix-Free} \end{array}\]\[\begin{array}{ccc} K\text{ sparse} &amp;&amp; P^TG^TB^TDBG P \end{array}\]&lt;p&gt;而高阶 FEM 再加入：&lt;/p&gt;
+\[\boxed{\text{tensor product}}\]\[\downarrow\]\[\boxed{\text{sum factorization}}\]&lt;p&gt;最终得到：&lt;/p&gt;
+\[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} + \text{Multigrid} }\]&lt;p&gt;这已经成为现代高性能高阶有限元的一条核心技术路线。&lt;/p&gt;
+&lt;p&gt;对于以后真正写 GPU 物理求解器，这张卡片最值得留下的工程判断是：&lt;/p&gt;
+\[\boxed{ \text{看到一个可以预计算并缓存的大数组时， 先不要问“怎么把它存得更紧凑”， 先问“我真的需要存它吗？”} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://mfem.org/performance/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;MFEM：Performance and Partial Assembly&lt;/a&gt; —— 我最推荐的入门材料。它把 \(P,G,B,D\) 的 operator decomposition、partial assembly、GPU 与 multigrid 的关系讲得非常清楚，而且对应真实工业级 C++ 实现。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Martin Kronbichler &amp;amp; Katharina Kormann, &lt;strong&gt;Fast Matrix-Free Evaluation of Discontinuous Galerkin Finite Element Operators&lt;/strong&gt;, &lt;em&gt;ACM TOMS&lt;/em&gt;, 2019。想真正理解 sum factorization、SIMD、memory bandwidth 和 operator kernel 性能，这是核心论文。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://doi.org/10.1145/3325864&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;ACM 论文页&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://libceed.org/en/latest/examples/bps/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;libCEED 官方 CEED Bakeoff Problems&lt;/a&gt; —— 如果以后自己写 FEM kernel，非常值得照这些标准问题 benchmark；它直接提供 mass、Laplace 等算子的跨 MFEM、deal.II、PETSc 等实现比较入口。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Moxey, Amici &amp;amp; Kirby, &lt;strong&gt;Efficient Matrix-Free High-Order Finite Element Evaluation for Simplicial Elements&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Scientific Computing&lt;/em&gt;, 2020。适合继续追问一个与你更相关的问题：**四面体网格没有标准 hex tensor-product 结构后，matrix-free 还能做到多快？**论文展示了 triangle/tet/prism 上仍可获得高效实现。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Arndt et al., &lt;strong&gt;ExaDG: High-Order Discontinuous Galerkin for the Exa-scale&lt;/strong&gt;。如果想看这一整套技术怎样组成真正的大规模求解器：matrix-free operator + sum factorization + massively parallel multigrid + optimized smoothers，就是很好的系统案例；相关工作报告实际软件贡献在不同硬件上带来约 3–4× 加速。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Incremental Potential Contact：CCD 为什么不能单独保证“碰撞合法”？</title>
+        <link>https://assranai.github.io/cards/43-incremental-potential-contact-2/</link>
+        <pubDate>Fri, 25 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/43-incremental-potential-contact-2/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;ipc&#34; tabindex=&#34;0&#34;&gt;Incremental Potential Contact&lt;/span&gt;（IPC）——把碰撞检测、接触响应与非穿透保证放进同一个优化问题&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：物理引擎 × 非线性 FEM × 接触力学 × &lt;span class=&#34;term-anchor&#34; data-term=&#34;ccd&#34; tabindex=&#34;0&#34;&gt;CCD&lt;/span&gt;&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 9 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这张卡片专门澄清一个很容易形成的判断：&lt;/p&gt;
+\[\boxed{\text{用了 CCD，就不会穿透。}}\]&lt;p&gt;这个说法只对了一半。&lt;/p&gt;
+&lt;p&gt;CCD 能回答的是：&lt;/p&gt;
+\[\boxed{\text{从 }x^n\text{ 走向候选 }x^{n+1}\text{ 的过程中，会不会发生首次接触？}}\]&lt;p&gt;但一个完整接触求解器还必须决定：&lt;/p&gt;
+\[\boxed{\text{既然不能走到那里，那最终应该走到哪里？}}\]&lt;p&gt;IPC 的价值就在这里。它把 &lt;strong&gt;CCD 的几何可行性保证&lt;/strong&gt;、&lt;strong&gt;barrier 的接触响应&lt;/strong&gt;、&lt;strong&gt;隐式时间积分的动力学目标&lt;/strong&gt;放进一个统一优化框架中。2020 年的原始 IPC 工作报告，它能在大变形、复杂接触条件下保持轨迹无相交、单元无反转，并避免很多传统 penalty/contact 方法所需的场景级参数调节。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先把三个经常混在一起的问题拆开&#34;&gt;1. 先把三个经常混在一起的问题拆开
+&lt;/h2&gt;&lt;p&gt;假设一个顶点正在高速撞向三角形。&lt;/p&gt;
+&lt;h3 id=&#34;问题-a会不会撞&#34;&gt;问题 A：会不会撞？
+&lt;/h3&gt;&lt;p&gt;这是 collision detection：&lt;/p&gt;
+\[d(x)=0?\]&lt;p&gt;如果只检查：&lt;/p&gt;
+\[d(x^n)&gt;0,\qquad d(x^{n+1})&gt;0,\]&lt;p&gt;高速运动可能出现：&lt;/p&gt;
+\[\text{start} \rightarrow \boxed{\text{穿过}} \rightarrow \text{end}.\]&lt;p&gt;两个离散时刻都没有重叠。&lt;/p&gt;
+&lt;p&gt;CCD 因而检查整条轨迹：&lt;/p&gt;
+\[x(t)=x^n+t(x^{n+1}-x^n), \qquad t\in[0,1],\]&lt;p&gt;寻找最早：&lt;/p&gt;
+\[d(x(t))=0.\]&lt;p&gt;它解决的是：&lt;/p&gt;
+\[\boxed{\text{collision detection / step validity}.}\]&lt;hr&gt;
+&lt;h3 id=&#34;问题-b发生接触以后产生多大的力&#34;&gt;问题 B：发生接触以后，产生多大的力？
+&lt;/h3&gt;&lt;p&gt;这是 contact response。&lt;/p&gt;
+&lt;p&gt;例如 penalty：&lt;/p&gt;
+\[E_c(d)= \frac{k}{2}\min(d,0)^2.\]&lt;p&gt;或者 constraint：&lt;/p&gt;
+\[d(x)\ge0.\]&lt;p&gt;它解决：&lt;/p&gt;
+\[\boxed{\text{contact mechanics}.}\]&lt;hr&gt;
+&lt;h3 id=&#34;问题-c数值迭代过程本身会不会穿过去&#34;&gt;问题 C：数值迭代过程本身会不会穿过去？
+&lt;/h3&gt;&lt;p&gt;这是第三个问题。&lt;/p&gt;
+&lt;p&gt;假设 Newton 当前状态：&lt;/p&gt;
+\[x_k\]&lt;p&gt;合法：&lt;/p&gt;
+\[d(x_k)&gt;0.\]&lt;p&gt;求得搜索方向：&lt;/p&gt;
+\[p_k.\]&lt;p&gt;直接更新：&lt;/p&gt;
+\[x_{k+1}=x_k+p_k\]&lt;p&gt;完全可能越过接触面。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{\text{最终解合法}}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{\text{求解路径始终合法}}\]&lt;p&gt;是两件事。&lt;/p&gt;
+&lt;p&gt;IPC 特别重视后者。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-ipc-从一个普通隐式时间步开始&#34;&gt;2. IPC 从一个普通隐式时间步开始
+&lt;/h1&gt;&lt;p&gt;考虑：&lt;/p&gt;
+\[M\ddot x=-\nabla E(x).\]&lt;p&gt;一个隐式时间步可以写成增量势能最小化：&lt;/p&gt;
+\[x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-\tilde x\|_M^2 + E_{\rm elastic}(x) \right].\]&lt;p&gt;其中：&lt;/p&gt;
+\[\tilde x\]&lt;p&gt;是惯性预测位置。&lt;/p&gt;
+&lt;p&gt;直觉上：&lt;/p&gt;
+&lt;p&gt;第一项说：&lt;/p&gt;
+\[\boxed{\text{按照惯性，我想去 }\tilde x}\]&lt;p&gt;弹性能说：&lt;/p&gt;
+\[\boxed{\text{但材料变形需要付出能量。}}\]&lt;p&gt;所以最终状态是两者折中。&lt;/p&gt;
+&lt;p&gt;IPC 加入第三项：&lt;/p&gt;
+\[\boxed{ E_{\rm IPC}(x) = \frac{1}{2h^2} \|x-\tilde x\|_M^2 + E_{\rm elastic}(x) + B(x) }\]&lt;p&gt;其中：&lt;/p&gt;
+\[B(x)\]&lt;p&gt;是 contact barrier。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-barrier-与普通-penalty-的区别非常关键&#34;&gt;3. Barrier 与普通 penalty 的区别非常关键
+&lt;/h1&gt;&lt;p&gt;传统 penalty 往往在：&lt;/p&gt;
+\[d&lt;0\]&lt;p&gt;之后产生惩罚：&lt;/p&gt;
+\[E_p(d) \propto (-d)^2.\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{\text{先允许非法，再努力把它推回来。}}\]&lt;p&gt;刚度 \(k\) 太小：&lt;/p&gt;
+\[\text{penetration}.\]&lt;p&gt;太大：&lt;/p&gt;
+\[\text{ill-conditioning}.\]&lt;p&gt;IPC 换一种逻辑。&lt;/p&gt;
+&lt;p&gt;设置一个激活距离：&lt;/p&gt;
+\[\hat d&gt;0.\]&lt;p&gt;当：&lt;/p&gt;
+\[d\ge\hat d\]&lt;p&gt;时：&lt;/p&gt;
+\[b(d)=0.\]&lt;p&gt;进入近接触区域后：&lt;/p&gt;
+\[0&lt;d&lt;\hat d,\]&lt;p&gt;barrier 开始增长，并且：&lt;/p&gt;
+\[\boxed{ \lim_{d\rightarrow0^+}b(d)=+\infty. }\]&lt;p&gt;原始 IPC 使用的 barrier 属于这种 interior-point 风格：只有接近接触的 primitive pairs 产生能量，而真正的零距离位于无限势垒之外。&lt;/p&gt;
+&lt;p&gt;直观图像：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;9
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;energy
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↑
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;∞ │\
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  │ \
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  │  \
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  │   \____
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  │        ─────────
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  └──────────────────→ distance
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  0       d_hat
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此优化器看到的世界是：&lt;/p&gt;
+\[\boxed{\text{穿透区域根本不属于可正常跨越的能量地形。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;4-那有-barrier-以后为什么还需要-ccd&#34;&gt;4. 那有 barrier 以后，为什么还需要 CCD？
+&lt;/h1&gt;&lt;p&gt;这是 IPC 最值得理解的一处。&lt;/p&gt;
+&lt;p&gt;假设当前：&lt;/p&gt;
+\[d(x_k)&gt;0.\]&lt;p&gt;Newton 给出：&lt;/p&gt;
+\[p_k.\]&lt;p&gt;即使 barrier 在：&lt;/p&gt;
+\[d\rightarrow0\]&lt;p&gt;时趋于无穷，&lt;/p&gt;
+&lt;p&gt;一个有限步长：&lt;/p&gt;
+\[x_k+\alpha p_k\]&lt;p&gt;仍可能直接从 barrier 一边&lt;strong&gt;跳到另一边&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;数值算法不会自动连续地“感受到”中间那个无穷大。&lt;/p&gt;
+&lt;p&gt;所以 IPC 对搜索方向执行 CCD，寻找：&lt;/p&gt;
+\[\alpha_{\max}\]&lt;p&gt;使得：&lt;/p&gt;
+\[x_k+\alpha p_k\]&lt;p&gt;沿整个运动路径保持无碰撞。&lt;/p&gt;
+&lt;p&gt;然后 line search 只能选择：&lt;/p&gt;
+\[\boxed{\alpha&lt;\alpha_{\max}.}\]&lt;p&gt;于是 CCD 在这里承担的是：&lt;/p&gt;
+\[\boxed{\text{feasible step-size filter}.}\]&lt;p&gt;这和把 CCD 仅仅理解成“碰撞发生时间检测器”已经有很大区别。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-所以真正的无穿透保证来自一个闭环&#34;&gt;5. 所以真正的无穿透保证来自一个闭环
+&lt;/h1&gt;&lt;p&gt;IPC 可以粗略写成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;21
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;x_k  当前合法状态
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓ Newton / quasi-Newton
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;p_k  候选搜索方向
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓ CCD
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;α_CCD  允许的最大合法步长
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓ line search
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;α ≤ α_CCD
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;x_{k+1} = x_k + α p_k
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;barrier forces reshape next search direction
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{Barrier 决定“不要靠近哪里”} }\]&lt;p&gt;而：&lt;/p&gt;
+\[\boxed{ \text{CCD 决定“这一步最多能走多远”.} }\]&lt;p&gt;两者结合才得到：&lt;/p&gt;
+\[\boxed{\text{intersection-free optimization trajectory}.}\]&lt;p&gt;这也是为什么把“碰撞合法性完全归功于 CCD”会漏掉关键的一半。&lt;/p&gt;
+&lt;p&gt;CCD 本身不会告诉物体应该怎样重新分配位移、弹性形变和接触反力。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-一个非常直观的反例&#34;&gt;6. 一个非常直观的反例
+&lt;/h1&gt;&lt;p&gt;假设一个球正高速撞墙。&lt;/p&gt;
+&lt;p&gt;CCD 算出：&lt;/p&gt;
+\[t_{\rm impact}=0.37h.\]&lt;p&gt;如果算法只是：&lt;/p&gt;
+\[\boxed{\text{走到 TOI，然后停下}}\]&lt;p&gt;当然不会穿墙。&lt;/p&gt;
+&lt;p&gt;但下一步怎么办？&lt;/p&gt;
+&lt;p&gt;球应该：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;停住？&lt;/li&gt;
+&lt;li&gt;回弹？&lt;/li&gt;
+&lt;li&gt;滑动？&lt;/li&gt;
+&lt;li&gt;压缩？&lt;/li&gt;
+&lt;li&gt;把墙压弯？&lt;/li&gt;
+&lt;li&gt;把冲量传递给其他物体？&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;CCD 没有答案。&lt;/p&gt;
+&lt;p&gt;它只提供一个几何事实：&lt;/p&gt;
+\[\boxed{\text{沿当前候选轨迹，37\% 时间处第一次触碰。}}\]&lt;p&gt;真正动力学响应来自接触模型和求解器。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{CCD 是 contact solver 的安全基础设施， 并不是 contact mechanics 本身。} }\]&lt;hr&gt;
+&lt;h1 id=&#34;7-ipc-为什么比ccd--penalty更深一层&#34;&gt;7. IPC 为什么比“CCD + penalty”更深一层？
+&lt;/h1&gt;&lt;p&gt;因为 contact 被直接放进：&lt;/p&gt;
+\[\boxed{\text{同一个增量势能优化问题}}\]&lt;p&gt;里。&lt;/p&gt;
+&lt;p&gt;假设：&lt;/p&gt;
+\[E(x) = E_{\rm inertia} + E_{\rm elastic} + E_{\rm contact}.\]&lt;p&gt;Newton 条件：&lt;/p&gt;
+\[\nabla E(x)=0.\]&lt;p&gt;于是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;惯性；&lt;/li&gt;
+&lt;li&gt;弹性；&lt;/li&gt;
+&lt;li&gt;接触；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;不是先后独立处理的三个 correction。&lt;/p&gt;
+&lt;p&gt;它们共同决定：&lt;/p&gt;
+\[x^{n+1}.\]&lt;p&gt;这非常重要。&lt;/p&gt;
+&lt;p&gt;在强接触、大变形问题里：&lt;/p&gt;
+\[\boxed{\text{接触本身会改变结构怎样变形，而结构变形又会改变接触几何。}}\]&lt;p&gt;所以 staggered：&lt;/p&gt;
+\[\text{elastic solve} \rightarrow \text{collision fix} \rightarrow \text{elastic fix}\]&lt;p&gt;容易产生耦合误差。&lt;/p&gt;
+&lt;p&gt;IPC 更接近：&lt;/p&gt;
+\[\boxed{\text{monolithic contact solve}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;8-这和-xpbd-的世界观差别很大&#34;&gt;8. 这和 XPBD 的世界观差别很大
+&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 通常从约束出发：&lt;/p&gt;
+\[C(x)\ge0\]&lt;p&gt;并通过：&lt;/p&gt;
+\[\Delta\lambda = \frac{-C-\tilde\alpha\lambda} {\sum_iw_i|\nabla C_i|^2+\tilde\alpha}\]&lt;p&gt;局部修改位置。&lt;/p&gt;
+&lt;p&gt;它的优势是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;简单；&lt;/li&gt;
+&lt;li&gt;局部；&lt;/li&gt;
+&lt;li&gt;易并行；&lt;/li&gt;
+&lt;li&gt;实时友好。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;IPC 则把接触视作：&lt;/p&gt;
+\[\boxed{\text{全局非线性能量优化的一部分}.}\]&lt;p&gt;因此 IPC 通常更昂贵，却可以更系统地处理：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;极端 stiffness；&lt;/li&gt;
+&lt;li&gt;大时间步；&lt;/li&gt;
+&lt;li&gt;大变形；&lt;/li&gt;
+&lt;li&gt;复杂 self-contact；&lt;/li&gt;
+&lt;li&gt;codimensional geometry。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;原始论文报告其鲁棒性不依赖特定材料、时间步长、速度或变形严重程度；后续工作又把这一框架扩展到了刚体、低维结构和混合多体系统。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-这也解释了为什么-ipc-对反转特别在意&#34;&gt;9. 这也解释了为什么 IPC 对“反转”特别在意
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;穿透不是几何模拟唯一的非法状态。&lt;/p&gt;
+&lt;p&gt;四面体还有：&lt;/p&gt;
+\[J=\det F.\]&lt;p&gt;如果：&lt;/p&gt;
+\[J\le0,\]&lt;p&gt;tet 已经反转。&lt;/p&gt;
+&lt;p&gt;所以一个 robust deformable solver 通常同时面对两个 feasible-set boundary：&lt;/p&gt;
+\[\boxed{d=0}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{J=0.}\]&lt;p&gt;IPC 原始工作同时关注 intersection-free 与 inversion-free trajectories。&lt;/p&gt;
+&lt;p&gt;从优化视角看，这很统一：&lt;/p&gt;
+\[\boxed{ x\in\mathcal F }\]&lt;p&gt;其中合法域：&lt;/p&gt;
+\[\mathcal F = \{ x: d_j(x)&gt;0,\; J_e(x)&gt;0 \}.\]&lt;p&gt;求解器真正做的是：&lt;/p&gt;
+\[\boxed{ \min_{x\in\mathcal F} E(x). }\]&lt;p&gt;这个视角比“检测到碰撞就推开”强很多。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-摩擦为什么比无摩擦接触麻烦&#34;&gt;10. 摩擦为什么比无摩擦接触麻烦？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;无摩擦 normal contact 可以比较自然地来自距离 barrier。&lt;/p&gt;
+&lt;p&gt;Coulomb friction：&lt;/p&gt;
+\[\|f_t\|\le\mu f_n\]&lt;p&gt;则涉及：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;法向接触力；&lt;/li&gt;
+&lt;li&gt;切向相对速度；&lt;/li&gt;
+&lt;li&gt;stick/slip；&lt;/li&gt;
+&lt;li&gt;非光滑性。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;IPC 路线发展出了 variational friction formulation，把摩擦也纳入优化框架。后续 rigid IPC 和 unified Newton barrier multibody 方法都沿用了这一方向。&lt;/p&gt;
+&lt;p&gt;这提醒一个重要事实：&lt;/p&gt;
+\[\boxed{ \text{“保证不穿透”比“正确模拟接触”容易得多。} }\]&lt;p&gt;一个 solver 完全可以：&lt;/p&gt;
+\[\text{zero penetration}\]&lt;p&gt;却给出错误的：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;摩擦；&lt;/li&gt;
+&lt;li&gt;restitution；&lt;/li&gt;
+&lt;li&gt;impact impulse；&lt;/li&gt;
+&lt;li&gt;energy dissipation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以评估碰撞求解器时不能只统计 penetration count。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-ipc-也有明显代价&#34;&gt;11. IPC 也有明显代价
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;它并不是实时游戏物理的万能答案。&lt;/p&gt;
+&lt;p&gt;主要成本来自：&lt;/p&gt;
+\[\boxed{\text{大量 CCD}}\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{\text{非线性全局优化}}.\]&lt;p&gt;每个 Newton iteration 都可能需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;broad phase；&lt;/li&gt;
+&lt;li&gt;candidate generation；&lt;/li&gt;
+&lt;li&gt;narrow-phase CCD；&lt;/li&gt;
+&lt;li&gt;barrier gradient/Hessian；&lt;/li&gt;
+&lt;li&gt;sparse linear solve；&lt;/li&gt;
+&lt;li&gt;line search。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以 IPC 的优势主要是：&lt;/p&gt;
+\[\boxed{\text{robustness / accuracy / guarantees}}\]&lt;p&gt;而不是最低单帧成本。&lt;/p&gt;
+&lt;p&gt;后续研究一直在尝试解决这一点，例如 Medial IPC 使用 reduced medial representation 加速 deformable simulation，而 Penetration-Free &lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;Projective Dynamics&lt;/span&gt; 则把 PD 的高效求解结构与 IPC barrier 结合起来，在 GPU 上追求 penetration-free 与计算效率的折中。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-一个对你自己的求解器很有价值的诊断框架&#34;&gt;12. 一个对你自己的求解器很有价值的诊断框架
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;以后碰到：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“接触以后 tet 坍缩 / 穿透 / 爆炸”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;可以把问题拆成四层，而不要统称为“碰撞不稳定”。&lt;/p&gt;
+&lt;p&gt;第一层：&lt;/p&gt;
+\[\boxed{\text{Detection}}\]&lt;p&gt;CCD 有没有漏掉真实碰撞？&lt;/p&gt;
+&lt;p&gt;第二层：&lt;/p&gt;
+\[\boxed{\text{Feasibility}}\]&lt;p&gt;即使检测到了，solver update 有没有跨过：&lt;/p&gt;
+\[d=0 \quad\text{或}\quad J=0?\]&lt;p&gt;第三层：&lt;/p&gt;
+\[\boxed{\text{Response}}\]&lt;p&gt;接触法向反力和摩擦是否合理？&lt;/p&gt;
+&lt;p&gt;第四层：&lt;/p&gt;
+\[\boxed{\text{Coupling / convergence}}\]&lt;p&gt;contact correction 与 elastic constraints 是否真正收敛到同一个一致状态？&lt;/p&gt;
+&lt;p&gt;这四层分别失败时，表面现象可能完全一样：&lt;/p&gt;
+\[\boxed{\text{mesh collapse}.}\]&lt;p&gt;但修复方法完全不同。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这也回答了ccd-是否才是碰撞合法的决定性约束&#34;&gt;13. 这也回答了“CCD 是否才是碰撞合法的决定性约束”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;更精确的回答可以写成：&lt;/p&gt;
+\[\boxed{ \text{CCD 对“搜索路径不跨越接触边界”具有决定性作用； 但它本身不定义最终合法解。} }\]&lt;p&gt;在 IPC 中：&lt;/p&gt;
+\[\boxed{\text{CCD = feasible step guardian}}\]\[\boxed{\text{barrier = contact response + boundary repulsion}}\]\[\boxed{\text{nonlinear optimizer = global reconciliation}}\]&lt;p&gt;三者缺一不可。&lt;/p&gt;
+&lt;p&gt;如果只有 barrier，没有 CCD：&lt;/p&gt;
+\[\boxed{\text{Newton step 可能跨过 barrier singularity}.}\]&lt;p&gt;如果只有 CCD，没有 barrier：&lt;/p&gt;
+\[\boxed{\text{你知道哪里不能去，却不知道应该去哪里}.}\]&lt;p&gt;如果两者都有，但全局求解没有充分收敛：&lt;/p&gt;
+\[\boxed{\text{弹性与接触仍可能处于错误的耦合平衡}.}\]&lt;p&gt;这就是 IPC 最值得建立的整体认识。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-一个很适合实现的小实验&#34;&gt;14. 一个很适合实现的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;不需要一开始就做 tet。&lt;/p&gt;
+&lt;p&gt;只做二维：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ● vertex
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       ↓ v
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;──────────────── edge
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;构造一个 point-edge system。&lt;/p&gt;
+&lt;h3 id=&#34;实验-a离散碰撞检测--penalty&#34;&gt;实验 A：离散碰撞检测 + penalty
+&lt;/h3&gt;&lt;p&gt;允许：&lt;/p&gt;
+\[d&lt;0\]&lt;p&gt;后产生：&lt;/p&gt;
+\[F=-kd.\]&lt;h3 id=&#34;实验-bccd--clamp-to-toi&#34;&gt;实验 B：CCD + clamp-to-TOI
+&lt;/h3&gt;&lt;p&gt;检测：&lt;/p&gt;
+\[\alpha_{\rm toi}.\]&lt;p&gt;直接：&lt;/p&gt;
+\[x\leftarrow x+\alpha_{\rm toi}p.\]&lt;h3 id=&#34;实验-cbarrier--newton但不限制步长&#34;&gt;实验 C：barrier + Newton，但不限制步长
+&lt;/h3&gt;&lt;p&gt;观察 Newton 是否可能越过：&lt;/p&gt;
+\[d=0.\]&lt;h3 id=&#34;实验-dbarrier--ccd-filtered-line-search&#34;&gt;实验 D：barrier + CCD-filtered line search
+&lt;/h3&gt;&lt;p&gt;限制：&lt;/p&gt;
+\[\alpha&lt;\alpha_{\rm CCD}.\]&lt;p&gt;然后比较：&lt;/p&gt;
+\[d_{\min}, \quad E, \quad \text{Newton iterations}, \quad \text{contact force}.\]&lt;p&gt;这个小实验会比直接阅读大型 IPC 代码更容易建立真正的直觉。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-还有一个值得知道的最新方向&#34;&gt;15. 还有一个值得知道的最新方向
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;IPC 的思路非常强，但“每个优化步都依赖保守 CCD”也是性能瓶颈。&lt;/p&gt;
+&lt;p&gt;因此近年的研究开始探索另一条路线。2025 年的 &lt;strong&gt;Offset Geometric Contact (OGC)&lt;/strong&gt; 使用 offset geometry 与局部 displacement bounds 来构造有限时间步的接触处理，在其目标场景中试图减少昂贵 CCD 的依赖，并强调适合 GPU 的局部操作。&lt;/p&gt;
+&lt;p&gt;另一方面，IPC 自身也在继续理论化。Ferguson 的研究页面列出的 &lt;strong&gt;Convergent Incremental Potential Contact&lt;/strong&gt; 从连续接触模型出发重新构造离散形式，研究网格细化下 contact solution 的收敛性——也就是进一步追问：&lt;/p&gt;
+\[\boxed{\text{离散 barrier contact 是否真的收敛到一个连续物理模型？}}\]&lt;p&gt;这说明现代接触研究已经从：&lt;/p&gt;
+\[\text{“别穿透”}\]&lt;p&gt;进一步走向：&lt;/p&gt;
+\[\boxed{ \text{几何保证} + \text{物理一致性} + \text{离散收敛} + \text{GPU 效率}. }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;IPC 最值得记住的不是 barrier 函数本身，而是它重新定义了“碰撞求解”的边界：&lt;/p&gt;
+\[\boxed{ \text{接触不是检测到一次事件以后做一次 correction； 它是整个时间步优化问题的可行域边界。} }\]&lt;p&gt;所以完整关系是：&lt;/p&gt;
+\[\text{Dynamics}\]\[\downarrow\]\[\text{Incremental Potential}\]\[+\]\[\boxed{\text{Barrier Contact}}\]\[+\]\[\boxed{\text{CCD-Filtered Line Search}}\]\[\downarrow\]\[\boxed{\text{IPC}}\]&lt;p&gt;而你之前关于 CCD 的判断可以进一步精炼成：&lt;/p&gt;
+\[\boxed{ \text{CCD 决定“这一步能不能安全地走过去”； 接触势能决定“为什么不应该走过去”； 全局求解器决定“所有物理要求同时存在时最终该停在哪里”。} }\]&lt;p&gt;这三层区分，对于以后诊断 XPBD、FEM、PD 或任何自研接触求解器都很有迁移价值。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Li, Ferguson, Schneider et al., &lt;strong&gt;&lt;em&gt;Incremental Potential Contact: Intersection- and Inversion-free, Large-Deformation Dynamics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM Transactions on Graphics / SIGGRAPH 2020&lt;/em&gt;。IPC 原始论文，最值得精读 barrier、CCD-filtered line search 和 incremental potential 三者怎样闭合成一个求解器。&lt;br&gt;
+Zachary Ferguson 的 IPC 论文与项目入口&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Ferguson et al., &lt;strong&gt;&lt;em&gt;Intersection-free Rigid Body Dynamics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG / SIGGRAPH 2021&lt;/em&gt;。如果想理解“为什么刚体 CCD 比线性 vertex trajectory 更麻烦”，这篇很重要：刚体点实际沿曲线运动，论文专门构造 curved-trajectory conservative CCD。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Wang et al., &lt;strong&gt;&lt;em&gt;A Large Scale Benchmark and an Inclusion-Based Algorithm for Continuous Collision Detection&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2021/2022。适合继续深入你最近特别关心的 CCD：论文系统 benchmark 了 CCD 的 correctness、accuracy 与 efficiency，并给出 floating-point 下具有正确性保证的 inclusion-based 方法。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Chen et al., &lt;strong&gt;&lt;em&gt;A Unified Newton Barrier Method for Multibody Dynamics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;SIGGRAPH 2022&lt;/em&gt;。把 IPC 的思想进一步扩展到刚体、软体、不同维度几何、关节约束和摩擦统一求解，很适合理解 barrier optimization 怎样从“软体接触算法”成长为通用 multibody solver architecture。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果想看下一代路线，可以关注 Chen et al., &lt;strong&gt;&lt;em&gt;Offset Geometric Contact&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG / SIGGRAPH 2025&lt;/em&gt;。它直接针对 IPC 一类方法的 CCD 成本探索 GPU-friendly 的替代设计，是理解当前 contact solver 前沿取舍很好的对照组。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 
