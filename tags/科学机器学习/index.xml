@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Mon, 28 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 01 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
         <link>https://assranai.github.io/cards/02-ak-mcs/</link>
         <pubDate>Sat, 15 Aug 2026 00:00:00 +0000</pubDate>
@@ -4572,6 +4572,771 @@ IOP 论文页&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;Dan Giles 的作者项目页与公开预印本入口 —— 如果希望沿“物理代理模型 + conformal UQ”继续跟踪作者团队，这是比泛泛阅读 CP 教程更贴近 Scientific ML 的入口。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Equilibrated Flux：有限元怎样从“误差估计”走到“可认证的误差上界”？</title>
+        <link>https://assranai.github.io/cards/48-equilibrated-flux/</link>
+        <pubDate>Wed, 30 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/48-equilibrated-flux/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Equilibrated Flux A Posteriori Error Estimation（平衡通量后验误差估计）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 误差认证 × \(H(\mathrm{div})\) × 自适应计算&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;上一张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt; 讨论的是：&lt;/p&gt;
+\[\boxed{\text{哪些误差真正影响我关心的 QoI？}}\]&lt;p&gt;今天换一个不同的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;FEM 算出位移、温度或压力以后，我们能不能给出一个&lt;strong&gt;真正可计算的数字&lt;/strong&gt;，保证真实误差绝不会超过它？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;普通 residual estimator 往往只能证明&lt;/p&gt;
+\[\|u-u_h\|_E\le C\,\eta_h,\]&lt;p&gt;问题在于 \(C\) 可能是未知的稳定性常数。于是软件告诉你&lt;/p&gt;
+\[\eta_h=0.012\]&lt;p&gt;并不严格等价于：&lt;/p&gt;
+\[\boxed{\|u-u_h\|_E\le0.012.}\]&lt;p&gt;&lt;strong&gt;Equilibrated Flux（平衡通量）方法的重要性就在这里：它通过额外重构一个严格满足局部守恒/平衡条件的通量场，把很多椭圆型问题的误差估计变成没有未知常数的、完全可计算的 guaranteed upper bound。&lt;/strong&gt; Ern 与 Vohralík 的统一框架进一步证明，这类估计可以做到局部可计算、局部有效，并对有限元多项式阶数具有鲁棒性。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-从最简单的-poisson-问题开始&#34;&gt;1. 从最简单的 Poisson 问题开始
+&lt;/h2&gt;&lt;p&gt;考虑&lt;/p&gt;
+\[-\nabla\cdot(A\nabla u)=f.\]&lt;p&gt;定义真实物理通量&lt;/p&gt;
+\[\boxed{\sigma=-A\nabla u.}\]&lt;p&gt;于是 PDE 可以拆成两个物理关系：&lt;/p&gt;
+\[\boxed{\sigma=-A\nabla u}\]&lt;p&gt;——本构关系；&lt;/p&gt;
+&lt;p&gt;以及&lt;/p&gt;
+\[\boxed{\nabla\cdot\sigma=f}\]&lt;p&gt;——平衡/守恒关系。&lt;/p&gt;
+&lt;p&gt;这其实非常重要。&lt;/p&gt;
+&lt;p&gt;原本一个二阶 PDE：&lt;/p&gt;
+\[-\nabla\cdot(A\nabla u)=f\]&lt;p&gt;被拆成了：&lt;/p&gt;
+\[\text{potential }u \xrightarrow{\text{constitutive law}} \sigma \xrightarrow{\text{conservation}} f.\]&lt;p&gt;在弹性力学里，这正对应：&lt;/p&gt;
+\[u \rightarrow \varepsilon \rightarrow \sigma\]&lt;p&gt;以及&lt;/p&gt;
+\[-\nabla\cdot\sigma=b.\]&lt;p&gt;所以今天的方法虽然用 Poisson 来解释，本质上属于一个非常普遍的&lt;strong&gt;物理守恒结构&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-普通位移型-fem-有一个容易忽视的性质&#34;&gt;2. 普通位移型 FEM 有一个容易忽视的性质
+&lt;/h1&gt;&lt;p&gt;求得&lt;/p&gt;
+\[u_h\in V_h.\]&lt;p&gt;自然得到一个“数值通量”：&lt;/p&gt;
+\[\sigma_h^{raw}=-A\nabla u_h.\]&lt;p&gt;问题来了。&lt;/p&gt;
+&lt;p&gt;如果使用常见的 \(P_1\) 连续有限元，\(u_h\) 在单元之间连续，但&lt;/p&gt;
+\[\nabla u_h\]&lt;p&gt;通常不连续。&lt;/p&gt;
+&lt;p&gt;因此在两个相邻单元 \(K_1,K_2\) 的公共面上：&lt;/p&gt;
+\[\sigma_{h,1}^{raw}\cdot n \neq \sigma_{h,2}^{raw}\cdot n.\]&lt;p&gt;换句话说：&lt;/p&gt;
+\[\boxed{\text{数值通量的法向分量可能在单元界面跳跃。}}\]&lt;p&gt;于是它并不严格属于&lt;/p&gt;
+\[H(\mathrm{div},\Omega).\]&lt;p&gt;也不能逐单元严格满足：&lt;/p&gt;
+\[\nabla\cdot\sigma_h=f.\]&lt;hr&gt;
+&lt;h1 id=&#34;3-这意味着什么&#34;&gt;3. 这意味着什么？
+&lt;/h1&gt;&lt;p&gt;想象热传导问题。&lt;/p&gt;
+&lt;p&gt;某个内部单元：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;           q_top
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;             ↑
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ┌─────────┐
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;q_left →│    K    │→ q_right
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        └─────────┘
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;             ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          q_bottom
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;物理守恒要求：&lt;/p&gt;
+\[\int_{\partial K}\sigma\cdot n\,ds = \int_K f\,dx.\]&lt;p&gt;即：&lt;/p&gt;
+\[\boxed{\text{流入/流出 + 内部源项必须精确平衡。}}\]&lt;p&gt;普通 conforming FEM 的解在&lt;strong&gt;弱意义&lt;/strong&gt;上满足 PDE，但直接由 \(\nabla u_h\) 得到的通量一般不逐单元满足这个强局部平衡。&lt;/p&gt;
+&lt;p&gt;因此我们做一件很有意思的事：&lt;/p&gt;
+\[\boxed{\text{不重新求整个 PDE，而是把数值通量“修复”成一个物理上平衡的通量。}}\]&lt;p&gt;得到：&lt;/p&gt;
+\[\sigma_h^\star.\]&lt;hr&gt;
+&lt;h1 id=&#34;4-什么叫-equilibrated&#34;&gt;4. 什么叫 Equilibrated？
+&lt;/h1&gt;&lt;p&gt;我们希望：&lt;/p&gt;
+\[\boxed{ \sigma_h^\star\in H(\mathrm{div},\Omega) }\]&lt;p&gt;并且：&lt;/p&gt;
+\[\boxed{ \nabla\cdot\sigma_h^\star = f_h }\]&lt;p&gt;其中 \(f_h\) 通常是 \(f\) 的合适离散投影。&lt;/p&gt;
+&lt;p&gt;第一条意味着内部面两侧的法向通量匹配：&lt;/p&gt;
+\[[\sigma_h^\star\cdot n]=0.\]&lt;p&gt;第二条意味着逐单元守恒：&lt;/p&gt;
+\[\int_{\partial K} \sigma_h^\star\cdot n\,ds = \int_K f_h\,dx.\]&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{\text{equilibration}.}\]&lt;p&gt;所以这个名字可以直接理解为：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;把 FEM 计算得到的近似物理场，修复成满足离散物理平衡定律的场。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Ern–Vohralík 的方法通常通过&lt;strong&gt;顶点 patch 上的小型混合有限元 Neumann 问题&lt;/strong&gt;完成这种重构，而无需重新求一个全局高精度 PDE。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-为什么--在这里突然出现&#34;&gt;5. 为什么 \(H(\mathrm{div})\) 在这里突然出现？
+&lt;/h1&gt;&lt;p&gt;这是今天非常值得顺手建立的一个有限元知识点。&lt;/p&gt;
+&lt;p&gt;普通标量场常用：&lt;/p&gt;
+\[H^1.\]&lt;p&gt;因为需要：&lt;/p&gt;
+\[u\]&lt;p&gt;跨单元连续。&lt;/p&gt;
+&lt;p&gt;但 flux / stress / velocity-like quantity 更自然的空间是：&lt;/p&gt;
+\[\boxed{ H(\mathrm{div}) = \{ v\in L^2: \nabla\cdot v\in L^2 \}. }\]&lt;p&gt;它要求的不是所有向量分量连续，而是：&lt;/p&gt;
+\[\boxed{\text{法向分量跨面连续。}}\]&lt;p&gt;这恰好就是局部守恒需要的条件。&lt;/p&gt;
+&lt;p&gt;经典有限元空间包括：&lt;/p&gt;
+\[\boxed{\text{Raviart–Thomas (RT)}}\]&lt;p&gt;和 BDM。&lt;/p&gt;
+&lt;p&gt;例如现代有限元框架明确把 Raviart–Thomas 元作为 \(H(\mathrm{div})\)-conforming finite element 使用。&lt;/p&gt;
+&lt;p&gt;这背后其实连着更大的理论体系：&lt;/p&gt;
+\[H^1 \xrightarrow{\nabla} H(\mathrm{curl}) \xrightarrow{\nabla\times} H(\mathrm{div}) \xrightarrow{\nabla\cdot} L^2.\]&lt;p&gt;这就是 &lt;strong&gt;de Rham complex&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;Arnold、Falk 与 Winther 的 Finite Element Exterior Calculus（FEEC）正是系统研究：怎样让离散有限元空间保留 PDE 原本的几何、拓扑和代数结构。&lt;/p&gt;
+&lt;p&gt;今天不展开 FEEC，但值得先记住：&lt;/p&gt;
+\[\boxed{\text{不同物理量天然属于不同函数空间。}}\]&lt;p&gt;这远比“所有变量都找一套 shape functions 插值”深一层。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-重构一个平衡通量以后神奇的事情发生了&#34;&gt;6. 重构一个平衡通量以后，神奇的事情发生了
+&lt;/h1&gt;&lt;p&gt;真实通量：&lt;/p&gt;
+\[\sigma=-A\nabla u.\]&lt;p&gt;有限元梯度通量：&lt;/p&gt;
+\[-A\nabla u_h.\]&lt;p&gt;平衡重构通量：&lt;/p&gt;
+\[\sigma_h^\star.\]&lt;p&gt;现在计算二者之间的差：&lt;/p&gt;
+\[\boxed{ \eta = \left\| A^{-1/2} \left( \sigma_h^\star+A\nabla u_h \right) \right\|. }\]&lt;p&gt;这看起来只是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“两个近似通量之间的距离”。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;但在适当条件下，可以证明：&lt;/p&gt;
+\[\boxed{ \|A^{1/2}\nabla(u-u_h)\| \le \eta }\]&lt;p&gt;或加上完全可计算的数据振荡项。&lt;/p&gt;
+&lt;p&gt;注意这条式子的意义：&lt;/p&gt;
+&lt;p&gt;左边：&lt;/p&gt;
+\[\boxed{\text{不知道，因为 }u\text{ 不知道}}\]&lt;p&gt;右边：&lt;/p&gt;
+\[\boxed{\text{完全由 }u_h,\sigma_h^\star\text{ 算出来。}}\]&lt;p&gt;所以：&lt;/p&gt;
+\[\eta=0.012\]&lt;p&gt;现在真的可以意味着：&lt;/p&gt;
+\[\boxed{ \|u-u_h\|_E\le0.012 }\]&lt;p&gt;而不是：&lt;/p&gt;
+\[\|u-u_h\|_E\le C\times0.012\]&lt;p&gt;且 \(C\) 不知道是多少。&lt;/p&gt;
+&lt;p&gt;这就是 &lt;strong&gt;guaranteed a posteriori error bound&lt;/strong&gt; 的真正含义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么这个上界会成立&#34;&gt;7. 为什么这个上界会成立？
+&lt;/h1&gt;&lt;p&gt;这里隐藏着一个很漂亮的几何结构。&lt;/p&gt;
+&lt;p&gt;真实解同时满足：&lt;/p&gt;
+\[\boxed{\text{kinematic admissibility}}\]&lt;p&gt;和&lt;/p&gt;
+\[\boxed{\text{static admissibility}}.\]&lt;p&gt;有限元 \(u_h\) 通常提供一个好的 kinematically admissible field。&lt;/p&gt;
+&lt;p&gt;而 equilibrated flux：&lt;/p&gt;
+\[\sigma_h^\star\]&lt;p&gt;提供一个 statically admissible field。&lt;/p&gt;
+&lt;p&gt;经典 &lt;strong&gt;Prager–Synge hypercircle theorem&lt;/strong&gt; 告诉我们：如果有一对分别满足运动学和静力学约束的近似场，那么它们之间的 constitutive mismatch 可以控制真实能量误差。Vohralík 的当前后验误差课程也把 Prager–Synge 定理、\(H^1/H(\mathrm{div})\)、本构律和平衡方程放在 equilibrated-flux 理论的基础位置。&lt;/p&gt;
+&lt;p&gt;直观上可以画成：&lt;/p&gt;
+\[\text{kinematically admissible states}\]&lt;p&gt;和&lt;/p&gt;
+\[\text{statically admissible states}\]&lt;p&gt;是两个约束集合。&lt;/p&gt;
+&lt;p&gt;真实解位于两者满足本构关系的交汇位置。&lt;/p&gt;
+&lt;p&gt;如果你各找一个合法近似：&lt;/p&gt;
+\[u_h,\qquad\sigma_h^\star,\]&lt;p&gt;它们彼此之间的不一致程度：&lt;/p&gt;
+\[\boxed{ \sigma_h^\star+A\nabla u_h }\]&lt;p&gt;就限制了真实解还能离它们多远。&lt;/p&gt;
+&lt;p&gt;所以这不是一个经验 estimator。&lt;/p&gt;
+&lt;p&gt;它来自：&lt;/p&gt;
+\[\boxed{\text{物理 admissibility + 能量几何}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;8-这与普通-residual-estimator-有什么本质区别&#34;&gt;8. 这与普通 residual estimator 有什么本质区别？
+&lt;/h1&gt;&lt;p&gt;Residual estimator 看：&lt;/p&gt;
+\[R_K=f+\nabla\cdot(A\nabla u_h)\]&lt;p&gt;以及 face jump：&lt;/p&gt;
+\[J_F= [A\nabla u_h\cdot n].\]&lt;p&gt;也就是问：&lt;/p&gt;
+\[\boxed{\text{离散解违反 PDE 多少？}}\]&lt;p&gt;Equilibrated flux 则进一步做：&lt;/p&gt;
+\[\boxed{\text{把这些 violation 修复成一个真正满足 equilibrium 的场。}}\]&lt;p&gt;然后比较：&lt;/p&gt;
+\[\text{raw constitutive flux}\]&lt;p&gt;与：&lt;/p&gt;
+\[\text{equilibrated physical flux}.\]&lt;p&gt;所以可以粗略理解成：&lt;/p&gt;
+\[\text{Residual estimator}\]\[\boxed{\text{测量违反守恒的程度}}\]&lt;p&gt;而：&lt;/p&gt;
+\[\text{Equilibrated flux}\]\[\boxed{\text{先恢复一个满足守恒的解，再测量恢复代价。}}\]&lt;p&gt;这就是为什么后者更容易得到 constant-free guaranteed bounds。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-为什么还要强调-local-efficiency&#34;&gt;9. 为什么还要强调 local efficiency？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果 estimator 永远说：&lt;/p&gt;
+\[\|e\|\le10^8\]&lt;p&gt;当然也是 guaranteed。&lt;/p&gt;
+&lt;p&gt;但毫无用处。&lt;/p&gt;
+&lt;p&gt;所以优秀 estimator 还要求：&lt;/p&gt;
+\[\eta_K \lesssim \|e\|_{\omega_K}.\]&lt;p&gt;即局部指标不能比真实局部误差夸张太多。&lt;/p&gt;
+&lt;p&gt;这叫：&lt;/p&gt;
+\[\boxed{\text{local efficiency}.}\]&lt;p&gt;理想 estimator 同时具备：&lt;/p&gt;
+\[\boxed{\text{guaranteed}}\]\[+\]\[\boxed{\text{locally efficient}}\]\[+\]\[\boxed{\text{fully computable}}\]\[+\]\[\boxed{\text{robust}}.\]&lt;p&gt;Ern 与 Vohralík 2015 的结果尤其重要，因为它对 conforming、nonconforming、DG、mixed discretizations 给出统一框架，而且局部效率常数对多项式阶数 \(p\) 鲁棒。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-对--鲁棒为什么重要&#34;&gt;10. “对 \(p\) 鲁棒”为什么重要？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设做高阶 FEM：&lt;/p&gt;
+\[p=1,2,4,8,12.\]&lt;p&gt;如果 estimator 满足：&lt;/p&gt;
+\[\eta\le C(p)\|e\|\]&lt;p&gt;而：&lt;/p&gt;
+\[C(p)\rightarrow\infty\]&lt;p&gt;随着阶数增长，&lt;/p&gt;
+&lt;p&gt;那么高阶计算时 estimator 会越来越保守。&lt;/p&gt;
+&lt;p&gt;你可能真实误差已经：&lt;/p&gt;
+\[10^{-6},\]&lt;p&gt;它还告诉你：&lt;/p&gt;
+\[10^{-2}.\]&lt;p&gt;所谓 polynomial-degree robust，就是相关常数不会随着：&lt;/p&gt;
+\[p\]&lt;p&gt;恶化。&lt;/p&gt;
+&lt;p&gt;这对：&lt;/p&gt;
+\[\boxed{hp\text{-adaptive FEM}}\]&lt;p&gt;尤其重要，因为否则你甚至无法可靠判断：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;这个区域应该细化 \(h\)，还是提高 \(p\)？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;2015 年的统一 equilibrated-flux 工作正把 polynomial-degree robustness 作为主要结果之一。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-它的计算成本其实没有想象中高&#34;&gt;11. 它的计算成本其实没有想象中高
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;你可能会想：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;为了估计误差，再解一个 mixed FEM，不就快等于重新求一次问题了吗？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;关键是：&lt;/p&gt;
+\[\boxed{\text{不需要全局求解。}}\]&lt;p&gt;典型算法把 domain 拆成 vertex patches：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       △ △
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;      △ ● △
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;       △ △
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;对每个顶点周围的小 patch：&lt;/p&gt;
+\[\omega_a\]&lt;p&gt;求一个局部 Raviart–Thomas mixed problem。&lt;/p&gt;
+&lt;p&gt;然后把局部 flux contributions：&lt;/p&gt;
+\[\sigma_h^a\]&lt;p&gt;相加：&lt;/p&gt;
+\[\boxed{ \sigma_h^\star = \sum_a\sigma_h^a. }\]&lt;p&gt;于是大量 patch：&lt;/p&gt;
+\[\boxed{\text{彼此独立，可以并行。}}\]&lt;p&gt;所以结构是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;global FEM solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; u_h
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; ┌─────┬─────┬─────┬─────┐
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;patch1 patch2 patch3 ... patchN
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; solve  solve  solve      solve
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; └─────┴─────┴─────┴─────┘
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; equilibrated flux
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        ↓
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; guaranteed error bound
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这在 GPU / multicore 上具有很自然的并行潜力。现代研究还在继续降低 equilibration 的局部成本；例如针对 isogeometric analysis 的工作专门把重构限制在小 support 上，以避免全局系统和大型 patch 的额外代价。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-对自研物理求解器这里有一个很值得迁移的思想&#34;&gt;12. 对自研物理求解器，这里有一个很值得迁移的思想
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;你目前在 &lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; / FEM 里会监控：&lt;/p&gt;
+\[J=\det F,\]\[\Delta x,\]&lt;p&gt;constraint violation，&lt;/p&gt;
+\[E_k,\]&lt;p&gt;COM 等。&lt;/p&gt;
+&lt;p&gt;这些大多属于：&lt;/p&gt;
+\[\boxed{\text{diagnostics}.}\]&lt;p&gt;它们告诉你：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“这个结果看起来有没有问题？”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Equilibrated-flux 思想再向前一步：&lt;/p&gt;
+\[\boxed{ \text{能不能利用物理守恒定律构造一个独立的 admissible reconstruction， 然后用两个物理一致表示之间的差异量化数值误差？} }\]&lt;p&gt;例如连续体里可以检查：&lt;/p&gt;
+\[\nabla\cdot P+b\]&lt;p&gt;动量平衡；&lt;/p&gt;
+&lt;p&gt;面之间 traction：&lt;/p&gt;
+\[P_1n_1+P_2n_2\]&lt;p&gt;是否守恒；&lt;/p&gt;
+&lt;p&gt;或者构造一个局部平衡 stress field。&lt;/p&gt;
+&lt;p&gt;这比单纯监控：&lt;/p&gt;
+\[\boxed{\text{constraint residual}}\]&lt;p&gt;更接近：&lt;/p&gt;
+\[\boxed{\text{physics-based numerical certification}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-对可靠性分析这个区别更关键&#34;&gt;13. 对可靠性分析，这个区别更关键
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设极限状态：&lt;/p&gt;
+\[g(X)=\sigma_{\rm allow}-\sigma_{\max}(X).\]&lt;p&gt;FEM 给出：&lt;/p&gt;
+\[\sigma_{\max,h}.\]&lt;p&gt;通常直接把它当真值：&lt;/p&gt;
+\[g_h(X) = \sigma_{\rm allow}-\sigma_{\max,h}(X).\]&lt;p&gt;但如果数值误差未知：&lt;/p&gt;
+\[\sigma_{\max} = \sigma_{\max,h} + \epsilon_h,\]&lt;p&gt;那么靠近：&lt;/p&gt;
+\[g=0\]&lt;p&gt;的样本可能发生：&lt;/p&gt;
+\[\boxed{\text{numerical false-safe}.}\]&lt;p&gt;如果能获得 certified error bound：&lt;/p&gt;
+\[|\epsilon_h|\le\eta_h,\]&lt;p&gt;就可以进一步构造：&lt;/p&gt;
+\[g^-(X),\qquad g^+(X)\]&lt;p&gt;形成保守安全/失效判据。&lt;/p&gt;
+&lt;p&gt;这会让可靠性分析从：&lt;/p&gt;
+\[\boxed{\text{surrogate uncertainty}}\]&lt;p&gt;继续向下一层走：&lt;/p&gt;
+\[\boxed{ \text{input uncertainty} + \text{surrogate uncertainty} + \text{discretization uncertainty}. }\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{\text{“仿真结果”本身也应该带误差预算。}}\]&lt;p&gt;这是可靠性分析真正走向 verified simulation 时绕不开的一层。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-它和昨天的-dwr-正好形成互补&#34;&gt;14. 它和昨天的 DWR 正好形成互补
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;DWR：&lt;/p&gt;
+\[\boxed{\text{goal-oriented}}\]&lt;p&gt;回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;哪里的误差最影响我的 QoI？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Equilibrated flux：&lt;/p&gt;
+\[\boxed{\text{guaranteed / physics-equilibrated}}\]&lt;p&gt;回答：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;我的离散误差到底能不能被一个可计算的数严格罩住？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;实际上两条路线还可以结合。&lt;/p&gt;
+&lt;p&gt;已经有工作把 &lt;strong&gt;goal-oriented error estimation&lt;/strong&gt; 与 equilibrated-flux reconstruction 联合起来，使 QoI error control 同时获得 equilibrated reconstruction 的优势。&lt;/p&gt;
+&lt;p&gt;所以可以理解成：&lt;/p&gt;
+\[\text{Residual} \rightarrow \text{哪里错}\]\[\text{DWR} \rightarrow \text{哪些错重要}\]\[\boxed{\text{Equilibrated Flux}} \rightarrow \boxed{\text{我能否严格证明误差不超过多少}}\]&lt;p&gt;三个问题层次不同。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-一个很值得做的最小实验&#34;&gt;15. 一个很值得做的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;做二维 Poisson：&lt;/p&gt;
+\[-\Delta u=f\]&lt;p&gt;选择一个有解析解的问题，例如：&lt;/p&gt;
+\[u(x,y)=\sin(\pi x)\sin(\pi y).\]&lt;p&gt;使用 \(P_1\) FEM。&lt;/p&gt;
+&lt;p&gt;计算三样东西：&lt;/p&gt;
+&lt;p&gt;真实能量误差：&lt;/p&gt;
+\[e_{\rm true} = \|\nabla(u-u_h)\|.\]&lt;p&gt;普通 residual estimator：&lt;/p&gt;
+\[\eta_{\rm res}.\]&lt;p&gt;RT0 equilibrated flux estimator：&lt;/p&gt;
+\[\eta_{\rm eq} = \|\sigma_h^\star+\nabla u_h\|.\]&lt;p&gt;然后随着：&lt;/p&gt;
+\[h\downarrow\]&lt;p&gt;记录：&lt;/p&gt;
+\[\boxed{ I_{\rm eff} = \frac{\eta}{e_{\rm true}} }\]&lt;p&gt;即 effectivity index。&lt;/p&gt;
+&lt;p&gt;理想情况：&lt;/p&gt;
+\[I_{\rm eff}\rightarrow1.\]&lt;p&gt;更关键的是检查：&lt;/p&gt;
+\[\boxed{ I_{\rm eff}\ge1 }\]&lt;p&gt;是否始终成立于 guaranteed estimator。&lt;/p&gt;
+&lt;p&gt;接着做第二组：&lt;/p&gt;
+\[p=1,2,3,4,5\]&lt;p&gt;观察 estimator 是否随 \(p\) 恶化。&lt;/p&gt;
+&lt;p&gt;这个实验会把“reliable”“efficient”“guaranteed”“robust”这四个很容易混淆的术语一次性弄清楚。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它在整个知识体系中卡在哪里&#34;&gt;16. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把有限元验证大致看成：&lt;/p&gt;
+\[\text{Mesh convergence}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{结果看起来收敛了吗？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Residual estimator}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{哪里离散得不够好？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Goal-oriented / DWR}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{哪里的误差影响 QoI？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\boxed{\text{Equilibrated Flux}}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{能不能给真实误差一个完全可计算的保证？}}\]&lt;p&gt;↓&lt;/p&gt;
+&lt;p&gt;更进一步：&lt;/p&gt;
+\[\boxed{\text{Verified / certified simulation}}\]&lt;p&gt;把：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;空间离散；&lt;/li&gt;
+&lt;li&gt;时间离散；&lt;/li&gt;
+&lt;li&gt;nonlinear iteration；&lt;/li&gt;
+&lt;li&gt;linear solver；&lt;/li&gt;
+&lt;li&gt;model reduction；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;产生的误差逐层纳入误差预算。&lt;/p&gt;
+&lt;p&gt;这并非纯理论方向。Vohralík 当前的课程体系已经明确把 equilibrated reconstruction 延伸到时间离散、Newton/固定点线性化和 multigrid 等代数求解误差；2025 年的工作又将这一框架用于复杂多相多组分多孔介质流。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Equilibrated Flux 最值得理解的并不是 Raviart–Thomas 元怎么写，而是：&lt;/p&gt;
+\[\boxed{ \text{“误差很小”与“我能够证明误差很小”， 是两个完全不同等级的数值计算。} }\]&lt;p&gt;普通 FEM 给你：&lt;/p&gt;
+\[u_h.\]&lt;p&gt;Residual estimator 告诉你：&lt;/p&gt;
+\[\boxed{\text{哪里可能有问题。}}\]&lt;p&gt;而 equilibrated flux 试图额外构造一个满足物理平衡的场：&lt;/p&gt;
+\[\sigma_h^\star,\]&lt;p&gt;然后利用：&lt;/p&gt;
+\[\boxed{ \text{kinematic admissibility} + \text{static admissibility} + \text{constitutive mismatch} }\]&lt;p&gt;把“看起来收敛”升级成：&lt;/p&gt;
+\[\boxed{\text{可认证的误差控制}.}\]&lt;p&gt;它还揭示了一条比误差估计本身更值得迁移的原则：&lt;/p&gt;
+\[\boxed{ \text{守恒律不仅是求解 PDE 的方程， 也可以成为检查和认证数值解的独立信息源。} }\]&lt;p&gt;对于以后自己写 FEM、软体求解器乃至可靠性计算链，这种思维很有价值：&lt;strong&gt;不要只让程序输出一个结果；尽量让程序同时输出“为什么这个结果值得相信”。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Martin Vohralík 的 &lt;strong&gt;A posteriori error estimates via equilibrated fluxes&lt;/strong&gt; 课程主页与讲义。2025/2026 课程直接从 \(H^1/H(\mathrm{div})\)、Prager–Synge、平衡方程一路讲到空间/时间离散、Newton 与代数求解器误差，是今天最推荐的系统学习入口。&lt;br&gt;
+课程主页与讲义入口&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Ern &amp;amp; Vohralík, &lt;strong&gt;Polynomial-Degree-Robust A Posteriori Estimates in a Unified Setting for Conforming, Nonconforming, Discontinuous Galerkin, and Mixed Discretizations&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Numerical Analysis&lt;/em&gt;, 53(2), 2015, DOI 10.1137/130950100。重点看 patchwise mixed reconstruction、guaranteed/local efficiency 和 \(p\)-robustness。&lt;br&gt;
+SIAM 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Douglas N. Arnold、Falk &amp;amp; Winther, &lt;strong&gt;Finite Element Exterior Calculus, Homological Techniques, and Applications&lt;/strong&gt;, &lt;em&gt;Acta Numerica&lt;/em&gt;, 2006。今天如果你对“为什么 \(H^1,H(\mathrm{curl}),H(\mathrm{div}),L^2\) 会形成一条链”产生兴趣，这就是应当继续读的理论入口；它把有限元从“选 shape function”提升到“离散时保留 PDE 的几何结构”。&lt;br&gt;
+Cambridge Core 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Ern, Smears &amp;amp; Vohralík, &lt;strong&gt;Equilibrated Flux A Posteriori Error Estimates in \(L^2(H^1)\)-Norms for High-Order Discretizations of Parabolic Problems&lt;/strong&gt;, &lt;em&gt;IMA Journal of Numerical Analysis&lt;/em&gt;, 2019。适合继续追问：空间误差之外，时间积分误差怎样也获得 guaranteed、无未知常数的控制。&lt;br&gt;
+Oxford Academic 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Randomized Sketching：为什么“先随机压缩，再精确计算”反而可能比直接算更可靠、更快？</title>
+        <link>https://assranai.github.io/cards/49-randomized-sketching/</link>
+        <pubDate>Thu, 01 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/49-randomized-sketching/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Randomized Numerical Linear Algebra（RandNLA）中的 Sketching / Subspace Embedding&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元求解器 × ROM × 代理模型 × 大规模科学计算 × AI 全栈&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天换到一个和近期 &lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt;、Equilibrated Flux、SUR 明显不同的方向：&lt;strong&gt;随机化数值线性代数&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;它最值得理解的地方有些反直觉。传统数值分析通常追求：&lt;/p&gt;
+\[\boxed{\text{确定性地、尽可能精确地处理原始大矩阵}}\]&lt;p&gt;RandNLA 却说：&lt;/p&gt;
+\[\boxed{\text{先随机地把问题压小，再认真解决那个小问题。}}\]&lt;p&gt;这并不是“用随机近似糊弄过去”。核心依据是：很多高维矩阵虽然有百万行、百万列，但真正与你当前计算任务有关的信息只存在于一个低维子空间中。随机投影可以以很高概率保留这个子空间的几何结构。Martinsson 与 Joel Tropp 的 &lt;em&gt;Acta Numerica&lt;/em&gt; 综述把这套思想系统化到了低秩近似、线性系统、核矩阵、误差估计和 streaming 等科学计算任务。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-从一个看起来很浪费的问题开始&#34;&gt;1. 从一个看起来很浪费的问题开始
+&lt;/h2&gt;&lt;p&gt;假设有超定最小二乘：&lt;/p&gt;
+\[x^\star=\arg\min_x\|Ax-b\|_2,\]&lt;p&gt;其中&lt;/p&gt;
+\[A\in\mathbb R^{m\times n},\qquad m\gg n.\]&lt;p&gt;例如：&lt;/p&gt;
+\[m=10^7,\qquad n=500.\]&lt;p&gt;这意味着有一千万条方程，但未知量只有 500 个。&lt;/p&gt;
+&lt;p&gt;传统算法要反复处理：&lt;/p&gt;
+\[10^7\times500\]&lt;p&gt;的大矩阵。&lt;/p&gt;
+&lt;p&gt;但仔细想：&lt;/p&gt;
+&lt;p&gt;真正与 \(x\) 有关的空间只有：&lt;/p&gt;
+\[\operatorname{col}(A),\]&lt;p&gt;其维数最多：&lt;/p&gt;
+\[n=500.\]&lt;p&gt;于是问题出现了：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;我真的需要保留这一千万维观测空间里的全部几何细节吗？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;RandNLA 的答案是：&lt;/p&gt;
+\[\boxed{\text{不需要。只需要保住与 }A\text{ 的列空间有关的几何。}}\]&lt;p&gt;这就是 sketching 的出发点。Woodruff 的经典综述正是把 linear sketching 描述为：先用随机矩阵将大矩阵压缩成远小的矩阵，再在压缩问题上完成主要计算。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-最简单的-sketch左乘一个随机矩阵&#34;&gt;2. 最简单的 Sketch：左乘一个随机矩阵
+&lt;/h1&gt;&lt;p&gt;构造：&lt;/p&gt;
+\[S\in\mathbb R^{s\times m}, \qquad n&lt;s\ll m.\]&lt;p&gt;然后：&lt;/p&gt;
+\[A\rightarrow SA,\]\[b\rightarrow Sb.\]&lt;p&gt;原问题：&lt;/p&gt;
+\[\min_x\|Ax-b\|_2\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{ \min_x\|SAx-Sb\|_2. }\]&lt;p&gt;如果：&lt;/p&gt;
+\[m=10^7,\]&lt;p&gt;但：&lt;/p&gt;
+\[s=5000,\]&lt;p&gt;就把一千万行压到了五千行。&lt;/p&gt;
+&lt;p&gt;真正的问题因此变成：&lt;/p&gt;
+\[\boxed{\text{随机压缩以后，为什么原问题没有被毁掉？}}\]&lt;hr&gt;
+&lt;h1 id=&#34;3-核心不是保留所有向量而是保留一个子空间&#34;&gt;3. 核心不是“保留所有向量”，而是保留一个子空间
+&lt;/h1&gt;&lt;p&gt;我们希望对相关子空间中的任意向量 \(y\)：&lt;/p&gt;
+\[(1-\varepsilon)\|y\|_2^2 \le \|Sy\|_2^2 \le (1+\varepsilon)\|y\|_2^2.\]&lt;p&gt;这叫：&lt;/p&gt;
+\[\boxed{\text{Subspace Embedding}.}\]&lt;p&gt;如果 \(S\) 对：&lt;/p&gt;
+\[\operatorname{span}(A,b)\]&lt;p&gt;近似保持长度，那么：&lt;/p&gt;
+\[\|Ax-b\|\]&lt;p&gt;与：&lt;/p&gt;
+\[\|S(Ax-b)\|\]&lt;p&gt;对所有相关 \(x\) 都差不多。&lt;/p&gt;
+&lt;p&gt;于是 sketch 后的最优解：&lt;/p&gt;
+\[\tilde x = \arg\min_x \|SAx-Sb\|\]&lt;p&gt;就能逼近：&lt;/p&gt;
+\[x^\star.\]&lt;p&gt;注意这里最深的一点：&lt;/p&gt;
+\[\boxed{\text{随机投影并不需要保留整个 }\mathbb R^m\text{。}}\]&lt;p&gt;它只需要保留：&lt;/p&gt;
+\[\boxed{\text{任务真正使用的低维子空间。}}\]&lt;p&gt;这正是随机化算法能从“高维”中逃出去的原因。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-为什么随机矩阵居然能做到&#34;&gt;4. 为什么随机矩阵居然能做到？
+&lt;/h1&gt;&lt;p&gt;最朴素的选择：&lt;/p&gt;
+\[S_{ij}\sim\mathcal N(0,1/s).\]&lt;p&gt;考虑一个固定向量：&lt;/p&gt;
+\[y.\]&lt;p&gt;随机投影以后：&lt;/p&gt;
+\[Sy\]&lt;p&gt;虽然方向变了，但其长度高度集中在：&lt;/p&gt;
+\[\|y\|\]&lt;p&gt;附近：&lt;/p&gt;
+\[\|Sy\|^2 \approx \|y\|^2.\]&lt;p&gt;随着：&lt;/p&gt;
+\[s\]&lt;p&gt;增大，这种集中越来越强。&lt;/p&gt;
+&lt;p&gt;这背后与著名的 &lt;strong&gt;Johnson–Lindenstrauss&lt;/strong&gt; 几何现象密切相关：&lt;/p&gt;
+\[\boxed{\text{高维空间中的有限点集可以随机投影到低维，同时近似保持距离。}}\]&lt;p&gt;RandNLA 把这种思想从“点集距离”进一步推广到了：&lt;/p&gt;
+\[\boxed{\text{整个线性子空间的几何保持。}}\]&lt;p&gt;所以随机性不是噪声源。&lt;/p&gt;
+&lt;p&gt;这里的随机性实际上是：&lt;/p&gt;
+\[\boxed{\text{一种快速寻找近似等距映射的工具。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;5-randomized-svd-更能体现它的力量&#34;&gt;5. Randomized SVD 更能体现它的力量
+&lt;/h1&gt;&lt;p&gt;假设有：&lt;/p&gt;
+\[A\in\mathbb R^{m\times n},\]&lt;p&gt;希望得到 rank-\(k\) 近似：&lt;/p&gt;
+\[A\approx U_k\Sigma_kV_k^T.\]&lt;p&gt;传统 SVD 对超大矩阵很贵。&lt;/p&gt;
+&lt;p&gt;Randomized SVD 做的第一件事却很简单：&lt;/p&gt;
+&lt;p&gt;生成：&lt;/p&gt;
+\[\Omega\in\mathbb R^{n\times(k+p)},\]&lt;p&gt;其中：&lt;/p&gt;
+\[p\]&lt;p&gt;只是少量 oversampling。&lt;/p&gt;
+&lt;p&gt;然后：&lt;/p&gt;
+\[\boxed{ Y=A\Omega. }\]&lt;p&gt;也就是说，随机生成：&lt;/p&gt;
+\[k+p\]&lt;p&gt;个方向，让矩阵 \(A\) 作用在这些随机方向上。&lt;/p&gt;
+&lt;p&gt;再求：&lt;/p&gt;
+\[Q=\operatorname{orth}(Y).\]&lt;p&gt;如果成功：&lt;/p&gt;
+\[\operatorname{range}(Q)\]&lt;p&gt;已经捕获了：&lt;/p&gt;
+\[A\]&lt;p&gt;最重要的输出子空间。&lt;/p&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[A\approx QQ^TA.\]&lt;p&gt;然后只需对：&lt;/p&gt;
+\[B=Q^TA\]&lt;p&gt;这个小矩阵做确定性 SVD：&lt;/p&gt;
+\[B=\tilde U\Sigma V^T,\]&lt;p&gt;最终：&lt;/p&gt;
+\[U=Q\tilde U.\]&lt;p&gt;整个逻辑只有：&lt;/p&gt;
+\[\boxed{ \text{随机探索} \rightarrow \text{找到重要子空间} \rightarrow \text{小规模确定性计算}. }\]&lt;p&gt;Halko、Martinsson 与 Tropp 2011 年的 &lt;em&gt;SIAM Review&lt;/em&gt; 经典论文正是把这一两阶段结构建立成 randomized matrix decomposition 的统一框架。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么随机方向能够找到主子空间&#34;&gt;6. 为什么随机方向能够找到主子空间？
+&lt;/h1&gt;&lt;p&gt;把矩阵写成：&lt;/p&gt;
+\[A=U\Sigma V^T.\]&lt;p&gt;于是：&lt;/p&gt;
+\[Y=A\Omega = U\Sigma V^T\Omega.\]&lt;p&gt;由于 Gaussian 随机矩阵具有旋转不变性：&lt;/p&gt;
+\[V^T\Omega\]&lt;p&gt;仍然“像一个随机矩阵”。&lt;/p&gt;
+&lt;p&gt;关键来了：&lt;/p&gt;
+\[\Sigma = \operatorname{diag} (\sigma_1,\sigma_2,\ldots).\]&lt;p&gt;如果：&lt;/p&gt;
+\[\sigma_1\gg\sigma_{100},\]&lt;p&gt;那么乘法：&lt;/p&gt;
+\[\Sigma V^T\Omega\]&lt;p&gt;会自动把大奇异值对应方向放大。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[A\Omega\]&lt;p&gt;实际上是：&lt;/p&gt;
+\[\boxed{\text{让系统自己放大最重要的随机方向。}}\]&lt;p&gt;这比“随机选几个坐标轴”强得多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-如果奇异值下降得不够快怎么办&#34;&gt;7. 如果奇异值下降得不够快怎么办？
+&lt;/h1&gt;&lt;p&gt;可以做：&lt;/p&gt;
+\[Y=(AA^T)^qA\Omega.\]&lt;p&gt;展开 SVD：&lt;/p&gt;
+\[(AA^T)^qA = U\Sigma^{2q+1}V^T.\]&lt;p&gt;于是奇异值变成：&lt;/p&gt;
+\[\sigma_i^{2q+1}.\]&lt;p&gt;假设：&lt;/p&gt;
+\[\sigma_1/\sigma_{20}=2.\]&lt;p&gt;原本区别不大。&lt;/p&gt;
+&lt;p&gt;取：&lt;/p&gt;
+\[q=2,\]&lt;p&gt;比例变成：&lt;/p&gt;
+\[2^5=32.\]&lt;p&gt;主子空间突然变得非常明显。&lt;/p&gt;
+&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{\text{Randomized Power Iteration}.}\]&lt;p&gt;它的本质不是“算更多次提高精度”，而是：&lt;/p&gt;
+\[\boxed{\text{主动放大谱间隙，让随机探测更容易辨认主空间。}}\]&lt;hr&gt;
+&lt;h1 id=&#34;8-这和你正在学的-podrom-有一个非常直接的连接&#34;&gt;8. 这和你正在学的 POD/ROM 有一个非常直接的连接
+&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt; 通常有 snapshot matrix：&lt;/p&gt;
+\[X= [ u^{(1)},u^{(2)},\ldots,u^{(N)} ].\]&lt;p&gt;然后 SVD：&lt;/p&gt;
+\[X=U\Sigma V^T.\]&lt;p&gt;取：&lt;/p&gt;
+\[U_r\]&lt;p&gt;作为 &lt;span class=&#34;term-anchor&#34; data-term=&#34;reduced-basis&#34; tabindex=&#34;0&#34;&gt;reduced basis&lt;/span&gt;。&lt;/p&gt;
+&lt;p&gt;如果：&lt;/p&gt;
+\[n_{\rm DOF}=10^7, \qquad N=10^4,\]&lt;p&gt;snapshot matrix 已经巨大。&lt;/p&gt;
+&lt;p&gt;Randomized SVD 可以直接做：&lt;/p&gt;
+\[Y=X\Omega,\]&lt;p&gt;其中：&lt;/p&gt;
+\[\Omega\in \mathbb R^{N\times(r+p)}.\]&lt;p&gt;于是不用完整分解 \(X\)，先压缩到：&lt;/p&gt;
+\[r+p\]&lt;p&gt;个组合 snapshot。&lt;/p&gt;
+&lt;p&gt;这意味着：&lt;/p&gt;
+\[\boxed{\text{RandNLA 可以成为 ROM 的底层基础设施。}}\]&lt;p&gt;所以以后看到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;randomized POD；&lt;/li&gt;
+&lt;li&gt;randomized DMD；&lt;/li&gt;
+&lt;li&gt;randomized reduced basis；&lt;/li&gt;
+&lt;li&gt;randomized low-rank approximation；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;它们并不是孤立技巧。&lt;/p&gt;
+&lt;p&gt;底层都是：&lt;/p&gt;
+\[\boxed{\text{先用随机探针找到系统真正活动的低维子空间。}}\]&lt;p&gt;Martinsson–Tropp 的综述也把 low-rank approximation、subspace iteration、Nyström 和 kernel approximation 放在同一 RandNLA 体系中。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-对-kriging--gp-也有直接意义&#34;&gt;9. 对 Kriging / GP 也有直接意义
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Gaussian Process 训练涉及：&lt;/p&gt;
+\[K\in\mathbb R^{N\times N}\]&lt;p&gt;以及：&lt;/p&gt;
+\[(K+\sigma^2I)^{-1}y.\]&lt;p&gt;复杂度通常接近：&lt;/p&gt;
+\[O(N^3).\]&lt;p&gt;当：&lt;/p&gt;
+\[N=10^5\]&lt;p&gt;时，直接 Cholesky 已经很困难。&lt;/p&gt;
+&lt;p&gt;如果 kernel matrix 存在低有效秩，可以用 randomized Nyström：&lt;/p&gt;
+\[K\approx CW^\dagger C^T.\]&lt;p&gt;更进一步，这个低秩结构还能用来构造：&lt;/p&gt;
+\[\boxed{\text{preconditioner}.}\]&lt;p&gt;Frangella、Tropp 与 Udell 的 Randomized Nyström Preconditioning 工作表明，对于对称正定线性系统，只要 Nyström rank 与矩阵的 effective dimension 同阶，预条件后的系统可以获得受控的条件数，并可通过自适应策略选择 rank。&lt;/p&gt;
+&lt;p&gt;所以随机低秩近似并不一定直接替代原问题。&lt;/p&gt;
+&lt;p&gt;它还可以：&lt;/p&gt;
+\[\boxed{\text{帮助精确迭代法更快地解原问题。}}\]&lt;p&gt;这个角色非常重要。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-这就引出-randnla-的第二种世界观sketch-and-solve-与-sketch-and-precondition&#34;&gt;10. 这就引出 RandNLA 的第二种世界观：Sketch-and-Solve 与 Sketch-and-Precondition
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;第一种：&lt;/p&gt;
+\[A \rightarrow SA \rightarrow \boxed{\text{直接解决压缩问题}}.\]&lt;p&gt;叫：&lt;/p&gt;
+\[\boxed{\text{sketch-and-solve}.}\]&lt;p&gt;优点：&lt;/p&gt;
+\[\text{快}.\]&lt;p&gt;但最终得到的是近似解。&lt;/p&gt;
+&lt;p&gt;第二种更适合科学计算：&lt;/p&gt;
+\[A \rightarrow SA \rightarrow \text{构造 preconditioner} \rightarrow \boxed{\text{回去解原始系统}}.\]&lt;p&gt;叫：&lt;/p&gt;
+\[\boxed{\text{sketch-and-precondition}.}\]&lt;p&gt;此时随机化只负责：&lt;/p&gt;
+\[\boxed{\text{快速理解矩阵结构}.}\]&lt;p&gt;最终 CG / GMRES 仍然求解原方程。&lt;/p&gt;
+&lt;p&gt;于是可以同时获得：&lt;/p&gt;
+\[\boxed{\text{随机方法的速度}}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{\text{经典迭代法的高精度}.}\]&lt;p&gt;这对 FEM 特别有意义。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-fem-为什么会关心它&#34;&gt;11. FEM 为什么会关心它？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;大型 FEM 最终经常变成：&lt;/p&gt;
+\[Ku=f.\]&lt;p&gt;或者 nonlinear Newton step：&lt;/p&gt;
+\[K_t\Delta u=-r.\]&lt;p&gt;真正昂贵的核心经常已经不是：&lt;/p&gt;
+\[\text{element formulation}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\text{large sparse linear algebra}.}\]&lt;p&gt;RandNLA 可以介入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;低秩 Schur complement；&lt;/li&gt;
+&lt;li&gt;randomized preconditioning；&lt;/li&gt;
+&lt;li&gt;eigenmode extraction；&lt;/li&gt;
+&lt;li&gt;ROM basis construction；&lt;/li&gt;
+&lt;li&gt;inverse problems；&lt;/li&gt;
+&lt;li&gt;Hessian approximation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Nakatsukasa 与 Tropp 最近的一类方法甚至直接把 random sketching 加进 GMRES 和 Rayleigh–Ritz 等经典投影方法，用 sketch 后的小问题减少正交化与投影成本；论文的模型实验报告过相对优化 MATLAB &lt;code&gt;gmres&lt;/code&gt; 达到最高约 \(70\times\)、相对 &lt;code&gt;eigs&lt;/code&gt; 约 \(10\times\) 的加速。这里当然不是所有 PDE 都会得到这种数量级，但它说明 randomized sketching 已经不只属于数据科学，也正在进入传统 Krylov scientific computing。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-它对-pde-inverse-problem-更有意思&#34;&gt;12. 它对 PDE inverse problem 更有意思
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑参数识别：&lt;/p&gt;
+\[\min_\theta \sum_{i=1}^{m} \| F_i(\theta)-d_i \|^2.\]&lt;p&gt;如果：&lt;/p&gt;
+\[m\]&lt;p&gt;代表成千上万个 source / receiver / experiment，&lt;/p&gt;
+&lt;p&gt;每一步优化都可能要求大量 PDE solves。&lt;/p&gt;
+&lt;p&gt;这时可以随机组合观测：&lt;/p&gt;
+\[S \begin{bmatrix} F_1-d_1\\ F_2-d_2\\ \vdots \end{bmatrix}\]&lt;p&gt;用少量随机线性组合近似原始 misfit。&lt;/p&gt;
+&lt;p&gt;Chen、Li、Newton 与 Stephen Wright 的工作专门研究了 PDE inverse problems 中的 structured random sketching。&lt;/p&gt;
+&lt;p&gt;这里随机化真正节省的是：&lt;/p&gt;
+\[\boxed{\text{昂贵 PDE 调用次数}.}\]&lt;p&gt;这与代理模型主动学习其实存在同一个底层目标：&lt;/p&gt;
+\[\boxed{\text{用尽可能少的昂贵物理计算获取足够的信息。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-为什么随机算法有时反而更适合-gpu&#34;&gt;13. 为什么随机算法有时反而更适合 GPU？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;传统高精度线性代数里有很多：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;sequential pivoting；&lt;/li&gt;
+&lt;li&gt;repeated orthogonalization；&lt;/li&gt;
+&lt;li&gt;irregular memory access。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;现代 GPU 最喜欢的是：&lt;/p&gt;
+\[\boxed{\text{大块 matrix–matrix multiplication}.}\]&lt;p&gt;Randomized SVD 的核心：&lt;/p&gt;
+\[Y=A\Omega\]&lt;p&gt;正是一个大规模矩阵乘法。&lt;/p&gt;
+&lt;p&gt;而且它通常只需少量遍历：&lt;/p&gt;
+\[A.\]&lt;p&gt;Halko 等早期就特别强调：对于放不进 fast memory 的矩阵，随机算法通常只需要常数次 data pass，而经典算法可能需要随目标秩增长的多次遍历；某些算法甚至可以 single-pass。&lt;/p&gt;
+&lt;p&gt;所以一个很重要的现代算法原则是：&lt;/p&gt;
+\[\boxed{\text{少做一点“数学上完美”的工作， 换成更多硬件喜欢的批量运算。}}\]&lt;p&gt;这也是 RandNLA 在今天比二十年前更重要的原因之一。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-但随机化并不是免费午餐&#34;&gt;14. 但随机化并不是免费午餐
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;它特别依赖一个条件：&lt;/p&gt;
+\[\boxed{\text{问题确实存在可压缩结构。}}\]&lt;p&gt;如果奇异值：&lt;/p&gt;
+\[\sigma_1,\sigma_2,\ldots\]&lt;p&gt;下降非常慢，&lt;/p&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[\operatorname{rank}_{\varepsilon}(A)\]&lt;p&gt;本身就很大。&lt;/p&gt;
+&lt;p&gt;此时无论多聪明：&lt;/p&gt;
+\[\boxed{\text{你不能把一个真正高维的问题魔法般变成低维。}}\]&lt;p&gt;第二个问题是概率保证。&lt;/p&gt;
+&lt;p&gt;典型结论形式是：&lt;/p&gt;
+\[P( \|A-QQ^TA\| \le \text{bound} ) \ge1-\delta.\]&lt;p&gt;它不是：&lt;/p&gt;
+\[100\%.\]&lt;p&gt;不过工程上：&lt;/p&gt;
+\[\delta\]&lt;p&gt;通常可以通过 oversampling 极低成本地压得很小。&lt;/p&gt;
+&lt;p&gt;第三个问题是：&lt;/p&gt;
+\[\boxed{\text{随机近似误差必须进入整个误差预算。}}\]&lt;p&gt;这和最近两张卡片的思想恰好接上：&lt;/p&gt;
+\[\text{FEM discretization error}\]\[+\]\[\text{iterative solver error}\]\[+\]\[\boxed{\text{randomized compression error}.}\]&lt;p&gt;真正成熟的科学计算不会把 sketch 当黑盒。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-一个非常值得自己实现的实验randomized-pod&#34;&gt;15. 一个非常值得自己实现的实验：Randomized POD
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;生成：&lt;/p&gt;
+\[X\in\mathbb R^{10000\times2000}.\]&lt;p&gt;让其奇异值：&lt;/p&gt;
+\[\sigma_i=e^{-i/20}.\]&lt;p&gt;目标：&lt;/p&gt;
+\[r=20.\]&lt;p&gt;比较：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;A：完整 SVD&lt;/strong&gt;&lt;/p&gt;
+\[X=U\Sigma V^T.\]&lt;p&gt;&lt;strong&gt;B：Randomized SVD&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;取：&lt;/p&gt;
+\[p=5,10,20\]&lt;p&gt;和：&lt;/p&gt;
+\[q=0,1,2.\]&lt;p&gt;计算：&lt;/p&gt;
+\[\Omega\sim N(0,1),\]\[Y=(XX^T)^qX\Omega,\]\[Q=\operatorname{orth}(Y).\]&lt;p&gt;然后比较：&lt;/p&gt;
+\[\boxed{ \frac{\|X-QQ^TX\|_F}{\|X\|_F} }\]&lt;p&gt;以及运行时间。&lt;/p&gt;
+&lt;p&gt;最值得观察的是：&lt;/p&gt;
+&lt;p&gt;当：&lt;/p&gt;
+\[p\approx10\]&lt;p&gt;且：&lt;/p&gt;
+\[q=1\]&lt;p&gt;时，randomized approximation 往往已经非常接近 truncated SVD。&lt;/p&gt;
+&lt;p&gt;然后把奇异值改成：&lt;/p&gt;
+\[\sigma_i=i^{-0.2}.\]&lt;p&gt;你会立刻看到：&lt;/p&gt;
+\[\boxed{\text{RandSVD 变难了。}}\]&lt;p&gt;真正决定 ROM 是否容易的不是：&lt;/p&gt;
+\[\boxed{\text{你有没有聪明算法}}\]&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\text{物理系统本身有没有快速衰减的低秩结构。}}\]&lt;p&gt;这个实验和你现在学 POD 非常适合直接连起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它在整个知识体系中卡在哪里&#34;&gt;16. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把降维思路粗略排成：&lt;/p&gt;
+\[\text{Physical model}\]\[\downarrow\]\[\text{Full-order discretization}\]&lt;p&gt;产生：&lt;/p&gt;
+\[A,\;K,\;X,\;J,\;H.\]&lt;p&gt;然后传统数值线性代数问：&lt;/p&gt;
+\[\boxed{\text{怎样精确处理这个大对象？}}\]&lt;p&gt;RandNLA 插进来问：&lt;/p&gt;
+\[\boxed{\text{这个大对象真正活动的子空间有多大？}}\]&lt;p&gt;如果答案是：&lt;/p&gt;
+\[r\ll n,\]&lt;p&gt;就：&lt;/p&gt;
+\[\boxed{\text{随机探测}} \rightarrow \boxed{\text{识别子空间}} \rightarrow \boxed{\text{压缩}} \rightarrow \boxed{\text{确定性精算}}.\]&lt;p&gt;再往上：&lt;/p&gt;
+\[\text{Randomized POD / ROM}\]\[\text{Randomized preconditioning}\]\[\text{Nyström GP}\]\[\text{PDE inverse sketching}\]\[\text{streaming scientific computing}.\]&lt;p&gt;所以 RandNLA 并不是一种具体算法。&lt;/p&gt;
+&lt;p&gt;它更像：&lt;/p&gt;
+\[\boxed{\text{一种处理“大但低有效维”计算对象的通用计算范式。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Randomized Sketching 最值得理解的不是“随机矩阵可以加速 SVD”，而是一个更深的方法论：&lt;/p&gt;
+\[\boxed{ \text{很多科学计算的困难来自表示维数很大， 并不意味着真正需要保存的信息维数也很大。} }\]&lt;p&gt;传统降阶通常先问：&lt;/p&gt;
+\[\boxed{\text{低维基是什么？}}\]&lt;p&gt;随机化方法则提出一个非常聪明的问题：&lt;/p&gt;
+\[\boxed{\text{我能不能先用少量随机探针，让系统自己告诉我重要子空间在哪里？}}\]&lt;p&gt;于是：&lt;/p&gt;
+\[\text{randomness}\]&lt;p&gt;在这里并不是不确定性的来源，而是一种：&lt;/p&gt;
+\[\boxed{\text{主动探测隐藏低维结构的计算工具}.}\]&lt;p&gt;这对 ROM 尤其值得建立直觉。你正在学习的 POD，本质上已经在利用：&lt;/p&gt;
+\[\boxed{\text{高维物理状态具有低维结构}.}\]&lt;p&gt;RandNLA 再向前推进一步：&lt;/p&gt;
+\[\boxed{ \text{既然最终只需要那个低维结构， 为什么还要完整地处理高维对象以后， 才把它降下来？ }\]&lt;p&gt;这就是它在现代科学计算里真正值得学的位置。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Halko、Martinsson 与 Joel Tropp，&lt;strong&gt;Finding Structure with Randomness: Probabilistic Algorithms for Constructing Approximate Matrix Decompositions&lt;/strong&gt;, &lt;em&gt;SIAM Review&lt;/em&gt; 53(2), 2011, 217–288，DOI 10.1137/090771806。Randomized SVD 最经典的系统入口，尤其推荐读“随机 range finder → 小规模确定性分解”的两阶段框架。&lt;br&gt;
+SIAM 原论文&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Martinsson &amp;amp; Tropp，&lt;strong&gt;Randomized Numerical Linear Algebra: Foundations and Algorithms&lt;/strong&gt;, &lt;em&gt;Acta Numerica&lt;/em&gt; 29, 2020。比上一条更完整，已经覆盖 randomized embeddings、regression、low-rank、Krylov、Nyström、kernel matrices、error estimation 和 streaming，适合把 RandNLA 建成完整知识体系。&lt;br&gt;
+Caltech 开放论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;David Woodruff，&lt;strong&gt;Sketching as a Tool for Numerical Linear Algebra&lt;/strong&gt;, &lt;em&gt;Foundations and Trends in Theoretical Computer Science&lt;/em&gt;。如果想真正理解 subspace embedding、least-squares sketching 为什么成立，这篇比只学 Randomized SVD 更合适。&lt;br&gt;
+IBM Research 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Nakatsukasa &amp;amp; Tropp，&lt;strong&gt;Fast and Accurate Randomized Algorithms for Linear Systems and Eigenvalue Problems&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Matrix Analysis and Applications&lt;/em&gt;, 2024。适合继续追问：“随机 sketching 能不能进入 GMRES、Rayleigh–Ritz 这些真正的 PDE/FEM 求解器底层？”答案是可以，而且这正是目前很活跃的方向。&lt;br&gt;
+SIAM 论文与补充代码&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

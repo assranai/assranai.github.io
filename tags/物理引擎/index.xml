@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Fri, 25 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Fri, 02 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>IPC：把“碰撞处理”改写成一个优化问题</title>
         <link>https://assranai.github.io/cards/01-ipc/</link>
         <pubDate>Fri, 14 Aug 2026 00:00:00 +0000</pubDate>
@@ -5347,6 +5347,406 @@ Zachary Ferguson 的 IPC 论文与项目入口&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;如果想看下一代路线，可以关注 Chen et al., &lt;strong&gt;&lt;em&gt;Offset Geometric Contact&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG / SIGGRAPH 2025&lt;/em&gt;。它直接针对 IPC 一类方法的 CCD 成本探索 GPU-friendly 的替代设计，是理解当前 contact solver 前沿取舍很好的对照组。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Projective Dynamics：为什么把非线性弹性拆成“局部投影 &#43; 全局线性求解”，就能同时获得速度、稳定性与并行性？</title>
+        <link>https://assranai.github.io/cards/50-projective-dynamics-3/</link>
+        <pubDate>Fri, 02 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/50-projective-dynamics-3/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;Projective Dynamics&lt;/span&gt;（PD，投影动力学）与 Local–Global Solver&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：物理引擎 × 软体动力学 × 有限元 × 优化算法&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 Projective Dynamics，因为它正好位于一个很有价值的交叉点：&lt;/p&gt;
+\[\boxed{\text{FEM 的能量建模}} \quad+\quad \boxed{\text{PBD 的约束投影}} \quad+\quad \boxed{\text{数值优化的 alternating minimization}}.\]&lt;p&gt;它不是简单的“另一种 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;”。2014 年 Bouaziz、Martin、Liu、Kavan 与 Pauly 提出的原始工作，就是试图在 nodal FEM 与 Position-Based Dynamics 之间建立桥梁：仍然从能量和隐式时间积分出发，却把某类非线性问题改写成极其便宜的局部投影和一个可预分解的全局线性系统。&lt;/p&gt;
+&lt;p&gt;对自己写软体求解器尤其值得学，因为 PD 揭示了一个比算法本身更通用的设计原则：&lt;/p&gt;
+\[\boxed{\text{不要总想着怎样更快地求非线性方程； 有时应该重新设计问题，使大部分非线性只存在于局部。}}\]&lt;hr&gt;
+&lt;h2 id=&#34;1-从隐式-euler-真正在求什么开始&#34;&gt;1. 从隐式 Euler 真正在求什么开始
+&lt;/h2&gt;&lt;p&gt;设节点位置为&lt;/p&gt;
+\[x,\]&lt;p&gt;上一时刻位置、速度为&lt;/p&gt;
+\[x_n,\quad v_n,\]&lt;p&gt;时间步为 \(h\)。&lt;/p&gt;
+&lt;p&gt;忽略一些细节，隐式 Euler 可以写成一个最小化问题：&lt;/p&gt;
+\[\boxed{ x_{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-y\|_M^2 + E(x) \right] }\]&lt;p&gt;其中&lt;/p&gt;
+\[y=x_n+h v_n+h^2M^{-1}f_{\rm ext},\]&lt;p&gt;而&lt;/p&gt;
+\[E(x)\]&lt;p&gt;是弹性势能。&lt;/p&gt;
+&lt;p&gt;第一项的意义是：&lt;/p&gt;
+\[\boxed{\text{惯性希望 }x\text{ 靠近自由运动预测 }y}\]&lt;p&gt;第二项则是：&lt;/p&gt;
+\[\boxed{\text{材料希望 }x\text{ 满足弹性规律}.}\]&lt;p&gt;所以一次时间步本质上是在求：&lt;/p&gt;
+\[\boxed{\text{惯性与弹性能量之间的最优折中}.}\]&lt;p&gt;这就是所谓 &lt;strong&gt;optimization integrator&lt;/strong&gt; 的视角，也是理解 PD、ADMM-PD、后来的 differentiable PD 等方法的共同入口。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-普通非线性-fem-为什么贵&#34;&gt;2. 普通非线性 FEM 为什么贵？
+&lt;/h1&gt;&lt;p&gt;如果&lt;/p&gt;
+\[E(x)\]&lt;p&gt;是一般 Neo-Hookean 能量，那么需要解：&lt;/p&gt;
+\[\nabla E_{\rm total}(x)=0.\]&lt;p&gt;Newton 法每轮大致需要：&lt;/p&gt;
+\[H(x_k)\Delta x=-g(x_k),\]&lt;p&gt;其中 Hessian&lt;/p&gt;
+\[H(x_k)\]&lt;p&gt;随当前形变改变。&lt;/p&gt;
+&lt;p&gt;于是每个时间步内部反复：&lt;/p&gt;
+\[\text{组装 Hessian} \rightarrow \text{factorization / linear solve} \rightarrow \text{更新} \rightarrow \text{再组装}.\]&lt;p&gt;真正昂贵的往往不是计算一个 tetrahedron 的能量，而是：&lt;/p&gt;
+\[\boxed{\text{全局非线性导致全局线性系统不断变化。}}\]&lt;p&gt;PD 的突破口就是这里。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-pd-对势能施加了一个特殊结构&#34;&gt;3. PD 对势能施加了一个特殊结构
+&lt;/h1&gt;&lt;p&gt;考虑一个约束能量：&lt;/p&gt;
+\[\boxed{ E_i(x) = \frac{w_i}{2} \min_{p_i\in C_i} \|A_i x-p_i\|^2. }\]&lt;p&gt;这里：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(A_ix\)：从全局位置抽取某个局部形变量；&lt;/li&gt;
+&lt;li&gt;\(C_i\)：合法局部状态的集合；&lt;/li&gt;
+&lt;li&gt;\(p_i\)：离 \(A_ix\) 最近的合法状态；&lt;/li&gt;
+&lt;li&gt;\(w_i\)：约束刚度。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这句话非常关键。&lt;/p&gt;
+&lt;p&gt;PD 没有直接说：&lt;/p&gt;
+\[\boxed{\text{这个约束必须满足}}\]&lt;p&gt;而是定义：&lt;/p&gt;
+\[\boxed{\text{当前状态距离“合法状态集合”有多远。}}\]&lt;p&gt;因此：&lt;/p&gt;
+\[E_i(x) = \frac{w_i}{2} d^2(A_ix,C_i).\]&lt;p&gt;这就是 &lt;strong&gt;projective potential&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;原始 PD 工作正是通过这种特殊势能，使 continuum-based constraints 也能进入统一 local–global 求解结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-一个最简单的弹簧例子&#34;&gt;4. 一个最简单的弹簧例子
+&lt;/h1&gt;&lt;p&gt;两节点：&lt;/p&gt;
+\[x_1,x_2\]&lt;p&gt;静止长度：&lt;/p&gt;
+\[l_0.\]&lt;p&gt;令：&lt;/p&gt;
+\[A_ix=x_1-x_2.\]&lt;p&gt;合法集合：&lt;/p&gt;
+\[C_i= \{p:\|p\|=l_0\}.\]&lt;p&gt;那么：&lt;/p&gt;
+\[p_i = \operatorname{Proj}_{C_i}(x_1-x_2) = l_0 \frac{x_1-x_2}{\|x_1-x_2\|}.\]&lt;p&gt;于是势能：&lt;/p&gt;
+\[E_i = \frac{k}{2} \| (x_1-x_2)-p_i \|^2.\]&lt;p&gt;你会发现：&lt;/p&gt;
+\[p_i\]&lt;p&gt;的求解完全只依赖这根弹簧。&lt;/p&gt;
+&lt;p&gt;另一根弹簧：&lt;/p&gt;
+\[p_j\]&lt;p&gt;和它无关。&lt;/p&gt;
+&lt;p&gt;因此所有：&lt;/p&gt;
+\[p_1,p_2,\ldots,p_m\]&lt;p&gt;都可以：&lt;/p&gt;
+\[\boxed{\text{并行计算。}}\]&lt;p&gt;这就是 &lt;strong&gt;local step&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-真正漂亮的地方在-global-step&#34;&gt;5. 真正漂亮的地方在 Global Step
+&lt;/h1&gt;&lt;p&gt;如果暂时把：&lt;/p&gt;
+\[p_i\]&lt;p&gt;固定，那么总目标变成：&lt;/p&gt;
+\[\frac{1}{2h^2}(x-y)^TM(x-y) + \sum_i \frac{w_i}{2} \|A_ix-p_i\|^2.\]&lt;p&gt;这时对 \(x\) 来说已经是一个&lt;strong&gt;纯二次函数&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;求导：&lt;/p&gt;
+\[\frac{1}{h^2}M(x-y) + \sum_iw_iA_i^T(A_ix-p_i) =0.\]&lt;p&gt;整理：&lt;/p&gt;
+\[\boxed{ \left( \frac{M}{h^2} + \sum_iw_iA_i^TA_i \right)x = \frac{M}{h^2}y + \sum_iw_iA_i^Tp_i. }\]&lt;p&gt;定义：&lt;/p&gt;
+\[\boxed{ K_{\rm PD} = \frac{M}{h^2} + \sum_iw_iA_i^TA_i. }\]&lt;p&gt;最重要的事情发生了：&lt;/p&gt;
+\[\boxed{K_{\rm PD}\text{ 不依赖当前 }x.}\]&lt;p&gt;只要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;拓扑不变；&lt;/li&gt;
+&lt;li&gt;\(h\) 不变；&lt;/li&gt;
+&lt;li&gt;constraint weights 不变；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么这个矩阵整个仿真过程中都可以不变。&lt;/p&gt;
+&lt;p&gt;所以可以预先：&lt;/p&gt;
+\[K_{\rm PD}=LL^T\]&lt;p&gt;做一次 Cholesky factorization。&lt;/p&gt;
+&lt;p&gt;之后每次 global step 只是：&lt;/p&gt;
+\[LL^Tx=b(p).\]&lt;p&gt;这正是 PD 获得高性能的关键。原始方法强调的也正是这种 alternating optimization 与可重复使用的全局系统结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-整个算法因此简单得惊人&#34;&gt;6. 整个算法因此简单得惊人
+&lt;/h1&gt;&lt;p&gt;一次时间步：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;y ← inertial prediction
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;repeat N iterations:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    # Local
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    parallel for constraint i:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        p_i ← projection(A_i x, C_i)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    # Global
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    b ← M y / h² + Σ w_i A_iᵀ p_i
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    solve K_PD x = b
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;于是复杂的非线性动力学被拆成：&lt;/p&gt;
+\[\boxed{\text{很多极小的非线性问题}}\]&lt;p&gt;加上：&lt;/p&gt;
+\[\boxed{\text{一个固定的大线性问题}.}\]&lt;p&gt;这是一种非常有迁移价值的计算架构：&lt;/p&gt;
+\[\boxed{\text{nonlinearity local，coupling global}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么-local-step-特别适合-gpu&#34;&gt;7. 为什么 Local Step 特别适合 GPU？
+&lt;/h1&gt;&lt;p&gt;例如一个 tetrahedron 的局部投影可能需要：&lt;/p&gt;
+\[F=DsDm^{-1},\]&lt;p&gt;然后对：&lt;/p&gt;
+\[F\]&lt;p&gt;做极分解或 SVD：&lt;/p&gt;
+\[F=U\Sigma V^T\]&lt;p&gt;并把它投影到某个 admissible set。&lt;/p&gt;
+&lt;p&gt;一个网格有：&lt;/p&gt;
+\[10^5\]&lt;p&gt;个 tetrahedra。&lt;/p&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[10^5\]&lt;p&gt;个局部 SVD 基本彼此独立。&lt;/p&gt;
+&lt;p&gt;这是 GPU 非常喜欢的：&lt;/p&gt;
+\[\boxed{\text{大量小型、结构相同、彼此独立的计算}.}\]&lt;p&gt;而 global step 则变成稀疏线性代数。&lt;/p&gt;
+&lt;p&gt;因此 PD 天然把软体求解器拆成两种硬件友好任务：&lt;/p&gt;
+\[\boxed{\text{local embarrassingly parallel kernels}}\]&lt;p&gt;和&lt;/p&gt;
+\[\boxed{\text{global sparse solve}.}\]&lt;p&gt;这比把整个非线性 Newton 系统扔给 GPU 要规整得多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-它和-pbd-到底差在哪里&#34;&gt;8. 它和 PBD 到底差在哪里？
+&lt;/h1&gt;&lt;p&gt;这点非常容易混淆。&lt;/p&gt;
+&lt;p&gt;PBD 大致是：&lt;/p&gt;
+\[x \rightarrow \text{constraint 1 correction} \rightarrow \text{constraint 2 correction} \rightarrow\cdots\]&lt;p&gt;很多实现本质上进行 Gauss–Seidel 式位置修正。&lt;/p&gt;
+&lt;p&gt;PD 则存在一个明确的全局目标：&lt;/p&gt;
+\[\boxed{ \min_{x,p} \frac{1}{2h^2}\|x-y\|_M^2 + \sum_i\frac{w_i}{2}\|A_ix-p_i\|^2. }\]&lt;p&gt;Local：&lt;/p&gt;
+\[p\leftarrow\arg\min_p E(x,p)\]&lt;p&gt;Global：&lt;/p&gt;
+\[x\leftarrow\arg\min_x E(x,p).\]&lt;p&gt;因此它实际上属于：&lt;/p&gt;
+\[\boxed{\text{block coordinate descent / alternating minimization}.}\]&lt;p&gt;这就是为什么原论文称它是在 FEM 与 PBD 之间搭桥，而不是简单地提出一种新的 constraint projection heuristic。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-这也解释了它和-xpbd-的一个深层区别&#34;&gt;9. 这也解释了它和 XPBD 的一个深层区别
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 的核心变量之一是：&lt;/p&gt;
+\[\lambda.\]&lt;p&gt;通过类似：&lt;/p&gt;
+\[\Delta\lambda = \frac{-C(x)-\tilde\alpha\lambda} {\sum_jw_j\|\nabla C_j\|^2+\tilde\alpha}\]&lt;p&gt;逐约束更新。&lt;/p&gt;
+&lt;p&gt;它的强项是：&lt;/p&gt;
+\[\boxed{\text{直接处理约束，并用 compliance 改善时间步依赖。}}\]&lt;p&gt;PD 则更偏向：&lt;/p&gt;
+\[\boxed{\text{从一个全局能量最小化问题出发。}}\]&lt;p&gt;因此可以粗略理解：&lt;/p&gt;
+\[\text{PBD / XPBD}\]&lt;p&gt;更像：&lt;/p&gt;
+\[\boxed{\text{constraint-centric solver}}\]&lt;p&gt;而：&lt;/p&gt;
+\[\text{PD}\]&lt;p&gt;更像：&lt;/p&gt;
+\[\boxed{\text{energy-centric optimization solver}.}\]&lt;p&gt;这也是为什么 PD 很容易和有限元、优化理论、模型降阶联系起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-pd-的真正代价它支持的材料模型受到限制&#34;&gt;10. PD 的真正代价：它支持的材料模型受到限制
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这里必须看到它的交换条件。&lt;/p&gt;
+&lt;p&gt;之所以：&lt;/p&gt;
+\[K_{\rm PD}\]&lt;p&gt;固定，是因为能量必须具有：&lt;/p&gt;
+\[\boxed{ \min_{p_i\in C_i} \|A_ix-p_i\|^2 }\]&lt;p&gt;这种特殊结构。&lt;/p&gt;
+&lt;p&gt;一般 Neo-Hookean：&lt;/p&gt;
+\[\Psi(F) = \frac{\mu}{2}(I_1-3) -\mu\ln J + \frac{\lambda}{2}(\ln J)^2\]&lt;p&gt;并不能天然写成这种简单 projective potential。&lt;/p&gt;
+&lt;p&gt;因此经典 PD 的一个重要限制就是：&lt;/p&gt;
+\[\boxed{\text{材料模型自由度换取了求解器结构。}}\]&lt;p&gt;Liu、Bouaziz 与 Kavan 后来从另一个角度解决了这个问题：证明 PD 可以解释为一种 &lt;strong&gt;quasi-Newton method&lt;/strong&gt;，进而把固定 PD matrix 当作 Hessian 近似，用于 Neo-Hookean 等一般超弹性材料。其工作报告相对常规 Newton 方法约一个数量级的性能优势，同时支持 PD 原本难以表示的材料。&lt;/p&gt;
+&lt;p&gt;这是一个很重要的理论跃迁：&lt;/p&gt;
+\[\boxed{\text{PD 不只是一个材料模型，也可以看成一个 Hessian approximation strategy。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-从这个角度重新看-newton&#34;&gt;11. 从这个角度重新看 Newton
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Newton：&lt;/p&gt;
+\[H(x_k)\Delta x=-g(x_k).\]&lt;p&gt;每次重新构造：&lt;/p&gt;
+\[H(x_k).\]&lt;p&gt;PD-style quasi-Newton 则相当于：&lt;/p&gt;
+\[\boxed{ H(x_k)\approx H_0 }\]&lt;p&gt;其中：&lt;/p&gt;
+\[H_0\]&lt;p&gt;可以提前 factorize。&lt;/p&gt;
+&lt;p&gt;所以问题变成：&lt;/p&gt;
+\[\boxed{\text{我愿意牺牲多少局部曲率精确性，换取 Hessian 可重复使用？}}\]&lt;p&gt;这和很多实时物理引擎的根本设计目标高度一致：&lt;/p&gt;
+\[\boxed{\text{不要追求单次迭代最聪明；追求单位毫秒内减少最多误差。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-更深一层pd-其实是-admm-家族的特殊结构&#34;&gt;12. 更深一层：PD 其实是 ADMM 家族的特殊结构
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;2017 年 Overby、Brown、Li 与 Rahul Narain 证明，Alternating Direction Method of Multipliers 可以用来构造一个包含 PD 的更一般框架：&lt;/p&gt;
+\[\boxed{\mathrm{ADMM}\supseteq\mathrm{PD}.}\]&lt;p&gt;引入局部变量：&lt;/p&gt;
+\[z_i=A_ix\]&lt;p&gt;和 dual variables：&lt;/p&gt;
+\[u_i,\]&lt;p&gt;ADMM 交替执行：&lt;/p&gt;
+\[z\text{-update},\]\[x\text{-update},\]\[u\text{-update}.\]&lt;p&gt;这样既保留：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;local parallelism；&lt;/li&gt;
+&lt;li&gt;constant prefactored global matrix；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;又能处理更一般的：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;nonlinear constitutive models；&lt;/li&gt;
+&lt;li&gt;hard constraints；&lt;/li&gt;
+&lt;li&gt;sliding；&lt;/li&gt;
+&lt;li&gt;dynamically changing contact constraints。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这正是论文的主要动机和结果。&lt;/p&gt;
+&lt;p&gt;所以知识体系实际上是：&lt;/p&gt;
+\[\boxed{ \text{PBD} \longleftrightarrow \text{PD} \longleftrightarrow \text{ADMM} \longleftrightarrow \text{general optimization}. }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这对接触问题尤其有意义&#34;&gt;13. 这对接触问题尤其有意义
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;接触是 PD 固定矩阵结构最容易遭到挑战的地方。&lt;/p&gt;
+&lt;p&gt;因为接触集合：&lt;/p&gt;
+\[\mathcal C(t)\]&lt;p&gt;每帧都可能改变。&lt;/p&gt;
+&lt;p&gt;如果每增加一个 contact constraint 都改变：&lt;/p&gt;
+\[K_{\rm PD},\]&lt;p&gt;那么：&lt;/p&gt;
+\[\boxed{\text{prefactorization 优势就没了。}}\]&lt;p&gt;所以后来很多工作都试图把动态 contact 尽量塞进 local / auxiliary-variable 一侧，而让 global matrix 保持不变。&lt;/p&gt;
+&lt;p&gt;例如 ADMM-PD 明确针对 sliding/contact 设计了动态约束处理，同时维持 constant prefactored system matrix。&lt;/p&gt;
+&lt;p&gt;2020 年的 Projective Dynamics with Dry Frictional Contact 又进一步把 Signorini–Coulomb 干摩擦接触整合进 local–global 架构，而不是简单使用 penalty force。&lt;/p&gt;
+&lt;p&gt;这里能看出一个非常实用的求解器设计原则：&lt;/p&gt;
+\[\boxed{ \text{把变化频繁的物理放在 local side， 把稳定的拓扑耦合留给 global side。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-它甚至自然连接-rom&#34;&gt;14. 它甚至自然连接 ROM
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[x\approx Uz,\]&lt;p&gt;其中：&lt;/p&gt;
+\[U\in\mathbb R^{3N\times r}.\]&lt;p&gt;代入 global step：&lt;/p&gt;
+\[K_{\rm PD}Uz=b.\]&lt;p&gt;Galerkin projection：&lt;/p&gt;
+\[\boxed{ U^TK_{\rm PD}Uz=U^Tb. }\]&lt;p&gt;于是 global system 从：&lt;/p&gt;
+\[3N\]&lt;p&gt;降到：&lt;/p&gt;
+\[r.\]&lt;p&gt;问题却没有完全解决，因为 local projections 仍然要遍历：&lt;/p&gt;
+\[m\]&lt;p&gt;个约束。&lt;/p&gt;
+&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{\text{hyper-reduction}}\]&lt;p&gt;出现的原因。&lt;/p&gt;
+&lt;p&gt;Brandt 等 2018 年的 Hyper-Reduced Projective Dynamics 同时近似 local constraint projections 并构造 sparse reduced bases，使时间积分成本不再直接随原始 mesh resolution 增长；论文展示了大型网格实时模拟，并且不要求训练数据或 modal analysis。&lt;/p&gt;
+&lt;p&gt;这和前一张 Randomized &lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt; 卡片正好接上：&lt;/p&gt;
+\[\text{state reduction}\]&lt;p&gt;解决：&lt;/p&gt;
+\[\boxed{\text{全局自由度太多}}\]&lt;p&gt;而 hyper-reduction 解决：&lt;/p&gt;
+\[\boxed{\text{非线性局部计算仍然太多}.}\]&lt;p&gt;这是 ROM 里一个非常重要的区别。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-pd-甚至很适合-differentiable-physics&#34;&gt;15. PD 甚至很适合 differentiable physics
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果希望计算：&lt;/p&gt;
+\[\frac{\partial x_T}{\partial\theta},\]&lt;p&gt;普通隐式非线性 FEM 反向传播可能需要不断处理变化的线性化系统。&lt;/p&gt;
+&lt;p&gt;PD 的 global matrix：&lt;/p&gt;
+\[K_{\rm PD}\]&lt;p&gt;却具有高度可重复结构。&lt;/p&gt;
+&lt;p&gt;DiffPD 正是利用这一点构造快速可微软体模拟器，用于 soft-body learning 和 control；其工作强调，与普通 implicit differentiable simulation 中昂贵的线性化动力学求解相比，PD 的结构允许显著加速反向传播。&lt;/p&gt;
+&lt;p&gt;因此 PD 的价值已经不只：&lt;/p&gt;
+\[\boxed{\text{forward simulation 很快}}\]&lt;p&gt;还包括：&lt;/p&gt;
+\[\boxed{\text{它产生了适合 differentiation 的计算图结构}.}\]&lt;p&gt;这对今天 AI + physics 的组合尤其重要。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-对你自己的-xpbd-求解器最值得迁移什么&#34;&gt;16. 对你自己的 XPBD 求解器，最值得迁移什么？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;不一定是“把 XPBD 全换成 PD”。&lt;/p&gt;
+&lt;p&gt;更值得迁移的是：&lt;/p&gt;
+\[\boxed{\text{重新审视哪些非线性真的必须进入全局耦合。}}\]&lt;p&gt;例如你之前遇到 tetrahedra 在接触后大量同时进入：&lt;/p&gt;
+\[J&lt;0.3\]&lt;p&gt;并最终锁死。&lt;/p&gt;
+&lt;p&gt;XPBD 当前结构大致是：&lt;/p&gt;
+\[\text{constraint} \rightarrow \Delta\lambda \rightarrow \Delta x \rightarrow \text{next constraint}.\]&lt;p&gt;如果未来研究 PD / ADMM-style solver，可以把问题重新写成：&lt;/p&gt;
+\[\text{Local:} \quad F_e \rightarrow \text{admissible deformation }P_e\]\[\text{Global:} \quad \text{寻找一个全局 }x \text{，尽量同时匹配所有 }P_e.\]&lt;p&gt;于是“局部材料希望每个 tet 成为什么形状”和“共享节点要求所有 tet 必须兼容”被明确拆开。&lt;/p&gt;
+&lt;p&gt;这会提供一个与 XPBD 完全不同的诊断视角：&lt;/p&gt;
+\[\boxed{\text{到底是 local material projection 崩了，还是 global compatibility 无法满足？}}\]&lt;p&gt;这对定位软体坍塌问题很有价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-一个非常值得自己实现的最小实验&#34;&gt;17. 一个非常值得自己实现的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;不要一开始做 tetrahedron。&lt;/p&gt;
+&lt;p&gt;只做：&lt;/p&gt;
+\[10\times10\]&lt;p&gt;二维 mass-spring cloth。&lt;/p&gt;
+&lt;p&gt;实现三个 solver：&lt;/p&gt;
+\[\boxed{\text{XPBD}}\]\[\boxed{\text{Newton implicit Euler}}\]\[\boxed{\text{Projective Dynamics}}.\]&lt;p&gt;PD 中：&lt;/p&gt;
+\[A_ix=x_a-x_b\]&lt;p&gt;以及：&lt;/p&gt;
+\[p_i = l_i \frac{x_a-x_b} {\|x_a-x_b\|}.\]&lt;p&gt;预计算：&lt;/p&gt;
+\[K_{\rm PD} = M/h^2+\sum_iw_iA_i^TA_i\]&lt;p&gt;并做一次 Cholesky。&lt;/p&gt;
+&lt;p&gt;然后比较：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;每步耗时；&lt;/li&gt;
+&lt;li&gt;迭代次数；&lt;/li&gt;
+&lt;li&gt;stretch error；&lt;/li&gt;
+&lt;li&gt;总能量；&lt;/li&gt;
+&lt;li&gt;大时间步稳定性；&lt;/li&gt;
+&lt;li&gt;stiffness 增大后的表现。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;最值得观察的不是谁“绝对最好”。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\text{三种方法把计算预算花在完全不同的地方。}}\]&lt;p&gt;XPBD：&lt;/p&gt;
+\[\text{大量便宜 constraint iterations}\]&lt;p&gt;Newton：&lt;/p&gt;
+\[\text{少量昂贵、曲率准确的 iterations}\]&lt;p&gt;PD：&lt;/p&gt;
+\[\boxed{\text{大量便宜 local projections + 重复利用一个昂贵的预分解}.}\]&lt;p&gt;这会把三类实时软体求解器的结构差异真正建立起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;18-它在整个知识体系中卡在哪里&#34;&gt;18. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把你现在接触的求解方法大致放成：&lt;/p&gt;
+\[\text{Explicit FEM}\]&lt;p&gt;简单，但受 CFL 限制。&lt;/p&gt;
+&lt;p&gt;↓&lt;/p&gt;
+\[\text{Implicit Newton FEM}\]&lt;p&gt;材料表达能力强、精度高，但每步非线性求解昂贵。&lt;/p&gt;
+&lt;p&gt;↓&lt;/p&gt;
+&lt;p&gt;一条路线走向：&lt;/p&gt;
+\[\text{PBD} \rightarrow \boxed{\text{XPBD}}\]&lt;p&gt;核心是：&lt;/p&gt;
+\[\boxed{\text{constraint projection}.}\]&lt;p&gt;另一条路线则是：&lt;/p&gt;
+\[\boxed{\text{Projective Dynamics}}\]&lt;p&gt;核心是：&lt;/p&gt;
+\[\boxed{\text{energy optimization + local/global splitting}.}\]&lt;p&gt;再向上：&lt;/p&gt;
+\[\text{PD as quasi-Newton}\]\[\text{ADMM-PD}\]\[\text{hyper-reduced PD}\]\[\text{DiffPD}.\]&lt;p&gt;所以 PD 最重要的位置其实是：&lt;/p&gt;
+\[\boxed{ \text{它是“图形学约束求解器” 通往“现代优化型物理求解器”的一座桥。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Projective Dynamics 最值得学的并不是那条固定矩阵公式，而是：&lt;/p&gt;
+\[\boxed{ \text{一个复杂非线性问题的高成本， 往往不是因为“非线性很多”， 而是因为这些非线性被迫全局耦合在一起。} }\]&lt;p&gt;PD 做的事情是：&lt;/p&gt;
+\[\boxed{ \text{把非线性留在局部， 把全局耦合变成线性。} }\]&lt;p&gt;于是：&lt;/p&gt;
+\[\text{local} = \text{非线性、便宜、并行}\]&lt;p&gt;而：&lt;/p&gt;
+\[\text{global} = \text{线性、昂贵、但可重复利用}.\]&lt;p&gt;这个模式的迁移价值远超软体模拟。&lt;/p&gt;
+&lt;p&gt;它与：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ADMM；&lt;/li&gt;
+&lt;li&gt;domain decomposition；&lt;/li&gt;
+&lt;li&gt;alternating minimization；&lt;/li&gt;
+&lt;li&gt;variable splitting；&lt;/li&gt;
+&lt;li&gt;hyper-reduction；&lt;/li&gt;
+&lt;li&gt;differentiable physics；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;共享着同一种算法设计思想：&lt;/p&gt;
+\[\boxed{\text{通过引入辅助变量和问题分裂，主动创造可利用的计算结构。}}\]&lt;p&gt;这就是 PD 真正值得深入理解的位置。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Bouaziz, Martin, Liu, Kavan &amp;amp; Pauly, &lt;strong&gt;Projective Dynamics: Fusing Constraint Projections for Fast Simulation&lt;/strong&gt;, &lt;em&gt;ACM Transactions on Graphics&lt;/em&gt;, SIGGRAPH 2014, DOI 10.1145/2601097.2601116。原始论文，优先读能量构造和 local–global solver，而不只是效果图。&lt;br&gt;
+Tiantian Liu 作者论文页与原文入口&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Liu, Bouaziz &amp;amp; Kavan, &lt;strong&gt;Quasi-Newton Methods for Real-time Simulation of Hyperelastic Materials&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2017。最值得看的地方是它如何把 PD 重新解释为 quasi-Newton，从而跨出 projective material 的限制并支持 Neo-Hookean 等超弹性模型。&lt;br&gt;
+作者项目页、论文与视频&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Overby, Brown, Li &amp;amp; Narain, &lt;strong&gt;ADMM ⊇ Projective Dynamics: Fast Simulation of Hyperelastic Models with Dynamic Constraints&lt;/strong&gt;, &lt;em&gt;IEEE TVCG&lt;/em&gt; 23(10), 2017, DOI 10.1109/TVCG.2017.2730875。适合继续理解“为什么 PD 本质上属于 variable splitting / optimization 家族”，以及动态 contact 怎样在不破坏 prefactorization 的情况下进入系统。&lt;br&gt;
+作者项目页：论文、补充材料、视频与源码&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Tao Du et al., &lt;strong&gt;DiffPD: Differentiable Projective Dynamics&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2022。如果想继续连接“软体求解器 → differentiable physics → AI/控制”，这是很合适的下一站。&lt;br&gt;
+DiffPD 官方项目页&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

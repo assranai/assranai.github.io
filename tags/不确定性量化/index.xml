@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Mon, 28 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E4%B8%8D%E7%A1%AE%E5%AE%9A%E6%80%A7%E9%87%8F%E5%8C%96/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Tue, 29 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E4%B8%8D%E7%A1%AE%E5%AE%9A%E6%80%A7%E9%87%8F%E5%8C%96/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Multifidelity Monte Carlo：代理模型不一定要“替代”高保真模型，它也可以只负责降方差</title>
         <link>https://assranai.github.io/cards/05-mfmc/</link>
         <pubDate>Tue, 18 Aug 2026 00:00:00 +0000</pubDate>
@@ -4499,6 +4499,391 @@ IOP 论文页&lt;/p&gt;
 &lt;p&gt;Dan Giles 的作者项目页与公开预印本入口 —— 如果希望沿“物理代理模型 + conformal UQ”继续跟踪作者团队，这是比泛泛阅读 CP 教程更贴近 Scientific ML 的入口。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Dual-Weighted Residual：有限元网格为什么应该围绕“你最终要算什么”来细化？</title>
+        <link>https://assranai.github.io/cards/47-dual-weighted-residual-3/</link>
+        <pubDate>Tue, 29 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/47-dual-weighted-residual-3/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;Dual-Weighted Residual&lt;/span&gt;（DWR，双重加权残差）与 Goal-Oriented Adaptivity&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 误差估计 × 自适应网格 × 可靠性&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 9 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 DWR，因为它包含一个对仿真研究非常有迁移价值、但在常规有限元课程里容易被弱化的思想：&lt;/p&gt;
+\[\boxed{\text{“解得准”必须先回答：什么量要准？}}\]&lt;p&gt;传统自适应 FEM 常试图降低整个场的误差，例如&lt;/p&gt;
+\[\|u-u_h\|_E.\]&lt;p&gt;但工程中真正关心的往往只是某个输出：&lt;/p&gt;
+\[J(u)= \text{孔边最大应力},\]&lt;p&gt;或&lt;/p&gt;
+\[J(u)= \text{某铰点位移},\]&lt;p&gt;或&lt;/p&gt;
+\[J(u)= \text{气动力系数}.\]&lt;p&gt;DWR 的核心思想是：&lt;/p&gt;
+\[\boxed{ \text{一个区域残差再大，如果它几乎不会影响目标量 }J, \text{ 就没必要优先在那里加网格。} }\]&lt;p&gt;反过来，一个局部残差本身不大，但如果目标量对那里极敏感，就可能必须精细离散。&lt;/p&gt;
+&lt;p&gt;这也是 Becker–Rannacher DWR 框架区别于普通 residual estimator 的根本之处。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-普通误差估计问的是哪里算错了&#34;&gt;1. 普通误差估计问的是“哪里算错了？”
+&lt;/h2&gt;&lt;p&gt;考虑 Poisson 问题：&lt;/p&gt;
+\[-\Delta u=f.\]&lt;p&gt;有限元得到：&lt;/p&gt;
+\[u_h.\]&lt;p&gt;单元 \(K\) 上可以定义 residual：&lt;/p&gt;
+\[R_K=f+\Delta u_h,\]&lt;p&gt;单元边界还有 flux jump：&lt;/p&gt;
+\[J_E= [\nabla u_h\cdot n].\]&lt;p&gt;传统 residual-based estimator 大致构造：&lt;/p&gt;
+\[\eta_K^2 \sim h_K^2\|R_K\|^2 + h_E\|J_E\|^2.\]&lt;p&gt;然后：&lt;/p&gt;
+\[\eta_K\text{ 大} \Rightarrow \text{细化 }K.\]&lt;p&gt;这很合理：&lt;/p&gt;
+\[\boxed{\text{PDE 在哪里没有被离散解很好满足，就修哪里。}}\]&lt;p&gt;但这里存在一个隐含假设：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;所有地方的误差，对最终工程结果都同样重要。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;实际上通常并不是。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-一个很直观的结构力学例子&#34;&gt;2. 一个很直观的结构力学例子
+&lt;/h1&gt;&lt;p&gt;假设研究一块带孔板：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;load →
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;──────────────────────────
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;│                        │
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;│       ◯ hole           │
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;│                        │
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;──────────────────────────
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;孔附近有应力集中。&lt;/p&gt;
+&lt;p&gt;如果目标是：&lt;/p&gt;
+\[J_1(u)= \text{孔边最大应力},\]&lt;p&gt;显然孔附近需要很细。&lt;/p&gt;
+&lt;p&gt;但现在把目标改成：&lt;/p&gt;
+\[J_2(u)= \text{右端平均位移}.\]&lt;p&gt;此时最优网格未必相同。&lt;/p&gt;
+&lt;p&gt;再换成：&lt;/p&gt;
+\[J_3(u)= \text{某个远端测点的 }u_y.\]&lt;p&gt;网格又可能发生变化。&lt;/p&gt;
+&lt;p&gt;所以同一个 PDE：&lt;/p&gt;
+\[A(u)=f\]&lt;p&gt;并不存在唯一的“最优自适应网格”。&lt;/p&gt;
+&lt;p&gt;更准确地说：&lt;/p&gt;
+\[\boxed{ \text{最优离散取决于 Quantity of Interest（QoI）}. }\]&lt;p&gt;deal.II 的官方 DWR 教程甚至直接比较 point value、point derivative 等不同目标函数，并让 dual functional 成为可替换的软件模块。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-dwr-怎样知道哪里影响我的目标&#34;&gt;3. DWR 怎样知道“哪里影响我的目标”？
+&lt;/h1&gt;&lt;p&gt;关键是引入一个 &lt;strong&gt;dual / &lt;span class=&#34;term-anchor&#34; data-term=&#34;adjoint&#34; tabindex=&#34;0&#34;&gt;adjoint&lt;/span&gt; problem&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;先写原问题：&lt;/p&gt;
+\[A(u)=f.\]&lt;p&gt;我们真正关心：&lt;/p&gt;
+\[J(u).\]&lt;p&gt;有限元解：&lt;/p&gt;
+\[u_h.\]&lt;p&gt;定义 primal residual：&lt;/p&gt;
+\[\boxed{ \rho(u_h)(v) = f(v)-A(u_h)(v). }\]&lt;p&gt;如果：&lt;/p&gt;
+\[u_h=u,\]&lt;p&gt;则：&lt;/p&gt;
+\[\rho=0.\]&lt;p&gt;现在定义 dual solution：&lt;/p&gt;
+\[z.\]&lt;p&gt;在线性问题中，它大致满足：&lt;/p&gt;
+\[\boxed{ A&#39;(u_h)^*z=J&#39;(u_h). }\]&lt;p&gt;如果系统写成矩阵：&lt;/p&gt;
+\[Ku=f,\]&lt;p&gt;目标量近似：&lt;/p&gt;
+\[J(u)=c^Tu,\]&lt;p&gt;那么 dual problem 就特别清楚：&lt;/p&gt;
+\[\boxed{ K^Tz=c. }\]&lt;p&gt;如果：&lt;/p&gt;
+\[K=K^T,\]&lt;p&gt;则：&lt;/p&gt;
+\[Kz=c.\]&lt;p&gt;这条方程非常值得理解。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4--到底是什么&#34;&gt;4. \(z\) 到底是什么？
+&lt;/h1&gt;&lt;p&gt;它不是另一个物理解。&lt;/p&gt;
+&lt;p&gt;它更接近：&lt;/p&gt;
+\[\boxed{ \text{目标 }J\text{ 对系统各处误差的“影响传播函数”.} }\]&lt;p&gt;例如：&lt;/p&gt;
+\[J(u)=u(x_0),\]&lt;p&gt;即只关心某一点的位移。&lt;/p&gt;
+&lt;p&gt;那么 dual problem 的右端相当于：&lt;/p&gt;
+\[\delta(x-x_0).\]&lt;p&gt;对于简单 Laplace 问题，dual solution 实际上就是以 \(x_0\) 为源点的 Green&amp;rsquo;s function。deal.II 的官方教程正用这个例子解释 dual solution。&lt;/p&gt;
+&lt;p&gt;这意味着：&lt;/p&gt;
+\[z(x)\]&lt;p&gt;告诉我们：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;在位置 \(x\) 产生一点 PDE 误差，最终会多大程度污染 \(x_0\) 的结果？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{\text{dual = sensitivity map}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;5-dwr-最重要的公式&#34;&gt;5. DWR 最重要的公式
+&lt;/h1&gt;&lt;p&gt;目标误差：&lt;/p&gt;
+\[J(u)-J(u_h)\]&lt;p&gt;可以近似写成：&lt;/p&gt;
+\[\boxed{ J(u)-J(u_h) \approx \rho(u_h)(z-\varphi_h). }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\varphi_h\]&lt;p&gt;是有限元空间中的某个近似。&lt;/p&gt;
+&lt;p&gt;局部化以后：&lt;/p&gt;
+\[\boxed{ J(u)-J(u_h) \approx \sum_K R_K \times W_K. }\]&lt;p&gt;其中：&lt;/p&gt;
+\[R_K\]&lt;p&gt;是 primal residual；&lt;/p&gt;
+&lt;p&gt;而：&lt;/p&gt;
+\[W_K\]&lt;p&gt;来自 dual solution。&lt;/p&gt;
+&lt;p&gt;所以名字就是：&lt;/p&gt;
+\[\boxed{\text{Dual-Weighted Residual}.}\]&lt;p&gt;这四个字可以直接按字面理解：&lt;/p&gt;
+\[\boxed{ \text{误差源} \times \text{它对目标的影响程度}. }\]&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么residual-大并不等于重要&#34;&gt;6. 为什么“Residual 大”并不等于“重要”？
+&lt;/h1&gt;&lt;p&gt;假设两个区域：&lt;/p&gt;
+\[K_A,\quad K_B.\]&lt;p&gt;A：&lt;/p&gt;
+\[R_A=100, \qquad z_A=0.001.\]&lt;p&gt;B：&lt;/p&gt;
+\[R_B=2, \qquad z_B=10.\]&lt;p&gt;普通 residual estimator 可能认为：&lt;/p&gt;
+\[A\gg B.\]&lt;p&gt;DWR 则看：&lt;/p&gt;
+\[R_Az_A=0.1,\]\[R_Bz_B=20.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{B\text{ 应该优先细化}.}\]&lt;p&gt;因为 A 虽然算得很差，但：&lt;/p&gt;
+\[\boxed{\text{这个错误几乎传不到我们真正关心的输出。}}\]&lt;p&gt;B 的局部误差不大，却被目标量高度放大。&lt;/p&gt;
+&lt;p&gt;这是 DWR 最核心的思想。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-这其实和反向传播非常像&#34;&gt;7. 这其实和反向传播非常像
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果把有限元看成：&lt;/p&gt;
+\[u=A^{-1}f\]&lt;p&gt;然后：&lt;/p&gt;
+\[J=J(u),\]&lt;p&gt;那么：&lt;/p&gt;
+&lt;p&gt;primal solve：&lt;/p&gt;
+\[\boxed{f\rightarrow u}\]&lt;p&gt;是 forward。&lt;/p&gt;
+&lt;p&gt;dual solve：&lt;/p&gt;
+\[\boxed{J\rightarrow z}\]&lt;p&gt;则是在把目标敏感度向整个计算域反向传播。&lt;/p&gt;
+&lt;p&gt;这与神经网络：&lt;/p&gt;
+\[\text{input} \rightarrow \text{network} \rightarrow L\]&lt;p&gt;然后：&lt;/p&gt;
+\[\frac{\partial L}{\partial\theta}\]&lt;p&gt;向后传播，本质结构高度相似。&lt;/p&gt;
+&lt;p&gt;所以 DWR 可以理解成：&lt;/p&gt;
+\[\boxed{\text{PDE 求解器中的 backpropagation of relevance}.}\]&lt;p&gt;这也是 adjoint 方法为什么同时出现在：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PDE-constrained optimization；&lt;/li&gt;
+&lt;li&gt;aerodynamic shape optimization；&lt;/li&gt;
+&lt;li&gt;inverse problems；&lt;/li&gt;
+&lt;li&gt;differentiable simulation；&lt;/li&gt;
+&lt;li&gt;goal-oriented FEM；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些看似不同的领域里。&lt;/p&gt;
+&lt;p&gt;它们共享的是：&lt;/p&gt;
+\[\boxed{\text{“从最终目标向计算过程反向传播敏感度”}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;8-一个容易踩的坑为什么不能直接用同阶-dual-fem&#34;&gt;8. 一个容易踩的坑：为什么不能直接用同阶 dual FEM？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设 primal：&lt;/p&gt;
+\[u_h\in V_h.\]&lt;p&gt;dual 也计算：&lt;/p&gt;
+\[z_h\in V_h.\]&lt;p&gt;Galerkin orthogonality：&lt;/p&gt;
+\[\rho(u_h)(v_h)=0, \qquad \forall v_h\in V_h.\]&lt;p&gt;于是如果直接拿：&lt;/p&gt;
+\[z_h\]&lt;p&gt;去加权：&lt;/p&gt;
+\[\rho(u_h)(z_h)=0.\]&lt;p&gt;你会得到：&lt;/p&gt;
+\[\boxed{\eta=0.}\]&lt;p&gt;显然荒谬。&lt;/p&gt;
+&lt;p&gt;所以 dual 必须包含 primal 空间之外的信息。&lt;/p&gt;
+&lt;p&gt;常见做法：&lt;/p&gt;
+\[z_h^{(p+1)}\]&lt;p&gt;使用更高阶有限元空间；&lt;/p&gt;
+&lt;p&gt;或者：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;enriched mesh；&lt;/li&gt;
+&lt;li&gt;local reconstruction；&lt;/li&gt;
+&lt;li&gt;extrapolation。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;deal.II 的 step-14 官方实现就采用了更高阶 dual space，并明确解释：如果 dual 与 primal 使用同一空间，由于 \(z-I_hz=0\)，估计器会退化为零。&lt;/p&gt;
+&lt;p&gt;这是实现 DWR 时非常关键的细节。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;9-dwr-不只是告诉你哪里细化还可以告诉你什么时候别再迭代&#34;&gt;9. DWR 不只是告诉你“哪里细化”，还可以告诉你“什么时候别再迭代”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设线性系统：&lt;/p&gt;
+\[Ku_h=f\]&lt;p&gt;使用迭代求解器。&lt;/p&gt;
+&lt;p&gt;实际误差来自两部分：&lt;/p&gt;
+\[\boxed{ \text{discretization error} + \text{algebraic solver error}. }\]&lt;p&gt;如果网格本身只能保证：&lt;/p&gt;
+\[10^{-3}\]&lt;p&gt;精度，&lt;/p&gt;
+&lt;p&gt;却把 Krylov solver 解到：&lt;/p&gt;
+\[10^{-12},\]&lt;p&gt;大量计算实际上没有意义。&lt;/p&gt;
+&lt;p&gt;DWR 可以估计：&lt;/p&gt;
+\[\boxed{\text{solver residual 对目标 }J\text{ 到底造成多少误差}.}\]&lt;p&gt;于是 stopping criterion 可以变成：&lt;/p&gt;
+\[\text{algebraic QoI error} \ll \text{discretization QoI error}.\]&lt;p&gt;Meidner、Rannacher 与 Vihharev 专门发展了这一思路，把 discretization error 和 iteration error 放进统一的 goal-oriented error control，并据此协调 multigrid、Gauss-Seidel、CG 等迭代精度与网格精度。&lt;/p&gt;
+&lt;p&gt;这是一个非常实用的工程原则：&lt;/p&gt;
+\[\boxed{ \text{求解器没必要把一个本来就离散得不准的问题解得极其精确。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-对瞬态问题它甚至可以回答什么时候需要小时间步&#34;&gt;10. 对瞬态问题，它甚至可以回答“什么时候需要小时间步”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑：&lt;/p&gt;
+\[M\ddot u+C\dot u+Ku=f(t).\]&lt;p&gt;假设最终只关心：&lt;/p&gt;
+\[J(u)=u(x_0,T).\]&lt;p&gt;传统时间步控制可能依据：&lt;/p&gt;
+\[\|\Delta u\|.\]&lt;p&gt;但 DWR 可以把：&lt;/p&gt;
+\[\boxed{\text{终态目标的敏感度}}\]&lt;p&gt;沿时间反向传播。&lt;/p&gt;
+&lt;p&gt;于是某些早期瞬间虽然运动剧烈：&lt;/p&gt;
+\[\|\dot u\|\gg0,\]&lt;p&gt;却可能对最终 \(J\) 影响很小。&lt;/p&gt;
+&lt;p&gt;另一些时间段运动看似平缓，却决定最终响应。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{\text{时间步也可以 goal-oriented adaptive}.}\]&lt;p&gt;在非定常 Navier–Stokes 中，Besier 与 Rannacher 已利用 DWR 把空间与时间离散误差分离，并据此同时调节网格和时间步；目标量可以是 drag coefficient 等实际物理输出。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-这对可靠性分析有一个非常直接的连接&#34;&gt;11. 这对可靠性分析有一个非常直接的连接
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设极限状态：&lt;/p&gt;
+\[g(X)=R(X)-S(X).\]&lt;p&gt;其中：&lt;/p&gt;
+\[R(X)\]&lt;p&gt;来自 FEM：&lt;/p&gt;
+\[R(X)=J(u(X)).\]&lt;p&gt;最终：&lt;/p&gt;
+\[P_f=P[g(X)&lt;0].\]&lt;p&gt;传统网格收敛可能要求：&lt;/p&gt;
+\[\|u-u_h\|&lt;\varepsilon.\]&lt;p&gt;但可靠性真正关心的是：&lt;/p&gt;
+\[\boxed{ \text{FEM 离散误差是否足以改变 }g(X)\text{ 的符号？} }\]&lt;p&gt;如果：&lt;/p&gt;
+\[g(X)=10,\]&lt;p&gt;即使：&lt;/p&gt;
+\[J\]&lt;p&gt;误差：&lt;/p&gt;
+\[0.1\]&lt;p&gt;也几乎无所谓。&lt;/p&gt;
+&lt;p&gt;但如果：&lt;/p&gt;
+\[g(X)=0.02,\]&lt;p&gt;那么：&lt;/p&gt;
+\[J\text{ error}=0.05\]&lt;p&gt;就可能把：&lt;/p&gt;
+\[\text{safe} \leftrightarrow \text{failure}\]&lt;p&gt;直接翻转。&lt;/p&gt;
+&lt;p&gt;所以更成熟的可靠性仿真体系应该考虑：&lt;/p&gt;
+\[\boxed{ \text{failure-boundary relevance} \times \text{QoI discretization error}. }\]&lt;p&gt;这与最近 SUR、Conformal、reliability-oriented sensitivity 的逻辑其实高度一致：&lt;/p&gt;
+\[\boxed{\text{计算精度应该围绕最终决策分配，而不是平均分配。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-对代理模型还有一个很有意思的启发&#34;&gt;12. 对代理模型还有一个很有意思的启发
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设 surrogate 输入：&lt;/p&gt;
+\[X\]&lt;p&gt;输出来自 FEM：&lt;/p&gt;
+\[Y_h(X)=J(u_h(X)).\]&lt;p&gt;通常我们默认：&lt;/p&gt;
+\[Y_h\]&lt;p&gt;就是真值标签。&lt;/p&gt;
+&lt;p&gt;但实际上：&lt;/p&gt;
+\[Y_h(X) = Y(X)+\epsilon_{\rm FEM}(X).\]&lt;p&gt;也就是说：&lt;/p&gt;
+\[\boxed{\text{训练数据本身有 discretization error}.}\]&lt;p&gt;如果不同参数点使用同一粗网格：&lt;/p&gt;
+\[\epsilon_{\rm FEM}(X)\]&lt;p&gt;还可能随参数剧烈变化。&lt;/p&gt;
+&lt;p&gt;于是代理模型实际上在拟合：&lt;/p&gt;
+\[\boxed{\text{physics response + numerical discretization artifact}.}\]&lt;p&gt;DWR 可以为每个样本提供：&lt;/p&gt;
+\[\eta_J(X) \approx J(u)-J(u_h).\]&lt;p&gt;于是未来甚至可以构造：&lt;/p&gt;
+\[\boxed{ \text{surrogate uncertainty} + \text{FEM discretization uncertainty} }\]&lt;p&gt;的联合误差预算。&lt;/p&gt;
+&lt;p&gt;这比简单地把所有 FEM 样本视为 exact labels 更严谨。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-它还自然通向多保真建模&#34;&gt;13. 它还自然通向多保真建模
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设粗网格：&lt;/p&gt;
+\[J_H^{\rm coarse}\]&lt;p&gt;很便宜。&lt;/p&gt;
+&lt;p&gt;DWR 给出：&lt;/p&gt;
+\[\eta_J.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ J^{\rm corrected} = J_h+\eta_J. }\]&lt;p&gt;这已经很接近一种：&lt;/p&gt;
+\[\boxed{\text{physics-informed multifidelity correction}.}\]&lt;p&gt;与普通 low-fidelity model 不同，它不仅告诉你：&lt;/p&gt;
+\[J_h\]&lt;p&gt;是多少，还估计：&lt;/p&gt;
+\[\boxed{\text{这个粗模型针对当前 QoI 大约错多少}.}\]&lt;p&gt;deal.II 的示例也指出，如果误差估计可信，可以直接把估计误差加到计算输出上改善目标量结果。&lt;/p&gt;
+&lt;p&gt;这使 DWR 和：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ROM error estimation；&lt;/li&gt;
+&lt;li&gt;multifidelity surrogate；&lt;/li&gt;
+&lt;li&gt;certified &lt;span class=&#34;term-anchor&#34; data-term=&#34;reduced-basis&#34; tabindex=&#34;0&#34;&gt;reduced basis&lt;/span&gt;；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;之间产生了非常自然的连接。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-dwr-不是免费的&#34;&gt;14. DWR 不是免费的
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;代价很明确：&lt;/p&gt;
+&lt;p&gt;你已经解了一次 primal：&lt;/p&gt;
+\[A(u_h)=f.\]&lt;p&gt;现在还要解：&lt;/p&gt;
+\[\boxed{\text{dual problem}.}\]&lt;p&gt;甚至 dual 需要：&lt;/p&gt;
+\[\boxed{\text{更高阶/更丰富的空间}.}\]&lt;p&gt;因此单次成本明显高于简单 residual indicator。&lt;/p&gt;
+&lt;p&gt;而且：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;nonlinear PDE 需要线性化；&lt;/li&gt;
+&lt;li&gt;nonlinear QoI 会出现额外 remainder；&lt;/li&gt;
+&lt;li&gt;多个完全不同的 QoI 可能需要多个 dual solves；&lt;/li&gt;
+&lt;li&gt;estimator 的可靠性仍依赖一定理论假设。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;现代研究也仍在处理这些问题。例如 Endtmayer、Langer 与 Wick 给出了 nonlinear PDE、nonlinear functional 以及 multiple goal functionals 情况下的 two-sided DWR a posteriori estimates，并分析通常被忽略的 remainder term 和 saturation assumption。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{\text{DWR 的收益来自“昂贵但聪明地分配精度”.}}\]&lt;p&gt;如果整个场都需要同等精确，它未必值得。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-一个很值得自己做的小实验&#34;&gt;15. 一个很值得自己做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;做二维 Poisson：&lt;/p&gt;
+\[-\Delta u=1\]&lt;p&gt;在：&lt;/p&gt;
+\[[0,1]^2\]&lt;p&gt;上求解。&lt;/p&gt;
+&lt;p&gt;只关心：&lt;/p&gt;
+\[J(u)=u(0.8,0.7).\]&lt;p&gt;比较三种 refinement：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;uniform；&lt;/li&gt;
+&lt;li&gt;ordinary residual estimator；&lt;/li&gt;
+&lt;li&gt;DWR。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;每轮记录：&lt;/p&gt;
+\[N_{\rm DOF}\]&lt;p&gt;以及：&lt;/p&gt;
+\[|J(u)-J(u_h)|.\]&lt;p&gt;然后把目标换成：&lt;/p&gt;
+\[J_2(u)=u(0.2,0.2).\]&lt;p&gt;最值得观察的并不是 convergence curve。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\text{网格会跟着 QoI 改变。}}\]&lt;p&gt;同一个 PDE、同一个载荷、同一个材料：&lt;/p&gt;
+\[\boxed{\text{仅仅因为“你问的问题变了”，最优网格也变了。}}\]&lt;p&gt;deal.II 的 step-14 已经提供了完整可运行的 DWR 实现，非常适合作为实验起点。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-它在整个知识体系中卡在哪里&#34;&gt;16. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把 FEM 自适应理解成：&lt;/p&gt;
+\[\text{Uniform refinement}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{所有地方都加精度可以吗？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\text{Residual adaptivity}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{PDE 哪里解得最差？}}\]&lt;p&gt;↓&lt;/p&gt;
+\[\boxed{\text{DWR / Goal-Oriented Adaptivity}}\]&lt;p&gt;问：&lt;/p&gt;
+\[\boxed{\text{哪里的误差最影响我真正关心的输出？}}\]&lt;p&gt;↓&lt;/p&gt;
+&lt;p&gt;进一步可以走向：&lt;/p&gt;
+\[\text{goal-oriented space-time adaptivity}\]\[\text{goal-oriented model adaptivity}\]\[\text{goal-oriented solver tolerance}\]\[\text{goal-oriented multifidelity}\]&lt;p&gt;甚至：&lt;/p&gt;
+\[\boxed{\text{goal-oriented uncertainty quantification}.}\]&lt;p&gt;这就是 DWR 在知识体系中的位置。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;DWR 最值得记住的不是某条 a posteriori estimator，而是：&lt;/p&gt;
+\[\boxed{ \text{误差本身没有统一的重要性； 误差的重要性取决于它最终能传播到你关心的量多少。} }\]&lt;p&gt;它把：&lt;/p&gt;
+\[\boxed{\text{Residual}}\]&lt;p&gt;——哪里算错了——&lt;/p&gt;
+&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{\text{Adjoint}}\]&lt;p&gt;——哪里的错误会影响目标——&lt;/p&gt;
+&lt;p&gt;相乘：&lt;/p&gt;
+\[\boxed{ \text{Goal Error} \approx \text{Local Error Source} \times \text{Goal Sensitivity}. }\]&lt;p&gt;这个结构远远超出 FEM。&lt;/p&gt;
+&lt;p&gt;你最近看到的很多方法其实都在逐渐收敛到同一个原则：&lt;/p&gt;
+\[\text{SUR：把样本预算花在最影响 }P_f\text{ 的地方}\]\[\text{MFMC：把高保真预算花在低保真解释不了的部分}\]\[\text{DWR：把网格预算花在最影响 QoI 的地方}.\]&lt;p&gt;它们背后的共同问题其实是：&lt;/p&gt;
+\[\boxed{ \text{计算资源有限时，哪些误差真正值得消灭？} }\]&lt;p&gt;这是从“会用数值方法”走向“会设计数值算法”非常重要的一层认识。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Roland Becker 与 Rolf Rannacher，&lt;strong&gt;An Optimal Control Approach to A Posteriori Error Estimation in Finite Element Methods&lt;/strong&gt;, &lt;em&gt;Acta Numerica&lt;/em&gt;, Vol. 10, pp. 1–102。DWR 的经典系统性文献，核心就是用 duality 取代传统全局稳定性常数，使误差估计直接针对物理目标量。&lt;br&gt;
+Cambridge Core 论文页&lt;/p&gt;
+&lt;p&gt;Wolfgang Bangerth 与 Rolf Rannacher，&lt;strong&gt;Adaptive Finite Element Methods for Differential Equations&lt;/strong&gt;, Birkhäuser, 2003。比论文更适合系统学习，从 a posteriori error estimation 一路讲到 DWR、非线性问题和结构/流体应用。&lt;br&gt;
+Springer 图书页&lt;/p&gt;
+&lt;p&gt;deal.II 官方 step-14：Dual Weighted Residual 教程与完整实现 —— 今天最推荐实际动手的资料。它包含 primal/dual solver、cell/edge residual、point value/derivative QoI，以及 DWR 与其他 refinement strategy 的数值比较。&lt;/p&gt;
+&lt;p&gt;Endtmayer、Langer &amp;amp; Wick，&lt;strong&gt;Two-Side a Posteriori Error Estimates for the Dual-Weighted Residual Method&lt;/strong&gt;, &lt;em&gt;SIAM Journal on Scientific Computing&lt;/em&gt;, 2020。适合在掌握基本 DWR 后继续研究 nonlinear PDE、multiple goals、iteration error 和 estimator 严格上下界。&lt;br&gt;
+SIAM 论文页&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
