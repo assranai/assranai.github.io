@@ -8,117 +8,1025 @@
         <language>en-us</language>
         <copyright>Assranai</copyright>
         <lastBuildDate>Fri, 02 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E8%BD%AF%E4%BD%93%E5%8A%A8%E5%8A%9B%E5%AD%A6/index.xml" rel="self" type="application/rss+xml" /><item>
-        <title>Projective Dynamics：把“PBD 的投影”变成真正的能量求解</title>
+        <title>IPC：把无穿透写成势能，再用 CCD 守住可行性</title>
+        <link>https://assranai.github.io/cards/01-ipc/</link>
+        <pubDate>Fri, 18 Sep 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/01-ipc/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;ipc&#34; tabindex=&#34;0&#34;&gt;Incremental Potential Contact&lt;/span&gt;（IPC，增量势接触）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 软体动力学 × 接触力学 × 物理引擎&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
+今天选 IPC，原因是它正好回答一个很容易混淆的问题：&lt;/p&gt;
+\[\boxed{\text{CCD 到底解决了接触问题的哪一部分？}}\]&lt;p&gt;你之前提到过一个很好的判断：“看起来 &lt;span class=&#34;term-anchor&#34; data-term=&#34;ccd&#34; tabindex=&#34;0&#34;&gt;CCD&lt;/span&gt; 才是起到碰撞合法决定性作用的约束。”这个判断抓住了一半关键：&lt;strong&gt;CCD 确实负责保证求解器走出的搜索轨迹不跨过碰撞边界，但它并不负责决定接触后的物理状态。&lt;/strong&gt; IPC 的贡献就在于把这两件事严密地组合起来。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-接触其实包含两个完全不同的问题&#34;&gt;1. 接触其实包含两个完全不同的问题
+&lt;/h2&gt;&lt;p&gt;假设两个软体表面正在接近。&lt;/p&gt;
+&lt;p&gt;第一个问题是几何问题：&lt;/p&gt;
+\[\boxed{\text{它们什么时候会相撞？}}\]&lt;p&gt;这是 Collision Detection，尤其是 Continuous Collision Detection（CCD）的职责。&lt;/p&gt;
+&lt;p&gt;第二个问题是动力学问题：&lt;/p&gt;
+\[\boxed{\text{相撞以后，新的位置、速度和接触力应该是什么？}}\]&lt;p&gt;这是 Contact Resolution。&lt;/p&gt;
+&lt;p&gt;传统实时物理引擎常把两者写成：&lt;/p&gt;
+\[\text{integrate} \rightarrow \text{detect collision} \rightarrow \text{generate constraints} \rightarrow \text{solve impulses/projections}.\]&lt;p&gt;IPC 换了一种更统一的结构：&lt;/p&gt;
+\[\boxed{ \text{把弹性、惯性和接触全部放进同一个增量势能最小化问题。} }\]&lt;p&gt;然后 CCD 不再负责“算出接触响应”，而负责确保优化器在寻找这个最小值时&lt;strong&gt;永远不跨过不可穿透边界&lt;/strong&gt;。原始 IPC 工作正是为隐式时间步进的非线性弹性动力学构造这一变分框架，并给出 intersection- 和 inversion-free 的轨迹保证。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-先从没有接触的隐式动力学开始&#34;&gt;2. 先从没有接触的隐式动力学开始
+&lt;/h1&gt;&lt;p&gt;考虑离散弹性体：&lt;/p&gt;
+\[M\ddot x=-\nabla E(x),\]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(x\)：节点位置；&lt;/li&gt;
+&lt;li&gt;\(M\)：质量矩阵；&lt;/li&gt;
+&lt;li&gt;\(E(x)\)：Neo-Hookean 等弹性势能。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;很多隐式时间积分可以改写成一个最小化问题。以一种典型形式表示：&lt;/p&gt;
+\[\boxed{ x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-\tilde x\|_M^2 + E(x) \right] }\]&lt;p&gt;其中：&lt;/p&gt;
+\[\tilde x=x^n+h v^n+\cdots\]&lt;p&gt;是忽略内部力时的预测位置。&lt;/p&gt;
+&lt;p&gt;第一项：&lt;/p&gt;
+\[\frac{1}{2h^2} \|x-\tilde x\|_M^2\]&lt;p&gt;可以理解成“惯性不希望你离预测位置太远”。&lt;/p&gt;
+&lt;p&gt;第二项：&lt;/p&gt;
+\[E(x)\]&lt;p&gt;则代表弹性体不希望发生高能量形变。&lt;/p&gt;
+&lt;p&gt;所以时间步本身变成：&lt;/p&gt;
+\[\boxed{\text{寻找惯性和弹性能量之间的最优折中。}}\]&lt;p&gt;这类 incremental-potential 观点本身是变分隐式积分的重要基础；IPC 的关键动作，是继续把 contact 放进这个目标函数。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-如果两个表面不能穿透最直接的数学表达是什么&#34;&gt;3. 如果两个表面不能穿透，最直接的数学表达是什么？
+&lt;/h1&gt;&lt;p&gt;设两个 primitive 的距离：&lt;/p&gt;
+\[d(x).\]&lt;p&gt;非穿透要求：&lt;/p&gt;
+\[\boxed{d(x)&gt;0.}\]&lt;p&gt;最直接的方法当然可以写成 constrained optimization：&lt;/p&gt;
+\[\min_x E_{\rm incremental}(x)\]&lt;p&gt;subject to&lt;/p&gt;
+\[d_i(x)\ge0.\]&lt;p&gt;但大量 point-triangle、edge-edge 接触会产生庞大的非线性 inequality constraint 系统。&lt;/p&gt;
+&lt;p&gt;IPC 采取 barrier 方法。&lt;/p&gt;
+&lt;p&gt;构造：&lt;/p&gt;
+\[B(d)\]&lt;p&gt;满足：&lt;/p&gt;
+\[B(d)\rightarrow+\infty \qquad d\rightarrow0^+.\]&lt;p&gt;于是目标变成：&lt;/p&gt;
+\[\boxed{ E_{\rm IPC}(x) = E_{\rm inertia}(x) + E_{\rm elastic}(x) + \kappa\sum_i B(d_i(x)). }\]&lt;p&gt;当两个 primitive 靠近：&lt;/p&gt;
+\[d\downarrow0,\]&lt;p&gt;barrier energy：&lt;/p&gt;
+\[B(d)\uparrow\infty.\]&lt;p&gt;所以优化器会被无限大的能量墙挡住。&lt;/p&gt;
+&lt;p&gt;这就是 IPC 的第一块核心结构：&lt;/p&gt;
+\[\boxed{\text{Contact as barrier potential}.}\]&lt;p&gt;官方 IPC Toolkit 目前直接提供 &lt;span class=&#34;term-anchor&#34; data-term=&#34;barrier&#34; tabindex=&#34;0&#34;&gt;barrier function&lt;/span&gt;、导数、adaptive barrier stiffness、距离 barrier potential，以及相应的接触距离导数。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;4-一个直观的一维模型&#34;&gt;4. 一个直观的一维模型
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设一个质量点位于：&lt;/p&gt;
+\[x&gt;0\]&lt;p&gt;的半空间，墙在：&lt;/p&gt;
+\[x=0.\]&lt;p&gt;没有接触时：&lt;/p&gt;
+\[E(x) = \frac{m}{2h^2}(x-\tilde x)^2.\]&lt;p&gt;假设预测位置：&lt;/p&gt;
+\[\tilde x=-0.1.\]&lt;p&gt;惯性项希望：&lt;/p&gt;
+\[x=-0.1,\]&lt;p&gt;也就是直接穿墙。&lt;/p&gt;
+&lt;p&gt;现在加入 barrier：&lt;/p&gt;
+\[E(x) = \frac{m}{2h^2}(x-\tilde x)^2 + \kappa B(x).\]&lt;p&gt;其中：&lt;/p&gt;
+\[B(x)\rightarrow\infty \quad(x\rightarrow0^+).\]&lt;p&gt;于是能量曲线大致变成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;energy
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↑
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;∞ |\
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  | \
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  |  \        inertia
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  |   \___   /
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  |       \_/
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  +------------→ x
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↑
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; barrier
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;最小值只能存在于：&lt;/p&gt;
+\[x&gt;0.\]&lt;p&gt;因此接触响应不是一次额外的“位置修正”。&lt;/p&gt;
+&lt;p&gt;它直接成为：&lt;/p&gt;
+\[\boxed{\text{整个动力学时间步的最优解的一部分。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;5-那-ccd-到底在哪里&#34;&gt;5. 那 CCD 到底在哪里？
+&lt;/h1&gt;&lt;p&gt;这就是 IPC 最容易被误解、也最值得理解的地方。&lt;/p&gt;
+&lt;p&gt;假设 Newton optimization 当前位于：&lt;/p&gt;
+\[x_k\]&lt;p&gt;并求得搜索方向：&lt;/p&gt;
+\[p_k.\]&lt;p&gt;普通 Newton：&lt;/p&gt;
+\[x_{k+1} = x_k+\alpha p_k.\]&lt;p&gt;即使：&lt;/p&gt;
+\[x_k\]&lt;p&gt;合法，&lt;/p&gt;
+\[x_k+\alpha p_k\]&lt;p&gt;仍然可能直接穿过另一块表面。&lt;/p&gt;
+&lt;p&gt;注意一个微妙问题：&lt;/p&gt;
+&lt;p&gt;barrier：&lt;/p&gt;
+\[B(d)\]&lt;p&gt;只在你&lt;strong&gt;评价候选状态&lt;/strong&gt;时告诉你能量巨大。&lt;/p&gt;
+&lt;p&gt;但如果优化搜索轨迹直接从：&lt;/p&gt;
+\[d&gt;0\]&lt;p&gt;跳到几何上的另一侧，离散距离函数未必能单凭端点状态可靠表达“途中发生过穿越”。&lt;/p&gt;
+&lt;p&gt;所以 IPC 使用 CCD 沿：&lt;/p&gt;
+\[x(\alpha)=x_k+\alpha p_k\]&lt;p&gt;检查：&lt;/p&gt;
+\[\boxed{\text{从当前状态沿搜索方向，第一次碰撞发生在哪个 }\alpha.}\]&lt;p&gt;得到最大合法步长：&lt;/p&gt;
+\[\alpha_{\rm CCD}.\]&lt;p&gt;然后 line search 只能选择：&lt;/p&gt;
+\[\boxed{ 0&lt;\alpha&lt;\alpha_{\rm CCD}. }\]&lt;p&gt;IPC Toolkit 因而同时提供 linear/nonlinear trajectory CCD；原始参考实现也包含 CTCD 与 Tight-Inclusion CCD。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;6-所以你之前关于-ccd-的判断可以更精确地改写成&#34;&gt;6. 所以你之前关于 CCD 的判断，可以更精确地改写成
+&lt;/h1&gt;\[\boxed{ \text{Barrier 决定“哪里不能去”， CCD 保证优化路径“不会一步跨过去”。} }\]&lt;p&gt;二者缺一不可。&lt;/p&gt;
+&lt;p&gt;Barrier：&lt;/p&gt;
+\[B(d)\rightarrow\infty\]&lt;p&gt;给出了&lt;strong&gt;动力学/优化意义上的不可穿透边界&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;CCD：&lt;/p&gt;
+\[\alpha\le\alpha_{\rm CCD}\]&lt;p&gt;给出了&lt;strong&gt;数值搜索轨迹的几何可行性保证&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[\boxed{ \text{CCD 是 trajectory feasibility 的守门员， Barrier 是 contact response 的势能模型。} }\]&lt;p&gt;单独 CCD：&lt;/p&gt;
+\[\text{只知道什么时候撞上}\]&lt;p&gt;并不知道：&lt;/p&gt;
+\[\boxed{\text{撞上以后系统应该在哪里达到力学平衡。}}\]&lt;p&gt;单独 barrier 而没有 safe step：&lt;/p&gt;
+&lt;p&gt;优化器又可能在离散迭代过程中越过 barrier domain。&lt;/p&gt;
+&lt;p&gt;IPC 的强项恰恰来自：&lt;/p&gt;
+\[\boxed{\text{variational contact + CCD-filtered optimization}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-这和-xpbd-的碰撞思路差在哪里&#34;&gt;7. 这和 XPBD 的碰撞思路差在哪里？
+&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 常把接触写成 inequality constraint：&lt;/p&gt;
+\[C(x)\ge0.\]&lt;p&gt;发生违反时做位置修正：&lt;/p&gt;
+\[\Delta x = M^{-1}\nabla C\,\Delta\lambda.\]&lt;p&gt;结构更像：&lt;/p&gt;
+\[\text{predict} \rightarrow \text{发现 violation} \rightarrow \text{projection}.\]&lt;p&gt;IPC 更接近：&lt;/p&gt;
+\[\boxed{ \text{从一开始就寻找一个不会进入 forbidden region 的动力学最小值。} }\]&lt;p&gt;因此二者对“合法状态”的处理哲学不同。&lt;/p&gt;
+&lt;p&gt;XPBD：&lt;/p&gt;
+\[\boxed{\text{constraint correction}}\]&lt;p&gt;IPC：&lt;/p&gt;
+\[\boxed{\text{interior-point optimization}}\]&lt;p&gt;。&lt;/p&gt;
+&lt;p&gt;这也解释了为什么 IPC 参考实现直接把默认 &lt;code&gt;constraintSolver&lt;/code&gt; 称为 &lt;code&gt;interiorPoint&lt;/code&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;8-为什么-ipc-特别适合大形变软体&#34;&gt;8. 为什么 IPC 特别适合大形变软体？
+&lt;/h1&gt;&lt;p&gt;软体接触最难的地方之一是：&lt;/p&gt;
+\[\boxed{\text{接触和材料形变高度耦合。}}\]&lt;p&gt;例如一个 Neo-Hookean 软体被挤过狭窄孔洞。&lt;/p&gt;
+&lt;p&gt;接触力改变形变；&lt;/p&gt;
+&lt;p&gt;形变改变表面几何；&lt;/p&gt;
+&lt;p&gt;表面几何又改变接触集合。&lt;/p&gt;
+&lt;p&gt;如果采用松散的：&lt;/p&gt;
+\[\text{elastic solve} \rightarrow \text{collision correction}\]&lt;p&gt;循环，&lt;/p&gt;
+&lt;p&gt;两个模块可能不断互相破坏对方的结果。&lt;/p&gt;
+&lt;p&gt;IPC 把：&lt;/p&gt;
+\[E_{\rm elastic}\]&lt;p&gt;和：&lt;/p&gt;
+\[E_{\rm contact}\]&lt;p&gt;放进同一个：&lt;/p&gt;
+\[\arg\min\]&lt;p&gt;里。&lt;/p&gt;
+&lt;p&gt;于是 Newton Hessian 中同时包含：&lt;/p&gt;
+\[\boxed{\text{material stiffness + contact stiffness}.}\]&lt;p&gt;接触不再是动力学求解完成后的“补丁”。&lt;/p&gt;
+&lt;p&gt;这也是原论文能处理极端压缩、大形变、多重自接触场景的重要原因。论文及官方项目展示了包括复杂四面体软体被压缩并挤过薄障碍物等案例。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-ipc-还有另一半很重要防止-tet-inversion&#34;&gt;9. IPC 还有另一半很重要：防止 tet inversion
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;对于四面体：&lt;/p&gt;
+\[F=\frac{\partial x}{\partial X},\]&lt;p&gt;体积变化：&lt;/p&gt;
+\[J=\det F.\]&lt;p&gt;物理上希望：&lt;/p&gt;
+\[J&gt;0.\]&lt;p&gt;如果：&lt;/p&gt;
+\[J\le0,\]&lt;p&gt;tet 已经反转。&lt;/p&gt;
+&lt;p&gt;原始 IPC 不只处理 surface contact，也针对 inversion-free large deformation dynamics 建立可行性机制，因此论文强调其 trajectory 同时 intersection-free 和 inversion-free。&lt;/p&gt;
+&lt;p&gt;从统一思想看：&lt;/p&gt;
+\[d&gt;0\]&lt;p&gt;是 contact admissibility，&lt;/p&gt;
+&lt;p&gt;而：&lt;/p&gt;
+\[J&gt;0\]&lt;p&gt;是 deformation admissibility。&lt;/p&gt;
+&lt;p&gt;两者都属于：&lt;/p&gt;
+\[\boxed{\text{configuration-space feasibility boundary}.}\]&lt;p&gt;这是一个非常值得迁移的理解。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-这与之前讨论的-barrier-v1-有一个更深的联系&#34;&gt;10. 这与之前讨论的 Barrier V1 有一个更深的联系
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;在软体求解器里，我们经常把：&lt;/p&gt;
+\[J_{\min}\]&lt;p&gt;当作诊断指标：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;J_min = 0.7 → OK
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;J_min = 0.1 → dangerous
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;J_min &amp;lt; 0 → inverted
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;但 IPC 思想会进一步问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;为什么要等到 \(J&lt;0\) 后再修？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;更系统的方式是让：&lt;/p&gt;
+\[J\rightarrow0^+\]&lt;p&gt;时能量直接急剧增大：&lt;/p&gt;
+\[E_{\rm barrier}(J)\rightarrow\infty.\]&lt;p&gt;于是：&lt;/p&gt;
+\[\boxed{ \text{合法性从“事后检测条件” 升级为“求解空间本身的边界”。} }\]&lt;p&gt;2021 年的 Codimensional IPC 又把这种思想扩展到薄结构，并提出 \(C^2\) constitutive barrier，把 strain limiting 也直接作为能量势处理，从而把应变限制与弹性、接触放进同一个最小化框架。&lt;/p&gt;
+&lt;p&gt;这是一种很强的统一建模哲学：&lt;/p&gt;
+\[\boxed{ \text{如果某个状态物理上绝不能发生， 尽量让优化问题本身无法到达那里。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-摩擦怎么办&#34;&gt;11. 摩擦怎么办？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Coulomb friction：&lt;/p&gt;
+\[\|f_t\| \le \mu f_n\]&lt;p&gt;天然带非光滑性。&lt;/p&gt;
+&lt;p&gt;IPC 后续体系把摩擦也组织为耗散势。当前官方 IPC Toolkit 已提供：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;smooth dissipative friction potential；&lt;/li&gt;
+&lt;li&gt;lagged dissipative friction potential；&lt;/li&gt;
+&lt;li&gt;friction potential derivatives。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此整体框架逐渐变成：&lt;/p&gt;
+\[\boxed{ E_{\rm inertia} + E_{\rm elasticity} + E_{\rm contact} + D_{\rm friction}. }\]&lt;p&gt;这比：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve elasticity
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve collision
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve friction
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;的模块拼接更统一。&lt;/p&gt;
+&lt;p&gt;代价则是：&lt;/p&gt;
+\[\boxed{\text{你必须解决一个更困难的全局非线性优化问题。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-ipc-的最大代价也恰恰来自-barrier&#34;&gt;12. IPC 的最大代价也恰恰来自 Barrier
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;当：&lt;/p&gt;
+\[d\rightarrow0,\]&lt;p&gt;barrier curvature 会迅速增大。&lt;/p&gt;
+&lt;p&gt;也就是说 Hessian：&lt;/p&gt;
+\[\nabla^2 B(d)\]&lt;p&gt;可能非常大。&lt;/p&gt;
+&lt;p&gt;于是整个 Newton system：&lt;/p&gt;
+\[H\Delta x=-g\]&lt;p&gt;变得：&lt;/p&gt;
+\[\boxed{\text{ill-conditioned}.}\]&lt;p&gt;这不是实现 bug，而是 barrier formulation 的结构性代价：&lt;/p&gt;
+&lt;p&gt;为了形成一道几乎不可穿越的“无限高能量墙”，它自然会在墙附近产生极大的 stiffness。&lt;/p&gt;
+&lt;p&gt;这会导致：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Newton iteration 增加；&lt;/li&gt;
+&lt;li&gt;linear solve 更难；&lt;/li&gt;
+&lt;li&gt;preconditioner 更重要；&lt;/li&gt;
+&lt;li&gt;contact-heavy scene 成本明显升高。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;有意思的是，2025 年底出现的 barrier-free penetration-free elastodynamics 工作正明确把“logarithmic barrier 导致病态线性系统”和 TOI locking 列为 IPC 的两个主要效率瓶颈，并尝试以 augmented-Lagrangian/constrained-optimization 路线解决。&lt;/p&gt;
+&lt;p&gt;所以 IPC 很强，但并没有终结接触算法研究。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这也是为什么ipc-很稳定不等于适合游戏实时物理&#34;&gt;13. 这也是为什么“IPC 很稳定”不等于“适合游戏实时物理”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;IPC 原论文解决的主要目标是：&lt;/p&gt;
+\[\boxed{\text{robustness + accuracy + geometric validity}.}\]&lt;p&gt;游戏引擎通常还要求：&lt;/p&gt;
+\[\boxed{\text{严格帧预算}.}\]&lt;p&gt;例如：&lt;/p&gt;
+\[16.7\text{ ms/frame}.\]&lt;p&gt;Newton + sparse Hessian + CCD + line search + barrier contact 的成本，与几十次高度并行的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;/XPBD kernel 并不是一个工程目标。&lt;/p&gt;
+&lt;p&gt;所以可以粗略理解：&lt;/p&gt;
+\[\text{XPBD} \rightarrow \boxed{\text{budget-first}}\]&lt;p&gt;而 IPC：&lt;/p&gt;
+\[\rightarrow \boxed{\text{robustness/validity-first}}.\]&lt;p&gt;当然两边正在互相靠近：IPC 后续已经有 reduced、GPU、codimensional 等大量加速方向；例如 Medial IPC 将 reduced deformable simulation 与 IPC contact 结合以提高效率。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-一个对自研求解器非常重要的架构启发&#34;&gt;14. 一个对自研求解器非常重要的架构启发
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果现在设计一个软体 solver，可以把碰撞系统分成三个职责，而不要混成一个“collision module”：&lt;/p&gt;
+\[\boxed{\text{Detection}}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\text{哪些 primitive 可能接触？}\]&lt;p&gt;包括 broad phase / narrow phase。&lt;/p&gt;
+&lt;p&gt;第二层：&lt;/p&gt;
+\[\boxed{\text{Continuous feasibility}}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\text{沿当前运动方向最多可以走多远而不穿透？}\]&lt;p&gt;这就是 CCD / TOI。&lt;/p&gt;
+&lt;p&gt;第三层：&lt;/p&gt;
+\[\boxed{\text{Contact response}}\]&lt;p&gt;回答：&lt;/p&gt;
+\[\text{合法区域内部应该选择哪个状态？}\]&lt;p&gt;可以是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;impulse；&lt;/li&gt;
+&lt;li&gt;complementarity；&lt;/li&gt;
+&lt;li&gt;XPBD constraint；&lt;/li&gt;
+&lt;li&gt;penalty；&lt;/li&gt;
+&lt;li&gt;barrier potential；&lt;/li&gt;
+&lt;li&gt;augmented Lagrangian。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{ \text{CCD 和 contact constraint 并不是竞争方案； 它们处于不同层级。} }\]&lt;p&gt;这点非常重要。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-这也解释了为什么只加-ccd不能解决软体坍缩&#34;&gt;15. 这也解释了为什么“只加 CCD”不能解决软体坍缩
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设 CCD 完美保证：&lt;/p&gt;
+\[\boxed{\text{surface 永远不互穿。}}\]&lt;p&gt;软体仍然可能：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;体积塌缩；&lt;/li&gt;
+&lt;li&gt;tet 退化；&lt;/li&gt;
+&lt;li&gt;\(J\rightarrow0\)；&lt;/li&gt;
+&lt;li&gt;弹性能异常；&lt;/li&gt;
+&lt;li&gt;velocity reconstruction 注入能量。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因为 CCD 只保证：&lt;/p&gt;
+\[\boxed{\text{collision geometry admissibility}.}\]&lt;p&gt;它并不保证：&lt;/p&gt;
+\[\boxed{\text{constitutive admissibility}}\]&lt;p&gt;或：&lt;/p&gt;
+\[\boxed{\text{energy stability}.}\]&lt;p&gt;所以一个软体求解器至少存在几套不同合法性：&lt;/p&gt;
+\[\boxed{ d_{\rm contact}&gt;0 }\]\[\boxed{ J&gt;0 }\]\[\boxed{ \text{finite constitutive energy} }\]\[\boxed{ \text{consistent velocity/energy update}. }\]&lt;p&gt;IPC 的价值就在于，它展示了如何把前几个条件尽量统一进一个 variational optimization framework。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-一个很值得自己实现的二维最小实验&#34;&gt;16. 一个很值得自己实现的二维最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;不需要直接实现完整 IPC。&lt;/p&gt;
+&lt;p&gt;只做：&lt;/p&gt;
+&lt;p&gt;一个质量点：&lt;/p&gt;
+\[x=(x,y)\]&lt;p&gt;自由落向地面：&lt;/p&gt;
+\[y=0.\]&lt;p&gt;定义：&lt;/p&gt;
+\[E(x) = \frac{m}{2h^2} \|x-\tilde x\|^2 + mgy + \kappa B(y).\]&lt;p&gt;例如选择一个只在：&lt;/p&gt;
+\[0&lt;y&lt;\hat d\]&lt;p&gt;激活的 barrier。&lt;/p&gt;
+&lt;p&gt;然后 Newton：&lt;/p&gt;
+\[H\Delta x=-g.\]&lt;p&gt;每次搜索：&lt;/p&gt;
+\[x+\alpha\Delta x\]&lt;p&gt;前计算：&lt;/p&gt;
+\[\alpha_{\rm CCD}.\]&lt;p&gt;强制：&lt;/p&gt;
+\[\alpha&lt;\alpha_{\rm CCD}.\]&lt;p&gt;比较三个版本：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;penalty only；&lt;/li&gt;
+&lt;li&gt;barrier without CCD-safe line search；&lt;/li&gt;
+&lt;li&gt;barrier + CCD-safe line search。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;真正应该记录：&lt;/p&gt;
+\[y_{\min},\]\[B(y),\]\[\|\nabla B\|,\]\[\alpha_{\rm CCD},\]&lt;p&gt;Newton iterations。&lt;/p&gt;
+&lt;p&gt;你会非常直观地看到：&lt;/p&gt;
+\[\boxed{ \text{Barrier 在塑造目标函数， CCD 在塑造优化器允许采取的路径。} }\]&lt;p&gt;这比直接阅读完整 IPC C++ 实现更容易建立正确心智模型。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-对可靠性方法也有一个意外的迁移价值&#34;&gt;17. 对可靠性方法也有一个意外的迁移价值
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;IPC 的思想其实对应一种很一般的可靠性建模原则。&lt;/p&gt;
+&lt;p&gt;传统可靠性：&lt;/p&gt;
+\[g(x)&lt;0\]&lt;p&gt;意味着进入 failure region。&lt;/p&gt;
+&lt;p&gt;通常我们允许数值模型进入失败区，再计算：&lt;/p&gt;
+\[P(g&lt;0).\]&lt;p&gt;但对于某些&lt;strong&gt;数学上绝不允许的状态&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(J\le0\)；&lt;/li&gt;
+&lt;li&gt;negative density；&lt;/li&gt;
+&lt;li&gt;invalid geometry；&lt;/li&gt;
+&lt;li&gt;impossible parameter combination；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;把它们作为 ordinary penalty 处理并不理想。&lt;/p&gt;
+&lt;p&gt;IPC 提醒我们区分：&lt;/p&gt;
+\[\boxed{\text{physical failure}}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{\text{mathematical inadmissibility}}.\]&lt;p&gt;前者应该允许模型进入，然后统计概率。&lt;/p&gt;
+&lt;p&gt;后者应该直接定义：&lt;/p&gt;
+\[\boxed{\text{feasible domain boundary}.}\]&lt;p&gt;这是做参数化 FEM、代理模型和自动采样时很容易忽略的一层。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;18-一个值得记住的思想feasibility-和-accuracy-分离&#34;&gt;18. 一个值得记住的思想：feasibility 和 accuracy 分离
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;IPC 有一个很有工程价值的设计哲学：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;数值精度可以降低，但几何可行性尽量不能降低。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;论文专门测试了较宽松求解容差；在动画等低精度需求下，即使降低优化精度，也仍可以维持 feasibility 和 plausible behavior。&lt;/p&gt;
+&lt;p&gt;这实际上给物理引擎设计提供了一种很有价值的层次：&lt;/p&gt;
+\[\text{Hard invariant}\]&lt;p&gt;例如：&lt;/p&gt;
+\[d&gt;0,\qquad J&gt;0\]&lt;p&gt;与&lt;/p&gt;
+\[\text{Soft accuracy target}\]&lt;p&gt;例如：&lt;/p&gt;
+\[\|\nabla E\|&lt;\epsilon\]&lt;p&gt;应该分开。&lt;/p&gt;
+&lt;p&gt;实时引擎完全可以允许：&lt;/p&gt;
+\[\epsilon=10^{-3}\]&lt;p&gt;而不是：&lt;/p&gt;
+\[10^{-8},\]&lt;p&gt;但最好不要允许：&lt;/p&gt;
+\[J&lt;0.\]&lt;p&gt;这是比“所有东西都调 tolerance”更清晰的求解器设计原则。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;19-一个更值得继续追的方向ipc-本身也在演化&#34;&gt;19. 一个更值得继续追的方向：IPC 本身也在演化
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;IPC 并没有停在 2020 年。&lt;/p&gt;
+&lt;p&gt;2021 年的 **Codimensional IPC（C-IPC）**进一步统一了：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;volumetric solids；&lt;/li&gt;
+&lt;li&gt;shells / cloth；&lt;/li&gt;
+&lt;li&gt;rods / hair；&lt;/li&gt;
+&lt;li&gt;particles；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;并加入 thickness 与 strain limiting 等处理，使 codimension 0/1/2/3 的结构可以在统一框架中进行摩擦接触。&lt;/p&gt;
+&lt;p&gt;更值得注意的是，IPC Toolkit 到 &lt;strong&gt;2026 年 2 月发布的 v1.5.0&lt;/strong&gt; 又加入了：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Geometric Contact Potential；&lt;/li&gt;
+&lt;li&gt;Offset Geometric Contact；&lt;/li&gt;
+&lt;li&gt;fully parallel LBVH broad phase；&lt;/li&gt;
+&lt;li&gt;collision normal / signed distance / dihedral angle 的 gradient 与 Hessian utilities。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以 IPC 已经逐渐从“一篇 SIGGRAPH 算法”发展成一个&lt;strong&gt;接触动力学方法族与工程工具链&lt;/strong&gt;。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;20-它和上一期的-complementarity-在哪里分叉&#34;&gt;20. 它和上一期的 Complementarity 在哪里分叉？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;complementarity&#34; tabindex=&#34;0&#34;&gt;Complementarity&lt;/span&gt; 接触通常写：&lt;/p&gt;
+\[g\ge0, \qquad \lambda\ge0, \qquad g\lambda=0.\]&lt;p&gt;它显式引入 dual variable：&lt;/p&gt;
+\[\lambda.\]&lt;p&gt;IPC 原始 primal barrier formulation 则主要在位置变量：&lt;/p&gt;
+\[x\]&lt;p&gt;上优化：&lt;/p&gt;
+\[\min_x E(x)+\kappa B(x).\]&lt;p&gt;因此可以粗略比较：&lt;/p&gt;
+\[\boxed{ \text{Complementarity：显式处理约束反力/冲量} }\]\[\boxed{ \text{IPC：把约束效应编码进 primal energy landscape} }\]&lt;p&gt;IPC 原论文也特别讨论了为什么采用 primal barrier：如果对数量巨大的 collision primitive pair 都增加拉格朗日乘子，系统规模会大幅增加，因此他们选择了更适合大量接触约束的 primal formulation。&lt;/p&gt;
+&lt;p&gt;这是理解两条现代接触路线差异的很好切口。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;21-ipc-为什么还需要-broad-phase--constraint-culling&#34;&gt;21. IPC 为什么还需要 broad phase / constraint culling？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;理论上所有三角形、边、点都可能碰撞。&lt;/p&gt;
+&lt;p&gt;如果有：&lt;/p&gt;
+\[N\]&lt;p&gt;个 primitives，&lt;/p&gt;
+&lt;p&gt;naive pair 数量：&lt;/p&gt;
+\[O(N^2).\]&lt;p&gt;这是完全不能接受的。&lt;/p&gt;
+&lt;p&gt;但 IPC barrier 有局部支持：&lt;/p&gt;
+\[d&gt;\hat d \Rightarrow b(d)=0.\]&lt;p&gt;因此只需要维护：&lt;/p&gt;
+\[\boxed{ \text{距离足够近的 active constraint set} }\]&lt;p&gt;而不是所有几何 pair。&lt;/p&gt;
+&lt;p&gt;这也是现代 IPC Toolkit 持续优化 broad phase 的原因。2026 年 2 月发布的 v1.5.0 已加入 fully parallel LBVH broad phase，同时加入新的接触势 formulation。&lt;/p&gt;
+&lt;p&gt;所以一个实际 IPC solver 的性能并不仅由：&lt;/p&gt;
+\[\text{linear solver}\]&lt;p&gt;决定。&lt;/p&gt;
+&lt;p&gt;collision candidate generation 本身就是大头。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;22-c-ipc-为什么很重要&#34;&gt;22. C-IPC 为什么很重要？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;原始 IPC 主要处理实体表面接触。&lt;/p&gt;
+&lt;p&gt;但很多图形学对象是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;cloth：二维曲面；&lt;/li&gt;
+&lt;li&gt;rods：一维曲线；&lt;/li&gt;
+&lt;li&gt;particles：零维点；&lt;/li&gt;
+&lt;li&gt;volumetric solids：三维体。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;2021 年的 &lt;strong&gt;Codimensional IPC（C-IPC）&lt;/strong&gt; 把这一体系扩展到：&lt;/p&gt;
+\[0D,1D,2D,3D\]&lt;p&gt;几何组合，并加入厚度、应变限制和摩擦等处理。论文明确强调其目标是让 mixed-dimensional systems 仍保持 interpenetration-free。&lt;/p&gt;
+&lt;p&gt;它还提出 ACCD——一种 additive continuous collision detection，用 conservative advancement 逐步逼近 time of impact，主要用于薄结构极严格的碰撞精度要求。&lt;/p&gt;
+&lt;p&gt;这说明 IPC 真正形成的已经不是一个单点算法，而是一套：&lt;/p&gt;
+\[\boxed{ \text{optimization-based contact simulation family} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;23-这对-tet-inversion-也有直接启发&#34;&gt;23. 这对 tet inversion 也有直接启发
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设材料要求：&lt;/p&gt;
+\[J=\det F&gt;0.\]&lt;p&gt;普通 Neo-Hookean 在某些实现或数值路径下，可能仍然面临：&lt;/p&gt;
+\[J\rightarrow0\]&lt;p&gt;甚至跨入：&lt;/p&gt;
+\[J&lt;0.\]&lt;p&gt;IPC 类思想会促使你把问题拆成：&lt;/p&gt;
+\[\boxed{ \text{材料能量是否阻止 }J\to0？ }\]&lt;p&gt;以及：&lt;/p&gt;
+\[\boxed{ \text{Newton / XPBD correction step 是否可能一步跨过 }J=0？ }\]&lt;p&gt;这与接触完全同构：&lt;/p&gt;
+\[d&gt;0\]&lt;p&gt;对应：&lt;/p&gt;
+\[J&gt;0.\]&lt;p&gt;所以你会自然想到：&lt;/p&gt;
+\[\boxed{ \text{barrier on }J + \text{step-size feasibility check} }\]&lt;p&gt;这就是 IPC formulation 对软体反转问题很强的迁移启发。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;24-一个很实用的自研调试指标feasibility-margin&#34;&gt;24. 一个很实用的自研调试指标：Feasibility Margin
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果做类似 IPC/Barrier 的 solver，我会建议每个 Newton/constraint iteration 都记录：&lt;/p&gt;
+\[d_{\min}\]&lt;p&gt;以及：&lt;/p&gt;
+\[J_{\min}.\]&lt;p&gt;再记录候选方向：&lt;/p&gt;
+\[p\]&lt;p&gt;对应的：&lt;/p&gt;
+\[\alpha_{\rm feasible}.\]&lt;p&gt;比如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;iteration   d_min      J_min      alpha_CCD
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;1           4.2e-3     0.82       1.00
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;2           9.1e-4     0.61       0.74
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;3           2.6e-4     0.49       0.21
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;4           2.1e-4     0.52       0.88
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果长期出现：&lt;/p&gt;
+\[\alpha_{\rm feasible}\ll1,\]&lt;p&gt;说明你的搜索方向一直猛烈撞向可行域边界。&lt;/p&gt;
+&lt;p&gt;这时真正的问题可能并不是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;CCD 太保守。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;更可能是：&lt;/p&gt;
+\[\boxed{ \text{gradient/Hessian/constraint coupling 产生了很差的优化方向。} }\]&lt;p&gt;这是一种比单看 penetration count 更有价值的 solver diagnostic。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;25-先把三个经常混在一起的问题拆开&#34;&gt;25. 先把三个经常混在一起的问题拆开
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设一个顶点正在高速撞向三角形。&lt;/p&gt;
+&lt;h3 id=&#34;问题-a会不会撞&#34;&gt;问题 A：会不会撞？
+&lt;/h3&gt;&lt;p&gt;这是 collision detection：&lt;/p&gt;
+\[d(x)=0?\]&lt;p&gt;如果只检查：&lt;/p&gt;
+\[d(x^n)&gt;0,\qquad d(x^{n+1})&gt;0,\]&lt;p&gt;高速运动可能出现：&lt;/p&gt;
+\[\text{start} \rightarrow \boxed{\text{穿过}} \rightarrow \text{end}.\]&lt;p&gt;两个离散时刻都没有重叠。&lt;/p&gt;
+&lt;p&gt;CCD 因而检查整条轨迹：&lt;/p&gt;
+\[x(t)=x^n+t(x^{n+1}-x^n), \qquad t\in[0,1],\]&lt;p&gt;寻找最早：&lt;/p&gt;
+\[d(x(t))=0.\]&lt;p&gt;它解决的是：&lt;/p&gt;
+\[\boxed{\text{collision detection / step validity}.}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h3 id=&#34;问题-b发生接触以后产生多大的力&#34;&gt;问题 B：发生接触以后，产生多大的力？
+&lt;/h3&gt;&lt;p&gt;这是 contact response。&lt;/p&gt;
+&lt;p&gt;例如 penalty：&lt;/p&gt;
+\[E_c(d)= \frac{k}{2}\min(d,0)^2.\]&lt;p&gt;或者 constraint：&lt;/p&gt;
+\[d(x)\ge0.\]&lt;p&gt;它解决：&lt;/p&gt;
+\[\boxed{\text{contact mechanics}.}\]&lt;hr&gt;
+&lt;h3 id=&#34;问题-c数值迭代过程本身会不会穿过去&#34;&gt;问题 C：数值迭代过程本身会不会穿过去？
+&lt;/h3&gt;&lt;p&gt;这是第三个问题。&lt;/p&gt;
+&lt;p&gt;假设 Newton 当前状态：&lt;/p&gt;
+\[x_k\]&lt;p&gt;合法：&lt;/p&gt;
+\[d(x_k)&gt;0.\]&lt;p&gt;求得搜索方向：&lt;/p&gt;
+\[p_k.\]&lt;p&gt;直接更新：&lt;/p&gt;
+\[x_{k+1}=x_k+p_k\]&lt;p&gt;完全可能越过接触面。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[\boxed{\text{最终解合法}}\]&lt;p&gt;和：&lt;/p&gt;
+\[\boxed{\text{求解路径始终合法}}\]&lt;p&gt;是两件事。&lt;/p&gt;
+&lt;p&gt;IPC 特别重视后者。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;26-这也回答了ccd-是否才是碰撞合法的决定性约束&#34;&gt;26. 这也回答了“CCD 是否才是碰撞合法的决定性约束”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;更精确的回答可以写成：&lt;/p&gt;
+\[\boxed{ \text{CCD 对“搜索路径不跨越接触边界”具有决定性作用； 但它本身不定义最终合法解。} }\]&lt;p&gt;在 IPC 中：&lt;/p&gt;
+\[\boxed{\text{CCD = feasible step guardian}}\]\[\boxed{\text{barrier = contact response + boundary repulsion}}\]\[\boxed{\text{nonlinear optimizer = global reconciliation}}\]&lt;p&gt;三者缺一不可。&lt;/p&gt;
+&lt;p&gt;如果只有 barrier，没有 CCD：&lt;/p&gt;
+\[\boxed{\text{Newton step 可能跨过 barrier singularity}.}\]&lt;p&gt;如果只有 CCD，没有 barrier：&lt;/p&gt;
+\[\boxed{\text{你知道哪里不能去，却不知道应该去哪里}.}\]&lt;p&gt;如果两者都有，但全局求解没有充分收敛：&lt;/p&gt;
+\[\boxed{\text{弹性与接触仍可能处于错误的耦合平衡}.}\]&lt;p&gt;这就是 IPC 最值得建立的整体认识。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;27-还有一个值得知道的最新方向&#34;&gt;27. 还有一个值得知道的最新方向
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;IPC 的思路非常强，但“每个优化步都依赖保守 CCD”也是性能瓶颈。&lt;/p&gt;
+&lt;p&gt;因此近年的研究开始探索另一条路线。2025 年的 &lt;strong&gt;Offset Geometric Contact (OGC)&lt;/strong&gt; 使用 offset geometry 与局部 displacement bounds 来构造有限时间步的接触处理，在其目标场景中试图减少昂贵 CCD 的依赖，并强调适合 GPU 的局部操作。&lt;/p&gt;
+&lt;p&gt;另一方面，IPC 自身也在继续理论化。Ferguson 的研究页面列出的 &lt;strong&gt;Convergent Incremental Potential Contact&lt;/strong&gt; 从连续接触模型出发重新构造离散形式，研究网格细化下 contact solution 的收敛性——也就是进一步追问：&lt;/p&gt;
+\[\boxed{\text{离散 barrier contact 是否真的收敛到一个连续物理模型？}}\]&lt;p&gt;这说明现代接触研究已经从：&lt;/p&gt;
+\[\text{“别穿透”}\]&lt;p&gt;进一步走向：&lt;/p&gt;
+\[\boxed{ \text{几何保证} + \text{物理一致性} + \text{离散收敛} + \text{GPU 效率}. }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;IPC 最值得记住的并不是“用了 barrier function”。&lt;/p&gt;
+&lt;p&gt;真正重要的是它把接触拆清楚了：&lt;/p&gt;
+\[\boxed{ \text{Barrier 决定可行域边界附近的动力学； CCD 保证数值搜索轨迹永远留在可行域内。} }\]&lt;p&gt;因此：&lt;/p&gt;
+\[\text{Collision detection} \neq \text{Collision response}.\]&lt;p&gt;更完整的结构是：&lt;/p&gt;
+\[\text{Incremental dynamics}\]\[+\]\[\boxed{\text{contact barrier potential}}\]\[+\]\[\boxed{\text{CCD-filtered line search}}\]\[+\]\[\text{nonlinear optimization}\]\[\downarrow\]\[\boxed{\text{intersection-free contacting elastodynamics}.}\]&lt;p&gt;对物理求解器开发，最有迁移价值的思想可以压缩成：&lt;/p&gt;
+\[\boxed{ \text{不要只在非法状态出现后修复它； 对于真正不可接受的状态， 更强的设计是让求解器的可行路径从一开始就无法穿过它。} }\]&lt;p&gt;这也是 IPC 在整个接触动力学知识体系中非常值得理解的位置。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Li, Ferguson, Schneider et al., &lt;strong&gt;&lt;em&gt;Incremental Potential Contact: Intersection- and Inversion-free, Large-Deformation Dynamics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM Transactions on Graphics / SIGGRAPH 2020&lt;/em&gt;。IPC 原始论文，最值得精读 barrier、CCD-filtered line search 和 incremental potential 三者怎样闭合成一个求解器。&lt;br&gt;
+Zachary Ferguson 的 IPC 论文与项目入口&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Ferguson et al., &lt;strong&gt;&lt;em&gt;Intersection-free Rigid Body Dynamics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG / SIGGRAPH 2021&lt;/em&gt;。如果想理解“为什么刚体 CCD 比线性 vertex trajectory 更麻烦”，这篇很重要：刚体点实际沿曲线运动，论文专门构造 curved-trajectory conservative CCD。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Wang et al., &lt;strong&gt;&lt;em&gt;A Large Scale Benchmark and an Inclusion-Based Algorithm for Continuous Collision Detection&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2021/2022。适合继续深入你最近特别关心的 CCD：论文系统 benchmark 了 CCD 的 correctness、accuracy 与 efficiency，并给出 floating-point 下具有正确性保证的 inclusion-based 方法。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Chen et al., &lt;strong&gt;&lt;em&gt;A Unified Newton Barrier Method for Multibody Dynamics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;SIGGRAPH 2022&lt;/em&gt;。把 IPC 的思想进一步扩展到刚体、软体、不同维度几何、关节约束和摩擦统一求解，很适合理解 barrier optimization 怎样从“软体接触算法”成长为通用 multibody solver architecture。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果想看下一代路线，可以关注 Chen et al., &lt;strong&gt;&lt;em&gt;Offset Geometric Contact&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG / SIGGRAPH 2025&lt;/em&gt;。它直接针对 IPC 一类方法的 CCD 成本探索 GPU-friendly 的替代设计，是理解当前 contact solver 前沿取舍很好的对照组。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Projective Dynamics：local–global 分解如何同时得到速度、稳定性与并行性</title>
         <link>https://assranai.github.io/cards/03-projective-dynamics/</link>
-        <pubDate>Sun, 16 Aug 2026 00:00:00 +0000</pubDate>
+        <pubDate>Fri, 02 Oct 2026 00:00:00 +0000</pubDate>
         
         <guid>https://assranai.github.io/cards/03-projective-dynamics/</guid>
-        <description>&lt;h1 id=&#34;projective-dynamics把pbd-的投影变成真正的能量求解&#34;&gt;Projective Dynamics：把“PBD 的投影”变成真正的能量求解
-&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;Projective Dynamics&lt;/span&gt;（PD，投影动力学）&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;领域：有限元 × 物理引擎 × 软体动力学&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Projective Dynamics 值得学，因为它正好卡在两个世界中间：&lt;/p&gt;
-\[\boxed{\text{PBD 的几何投影}} \quad\longleftrightarrow\quad \boxed{\text{FEM 的能量最小化}}\]&lt;p&gt;它由 Bouaziz、Martin、Liu、Kavan、Pauly 在 SIGGRAPH 2014 提出，目标就是建立一座从 nodal FEM 到 Position Based Dynamics 的桥梁：保留隐式积分的稳定性与能量解释，同时利用局部约束投影获得接近实时应用所需要的效率。原论文明确把它描述为一种 projection-based implicit Euler integrator。&lt;/p&gt;
-&lt;p&gt;这也是理解 &lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt;、quasi-Newton FEM、ADMM deformables 甚至 differentiable physics 的一个非常好的中间节点。&lt;/p&gt;
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;Projective Dynamics&lt;/span&gt;（PD，投影动力学）与 Local–Global Solver&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：物理引擎 × 软体动力学 × 有限元 × 优化算法&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天选 Projective Dynamics，因为它正好位于一个很有价值的交叉点：&lt;/p&gt;
+\[\boxed{\text{FEM 的能量建模}} \quad+\quad \boxed{\text{PBD 的约束投影}} \quad+\quad \boxed{\text{数值优化的 alternating minimization}}.\]&lt;p&gt;它不是简单的“另一种 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;”。2014 年 Bouaziz、Martin、Liu、Kavan 与 Pauly 提出的原始工作，就是试图在 nodal FEM 与 Position-Based Dynamics 之间建立桥梁：仍然从能量和隐式时间积分出发，却把某类非线性问题改写成极其便宜的局部投影和一个可预分解的全局线性系统。&lt;/p&gt;
+&lt;p&gt;对自己写软体求解器尤其值得学，因为 PD 揭示了一个比算法本身更通用的设计原则：&lt;/p&gt;
+\[\boxed{\text{不要总想着怎样更快地求非线性方程； 有时应该重新设计问题，使大部分非线性只存在于局部。}}\]&lt;hr&gt;
+&lt;h2 id=&#34;1-从隐式-euler-真正在求什么开始&#34;&gt;1. 从隐式 Euler 真正在求什么开始
+&lt;/h2&gt;&lt;p&gt;设节点位置为&lt;/p&gt;
+\[x,\]&lt;p&gt;上一时刻位置、速度为&lt;/p&gt;
+\[x_n,\quad v_n,\]&lt;p&gt;时间步为 \(h\)。&lt;/p&gt;
+&lt;p&gt;忽略一些细节，隐式 Euler 可以写成一个最小化问题：&lt;/p&gt;
+\[\boxed{ x_{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-y\|_M^2 + E(x) \right] }\]&lt;p&gt;其中&lt;/p&gt;
+\[y=x_n+h v_n+h^2M^{-1}f_{\rm ext},\]&lt;p&gt;而&lt;/p&gt;
+\[E(x)\]&lt;p&gt;是弹性势能。&lt;/p&gt;
+&lt;p&gt;第一项的意义是：&lt;/p&gt;
+\[\boxed{\text{惯性希望 }x\text{ 靠近自由运动预测 }y}\]&lt;p&gt;第二项则是：&lt;/p&gt;
+\[\boxed{\text{材料希望 }x\text{ 满足弹性规律}.}\]&lt;p&gt;所以一次时间步本质上是在求：&lt;/p&gt;
+\[\boxed{\text{惯性与弹性能量之间的最优折中}.}\]&lt;p&gt;这就是所谓 &lt;strong&gt;optimization integrator&lt;/strong&gt; 的视角，也是理解 PD、ADMM-PD、后来的 differentiable PD 等方法的共同入口。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h2 id=&#34;1-先看它试图解决什么问题&#34;&gt;1. 先看它试图解决什么问题
-&lt;/h2&gt;&lt;p&gt;普通 FEM 的隐式时间积分可以写成：&lt;/p&gt;
-\[x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} (x-y)^T M(x-y) + E(x) \right],\]&lt;p&gt;其中&lt;/p&gt;
-\[y=x^n+h v^n+h^2M^{-1}f_{\rm ext}\]&lt;p&gt;可以理解为惯性预测位置。&lt;/p&gt;
-&lt;p&gt;这个形式其实很好：&lt;/p&gt;
+&lt;h1 id=&#34;2-普通非线性-fem-为什么贵&#34;&gt;2. 普通非线性 FEM 为什么贵？
+&lt;/h1&gt;&lt;p&gt;如果&lt;/p&gt;
+\[E(x)\]&lt;p&gt;是一般 Neo-Hookean 能量，那么需要解：&lt;/p&gt;
+\[\nabla E_{\rm total}(x)=0.\]&lt;p&gt;Newton 法每轮大致需要：&lt;/p&gt;
+\[H(x_k)\Delta x=-g(x_k),\]&lt;p&gt;其中 Hessian&lt;/p&gt;
+\[H(x_k)\]&lt;p&gt;随当前形变改变。&lt;/p&gt;
+&lt;p&gt;于是每个时间步内部反复：&lt;/p&gt;
+\[\text{组装 Hessian} \rightarrow \text{factorization / linear solve} \rightarrow \text{更新} \rightarrow \text{再组装}.\]&lt;p&gt;真正昂贵的往往不是计算一个 tetrahedron 的能量，而是：&lt;/p&gt;
+\[\boxed{\text{全局非线性导致全局线性系统不断变化。}}\]&lt;p&gt;PD 的突破口就是这里。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-pd-对势能施加了一个特殊结构&#34;&gt;3. PD 对势能施加了一个特殊结构
+&lt;/h1&gt;&lt;p&gt;考虑一个约束能量：&lt;/p&gt;
+\[\boxed{ E_i(x) = \frac{w_i}{2} \min_{p_i\in C_i} \|A_i x-p_i\|^2. }\]&lt;p&gt;这里：&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;有明确能量；&lt;/li&gt;
-&lt;li&gt;时间积分稳定；&lt;/li&gt;
-&lt;li&gt;材料模型物理意义清楚。&lt;/li&gt;
+&lt;li&gt;\(A_ix\)：从全局位置抽取某个局部形变量；&lt;/li&gt;
+&lt;li&gt;\(C_i\)：合法局部状态的集合；&lt;/li&gt;
+&lt;li&gt;\(p_i\)：离 \(A_ix\) 最近的合法状态；&lt;/li&gt;
+&lt;li&gt;\(w_i\)：约束刚度。&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;问题在于：&lt;/p&gt;
-\[E(x)\]&lt;p&gt;通常高度非线性。&lt;/p&gt;
-&lt;p&gt;Newton 法需要反复处理：&lt;/p&gt;
-\[H(x)\Delta x=-g(x),\]&lt;p&gt;而 Hessian&lt;/p&gt;
-\[H(x)=\frac{M}{h^2}+\nabla^2E(x)\]&lt;p&gt;随着形变改变。&lt;/p&gt;
-&lt;p&gt;对于大规模软体，这意味着：&lt;/p&gt;
-\[\text{assembly} + \text{factorization / iterative solve}\]&lt;p&gt;都很贵。&lt;/p&gt;
-&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt; 走了另一条路：&lt;/p&gt;
-\[C_i(x)=0\]&lt;p&gt;然后直接投影：&lt;/p&gt;
-\[x\leftarrow x+\Delta x_i.\]&lt;p&gt;速度很快，鲁棒性高，但物理能量结构相对弱。&lt;/p&gt;
-&lt;p&gt;PD 的问题可以浓缩成：&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;&lt;strong&gt;有没有办法让“投影”本身变成能量最小化的一部分？&lt;/strong&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;答案是：可以。&lt;/p&gt;
+&lt;p&gt;这句话非常关键。&lt;/p&gt;
+&lt;p&gt;PD 没有直接说：&lt;/p&gt;
+\[\boxed{\text{这个约束必须满足}}\]&lt;p&gt;而是定义：&lt;/p&gt;
+\[\boxed{\text{当前状态距离“合法状态集合”有多远。}}\]&lt;p&gt;因此：&lt;/p&gt;
+\[E_i(x) = \frac{w_i}{2} d^2(A_ix,C_i).\]&lt;p&gt;这就是 &lt;strong&gt;projective potential&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;原始 PD 工作正是通过这种特殊势能，使 continuum-based constraints 也能进入统一 local–global 求解结构。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;2-projective-dynamics-最关键的一步引入辅助变量&#34;&gt;2. Projective Dynamics 最关键的一步：引入辅助变量 \(p_i\)
-&lt;/h1&gt;&lt;p&gt;PD 对每个约束定义一种特殊能量：&lt;/p&gt;
-\[E_i(x) = \min_{p_i\in\mathcal M_i} w_i \|G_i x-p_i\|^2.\]&lt;p&gt;这里：&lt;/p&gt;
+&lt;h1 id=&#34;4-一个最简单的弹簧例子&#34;&gt;4. 一个最简单的弹簧例子
+&lt;/h1&gt;&lt;p&gt;两节点：&lt;/p&gt;
+\[x_1,x_2\]&lt;p&gt;静止长度：&lt;/p&gt;
+\[l_0.\]&lt;p&gt;令：&lt;/p&gt;
+\[A_ix=x_1-x_2.\]&lt;p&gt;合法集合：&lt;/p&gt;
+\[C_i= \{p:\|p\|=l_0\}.\]&lt;p&gt;那么：&lt;/p&gt;
+\[p_i = \operatorname{Proj}_{C_i}(x_1-x_2) = l_0 \frac{x_1-x_2}{\|x_1-x_2\|}.\]&lt;p&gt;于是势能：&lt;/p&gt;
+\[E_i = \frac{k}{2} \| (x_1-x_2)-p_i \|^2.\]&lt;p&gt;你会发现：&lt;/p&gt;
+\[p_i\]&lt;p&gt;的求解完全只依赖这根弹簧。&lt;/p&gt;
+&lt;p&gt;另一根弹簧：&lt;/p&gt;
+\[p_j\]&lt;p&gt;和它无关。&lt;/p&gt;
+&lt;p&gt;因此所有：&lt;/p&gt;
+\[p_1,p_2,\ldots,p_m\]&lt;p&gt;都可以：&lt;/p&gt;
+\[\boxed{\text{并行计算。}}\]&lt;p&gt;这就是 &lt;strong&gt;local step&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;5-真正漂亮的地方在-global-step&#34;&gt;5. 真正漂亮的地方在 Global Step
+&lt;/h1&gt;&lt;p&gt;如果暂时把：&lt;/p&gt;
+\[p_i\]&lt;p&gt;固定，那么总目标变成：&lt;/p&gt;
+\[\frac{1}{2h^2}(x-y)^TM(x-y) + \sum_i \frac{w_i}{2} \|A_ix-p_i\|^2.\]&lt;p&gt;这时对 \(x\) 来说已经是一个&lt;strong&gt;纯二次函数&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;求导：&lt;/p&gt;
+\[\frac{1}{h^2}M(x-y) + \sum_iw_iA_i^T(A_ix-p_i) =0.\]&lt;p&gt;整理：&lt;/p&gt;
+\[\boxed{ \left( \frac{M}{h^2} + \sum_iw_iA_i^TA_i \right)x = \frac{M}{h^2}y + \sum_iw_iA_i^Tp_i. }\]&lt;p&gt;定义：&lt;/p&gt;
+\[\boxed{ K_{\rm PD} = \frac{M}{h^2} + \sum_iw_iA_i^TA_i. }\]&lt;p&gt;最重要的事情发生了：&lt;/p&gt;
+\[\boxed{K_{\rm PD}\text{ 不依赖当前 }x.}\]&lt;p&gt;只要：&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;\(G_i x\)：从当前节点状态提取某种局部形变量；&lt;/li&gt;
-&lt;li&gt;\(\mathcal M_i\)：合法局部状态组成的 manifold；&lt;/li&gt;
-&lt;li&gt;\(p_i\)：这个 manifold 上距离当前状态最近的点；&lt;/li&gt;
-&lt;li&gt;\(w_i\)：约束权重。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;这个式子的几何意义非常漂亮：&lt;/p&gt;
-\[\boxed{ \text{能量} = \text{当前局部状态距离“理想状态集合”的平方距离} }\]&lt;p&gt;例如一个弹簧。&lt;/p&gt;
-&lt;p&gt;设：&lt;/p&gt;
-\[G_i x=x_a-x_b.\]&lt;p&gt;理想状态要求弹簧长度：&lt;/p&gt;
-\[\|p_i\|=l_0.\]&lt;p&gt;那么：&lt;/p&gt;
-\[\mathcal M_i= \{p:\|p\|=l_0\}.\]&lt;p&gt;Local step 做的事情就是：&lt;/p&gt;
-\[p_i = \operatorname{proj}_{\mathcal M_i}(G_i x).\]&lt;p&gt;也就是把当前弹簧向量投影到半径：&lt;/p&gt;
-\[l_0\]&lt;p&gt;的球面上。&lt;/p&gt;
-&lt;p&gt;这就是 &lt;strong&gt;Projective&lt;/strong&gt; 这个词真正的来源。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;3-为什么这会产生一个非常高效的算法&#34;&gt;3. 为什么这会产生一个非常高效的算法？
-&lt;/h1&gt;&lt;p&gt;加入所有 \(p_i\) 后，整个时间步可以写成：&lt;/p&gt;
-\[\tilde E(x,p) = \frac{1}{2h^2}(x-y)^TM(x-y) + \sum_i w_i\|G_i x-p_i\|^2.\]&lt;p&gt;然后交替优化：&lt;/p&gt;
-\[\boxed{ \text{Local step} \rightarrow \text{Global step} \rightarrow \text{Local step} \rightarrow\cdots }\]&lt;p&gt;这就是 PD 的核心。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h2 id=&#34;local-step&#34;&gt;Local step
-&lt;/h2&gt;&lt;p&gt;固定 \(x\)，分别求：&lt;/p&gt;
-\[p_i = \arg\min_{p_i\in\mathcal M_i} \|G_i x-p_i\|^2.\]&lt;p&gt;每个 constraint 都是独立的。&lt;/p&gt;
-&lt;p&gt;因此：&lt;/p&gt;
-\[\boxed{\text{天然并行}}\]&lt;p&gt;一个 tet、一个 spring、一个 triangle 可以各算各的。&lt;/p&gt;
-&lt;p&gt;而且很多投影都有闭式解。&lt;/p&gt;
-&lt;p&gt;例如 corotated 类模型中，可以把局部 deformation gradient：&lt;/p&gt;
-\[F\]&lt;p&gt;投影到 rotation manifold：&lt;/p&gt;
-\[SO(3),\]&lt;p&gt;得到：&lt;/p&gt;
-\[R=\operatorname{polar}(F).\]&lt;p&gt;这时：&lt;/p&gt;
-\[p_i\sim R.\]&lt;p&gt;所以 local step 本质上做的是：&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;&lt;strong&gt;这个元素如果能瞬间回到一个“理想局部状态”，它最应该变成什么？&lt;/strong&gt;&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;4-global-step-才是-pd-真正强大的地方&#34;&gt;4. Global step 才是 PD 真正强大的地方
-&lt;/h1&gt;&lt;p&gt;固定所有 \(p_i\) 后，目标函数对 \(x\) 是&lt;strong&gt;纯二次函数&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;梯度为：&lt;/p&gt;
-\[\frac{1}{h^2}M(x-y) + Lx - Jp = 0.\]&lt;p&gt;于是得到：&lt;/p&gt;
-\[\boxed{ \left( \frac{M}{h^2}+L \right)x = \frac{M}{h^2}y+Jp }\]&lt;p&gt;其中：&lt;/p&gt;
-\[L=\sum_i w_iG_i^TG_i.\]&lt;p&gt;最关键的是：&lt;/p&gt;
-\[\boxed{ A= \frac{M}{h^2}+L }\]&lt;p&gt;&lt;strong&gt;不依赖当前形变 \(x\)&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;只要：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;mesh 拓扑不变；&lt;/li&gt;
-&lt;li&gt;质量不变；&lt;/li&gt;
-&lt;li&gt;timestep 不变；&lt;/li&gt;
+&lt;li&gt;拓扑不变；&lt;/li&gt;
+&lt;li&gt;\(h\) 不变；&lt;/li&gt;
 &lt;li&gt;constraint weights 不变；&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;这个矩阵就一直不变。PD 后续工作的推导也明确指出，这允许预计算并重复利用稀疏 Cholesky 分解。&lt;/p&gt;
-&lt;p&gt;于是：&lt;/p&gt;
-\[A=LL^T\]&lt;p&gt;可以在仿真开始前 factorize 一次。&lt;/p&gt;
-&lt;p&gt;每个 global step 只需要：&lt;/p&gt;
-\[LL^Tx=b\]&lt;p&gt;做两个 triangular solve。&lt;/p&gt;
-&lt;p&gt;这就是 PD 的计算优势来源。&lt;/p&gt;
+&lt;p&gt;那么这个矩阵整个仿真过程中都可以不变。&lt;/p&gt;
+&lt;p&gt;所以可以预先：&lt;/p&gt;
+\[K_{\rm PD}=LL^T\]&lt;p&gt;做一次 Cholesky factorization。&lt;/p&gt;
+&lt;p&gt;之后每次 global step 只是：&lt;/p&gt;
+\[LL^Tx=b(p).\]&lt;p&gt;这正是 PD 获得高性能的关键。原始方法强调的也正是这种 alternating optimization 与可重复使用的全局系统结构。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;5-它为什么比普通-pbd更值得从求解器角度研究&#34;&gt;5. 它为什么比“普通 PBD”更值得从求解器角度研究？
-&lt;/h1&gt;&lt;p&gt;表面看，两者都在 projection。&lt;/p&gt;
-&lt;p&gt;但数学地位完全不同。&lt;/p&gt;
-&lt;p&gt;PBD 常见结构是：&lt;/p&gt;
-\[C_1(x)\rightarrow C_2(x)\rightarrow C_3(x)\]&lt;p&gt;逐约束 Gauss-Seidel 修正。&lt;/p&gt;
-&lt;p&gt;而 PD 实际在最小化一个统一目标：&lt;/p&gt;
-\[E_{\rm inertia} + \sum_i E_i.\]&lt;p&gt;Local projection 只是为了快速处理这个目标里的非线性部分。&lt;/p&gt;
-&lt;p&gt;因此可以粗略理解为：&lt;/p&gt;
-\[\boxed{ \text{PBD：projection 本身就是 solver} }\]&lt;p&gt;而：&lt;/p&gt;
-\[\boxed{ \text{PD：projection 是 nonlinear optimization 的一个子步骤} }\]&lt;p&gt;这也是原作者所说的“bridge between nodal FEM and Position Based Dynamics”的真正含义。&lt;/p&gt;
+&lt;h1 id=&#34;6-整个算法因此简单得惊人&#34;&gt;6. 整个算法因此简单得惊人
+&lt;/h1&gt;&lt;p&gt;一次时间步：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;y ← inertial prediction
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;repeat N iterations:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    # Local
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    parallel for constraint i:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        p_i ← projection(A_i x, C_i)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    # Global
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    b ← M y / h² + Σ w_i A_iᵀ p_i
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    solve K_PD x = b
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;于是复杂的非线性动力学被拆成：&lt;/p&gt;
+\[\boxed{\text{很多极小的非线性问题}}\]&lt;p&gt;加上：&lt;/p&gt;
+\[\boxed{\text{一个固定的大线性问题}.}\]&lt;p&gt;这是一种非常有迁移价值的计算架构：&lt;/p&gt;
+\[\boxed{\text{nonlinearity local，coupling global}.}\]&lt;hr&gt;
+&lt;h1 id=&#34;7-为什么-local-step-特别适合-gpu&#34;&gt;7. 为什么 Local Step 特别适合 GPU？
+&lt;/h1&gt;&lt;p&gt;例如一个 tetrahedron 的局部投影可能需要：&lt;/p&gt;
+\[F=DsDm^{-1},\]&lt;p&gt;然后对：&lt;/p&gt;
+\[F\]&lt;p&gt;做极分解或 SVD：&lt;/p&gt;
+\[F=U\Sigma V^T\]&lt;p&gt;并把它投影到某个 admissible set。&lt;/p&gt;
+&lt;p&gt;一个网格有：&lt;/p&gt;
+\[10^5\]&lt;p&gt;个 tetrahedra。&lt;/p&gt;
+&lt;p&gt;那么：&lt;/p&gt;
+\[10^5\]&lt;p&gt;个局部 SVD 基本彼此独立。&lt;/p&gt;
+&lt;p&gt;这是 GPU 非常喜欢的：&lt;/p&gt;
+\[\boxed{\text{大量小型、结构相同、彼此独立的计算}.}\]&lt;p&gt;而 global step 则变成稀疏线性代数。&lt;/p&gt;
+&lt;p&gt;因此 PD 天然把软体求解器拆成两种硬件友好任务：&lt;/p&gt;
+\[\boxed{\text{local embarrassingly parallel kernels}}\]&lt;p&gt;和&lt;/p&gt;
+\[\boxed{\text{global sparse solve}.}\]&lt;p&gt;这比把整个非线性 Newton 系统扔给 GPU 要规整得多。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;6-一个更深的视角pd-其实可以解释成-quasi-newton&#34;&gt;6. 一个更深的视角：PD 其实可以解释成 quasi-Newton
+&lt;h1 id=&#34;8-它和-pbd-到底差在哪里&#34;&gt;8. 它和 PBD 到底差在哪里？
+&lt;/h1&gt;&lt;p&gt;这点非常容易混淆。&lt;/p&gt;
+&lt;p&gt;PBD 大致是：&lt;/p&gt;
+\[x \rightarrow \text{constraint 1 correction} \rightarrow \text{constraint 2 correction} \rightarrow\cdots\]&lt;p&gt;很多实现本质上进行 Gauss–Seidel 式位置修正。&lt;/p&gt;
+&lt;p&gt;PD 则存在一个明确的全局目标：&lt;/p&gt;
+\[\boxed{ \min_{x,p} \frac{1}{2h^2}\|x-y\|_M^2 + \sum_i\frac{w_i}{2}\|A_ix-p_i\|^2. }\]&lt;p&gt;Local：&lt;/p&gt;
+\[p\leftarrow\arg\min_p E(x,p)\]&lt;p&gt;Global：&lt;/p&gt;
+\[x\leftarrow\arg\min_x E(x,p).\]&lt;p&gt;因此它实际上属于：&lt;/p&gt;
+\[\boxed{\text{block coordinate descent / alternating minimization}.}\]&lt;p&gt;这就是为什么原论文称它是在 FEM 与 PBD 之间搭桥，而不是简单地提出一种新的 constraint projection heuristic。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;9-这也解释了它和-xpbd-的一个深层区别&#34;&gt;9. 这也解释了它和 XPBD 的一个深层区别
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 的核心变量之一是：&lt;/p&gt;
+\[\lambda.\]&lt;p&gt;通过类似：&lt;/p&gt;
+\[\Delta\lambda = \frac{-C(x)-\tilde\alpha\lambda} {\sum_jw_j\|\nabla C_j\|^2+\tilde\alpha}\]&lt;p&gt;逐约束更新。&lt;/p&gt;
+&lt;p&gt;它的强项是：&lt;/p&gt;
+\[\boxed{\text{直接处理约束，并用 compliance 改善时间步依赖。}}\]&lt;p&gt;PD 则更偏向：&lt;/p&gt;
+\[\boxed{\text{从一个全局能量最小化问题出发。}}\]&lt;p&gt;因此可以粗略理解：&lt;/p&gt;
+\[\text{PBD / XPBD}\]&lt;p&gt;更像：&lt;/p&gt;
+\[\boxed{\text{constraint-centric solver}}\]&lt;p&gt;而：&lt;/p&gt;
+\[\text{PD}\]&lt;p&gt;更像：&lt;/p&gt;
+\[\boxed{\text{energy-centric optimization solver}.}\]&lt;p&gt;这也是为什么 PD 很容易和有限元、优化理论、模型降阶联系起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;10-pd-的真正代价它支持的材料模型受到限制&#34;&gt;10. PD 的真正代价：它支持的材料模型受到限制
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这里必须看到它的交换条件。&lt;/p&gt;
+&lt;p&gt;之所以：&lt;/p&gt;
+\[K_{\rm PD}\]&lt;p&gt;固定，是因为能量必须具有：&lt;/p&gt;
+\[\boxed{ \min_{p_i\in C_i} \|A_ix-p_i\|^2 }\]&lt;p&gt;这种特殊结构。&lt;/p&gt;
+&lt;p&gt;一般 Neo-Hookean：&lt;/p&gt;
+\[\Psi(F) = \frac{\mu}{2}(I_1-3) -\mu\ln J + \frac{\lambda}{2}(\ln J)^2\]&lt;p&gt;并不能天然写成这种简单 projective potential。&lt;/p&gt;
+&lt;p&gt;因此经典 PD 的一个重要限制就是：&lt;/p&gt;
+\[\boxed{\text{材料模型自由度换取了求解器结构。}}\]&lt;p&gt;Liu、Bouaziz 与 Kavan 后来从另一个角度解决了这个问题：证明 PD 可以解释为一种 &lt;strong&gt;quasi-Newton method&lt;/strong&gt;，进而把固定 PD matrix 当作 Hessian 近似，用于 Neo-Hookean 等一般超弹性材料。其工作报告相对常规 Newton 方法约一个数量级的性能优势，同时支持 PD 原本难以表示的材料。&lt;/p&gt;
+&lt;p&gt;这是一个很重要的理论跃迁：&lt;/p&gt;
+\[\boxed{\text{PD 不只是一个材料模型，也可以看成一个 Hessian approximation strategy。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;11-从这个角度重新看-newton&#34;&gt;11. 从这个角度重新看 Newton
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Newton：&lt;/p&gt;
+\[H(x_k)\Delta x=-g(x_k).\]&lt;p&gt;每次重新构造：&lt;/p&gt;
+\[H(x_k).\]&lt;p&gt;PD-style quasi-Newton 则相当于：&lt;/p&gt;
+\[\boxed{ H(x_k)\approx H_0 }\]&lt;p&gt;其中：&lt;/p&gt;
+\[H_0\]&lt;p&gt;可以提前 factorize。&lt;/p&gt;
+&lt;p&gt;所以问题变成：&lt;/p&gt;
+\[\boxed{\text{我愿意牺牲多少局部曲率精确性，换取 Hessian 可重复使用？}}\]&lt;p&gt;这和很多实时物理引擎的根本设计目标高度一致：&lt;/p&gt;
+\[\boxed{\text{不要追求单次迭代最聪明；追求单位毫秒内减少最多误差。}}\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;12-更深一层pd-其实是-admm-家族的特殊结构&#34;&gt;12. 更深一层：PD 其实是 ADMM 家族的特殊结构
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;2017 年 Overby、Brown、Li 与 Rahul Narain 证明，Alternating Direction Method of Multipliers 可以用来构造一个包含 PD 的更一般框架：&lt;/p&gt;
+\[\boxed{\mathrm{ADMM}\supseteq\mathrm{PD}.}\]&lt;p&gt;引入局部变量：&lt;/p&gt;
+\[z_i=A_ix\]&lt;p&gt;和 dual variables：&lt;/p&gt;
+\[u_i,\]&lt;p&gt;ADMM 交替执行：&lt;/p&gt;
+\[z\text{-update},\]\[x\text{-update},\]\[u\text{-update}.\]&lt;p&gt;这样既保留：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;local parallelism；&lt;/li&gt;
+&lt;li&gt;constant prefactored global matrix；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;又能处理更一般的：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;nonlinear constitutive models；&lt;/li&gt;
+&lt;li&gt;hard constraints；&lt;/li&gt;
+&lt;li&gt;sliding；&lt;/li&gt;
+&lt;li&gt;dynamically changing contact constraints。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这正是论文的主要动机和结果。&lt;/p&gt;
+&lt;p&gt;所以知识体系实际上是：&lt;/p&gt;
+\[\boxed{ \text{PBD} \longleftrightarrow \text{PD} \longleftrightarrow \text{ADMM} \longleftrightarrow \text{general optimization}. }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;13-这对接触问题尤其有意义&#34;&gt;13. 这对接触问题尤其有意义
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;接触是 PD 固定矩阵结构最容易遭到挑战的地方。&lt;/p&gt;
+&lt;p&gt;因为接触集合：&lt;/p&gt;
+\[\mathcal C(t)\]&lt;p&gt;每帧都可能改变。&lt;/p&gt;
+&lt;p&gt;如果每增加一个 contact constraint 都改变：&lt;/p&gt;
+\[K_{\rm PD},\]&lt;p&gt;那么：&lt;/p&gt;
+\[\boxed{\text{prefactorization 优势就没了。}}\]&lt;p&gt;所以后来很多工作都试图把动态 contact 尽量塞进 local / auxiliary-variable 一侧，而让 global matrix 保持不变。&lt;/p&gt;
+&lt;p&gt;例如 ADMM-PD 明确针对 sliding/contact 设计了动态约束处理，同时维持 constant prefactored system matrix。&lt;/p&gt;
+&lt;p&gt;2020 年的 Projective Dynamics with Dry Frictional Contact 又进一步把 Signorini–Coulomb 干摩擦接触整合进 local–global 架构，而不是简单使用 penalty force。&lt;/p&gt;
+&lt;p&gt;这里能看出一个非常实用的求解器设计原则：&lt;/p&gt;
+\[\boxed{ \text{把变化频繁的物理放在 local side， 把稳定的拓扑耦合留给 global side。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;14-它甚至自然连接-rom&#34;&gt;14. 它甚至自然连接 ROM
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[x\approx Uz,\]&lt;p&gt;其中：&lt;/p&gt;
+\[U\in\mathbb R^{3N\times r}.\]&lt;p&gt;代入 global step：&lt;/p&gt;
+\[K_{\rm PD}Uz=b.\]&lt;p&gt;Galerkin projection：&lt;/p&gt;
+\[\boxed{ U^TK_{\rm PD}Uz=U^Tb. }\]&lt;p&gt;于是 global system 从：&lt;/p&gt;
+\[3N\]&lt;p&gt;降到：&lt;/p&gt;
+\[r.\]&lt;p&gt;问题却没有完全解决，因为 local projections 仍然要遍历：&lt;/p&gt;
+\[m\]&lt;p&gt;个约束。&lt;/p&gt;
+&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{\text{hyper-reduction}}\]&lt;p&gt;出现的原因。&lt;/p&gt;
+&lt;p&gt;Brandt 等 2018 年的 Hyper-Reduced Projective Dynamics 同时近似 local constraint projections 并构造 sparse reduced bases，使时间积分成本不再直接随原始 mesh resolution 增长；论文展示了大型网格实时模拟，并且不要求训练数据或 modal analysis。&lt;/p&gt;
+&lt;p&gt;这和前一张 Randomized &lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt; 卡片正好接上：&lt;/p&gt;
+\[\text{state reduction}\]&lt;p&gt;解决：&lt;/p&gt;
+\[\boxed{\text{全局自由度太多}}\]&lt;p&gt;而 hyper-reduction 解决：&lt;/p&gt;
+\[\boxed{\text{非线性局部计算仍然太多}.}\]&lt;p&gt;这是 ROM 里一个非常重要的区别。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;15-pd-甚至很适合-differentiable-physics&#34;&gt;15. PD 甚至很适合 differentiable physics
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果希望计算：&lt;/p&gt;
+\[\frac{\partial x_T}{\partial\theta},\]&lt;p&gt;普通隐式非线性 FEM 反向传播可能需要不断处理变化的线性化系统。&lt;/p&gt;
+&lt;p&gt;PD 的 global matrix：&lt;/p&gt;
+\[K_{\rm PD}\]&lt;p&gt;却具有高度可重复结构。&lt;/p&gt;
+&lt;p&gt;DiffPD 正是利用这一点构造快速可微软体模拟器，用于 soft-body learning 和 control；其工作强调，与普通 implicit differentiable simulation 中昂贵的线性化动力学求解相比，PD 的结构允许显著加速反向传播。&lt;/p&gt;
+&lt;p&gt;因此 PD 的价值已经不只：&lt;/p&gt;
+\[\boxed{\text{forward simulation 很快}}\]&lt;p&gt;还包括：&lt;/p&gt;
+\[\boxed{\text{它产生了适合 differentiation 的计算图结构}.}\]&lt;p&gt;这对今天 AI + physics 的组合尤其重要。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;16-对你自己的-xpbd-求解器最值得迁移什么&#34;&gt;16. 对你自己的 XPBD 求解器，最值得迁移什么？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;不一定是“把 XPBD 全换成 PD”。&lt;/p&gt;
+&lt;p&gt;更值得迁移的是：&lt;/p&gt;
+\[\boxed{\text{重新审视哪些非线性真的必须进入全局耦合。}}\]&lt;p&gt;例如你之前遇到 tetrahedra 在接触后大量同时进入：&lt;/p&gt;
+\[J&lt;0.3\]&lt;p&gt;并最终锁死。&lt;/p&gt;
+&lt;p&gt;XPBD 当前结构大致是：&lt;/p&gt;
+\[\text{constraint} \rightarrow \Delta\lambda \rightarrow \Delta x \rightarrow \text{next constraint}.\]&lt;p&gt;如果未来研究 PD / ADMM-style solver，可以把问题重新写成：&lt;/p&gt;
+\[\text{Local:} \quad F_e \rightarrow \text{admissible deformation }P_e\]\[\text{Global:} \quad \text{寻找一个全局 }x \text{，尽量同时匹配所有 }P_e.\]&lt;p&gt;于是“局部材料希望每个 tet 成为什么形状”和“共享节点要求所有 tet 必须兼容”被明确拆开。&lt;/p&gt;
+&lt;p&gt;这会提供一个与 XPBD 完全不同的诊断视角：&lt;/p&gt;
+\[\boxed{\text{到底是 local material projection 崩了，还是 global compatibility 无法满足？}}\]&lt;p&gt;这对定位软体坍塌问题很有价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;17-一个非常值得自己实现的最小实验&#34;&gt;17. 一个非常值得自己实现的最小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;不要一开始做 tetrahedron。&lt;/p&gt;
+&lt;p&gt;只做：&lt;/p&gt;
+\[10\times10\]&lt;p&gt;二维 mass-spring cloth。&lt;/p&gt;
+&lt;p&gt;实现三个 solver：&lt;/p&gt;
+\[\boxed{\text{XPBD}}\]\[\boxed{\text{Newton implicit Euler}}\]\[\boxed{\text{Projective Dynamics}}.\]&lt;p&gt;PD 中：&lt;/p&gt;
+\[A_ix=x_a-x_b\]&lt;p&gt;以及：&lt;/p&gt;
+\[p_i = l_i \frac{x_a-x_b} {\|x_a-x_b\|}.\]&lt;p&gt;预计算：&lt;/p&gt;
+\[K_{\rm PD} = M/h^2+\sum_iw_iA_i^TA_i\]&lt;p&gt;并做一次 Cholesky。&lt;/p&gt;
+&lt;p&gt;然后比较：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;每步耗时；&lt;/li&gt;
+&lt;li&gt;迭代次数；&lt;/li&gt;
+&lt;li&gt;stretch error；&lt;/li&gt;
+&lt;li&gt;总能量；&lt;/li&gt;
+&lt;li&gt;大时间步稳定性；&lt;/li&gt;
+&lt;li&gt;stiffness 增大后的表现。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;最值得观察的不是谁“绝对最好”。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[\boxed{\text{三种方法把计算预算花在完全不同的地方。}}\]&lt;p&gt;XPBD：&lt;/p&gt;
+\[\text{大量便宜 constraint iterations}\]&lt;p&gt;Newton：&lt;/p&gt;
+\[\text{少量昂贵、曲率准确的 iterations}\]&lt;p&gt;PD：&lt;/p&gt;
+\[\boxed{\text{大量便宜 local projections + 重复利用一个昂贵的预分解}.}\]&lt;p&gt;这会把三类实时软体求解器的结构差异真正建立起来。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;18-它在整个知识体系中卡在哪里&#34;&gt;18. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以把你现在接触的求解方法大致放成：&lt;/p&gt;
+\[\text{Explicit FEM}\]&lt;p&gt;简单，但受 CFL 限制。&lt;/p&gt;
+&lt;p&gt;↓&lt;/p&gt;
+\[\text{Implicit Newton FEM}\]&lt;p&gt;材料表达能力强、精度高，但每步非线性求解昂贵。&lt;/p&gt;
+&lt;p&gt;↓&lt;/p&gt;
+&lt;p&gt;一条路线走向：&lt;/p&gt;
+\[\text{PBD} \rightarrow \boxed{\text{XPBD}}\]&lt;p&gt;核心是：&lt;/p&gt;
+\[\boxed{\text{constraint projection}.}\]&lt;p&gt;另一条路线则是：&lt;/p&gt;
+\[\boxed{\text{Projective Dynamics}}\]&lt;p&gt;核心是：&lt;/p&gt;
+\[\boxed{\text{energy optimization + local/global splitting}.}\]&lt;p&gt;再向上：&lt;/p&gt;
+\[\text{PD as quasi-Newton}\]\[\text{ADMM-PD}\]\[\text{hyper-reduced PD}\]\[\text{DiffPD}.\]&lt;p&gt;所以 PD 最重要的位置其实是：&lt;/p&gt;
+\[\boxed{ \text{它是“图形学约束求解器” 通往“现代优化型物理求解器”的一座桥。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;19-一个更深的视角pd-其实可以解释成-quasi-newton&#34;&gt;19. 一个更深的视角：PD 其实可以解释成 quasi-Newton
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
@@ -134,34 +1042,7 @@
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;7-这解释了-pd-为什么快也解释了它为什么会慢慢收敛&#34;&gt;7. 这解释了 PD 为什么快，也解释了它为什么会慢慢收敛
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;Newton 每次使用：&lt;/p&gt;
-\[H(x_k),\]&lt;p&gt;所以搜索方向非常贴合当前非线性能量地形。&lt;/p&gt;
-&lt;p&gt;PD 始终使用：&lt;/p&gt;
-\[A= \frac{M}{h^2}+L.\]&lt;p&gt;优点：&lt;/p&gt;
-\[\boxed{\text{矩阵固定，可以预分解}}\]&lt;p&gt;代价：&lt;/p&gt;
-\[\boxed{\text{Hessian 近似可能越来越不准}}\]&lt;p&gt;如果发生强非线性：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;大旋转；&lt;/li&gt;
-&lt;li&gt;强压缩；&lt;/li&gt;
-&lt;li&gt;高度非线性材料；&lt;/li&gt;
-&lt;li&gt;极端 deformation；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;那么：&lt;/p&gt;
-\[A\]&lt;p&gt;与真实：&lt;/p&gt;
-\[H(x)\]&lt;p&gt;的差距会越来越大。&lt;/p&gt;
-&lt;p&gt;于是你会看到：&lt;/p&gt;
-\[\text{iteration count}\uparrow.\]&lt;p&gt;这实际上就是：&lt;/p&gt;
-\[\boxed{ \text{per-iteration cost} \leftrightarrow \text{convergence rate} }\]&lt;p&gt;之间的经典交换。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;8-一个很漂亮的后续chebyshev-acceleration&#34;&gt;8. 一个很漂亮的后续：Chebyshev acceleration
+&lt;h1 id=&#34;20-一个很漂亮的后续chebyshev-acceleration&#34;&gt;20. 一个很漂亮的后续：Chebyshev acceleration
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
@@ -184,81 +1065,121 @@
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;9-pd-的一个根本限制不是所有材料都天然适配这种投影能量&#34;&gt;9. PD 的一个根本限制：不是所有材料都天然适配这种投影能量
+&lt;h1 id=&#34;21-这其实是一种非常普遍的算法设计哲学&#34;&gt;21. 这其实是一种非常普遍的算法设计哲学
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;PD 要求材料能写成类似：&lt;/p&gt;
-\[E_i(x) = \min_{p_i\in\mathcal M_i} w_i \|G_ix-p_i\|^2.\]&lt;p&gt;这是一种很特殊的能量结构。&lt;/p&gt;
-&lt;p&gt;例如：&lt;/p&gt;
+    &lt;p&gt;假设原问题：&lt;/p&gt;
+\[\min_x E(x)\]&lt;p&gt;很难。&lt;/p&gt;
+&lt;p&gt;PD 引入辅助变量：&lt;/p&gt;
+\[p.\]&lt;p&gt;把它变成：&lt;/p&gt;
+\[\min_{x,p} E(x,p).\]&lt;p&gt;然后：&lt;/p&gt;
+&lt;p&gt;固定 \(x\)：&lt;/p&gt;
+\[p\leftarrow\arg\min_pE(x,p)\]&lt;p&gt;很容易。&lt;/p&gt;
+&lt;p&gt;固定 \(p\)：&lt;/p&gt;
+\[x\leftarrow\arg\min_xE(x,p)\]&lt;p&gt;也很容易。&lt;/p&gt;
+&lt;p&gt;这就是：&lt;/p&gt;
+\[\boxed{\text{variable splitting}.}\]&lt;p&gt;同一思想大量存在于：&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;ARAP；&lt;/li&gt;
-&lt;li&gt;springs；&lt;/li&gt;
-&lt;li&gt;一些 corotated 型能量；&lt;/li&gt;
+&lt;li&gt;ADMM；&lt;/li&gt;
+&lt;li&gt;alternating minimization；&lt;/li&gt;
+&lt;li&gt;proximal methods；&lt;/li&gt;
+&lt;li&gt;EM；&lt;/li&gt;
+&lt;li&gt;block coordinate descent。&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;非常适合。&lt;/p&gt;
-&lt;p&gt;但标准：&lt;/p&gt;
-\[\text{Neo-Hookean}\]&lt;p&gt;并不能简单地完全塞进原始 PD 形式。&lt;/p&gt;
-&lt;p&gt;这也是为什么后续出现：&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Quasi-Newton Methods for Real-Time Simulation of Hyperelastic Materials&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;该工作保留 PD 的固定 Hessian 近似：&lt;/p&gt;
-\[\frac{M}{h^2}+L,\]&lt;p&gt;同时把真正的：&lt;/p&gt;
-\[\nabla E(x)\]&lt;p&gt;换成一般超弹性材料的梯度，从而支持 StVK、Neo-Hookean、Mooney-Rivlin 等材料，再利用 L-BFGS 改善收敛。&lt;/p&gt;
-&lt;p&gt;所以知识演化路径大致是：&lt;/p&gt;
-\[\boxed{ \text{PBD} \rightarrow \text{Projective Dynamics} \rightarrow \text{Quasi-Newton PD} \rightarrow \text{general hyperelastic real-time FEM} }\]&lt;p&gt;这是非常值得记住的一条技术脉络。&lt;/p&gt;
-
+&lt;p&gt;所以 PD 真正值得学的不只是一个软体算法。&lt;/p&gt;
+&lt;p&gt;它展示了一种很强的计算思想：&lt;/p&gt;
+\[\boxed{ \text{如果整体非线性太难， 引入辅助变量，让困难的结构局部化， 再让剩余的全局问题变成可重复求解的简单结构。} }\]
   &lt;/div&gt;
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;10-它甚至连接到了可微物理&#34;&gt;10. 它甚至连接到了可微物理
+&lt;h1 id=&#34;22-更进一步为什么固定矩阵如此值钱&#34;&gt;22. 更进一步：为什么“固定矩阵”如此值钱？
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;2022 年 SIGGRAPH/TOG 的 &lt;strong&gt;DiffPD&lt;/strong&gt; 又进一步利用了 PD 的关键结构。&lt;/p&gt;
-&lt;p&gt;因为 forward simulation 已经有：&lt;/p&gt;
-\[A=LL^T\]&lt;p&gt;这种预分解矩阵，那么反向传播中的线性系统也可以复用这一结构。&lt;/p&gt;
-&lt;p&gt;DiffPD 因此把 PD 扩展成可微软体模拟器，用于：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;system identification；&lt;/li&gt;
-&lt;li&gt;inverse design；&lt;/li&gt;
-&lt;li&gt;trajectory optimization；&lt;/li&gt;
-&lt;li&gt;closed-loop control。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;论文项目页报告，相比标准 Newton-based differentiable simulation，在其测试中获得约 &lt;strong&gt;4–19×&lt;/strong&gt; 加速。&lt;/p&gt;
-&lt;p&gt;这里可以看到一个非常清晰的工程链条：&lt;/p&gt;
-\[\text{固定结构矩阵}\]&lt;p&gt;最初只是：&lt;/p&gt;
-\[\text{让实时仿真更快}\]&lt;p&gt;后来却进一步变成：&lt;/p&gt;
-\[\text{让反向传播更快}.\]&lt;p&gt;这就是好的数值结构所产生的“二次价值”。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;对实时软体求解器最值得迁移的一点&#34;&gt;对实时软体求解器最值得迁移的一点
-&lt;/h1&gt;&lt;p&gt;PD 最值得学习的其实不是 local-global 这几个步骤，而是一个更一般的设计思想：&lt;/p&gt;
-\[\boxed{ \text{把非线性放到便宜的局部问题里， 把全局耦合压缩成固定线性系统} }\]&lt;p&gt;这是一类非常强大的求解器设计模式。&lt;/p&gt;
-&lt;p&gt;很多计算力可以拆成：&lt;/p&gt;
-\[\text{local nonlinear physics} + \text{global linear coupling}.\]&lt;p&gt;如果做得好，就可以达到：&lt;/p&gt;
-\[\text{local：并行}\]\[\text{global：预分解 / GPU iterative solve}\]&lt;p&gt;而不是每个 iteration 都重新构造完整 nonlinear FEM Hessian。&lt;/p&gt;
-&lt;p&gt;对于四面体软体求解器，这个视角尤其值得尝试：&lt;/p&gt;
-\[F_e \rightarrow \text{local constitutive operation} \rightarrow \text{global nodal reconciliation}.\]&lt;p&gt;这和 XPBD 的 constraint projection 非常接近，但 PD 给它补上了一个完整的优化解释。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h2&gt;\[\boxed{ \text{Projective Dynamics 的核心并不是“投影”，而是让非线性局部化。} }\]&lt;p&gt;一旦看到这一点，你会发现 PD、PBD、quasi-Newton、ADMM、differentiable simulation 之间并没有那么远。&lt;/p&gt;
-&lt;p&gt;它们很多时候都在回答同一个问题：&lt;/p&gt;
+    &lt;p&gt;设一个软体有：&lt;/p&gt;
+\[n=10^5\]&lt;p&gt;自由度。&lt;/p&gt;
+&lt;p&gt;如果每个 Newton iteration 都需要：&lt;/p&gt;
+\[H_k\]&lt;p&gt;重新 factorize，成本很高。&lt;/p&gt;
+&lt;p&gt;而 PD：&lt;/p&gt;
+\[K=LL^T\]&lt;p&gt;一次预分解后，之后几千帧都可能复用。&lt;/p&gt;
+&lt;p&gt;于是昂贵工作从：&lt;/p&gt;
+\[\boxed{\text{per iteration}}\]&lt;p&gt;变成：&lt;/p&gt;
+\[\boxed{\text{one-time preprocessing}.}\]&lt;p&gt;这实际上是在利用游戏/动画模拟的一个重要性质：&lt;/p&gt;
+\[\boxed{\text{拓扑通常长期不变。}}\]&lt;p&gt;所以 PD 并非只利用数学结构，还利用了&lt;strong&gt;应用工作负载结构&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;这条原则对工程开发很重要：&lt;/p&gt;
 &lt;blockquote&gt;
-&lt;p&gt;&lt;strong&gt;怎样把一个昂贵的全局非线性问题，拆成便宜的局部非线性 + 可重复利用的全局结构？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;优化算法时，不只看一次 solve 的复杂度，还要看哪些昂贵结构能够跨时间步缓存。&lt;/p&gt;
 &lt;/blockquote&gt;
-&lt;p&gt;这可能比单独学习某个 constraint formula 更值得记住。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;23-接触会破坏这个漂亮结构吗&#34;&gt;23. 接触会破坏这个漂亮结构吗？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这正是实际 PD 的难点之一。&lt;/p&gt;
+&lt;p&gt;普通 PD 的优势来自：&lt;/p&gt;
+\[K=\text{constant}.\]&lt;p&gt;但接触集合：&lt;/p&gt;
+\[\mathcal C(x)\]&lt;p&gt;不断变化。&lt;/p&gt;
+&lt;p&gt;如果每出现一个 contact 都修改：&lt;/p&gt;
+\[K,\]&lt;p&gt;就会失去预分解优势。&lt;/p&gt;
+&lt;p&gt;因此 PD 接触算法往往想办法让 contact：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;进入 RHS；&lt;/li&gt;
+&lt;li&gt;进入独立 local solve；&lt;/li&gt;
+&lt;li&gt;或仅影响很小的自由度子集；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;尽量避免重构整个 global matrix。&lt;/p&gt;
+&lt;p&gt;例如 DiffCloth 在 PD 框架中加入 Signorini–Coulomb dry friction contact，并把 contact 处理设计成额外 local step，从而继续利用 PD 的 global-local 结构。&lt;/p&gt;
+&lt;p&gt;这也是一个非常一般的求解器设计目标：&lt;/p&gt;
+\[\boxed{ \text{动态变化的物理，尽量不要破坏静态可缓存的线性骨架。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h1&gt;&lt;p&gt;Projective Dynamics 最值得学的并不是那条固定矩阵公式，而是：&lt;/p&gt;
+\[\boxed{ \text{一个复杂非线性问题的高成本， 往往不是因为“非线性很多”， 而是因为这些非线性被迫全局耦合在一起。} }\]&lt;p&gt;PD 做的事情是：&lt;/p&gt;
+\[\boxed{ \text{把非线性留在局部， 把全局耦合变成线性。} }\]&lt;p&gt;于是：&lt;/p&gt;
+\[\text{local} = \text{非线性、便宜、并行}\]&lt;p&gt;而：&lt;/p&gt;
+\[\text{global} = \text{线性、昂贵、但可重复利用}.\]&lt;p&gt;这个模式的迁移价值远超软体模拟。&lt;/p&gt;
+&lt;p&gt;它与：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;ADMM；&lt;/li&gt;
+&lt;li&gt;domain decomposition；&lt;/li&gt;
+&lt;li&gt;alternating minimization；&lt;/li&gt;
+&lt;li&gt;variable splitting；&lt;/li&gt;
+&lt;li&gt;hyper-reduction；&lt;/li&gt;
+&lt;li&gt;differentiable physics；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;共享着同一种算法设计思想：&lt;/p&gt;
+\[\boxed{\text{通过引入辅助变量和问题分裂，主动创造可利用的计算结构。}}\]&lt;p&gt;这就是 PD 真正值得深入理解的位置。&lt;/p&gt;
 &lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
 &lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看扩展内容&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;首选原论文 Bouaziz et al., &lt;strong&gt;Projective Dynamics: Fusing Constraint Projections for Fast Simulation&lt;/strong&gt;, SIGGRAPH 2014。作者项目页包含论文和演示，并明确给出了其 FEM/PBD 桥接定位。&lt;/p&gt;
-&lt;p&gt;第二篇推荐 Liu, Bouaziz &amp;amp; Kavan, &lt;strong&gt;Quasi-Newton Methods for Real-Time Simulation of Hyperelastic Materials&lt;/strong&gt;。它最值得看的部分是“PD = fixed-Hessian quasi-Newton”这一重新解释，以及如何把这一思想扩展到 Neo-Hookean 等一般材料。&lt;/p&gt;
-&lt;p&gt;想理解实时加速，可以继续看 Huamin Wang, &lt;strong&gt;A Chebyshev Semi-Iterative Approach for Accelerating Projective and Position-Based Dynamics&lt;/strong&gt;, SIGGRAPH Asia 2015；作者主页同时提供论文、代码和视频。&lt;/p&gt;
-&lt;p&gt;如果想连接 AI / inverse design，则推荐 MIT 的 &lt;strong&gt;DiffPD: Differentiable Projective Dynamics&lt;/strong&gt; 项目页和代码，它展示了 PD 的矩阵结构如何进一步服务可微模拟。&lt;/p&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Bouaziz, Martin, Liu, Kavan &amp;amp; Pauly, &lt;strong&gt;Projective Dynamics: Fusing Constraint Projections for Fast Simulation&lt;/strong&gt;, &lt;em&gt;ACM Transactions on Graphics&lt;/em&gt;, SIGGRAPH 2014, DOI 10.1145/2601097.2601116。原始论文，优先读能量构造和 local–global solver，而不只是效果图。&lt;br&gt;
+Tiantian Liu 作者论文页与原文入口&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Liu, Bouaziz &amp;amp; Kavan, &lt;strong&gt;Quasi-Newton Methods for Real-time Simulation of Hyperelastic Materials&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2017。最值得看的地方是它如何把 PD 重新解释为 quasi-Newton，从而跨出 projective material 的限制并支持 Neo-Hookean 等超弹性模型。&lt;br&gt;
+作者项目页、论文与视频&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Overby, Brown, Li &amp;amp; Narain, &lt;strong&gt;ADMM ⊇ Projective Dynamics: Fast Simulation of Hyperelastic Models with Dynamic Constraints&lt;/strong&gt;, &lt;em&gt;IEEE TVCG&lt;/em&gt; 23(10), 2017, DOI 10.1109/TVCG.2017.2730875。适合继续理解“为什么 PD 本质上属于 variable splitting / optimization 家族”，以及动态 contact 怎样在不破坏 prefactorization 的情况下进入系统。&lt;br&gt;
+作者项目页：论文、补充材料、视频与源码&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Tao Du et al., &lt;strong&gt;DiffPD: Differentiable Projective Dynamics&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2022。如果想继续连接“软体求解器 → differentiable physics → AI/控制”，这是很合适的下一站。&lt;br&gt;
+DiffPD 官方项目页&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -271,8 +1192,7 @@
         <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
         
         <guid>https://assranai.github.io/cards/06-apic/</guid>
-        <description>&lt;h1 id=&#34;apic粒子法里的数值耗散很多时候来自信息在表示转换时被丢掉&#34;&gt;APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”
-&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Affine Particle-In-Cell（&lt;span class=&#34;term-anchor&#34; data-term=&#34;apic&#34; tabindex=&#34;0&#34;&gt;APIC&lt;/span&gt;）与粒子—网格传递&lt;/strong&gt;&lt;br&gt;
+        <description>&lt;p&gt;&lt;strong&gt;主题：Affine Particle-In-Cell（&lt;span class=&#34;term-anchor&#34; data-term=&#34;apic&#34; tabindex=&#34;0&#34;&gt;APIC&lt;/span&gt;）与粒子—网格传递&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：计算力学 × 物理引擎 × 软体动力学 × 流体 × 数值方法&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天讲 APIC，因为它揭示了一个很容易被忽略的求解器问题：&lt;/p&gt;
@@ -641,8 +1561,7 @@
         <pubDate>Mon, 24 Aug 2026 00:00:00 +0000</pubDate>
         
         <guid>https://assranai.github.io/cards/11-hourglass-modes/</guid>
-        <description>&lt;h1 id=&#34;hourglass-modes有限元里最危险的一类假柔软&#34;&gt;Hourglass Modes：有限元里最危险的一类“假柔软”
-&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;hourglass&#34; tabindex=&#34;0&#34;&gt;Hourglass&lt;/span&gt; modes（沙漏模态 / 零能模态）与 reduced integration stabilization&lt;/strong&gt;&lt;br&gt;
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;hourglass&#34; tabindex=&#34;0&#34;&gt;Hourglass&lt;/span&gt; modes（沙漏模态 / 零能模态）与 reduced integration stabilization&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：有限元 × 软体动力学 × 数值方法&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;Hourglass modes 值得学，因为它揭示了一类很容易被误诊的问题：&lt;/p&gt;
@@ -995,8 +1914,7 @@
         <pubDate>Tue, 25 Aug 2026 00:00:00 +0000</pubDate>
         
         <guid>https://assranai.github.io/cards/12-imex/</guid>
-        <description>&lt;h1 id=&#34;imex为什么刚的部分隐式算软的部分显式算是一种很强的求解器设计模式&#34;&gt;IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式
-&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;imex&#34; tabindex=&#34;0&#34;&gt;IMEX&lt;/span&gt;（Implicit–Explicit，隐显式混合时间积分）&lt;/strong&gt;&lt;br&gt;
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;imex&#34; tabindex=&#34;0&#34;&gt;IMEX&lt;/span&gt;（Implicit–Explicit，隐显式混合时间积分）&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：有限元 × 物理引擎 × 软体动力学 × 数值方法&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;IMEX 值得学，因为它针对一个非常普遍的工程矛盾：&lt;/p&gt;
@@ -1353,12 +2271,11 @@
         </item>
         <item>
         <title>FAS：非线性问题的“粗网格”不该只修正误差，而应该直接解一个粗尺度的完整非线性状态</title>
-        <link>https://assranai.github.io/cards/21-fas/</link>
+        <link>https://assranai.github.io/cards/20-fas/</link>
         <pubDate>Thu, 03 Sep 2026 00:00:00 +0000</pubDate>
         
-        <guid>https://assranai.github.io/cards/21-fas/</guid>
-        <description>&lt;h1 id=&#34;fas非线性问题的粗网格不该只修正误差而应该直接解一个粗尺度的完整非线性状态&#34;&gt;FAS：非线性问题的“粗网格”不该只修正误差，而应该直接解一个粗尺度的完整非线性状态
-&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;fas&#34; tabindex=&#34;0&#34;&gt;Full Approximation Scheme&lt;/span&gt;（FAS，全近似格式）&lt;/strong&gt;&lt;br&gt;
+        <guid>https://assranai.github.io/cards/20-fas/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;fas&#34; tabindex=&#34;0&#34;&gt;Full Approximation Scheme&lt;/span&gt;（FAS，全近似格式）&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：有限元 × 数值方法 × 软体动力学 × 接触力学&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;上一期 &lt;span class=&#34;term-anchor&#34; data-term=&#34;multigrid&#34; tabindex=&#34;0&#34;&gt;Multigrid&lt;/span&gt; 的核心是：&lt;/p&gt;
@@ -1773,7 +2690,10 @@
 
 &lt;hr&gt;
 &lt;h1 id=&#34;17-一个非常值得自研的最小实验&#34;&gt;17. 一个非常值得自研的最小实验
-&lt;/h1&gt;&lt;p&gt;如果已有一个 nonlinear spring/cloth/soft-body solver，不需要直接上三维大 tet。&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果已有一个 nonlinear spring/cloth/soft-body solver，不需要直接上三维大 tet。&lt;/p&gt;
 &lt;p&gt;可以从 1D nonlinear Poisson 开始：&lt;/p&gt;
 \[-\frac{d}{dx} \left[ (1+u^2)\frac{du}{dx} \right] = f.\]&lt;p&gt;离散得到：&lt;/p&gt;
 \[F_h(u_h)=f_h.\]&lt;p&gt;建立：&lt;/p&gt;
@@ -1791,6 +2711,10 @@
 \[\boxed{ \text{网格从 }N=10^3\rightarrow10^5 \text{ 后，iteration count 是否增长。} }\]&lt;p&gt;如果 FAS hierarchy 设计良好，它追求的是：&lt;/p&gt;
 \[\boxed{\text{近似 mesh-independent nonlinear convergence}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这才是 nonlinear multigrid 真正的价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;18-对大型游戏物理最值得迁移的一层&#34;&gt;18. 对大型游戏物理最值得迁移的一层
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
@@ -1857,12 +2781,11 @@
         </item>
         <item>
         <title>Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</title>
-        <link>https://assranai.github.io/cards/25-hyper-reduction/</link>
+        <link>https://assranai.github.io/cards/24-hyper-reduction/</link>
         <pubDate>Mon, 07 Sep 2026 00:00:00 +0000</pubDate>
         
-        <guid>https://assranai.github.io/cards/25-hyper-reduction/</guid>
-        <description>&lt;h1 id=&#34;hyper-reduction状态维数降到几十并不意味着非线性有限元真的变快&#34;&gt;Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快
-&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW&lt;/strong&gt;&lt;br&gt;
+        <guid>https://assranai.github.io/cards/24-hyper-reduction/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：有限元 × 数值方法 × 代理模型 × 软体动力学&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：&lt;/p&gt;
@@ -2390,12 +3313,11 @@
         </item>
         <item>
         <title>Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元</title>
-        <link>https://assranai.github.io/cards/28-inf-sup-lbb-condition/</link>
+        <link>https://assranai.github.io/cards/27-inf-sup-lbb-condition/</link>
         <pubDate>Thu, 10 Sep 2026 00:00:00 +0000</pubDate>
         
-        <guid>https://assranai.github.io/cards/28-inf-sup-lbb-condition/</guid>
-        <description>&lt;h1 id=&#34;inf-sup--lbb-条件为什么位移和压力都插值正确仍可能得到一个完全错误的有限元&#34;&gt;Inf-Sup / LBB 条件：为什么“位移和压力都插值正确”仍可能得到一个完全错误的有限元
-&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Inf-Sup Condition / Ladyzhenskaya–Babuška–Brezzi 条件&lt;/strong&gt;&lt;br&gt;
+        <guid>https://assranai.github.io/cards/27-inf-sup-lbb-condition/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：Inf-Sup Condition / Ladyzhenskaya–Babuška–Brezzi 条件&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：有限元 × 流体 × 软体动力学 × 数值方法&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
 今天选 &lt;strong&gt;Inf-Sup 条件&lt;/strong&gt;，因为它解决的是有限元里一个很反直觉的问题：&lt;/p&gt;
@@ -2884,1945 +3806,6 @@
 &lt;p&gt;&lt;strong&gt;FEniCSx Mixed Finite Element Tutorial&lt;/strong&gt;。适合直接实现 Taylor–Hood / MINI。当前教程明确展示了 mixed spaces、Taylor–Hood 和 MINI 的构建方式。&lt;br&gt;
 &lt;a class=&#34;link&#34; href=&#34;https://jsdokken.com/FEniCS-workshop/src/deep_dive/mixed_problems.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;FEniCS mixed problem 教程&lt;/a&gt;&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ol&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-</description>
-        </item>
-        <item>
-        <title>IPC：为什么“CCD 检测到不穿透”还不够——把接触本身写进时间步的势能里</title>
-        <link>https://assranai.github.io/cards/36-ipc-potential-contact/</link>
-        <pubDate>Fri, 18 Sep 2026 00:00:00 +0000</pubDate>
-        
-        <guid>https://assranai.github.io/cards/36-ipc-potential-contact/</guid>
-        <description>&lt;h1 id=&#34;ipc为什么ccd-检测到不穿透还不够把接触本身写进时间步的势能里&#34;&gt;IPC：为什么“CCD 检测到不穿透”还不够——把接触本身写进时间步的势能里
-&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;ipc&#34; tabindex=&#34;0&#34;&gt;Incremental Potential Contact&lt;/span&gt;（IPC，增量势接触）&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;领域：有限元 × 软体动力学 × 接触力学 × 物理引擎&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
-今天选 IPC，原因是它正好回答一个很容易混淆的问题：&lt;/p&gt;
-\[\boxed{\text{CCD 到底解决了接触问题的哪一部分？}}\]&lt;p&gt;你之前提到过一个很好的判断：“看起来 &lt;span class=&#34;term-anchor&#34; data-term=&#34;ccd&#34; tabindex=&#34;0&#34;&gt;CCD&lt;/span&gt; 才是起到碰撞合法决定性作用的约束。”这个判断抓住了一半关键：&lt;strong&gt;CCD 确实负责保证求解器走出的搜索轨迹不跨过碰撞边界，但它并不负责决定接触后的物理状态。&lt;/strong&gt; IPC 的贡献就在于把这两件事严密地组合起来。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h2 id=&#34;1-接触其实包含两个完全不同的问题&#34;&gt;1. 接触其实包含两个完全不同的问题
-&lt;/h2&gt;&lt;p&gt;假设两个软体表面正在接近。&lt;/p&gt;
-&lt;p&gt;第一个问题是几何问题：&lt;/p&gt;
-\[\boxed{\text{它们什么时候会相撞？}}\]&lt;p&gt;这是 Collision Detection，尤其是 Continuous Collision Detection（CCD）的职责。&lt;/p&gt;
-&lt;p&gt;第二个问题是动力学问题：&lt;/p&gt;
-\[\boxed{\text{相撞以后，新的位置、速度和接触力应该是什么？}}\]&lt;p&gt;这是 Contact Resolution。&lt;/p&gt;
-&lt;p&gt;传统实时物理引擎常把两者写成：&lt;/p&gt;
-\[\text{integrate} \rightarrow \text{detect collision} \rightarrow \text{generate constraints} \rightarrow \text{solve impulses/projections}.\]&lt;p&gt;IPC 换了一种更统一的结构：&lt;/p&gt;
-\[\boxed{ \text{把弹性、惯性和接触全部放进同一个增量势能最小化问题。} }\]&lt;p&gt;然后 CCD 不再负责“算出接触响应”，而负责确保优化器在寻找这个最小值时&lt;strong&gt;永远不跨过不可穿透边界&lt;/strong&gt;。原始 IPC 工作正是为隐式时间步进的非线性弹性动力学构造这一变分框架，并给出 intersection- 和 inversion-free 的轨迹保证。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;2-先从没有接触的隐式动力学开始&#34;&gt;2. 先从没有接触的隐式动力学开始
-&lt;/h1&gt;&lt;p&gt;考虑离散弹性体：&lt;/p&gt;
-\[M\ddot x=-\nabla E(x),\]&lt;p&gt;其中：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;\(x\)：节点位置；&lt;/li&gt;
-&lt;li&gt;\(M\)：质量矩阵；&lt;/li&gt;
-&lt;li&gt;\(E(x)\)：Neo-Hookean 等弹性势能。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;很多隐式时间积分可以改写成一个最小化问题。以一种典型形式表示：&lt;/p&gt;
-\[\boxed{ x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-\tilde x\|_M^2 + E(x) \right] }\]&lt;p&gt;其中：&lt;/p&gt;
-\[\tilde x=x^n+h v^n+\cdots\]&lt;p&gt;是忽略内部力时的预测位置。&lt;/p&gt;
-&lt;p&gt;第一项：&lt;/p&gt;
-\[\frac{1}{2h^2} \|x-\tilde x\|_M^2\]&lt;p&gt;可以理解成“惯性不希望你离预测位置太远”。&lt;/p&gt;
-&lt;p&gt;第二项：&lt;/p&gt;
-\[E(x)\]&lt;p&gt;则代表弹性体不希望发生高能量形变。&lt;/p&gt;
-&lt;p&gt;所以时间步本身变成：&lt;/p&gt;
-\[\boxed{\text{寻找惯性和弹性能量之间的最优折中。}}\]&lt;p&gt;这类 incremental-potential 观点本身是变分隐式积分的重要基础；IPC 的关键动作，是继续把 contact 放进这个目标函数。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;3-如果两个表面不能穿透最直接的数学表达是什么&#34;&gt;3. 如果两个表面不能穿透，最直接的数学表达是什么？
-&lt;/h1&gt;&lt;p&gt;设两个 primitive 的距离：&lt;/p&gt;
-\[d(x).\]&lt;p&gt;非穿透要求：&lt;/p&gt;
-\[\boxed{d(x)&gt;0.}\]&lt;p&gt;最直接的方法当然可以写成 constrained optimization：&lt;/p&gt;
-\[\min_x E_{\rm incremental}(x)\]&lt;p&gt;subject to&lt;/p&gt;
-\[d_i(x)\ge0.\]&lt;p&gt;但大量 point-triangle、edge-edge 接触会产生庞大的非线性 inequality constraint 系统。&lt;/p&gt;
-&lt;p&gt;IPC 采取 barrier 方法。&lt;/p&gt;
-&lt;p&gt;构造：&lt;/p&gt;
-\[B(d)\]&lt;p&gt;满足：&lt;/p&gt;
-\[B(d)\rightarrow+\infty \qquad d\rightarrow0^+.\]&lt;p&gt;于是目标变成：&lt;/p&gt;
-\[\boxed{ E_{\rm IPC}(x) = E_{\rm inertia}(x) + E_{\rm elastic}(x) + \kappa\sum_i B(d_i(x)). }\]&lt;p&gt;当两个 primitive 靠近：&lt;/p&gt;
-\[d\downarrow0,\]&lt;p&gt;barrier energy：&lt;/p&gt;
-\[B(d)\uparrow\infty.\]&lt;p&gt;所以优化器会被无限大的能量墙挡住。&lt;/p&gt;
-&lt;p&gt;这就是 IPC 的第一块核心结构：&lt;/p&gt;
-\[\boxed{\text{Contact as barrier potential}.}\]&lt;p&gt;官方 IPC Toolkit 目前直接提供 &lt;span class=&#34;term-anchor&#34; data-term=&#34;barrier&#34; tabindex=&#34;0&#34;&gt;barrier function&lt;/span&gt;、导数、adaptive barrier stiffness、距离 barrier potential，以及相应的接触距离导数。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;4-一个直观的一维模型&#34;&gt;4. 一个直观的一维模型
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;假设一个质量点位于：&lt;/p&gt;
-\[x&gt;0\]&lt;p&gt;的半空间，墙在：&lt;/p&gt;
-\[x=0.\]&lt;p&gt;没有接触时：&lt;/p&gt;
-\[E(x) = \frac{m}{2h^2}(x-\tilde x)^2.\]&lt;p&gt;假设预测位置：&lt;/p&gt;
-\[\tilde x=-0.1.\]&lt;p&gt;惯性项希望：&lt;/p&gt;
-\[x=-0.1,\]&lt;p&gt;也就是直接穿墙。&lt;/p&gt;
-&lt;p&gt;现在加入 barrier：&lt;/p&gt;
-\[E(x) = \frac{m}{2h^2}(x-\tilde x)^2 + \kappa B(x).\]&lt;p&gt;其中：&lt;/p&gt;
-\[B(x)\rightarrow\infty \quad(x\rightarrow0^+).\]&lt;p&gt;于是能量曲线大致变成：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;energy
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↑
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;∞ |\
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  | \
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  |  \        inertia
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  |   \___   /
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  |       \_/
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  +------------→ x
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  0
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  ↑
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; barrier
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;最小值只能存在于：&lt;/p&gt;
-\[x&gt;0.\]&lt;p&gt;因此接触响应不是一次额外的“位置修正”。&lt;/p&gt;
-&lt;p&gt;它直接成为：&lt;/p&gt;
-\[\boxed{\text{整个动力学时间步的最优解的一部分。}}\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;5-那-ccd-到底在哪里&#34;&gt;5. 那 CCD 到底在哪里？
-&lt;/h1&gt;&lt;p&gt;这就是 IPC 最容易被误解、也最值得理解的地方。&lt;/p&gt;
-&lt;p&gt;假设 Newton optimization 当前位于：&lt;/p&gt;
-\[x_k\]&lt;p&gt;并求得搜索方向：&lt;/p&gt;
-\[p_k.\]&lt;p&gt;普通 Newton：&lt;/p&gt;
-\[x_{k+1} = x_k+\alpha p_k.\]&lt;p&gt;即使：&lt;/p&gt;
-\[x_k\]&lt;p&gt;合法，&lt;/p&gt;
-\[x_k+\alpha p_k\]&lt;p&gt;仍然可能直接穿过另一块表面。&lt;/p&gt;
-&lt;p&gt;注意一个微妙问题：&lt;/p&gt;
-&lt;p&gt;barrier：&lt;/p&gt;
-\[B(d)\]&lt;p&gt;只在你&lt;strong&gt;评价候选状态&lt;/strong&gt;时告诉你能量巨大。&lt;/p&gt;
-&lt;p&gt;但如果优化搜索轨迹直接从：&lt;/p&gt;
-\[d&gt;0\]&lt;p&gt;跳到几何上的另一侧，离散距离函数未必能单凭端点状态可靠表达“途中发生过穿越”。&lt;/p&gt;
-&lt;p&gt;所以 IPC 使用 CCD 沿：&lt;/p&gt;
-\[x(\alpha)=x_k+\alpha p_k\]&lt;p&gt;检查：&lt;/p&gt;
-\[\boxed{\text{从当前状态沿搜索方向，第一次碰撞发生在哪个 }\alpha.}\]&lt;p&gt;得到最大合法步长：&lt;/p&gt;
-\[\alpha_{\rm CCD}.\]&lt;p&gt;然后 line search 只能选择：&lt;/p&gt;
-\[\boxed{ 0&lt;\alpha&lt;\alpha_{\rm CCD}. }\]&lt;p&gt;IPC Toolkit 因而同时提供 linear/nonlinear trajectory CCD；原始参考实现也包含 CTCD 与 Tight-Inclusion CCD。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;6-所以你之前关于-ccd-的判断可以更精确地改写成&#34;&gt;6. 所以你之前关于 CCD 的判断，可以更精确地改写成
-&lt;/h1&gt;\[\boxed{ \text{Barrier 决定“哪里不能去”， CCD 保证优化路径“不会一步跨过去”。} }\]&lt;p&gt;二者缺一不可。&lt;/p&gt;
-&lt;p&gt;Barrier：&lt;/p&gt;
-\[B(d)\rightarrow\infty\]&lt;p&gt;给出了&lt;strong&gt;动力学/优化意义上的不可穿透边界&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;CCD：&lt;/p&gt;
-\[\alpha\le\alpha_{\rm CCD}\]&lt;p&gt;给出了&lt;strong&gt;数值搜索轨迹的几何可行性保证&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;因此：&lt;/p&gt;
-\[\boxed{ \text{CCD 是 trajectory feasibility 的守门员， Barrier 是 contact response 的势能模型。} }\]&lt;p&gt;单独 CCD：&lt;/p&gt;
-\[\text{只知道什么时候撞上}\]&lt;p&gt;并不知道：&lt;/p&gt;
-\[\boxed{\text{撞上以后系统应该在哪里达到力学平衡。}}\]&lt;p&gt;单独 barrier 而没有 safe step：&lt;/p&gt;
-&lt;p&gt;优化器又可能在离散迭代过程中越过 barrier domain。&lt;/p&gt;
-&lt;p&gt;IPC 的强项恰恰来自：&lt;/p&gt;
-\[\boxed{\text{variational contact + CCD-filtered optimization}.}\]&lt;hr&gt;
-&lt;h1 id=&#34;7-这和-xpbd-的碰撞思路差在哪里&#34;&gt;7. 这和 XPBD 的碰撞思路差在哪里？
-&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 常把接触写成 inequality constraint：&lt;/p&gt;
-\[C(x)\ge0.\]&lt;p&gt;发生违反时做位置修正：&lt;/p&gt;
-\[\Delta x = M^{-1}\nabla C\,\Delta\lambda.\]&lt;p&gt;结构更像：&lt;/p&gt;
-\[\text{predict} \rightarrow \text{发现 violation} \rightarrow \text{projection}.\]&lt;p&gt;IPC 更接近：&lt;/p&gt;
-\[\boxed{ \text{从一开始就寻找一个不会进入 forbidden region 的动力学最小值。} }\]&lt;p&gt;因此二者对“合法状态”的处理哲学不同。&lt;/p&gt;
-&lt;p&gt;XPBD：&lt;/p&gt;
-\[\boxed{\text{constraint correction}}\]&lt;p&gt;IPC：&lt;/p&gt;
-\[\boxed{\text{interior-point optimization}}\]&lt;p&gt;。&lt;/p&gt;
-&lt;p&gt;这也解释了为什么 IPC 参考实现直接把默认 &lt;code&gt;constraintSolver&lt;/code&gt; 称为 &lt;code&gt;interiorPoint&lt;/code&gt;。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;8-为什么-ipc-特别适合大形变软体&#34;&gt;8. 为什么 IPC 特别适合大形变软体？
-&lt;/h1&gt;&lt;p&gt;软体接触最难的地方之一是：&lt;/p&gt;
-\[\boxed{\text{接触和材料形变高度耦合。}}\]&lt;p&gt;例如一个 Neo-Hookean 软体被挤过狭窄孔洞。&lt;/p&gt;
-&lt;p&gt;接触力改变形变；&lt;/p&gt;
-&lt;p&gt;形变改变表面几何；&lt;/p&gt;
-&lt;p&gt;表面几何又改变接触集合。&lt;/p&gt;
-&lt;p&gt;如果采用松散的：&lt;/p&gt;
-\[\text{elastic solve} \rightarrow \text{collision correction}\]&lt;p&gt;循环，&lt;/p&gt;
-&lt;p&gt;两个模块可能不断互相破坏对方的结果。&lt;/p&gt;
-&lt;p&gt;IPC 把：&lt;/p&gt;
-\[E_{\rm elastic}\]&lt;p&gt;和：&lt;/p&gt;
-\[E_{\rm contact}\]&lt;p&gt;放进同一个：&lt;/p&gt;
-\[\arg\min\]&lt;p&gt;里。&lt;/p&gt;
-&lt;p&gt;于是 Newton Hessian 中同时包含：&lt;/p&gt;
-\[\boxed{\text{material stiffness + contact stiffness}.}\]&lt;p&gt;接触不再是动力学求解完成后的“补丁”。&lt;/p&gt;
-&lt;p&gt;这也是原论文能处理极端压缩、大形变、多重自接触场景的重要原因。论文及官方项目展示了包括复杂四面体软体被压缩并挤过薄障碍物等案例。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;9-ipc-还有另一半很重要防止-tet-inversion&#34;&gt;9. IPC 还有另一半很重要：防止 tet inversion
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;对于四面体：&lt;/p&gt;
-\[F=\frac{\partial x}{\partial X},\]&lt;p&gt;体积变化：&lt;/p&gt;
-\[J=\det F.\]&lt;p&gt;物理上希望：&lt;/p&gt;
-\[J&gt;0.\]&lt;p&gt;如果：&lt;/p&gt;
-\[J\le0,\]&lt;p&gt;tet 已经反转。&lt;/p&gt;
-&lt;p&gt;原始 IPC 不只处理 surface contact，也针对 inversion-free large deformation dynamics 建立可行性机制，因此论文强调其 trajectory 同时 intersection-free 和 inversion-free。&lt;/p&gt;
-&lt;p&gt;从统一思想看：&lt;/p&gt;
-\[d&gt;0\]&lt;p&gt;是 contact admissibility，&lt;/p&gt;
-&lt;p&gt;而：&lt;/p&gt;
-\[J&gt;0\]&lt;p&gt;是 deformation admissibility。&lt;/p&gt;
-&lt;p&gt;两者都属于：&lt;/p&gt;
-\[\boxed{\text{configuration-space feasibility boundary}.}\]&lt;p&gt;这是一个非常值得迁移的理解。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;10-这与之前讨论的-barrier-v1-有一个更深的联系&#34;&gt;10. 这与之前讨论的 Barrier V1 有一个更深的联系
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;在软体求解器里，我们经常把：&lt;/p&gt;
-\[J_{\min}\]&lt;p&gt;当作诊断指标：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;J_min = 0.7 → OK
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;J_min = 0.1 → dangerous
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;J_min &amp;lt; 0 → inverted
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;但 IPC 思想会进一步问：&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;为什么要等到 \(J&lt;0\) 后再修？&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;更系统的方式是让：&lt;/p&gt;
-\[J\rightarrow0^+\]&lt;p&gt;时能量直接急剧增大：&lt;/p&gt;
-\[E_{\rm barrier}(J)\rightarrow\infty.\]&lt;p&gt;于是：&lt;/p&gt;
-\[\boxed{ \text{合法性从“事后检测条件” 升级为“求解空间本身的边界”。} }\]&lt;p&gt;2021 年的 Codimensional IPC 又把这种思想扩展到薄结构，并提出 \(C^2\) constitutive barrier，把 strain limiting 也直接作为能量势处理，从而把应变限制与弹性、接触放进同一个最小化框架。&lt;/p&gt;
-&lt;p&gt;这是一种很强的统一建模哲学：&lt;/p&gt;
-\[\boxed{ \text{如果某个状态物理上绝不能发生， 尽量让优化问题本身无法到达那里。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;11-摩擦怎么办&#34;&gt;11. 摩擦怎么办？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;Coulomb friction：&lt;/p&gt;
-\[\|f_t\| \le \mu f_n\]&lt;p&gt;天然带非光滑性。&lt;/p&gt;
-&lt;p&gt;IPC 后续体系把摩擦也组织为耗散势。当前官方 IPC Toolkit 已提供：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;smooth dissipative friction potential；&lt;/li&gt;
-&lt;li&gt;lagged dissipative friction potential；&lt;/li&gt;
-&lt;li&gt;friction potential derivatives。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;因此整体框架逐渐变成：&lt;/p&gt;
-\[\boxed{ E_{\rm inertia} + E_{\rm elasticity} + E_{\rm contact} + D_{\rm friction}. }\]&lt;p&gt;这比：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve elasticity
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve collision
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;solve friction
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;的模块拼接更统一。&lt;/p&gt;
-&lt;p&gt;代价则是：&lt;/p&gt;
-\[\boxed{\text{你必须解决一个更困难的全局非线性优化问题。}}\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;12-ipc-的最大代价也恰恰来自-barrier&#34;&gt;12. IPC 的最大代价也恰恰来自 Barrier
-&lt;/h1&gt;&lt;p&gt;当：&lt;/p&gt;
-\[d\rightarrow0,\]&lt;p&gt;barrier curvature 会迅速增大。&lt;/p&gt;
-&lt;p&gt;也就是说 Hessian：&lt;/p&gt;
-\[\nabla^2 B(d)\]&lt;p&gt;可能非常大。&lt;/p&gt;
-&lt;p&gt;于是整个 Newton system：&lt;/p&gt;
-\[H\Delta x=-g\]&lt;p&gt;变得：&lt;/p&gt;
-\[\boxed{\text{ill-conditioned}.}\]&lt;p&gt;这不是实现 bug，而是 barrier formulation 的结构性代价：&lt;/p&gt;
-&lt;p&gt;为了形成一道几乎不可穿越的“无限高能量墙”，它自然会在墙附近产生极大的 stiffness。&lt;/p&gt;
-&lt;p&gt;这会导致：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Newton iteration 增加；&lt;/li&gt;
-&lt;li&gt;linear solve 更难；&lt;/li&gt;
-&lt;li&gt;preconditioner 更重要；&lt;/li&gt;
-&lt;li&gt;contact-heavy scene 成本明显升高。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;有意思的是，2025 年底出现的 barrier-free penetration-free elastodynamics 工作正明确把“logarithmic barrier 导致病态线性系统”和 TOI locking 列为 IPC 的两个主要效率瓶颈，并尝试以 augmented-Lagrangian/constrained-optimization 路线解决。&lt;/p&gt;
-&lt;p&gt;所以 IPC 很强，但并没有终结接触算法研究。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;13-这也是为什么ipc-很稳定不等于适合游戏实时物理&#34;&gt;13. 这也是为什么“IPC 很稳定”不等于“适合游戏实时物理”
-&lt;/h1&gt;&lt;p&gt;IPC 原论文解决的主要目标是：&lt;/p&gt;
-\[\boxed{\text{robustness + accuracy + geometric validity}.}\]&lt;p&gt;游戏引擎通常还要求：&lt;/p&gt;
-\[\boxed{\text{严格帧预算}.}\]&lt;p&gt;例如：&lt;/p&gt;
-\[16.7\text{ ms/frame}.\]&lt;p&gt;Newton + sparse Hessian + CCD + line search + barrier contact 的成本，与几十次高度并行的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;/XPBD kernel 并不是一个工程目标。&lt;/p&gt;
-&lt;p&gt;所以可以粗略理解：&lt;/p&gt;
-\[\text{XPBD} \rightarrow \boxed{\text{budget-first}}\]&lt;p&gt;而 IPC：&lt;/p&gt;
-\[\rightarrow \boxed{\text{robustness/validity-first}}.\]&lt;p&gt;当然两边正在互相靠近：IPC 后续已经有 reduced、GPU、codimensional 等大量加速方向；例如 Medial IPC 将 reduced deformable simulation 与 IPC contact 结合以提高效率。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;14-一个对自研求解器非常重要的架构启发&#34;&gt;14. 一个对自研求解器非常重要的架构启发
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;如果现在设计一个软体 solver，可以把碰撞系统分成三个职责，而不要混成一个“collision module”：&lt;/p&gt;
-\[\boxed{\text{Detection}}\]&lt;p&gt;回答：&lt;/p&gt;
-\[\text{哪些 primitive 可能接触？}\]&lt;p&gt;包括 broad phase / narrow phase。&lt;/p&gt;
-&lt;p&gt;第二层：&lt;/p&gt;
-\[\boxed{\text{Continuous feasibility}}\]&lt;p&gt;回答：&lt;/p&gt;
-\[\text{沿当前运动方向最多可以走多远而不穿透？}\]&lt;p&gt;这就是 CCD / TOI。&lt;/p&gt;
-&lt;p&gt;第三层：&lt;/p&gt;
-\[\boxed{\text{Contact response}}\]&lt;p&gt;回答：&lt;/p&gt;
-\[\text{合法区域内部应该选择哪个状态？}\]&lt;p&gt;可以是：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;impulse；&lt;/li&gt;
-&lt;li&gt;complementarity；&lt;/li&gt;
-&lt;li&gt;XPBD constraint；&lt;/li&gt;
-&lt;li&gt;penalty；&lt;/li&gt;
-&lt;li&gt;barrier potential；&lt;/li&gt;
-&lt;li&gt;augmented Lagrangian。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;所以：&lt;/p&gt;
-\[\boxed{ \text{CCD 和 contact constraint 并不是竞争方案； 它们处于不同层级。} }\]&lt;p&gt;这点非常重要。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;15-这也解释了为什么只加-ccd不能解决软体坍缩&#34;&gt;15. 这也解释了为什么“只加 CCD”不能解决软体坍缩
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;假设 CCD 完美保证：&lt;/p&gt;
-\[\boxed{\text{surface 永远不互穿。}}\]&lt;p&gt;软体仍然可能：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;体积塌缩；&lt;/li&gt;
-&lt;li&gt;tet 退化；&lt;/li&gt;
-&lt;li&gt;\(J\rightarrow0\)；&lt;/li&gt;
-&lt;li&gt;弹性能异常；&lt;/li&gt;
-&lt;li&gt;velocity reconstruction 注入能量。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;因为 CCD 只保证：&lt;/p&gt;
-\[\boxed{\text{collision geometry admissibility}.}\]&lt;p&gt;它并不保证：&lt;/p&gt;
-\[\boxed{\text{constitutive admissibility}}\]&lt;p&gt;或：&lt;/p&gt;
-\[\boxed{\text{energy stability}.}\]&lt;p&gt;所以一个软体求解器至少存在几套不同合法性：&lt;/p&gt;
-\[\boxed{ d_{\rm contact}&gt;0 }\]\[\boxed{ J&gt;0 }\]\[\boxed{ \text{finite constitutive energy} }\]\[\boxed{ \text{consistent velocity/energy update}. }\]&lt;p&gt;IPC 的价值就在于，它展示了如何把前几个条件尽量统一进一个 variational optimization framework。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;16-一个很值得自己实现的二维最小实验&#34;&gt;16. 一个很值得自己实现的二维最小实验
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;不需要直接实现完整 IPC。&lt;/p&gt;
-&lt;p&gt;只做：&lt;/p&gt;
-&lt;p&gt;一个质量点：&lt;/p&gt;
-\[x=(x,y)\]&lt;p&gt;自由落向地面：&lt;/p&gt;
-\[y=0.\]&lt;p&gt;定义：&lt;/p&gt;
-\[E(x) = \frac{m}{2h^2} \|x-\tilde x\|^2 + mgy + \kappa B(y).\]&lt;p&gt;例如选择一个只在：&lt;/p&gt;
-\[0&lt;y&lt;\hat d\]&lt;p&gt;激活的 barrier。&lt;/p&gt;
-&lt;p&gt;然后 Newton：&lt;/p&gt;
-\[H\Delta x=-g.\]&lt;p&gt;每次搜索：&lt;/p&gt;
-\[x+\alpha\Delta x\]&lt;p&gt;前计算：&lt;/p&gt;
-\[\alpha_{\rm CCD}.\]&lt;p&gt;强制：&lt;/p&gt;
-\[\alpha&lt;\alpha_{\rm CCD}.\]&lt;p&gt;比较三个版本：&lt;/p&gt;
-&lt;ol&gt;
-&lt;li&gt;penalty only；&lt;/li&gt;
-&lt;li&gt;barrier without CCD-safe line search；&lt;/li&gt;
-&lt;li&gt;barrier + CCD-safe line search。&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;真正应该记录：&lt;/p&gt;
-\[y_{\min},\]\[B(y),\]\[\|\nabla B\|,\]\[\alpha_{\rm CCD},\]&lt;p&gt;Newton iterations。&lt;/p&gt;
-&lt;p&gt;你会非常直观地看到：&lt;/p&gt;
-\[\boxed{ \text{Barrier 在塑造目标函数， CCD 在塑造优化器允许采取的路径。} }\]&lt;p&gt;这比直接阅读完整 IPC C++ 实现更容易建立正确心智模型。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;17-对可靠性方法也有一个意外的迁移价值&#34;&gt;17. 对可靠性方法也有一个意外的迁移价值
-&lt;/h1&gt;&lt;p&gt;IPC 的思想其实对应一种很一般的可靠性建模原则。&lt;/p&gt;
-&lt;p&gt;传统可靠性：&lt;/p&gt;
-\[g(x)&lt;0\]&lt;p&gt;意味着进入 failure region。&lt;/p&gt;
-&lt;p&gt;通常我们允许数值模型进入失败区，再计算：&lt;/p&gt;
-\[P(g&lt;0).\]&lt;p&gt;但对于某些&lt;strong&gt;数学上绝不允许的状态&lt;/strong&gt;：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;\(J\le0\)；&lt;/li&gt;
-&lt;li&gt;negative density；&lt;/li&gt;
-&lt;li&gt;invalid geometry；&lt;/li&gt;
-&lt;li&gt;impossible parameter combination；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;把它们作为 ordinary penalty 处理并不理想。&lt;/p&gt;
-&lt;p&gt;IPC 提醒我们区分：&lt;/p&gt;
-\[\boxed{\text{physical failure}}\]&lt;p&gt;和：&lt;/p&gt;
-\[\boxed{\text{mathematical inadmissibility}}.\]&lt;p&gt;前者应该允许模型进入，然后统计概率。&lt;/p&gt;
-&lt;p&gt;后者应该直接定义：&lt;/p&gt;
-\[\boxed{\text{feasible domain boundary}.}\]&lt;p&gt;这是做参数化 FEM、代理模型和自动采样时很容易忽略的一层。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h1&gt;&lt;p&gt;IPC 最值得记住的并不是“用了 barrier function”。&lt;/p&gt;
-&lt;p&gt;真正重要的是它把接触拆清楚了：&lt;/p&gt;
-\[\boxed{ \text{Barrier 决定可行域边界附近的动力学； CCD 保证数值搜索轨迹永远留在可行域内。} }\]&lt;p&gt;因此：&lt;/p&gt;
-\[\text{Collision detection} \neq \text{Collision response}.\]&lt;p&gt;更完整的结构是：&lt;/p&gt;
-\[\text{Incremental dynamics}\]\[+\]\[\boxed{\text{contact barrier potential}}\]\[+\]\[\boxed{\text{CCD-filtered line search}}\]\[+\]\[\text{nonlinear optimization}\]\[\downarrow\]\[\boxed{\text{intersection-free contacting elastodynamics}.}\]&lt;p&gt;对物理求解器开发，最有迁移价值的思想可以压缩成：&lt;/p&gt;
-\[\boxed{ \text{不要只在非法状态出现后修复它； 对于真正不可接受的状态， 更强的设计是让求解器的可行路径从一开始就无法穿过它。} }\]&lt;p&gt;这也是 IPC 在整个接触动力学知识体系中非常值得理解的位置。&lt;/p&gt;
-&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
-&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;ol&gt;
-&lt;li&gt;
-&lt;p&gt;Minchen Li et al., &lt;strong&gt;&lt;em&gt;Incremental Potential Contact: Intersection- and Inversion-free Large Deformation Dynamics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM Transactions on Graphics (SIGGRAPH 2020)&lt;/em&gt;。IPC 原始论文，建议重点看 incremental potential、barrier、CCD line search 和 inversion-free 部分。&lt;br&gt;
-&lt;a class=&#34;link&#34; href=&#34;https://ipc-sim.github.io/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
-    &gt;IPC 官方项目页&lt;/a&gt;&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://github.com/ipc-sim/IPC&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
-    &gt;IPC 官方参考实现&lt;/a&gt;。论文对应的完整 C++ 实现，包括 Neo-Hookean、Backward Euler/Newmark、CCD、Newton/linear solver 和大量 benchmark scene。&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://github.com/ipc-sim/ipc-toolkit&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
-    &gt;IPC Toolkit&lt;/a&gt;。如果真正准备往自己的求解器里接 IPC，这个比直接拆原论文代码更合适：它已经独立封装了 CCD、距离及其导数、barrier potential、adaptive stiffness 和 friction potential。&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Li, Kaufman &amp;amp; Jiang, &lt;strong&gt;&lt;em&gt;Codimensional Incremental Potential Contact&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG / SIGGRAPH 2021&lt;/em&gt;。把 IPC 推广到 cloth、rod、particle、volume 混合系统，并加入 constitutive strain-limiting barrier。&lt;br&gt;
-Adobe Research 论文页&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;如果想看这条路线目前仍在解决什么问题，可以继续读 2025 年提出的 &lt;strong&gt;&lt;em&gt;Robust and Efficient Penetration-Free Elastodynamics without Barriers&lt;/em&gt;&lt;/strong&gt;；它把 barrier conditioning 与 TOI locking 明确视为 IPC 的效率瓶颈，并探索 barrier-free constrained optimization 路线。&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ol&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-</description>
-        </item>
-        <item>
-        <title>Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？</title>
-        <link>https://assranai.github.io/cards/37-asynchronous-variational-integrators/</link>
-        <pubDate>Sat, 19 Sep 2026 00:00:00 +0000</pubDate>
-        
-        <guid>https://assranai.github.io/cards/37-asynchronous-variational-integrators/</guid>
-        <description>&lt;h1 id=&#34;asynchronous-variational-integrators为什么整个有限元模型必须共用同一个时间步&#34;&gt;Asynchronous Variational Integrators：为什么整个有限元模型必须共用同一个时间步？
-&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;主题：Asynchronous &lt;span class=&#34;term-anchor&#34; data-term=&#34;vi&#34; tabindex=&#34;0&#34;&gt;Variational Integrators&lt;/span&gt;（AVI，异步变分积分器）&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;领域：有限元 × 软体动力学 × 数值方法 × 物理引擎&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;br&gt;
-今天选一个与前几天的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;ipc&#34; tabindex=&#34;0&#34;&gt;IPC&lt;/span&gt;、&lt;span class=&#34;term-anchor&#34; data-term=&#34;anderson&#34; tabindex=&#34;0&#34;&gt;Anderson Acceleration&lt;/span&gt;、Randomized SVD 明显不同的问题：&lt;/p&gt;
-\[\boxed{\text{为什么一个拥有百万个单元的动力学系统，通常必须所有单元一起走 } \Delta t？}\]&lt;p&gt;这件事我们太习惯了，以至于很少质疑它。&lt;/p&gt;
-&lt;p&gt;显式有限元通常执行：&lt;/p&gt;
-\[t_n \rightarrow t_n+\Delta t\]&lt;p&gt;然后：&lt;/p&gt;
-\[\boxed{\text{所有单元统一更新一次。}}\]&lt;p&gt;但如果一个软体里：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;95% 区域柔软、变化缓慢；&lt;/li&gt;
-&lt;li&gt;4% 区域发生较快振动；&lt;/li&gt;
-&lt;li&gt;1% 区域非常刚、需要极小稳定时间步；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;整个系统的：&lt;/p&gt;
-\[\Delta t\]&lt;p&gt;往往被最后那 1% 决定。&lt;/p&gt;
-&lt;p&gt;AVI 提出了一个很激进但自然的答案：&lt;/p&gt;
-\[\boxed{ \text{每个有限元单元可以拥有自己的时间步， 甚至这些时间步不需要互为整数倍。} }\]&lt;p&gt;例如：&lt;/p&gt;
-\[h_1=1\text{ ms}, \qquad h_2=1.7\text{ ms}, \qquad h_3=5.3\text{ ms}.\]&lt;p&gt;哪个单元下一次该更新，就只更新哪个单元。&lt;/p&gt;
-&lt;p&gt;这听起来像简单的 local time stepping，但真正让 AVI 特别的地方是：&lt;/p&gt;
-\[\boxed{\text{这种异步更新仍然来自一个离散 Hamilton 变分原理。}}\]&lt;p&gt;因此它并非随意把不同时间步拼起来，而是在离散时空上重新构造力学系统。Lew、Marsden、Ortiz 与 West 2003 年的原始 AVI 工作证明，这种结构允许每个单元选择相互独立、甚至没有整数比例关系的局部时间步，同时精确保留局部动量以及离散 multisymplectic structure；后续数值实验也显示出很好的长期能量行为。&lt;/p&gt;
-&lt;p&gt;真正值得学的是：&lt;/p&gt;
-\[\boxed{ \text{时间离散本身也可以被局部化。} }\]&lt;hr&gt;
-&lt;h2 id=&#34;1-传统显式有限元的一个结构性浪费&#34;&gt;1. 传统显式有限元的一个结构性浪费
-&lt;/h2&gt;&lt;p&gt;考虑半离散动力学：&lt;/p&gt;
-\[M\ddot x=-\nabla V(x),\]&lt;p&gt;其中：&lt;/p&gt;
-\[V(x)=\sum_{e=1}^{N_e}V_e(x).\]&lt;p&gt;每个有限元单元贡献一个势能：&lt;/p&gt;
-\[V_e.\]&lt;p&gt;显式积分的稳定时间步通常受最高频率限制：&lt;/p&gt;
-\[\Delta t \lesssim \frac{C}{\omega_{\max}}.\]&lt;p&gt;在 FEM 中也常写成类似 CFL 条件：&lt;/p&gt;
-\[\Delta t_e \sim \frac{h_e}{c_e},\]&lt;p&gt;其中：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;\(h_e\)：单元尺度；&lt;/li&gt;
-&lt;li&gt;\(c_e\)：局部波速。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;假设模型中：&lt;/p&gt;
-\[100000\]&lt;p&gt;个单元。&lt;/p&gt;
-&lt;p&gt;其中只有一个极小单元：&lt;/p&gt;
-\[h_{\min}=0.01h_{\rm typical}.\]&lt;p&gt;那么：&lt;/p&gt;
-\[\Delta t_{\rm global}\]&lt;p&gt;可能直接缩小约两个数量级。&lt;/p&gt;
-&lt;p&gt;于是：&lt;/p&gt;
-\[\boxed{ 99999\text{ 个本来不需要这么频繁更新的单元， 被迫陪着那个最刚/最小的单元一起计算。} }\]&lt;p&gt;这就是 AVI 要攻击的问题。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;2-最直接的想法当然是-local-time-stepping&#34;&gt;2. 最直接的想法当然是 Local Time Stepping
-&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
-\[\Delta t_e\]&lt;p&gt;是单元 \(e\) 的稳定时间步。&lt;/p&gt;
-&lt;p&gt;可以自然地想：&lt;/p&gt;
-\[\boxed{\text{每个 element 自己走自己的时间。}}\]&lt;p&gt;例如：&lt;/p&gt;
-&lt;table&gt;
-	&lt;thead&gt;
-			&lt;tr&gt;
-					&lt;th&gt;element&lt;/th&gt;
-					&lt;th style=&#34;text-align: right&#34;&gt;timestep&lt;/th&gt;
-			&lt;/tr&gt;
-	&lt;/thead&gt;
-	&lt;tbody&gt;
-			&lt;tr&gt;
-					&lt;td&gt;\(e_1\)&lt;/td&gt;
-					&lt;td style=&#34;text-align: right&#34;&gt;0.1 ms&lt;/td&gt;
-			&lt;/tr&gt;
-			&lt;tr&gt;
-					&lt;td&gt;\(e_2\)&lt;/td&gt;
-					&lt;td style=&#34;text-align: right&#34;&gt;0.1 ms&lt;/td&gt;
-			&lt;/tr&gt;
-			&lt;tr&gt;
-					&lt;td&gt;\(e_3\)&lt;/td&gt;
-					&lt;td style=&#34;text-align: right&#34;&gt;1 ms&lt;/td&gt;
-			&lt;/tr&gt;
-			&lt;tr&gt;
-					&lt;td&gt;\(e_4\)&lt;/td&gt;
-					&lt;td style=&#34;text-align: right&#34;&gt;5 ms&lt;/td&gt;
-			&lt;/tr&gt;
-	&lt;/tbody&gt;
-&lt;/table&gt;
-&lt;p&gt;那么 5 ms 内：&lt;/p&gt;
-\[e_1,e_2\]&lt;p&gt;更新 50 次，&lt;/p&gt;
-&lt;p&gt;而：&lt;/p&gt;
-\[e_4\]&lt;p&gt;只更新一次。&lt;/p&gt;
-&lt;p&gt;理论计算量可能大幅降低。&lt;/p&gt;
-&lt;p&gt;问题随之出现：&lt;/p&gt;
-\[\boxed{\text{这些单元共享节点。}}\]&lt;p&gt;例如：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;tet A ---- node i ---- tet B
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;如果：&lt;/p&gt;
-\[t_A=1.3\text{ ms}\]&lt;p&gt;而：&lt;/p&gt;
-\[t_B=4.7\text{ ms},\]&lt;p&gt;共享节点 \(i\) 到底“处于哪个时间”？&lt;/p&gt;
-&lt;p&gt;这就是 asynchronous dynamics 真正困难的地方。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;3-avi-的突破不要先写微分方程再异步积分&#34;&gt;3. AVI 的突破：不要先写微分方程再异步积分
-&lt;/h1&gt;&lt;p&gt;普通思路是：&lt;/p&gt;
-\[M\ddot x=f(x)\]&lt;p&gt;然后寻找一个 asynchronous ODE solver。&lt;/p&gt;
-&lt;p&gt;AVI 走了一条更底层的路线：&lt;/p&gt;
-\[\boxed{\text{从 Hamilton&#39;s principle 开始离散。}}\]&lt;p&gt;连续力学的 action：&lt;/p&gt;
-\[S[q] = \int L(q,\dot q)\,dt\]&lt;p&gt;其中：&lt;/p&gt;
-\[L=T-V.\]&lt;p&gt;真实轨迹满足：&lt;/p&gt;
-\[\boxed{\delta S=0.}\]&lt;p&gt;Variational Integrator 不先离散：&lt;/p&gt;
-\[\ddot q=f(q),\]&lt;p&gt;而是先离散：&lt;/p&gt;
-\[\boxed{\text{action integral}.}\]&lt;p&gt;然后要求：&lt;/p&gt;
-\[\delta S_d=0.\]&lt;p&gt;Marsden 与 West 的经典 &lt;em&gt;Acta Numerica&lt;/em&gt; 综述系统说明了这种 discrete mechanics 思路，并展示了 &lt;span class=&#34;term-anchor&#34; data-term=&#34;verlet&#34; tabindex=&#34;0&#34;&gt;Verlet&lt;/span&gt;、SHAKE、RATTLE、Newmark 和 symplectic Runge–Kutta 等大量熟悉算法都可以放进离散变分框架。&lt;/p&gt;
-&lt;p&gt;这一步非常重要：&lt;/p&gt;
-\[\boxed{ \text{算法的守恒结构不是事后补出来的， 而是从离散力学原理里长出来的。} }\]&lt;hr&gt;
-&lt;h1 id=&#34;4-avi-再进一步每个势能项拥有自己的时钟&#34;&gt;4. AVI 再进一步：每个势能项拥有自己的“时钟”
-&lt;/h1&gt;&lt;p&gt;因为：&lt;/p&gt;
-\[V(x) = \sum_eV_e(x),\]&lt;p&gt;可以给每个：&lt;/p&gt;
-\[V_e\]&lt;p&gt;单独定义更新时间：&lt;/p&gt;
-\[t_e^0,t_e^1,t_e^2,\ldots\]&lt;p&gt;其中：&lt;/p&gt;
-\[t_e^{j+1}-t_e^j=h_e.\]&lt;p&gt;于是整个系统不再拥有唯一：&lt;/p&gt;
-\[t_0,t_1,t_2,\ldots\]&lt;p&gt;而拥有很多交错的 event times：&lt;/p&gt;
-\[\boxed{ \mathcal T = \bigcup_e \{t_e^0,t_e^1,\ldots\}. }\]&lt;p&gt;例如：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;element A: |---|---|---|---|---|
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;element B: |---------|---------|
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;element C: |-----|-----|-----|
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;time ------→
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;系统每到达一个：&lt;/p&gt;
-\[t\in\mathcal T\]&lt;p&gt;只处理在这个时间触发的 element。&lt;/p&gt;
-&lt;p&gt;于是时间积分器本质上变成：&lt;/p&gt;
-\[\boxed{\text{event-driven simulation}.}\]&lt;hr&gt;
-&lt;h1 id=&#34;5-最简单的实现结构其实像优先队列&#34;&gt;5. 最简单的实现结构其实像优先队列
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;每个 element 保存：&lt;/p&gt;
-\[t_e^{next}.\]&lt;p&gt;建立 min-heap：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;(element, next_time)
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;主循环：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;while t &amp;lt; T_end:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    e = pop_element_with_smallest_next_time()
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    advance relevant nodes to t_e
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    evaluate force from element e
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    apply impulse / momentum update
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    t_e += h_e
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    push e back into queue
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;所以：&lt;/p&gt;
-\[\boxed{ \text{AVI 的 scheduler 很像离散事件模拟器。} }\]&lt;p&gt;这和传统：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;for timestep:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    for every element:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        compute force
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;完全不同。&lt;/p&gt;
-&lt;p&gt;传统 FEM 的主要外层循环是：&lt;/p&gt;
-\[\boxed{\text{time}}\]&lt;p&gt;AVI 的主要外层循环是：&lt;/p&gt;
-\[\boxed{\text{events}.}\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;6-为什么这里会出现impulse&#34;&gt;6. 为什么这里会出现“impulse”？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;如果某个 element：&lt;/p&gt;
-\[e\]&lt;p&gt;在时刻：&lt;/p&gt;
-\[t\]&lt;p&gt;被更新，&lt;/p&gt;
-&lt;p&gt;其势能：&lt;/p&gt;
-\[V_e(x)\]&lt;p&gt;产生力：&lt;/p&gt;
-\[f_e=-\nabla V_e.\]&lt;p&gt;在一个局部时间间隔：&lt;/p&gt;
-\[h_e\]&lt;p&gt;内，它可以形成近似 impulse：&lt;/p&gt;
-\[\boxed{ \Delta p_e = -h_e\nabla V_e(x). }\]&lt;p&gt;于是节点 momentum 更新：&lt;/p&gt;
-\[p_i \leftarrow p_i+\Delta p_{e,i}.\]&lt;p&gt;位置则根据当前 momentum 在 event 之间漂移。&lt;/p&gt;
-&lt;p&gt;因此一个很粗略的 AVI 心智模型是：&lt;/p&gt;
-\[\boxed{ \text{节点自由漂移} + \text{不同 element 在自己的时刻施加 impulse}. }\]&lt;p&gt;这已经足以理解它为什么能够异步。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;7-一个非常直观的例子软体里嵌了一块高刚度材料&#34;&gt;7. 一个非常直观的例子：软体里嵌了一块高刚度材料
-&lt;/h1&gt;&lt;p&gt;假设一个角色腹部软组织：&lt;/p&gt;
-\[E=10^4\text{ Pa}.\]&lt;p&gt;内部有一个刚得多的骨骼附近区域：&lt;/p&gt;
-\[E=10^8\text{ Pa}.\]&lt;p&gt;波速近似：&lt;/p&gt;
-\[c\sim\sqrt{\frac{E}{\rho}}.\]&lt;p&gt;于是刚区域的：&lt;/p&gt;
-\[c\]&lt;p&gt;可能高约：&lt;/p&gt;
-\[100\times.\]&lt;p&gt;如果使用 global explicit timestep：&lt;/p&gt;
-\[\Delta t \propto\frac{1}{c_{\max}},\]&lt;p&gt;整个软体都必须跟着骨骼附近区域使用很小：&lt;/p&gt;
-\[\Delta t.\]&lt;p&gt;AVI 可以让：&lt;/p&gt;
-\[h_{\rm stiff}=0.01\text{ ms},\]&lt;p&gt;而远处柔软区域：&lt;/p&gt;
-\[h_{\rm soft}=1\text{ ms}.\]&lt;p&gt;于是：&lt;/p&gt;
-\[\boxed{ \text{高频动力学只在真正产生高频动力学的地方付费。} }\]&lt;p&gt;这就是 local temporal adaptivity 的核心价值。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;8-为什么这比普通-substepping-更深&#34;&gt;8. 为什么这比普通 substepping 更深？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;游戏物理中常做：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;frame dt = 16 ms
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;for 4 substeps:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    simulate(dt / 4)
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;但所有对象仍然：&lt;/p&gt;
-\[\boxed{\text{一起 substep}.}\]&lt;p&gt;更高级一点可以：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;fast object → 8 substeps
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;slow object → 2 substeps
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;但对象发生强耦合后，很快会出现同步问题。&lt;/p&gt;
-&lt;p&gt;AVI 的区别在于：&lt;/p&gt;
-\[\boxed{ \text{异步性被写进离散 variational structure 本身。} }\]&lt;p&gt;它不是简单地：&lt;/p&gt;
-\[\boxed{\text{“有些东西多算几遍”。}}\]&lt;p&gt;原始 AVI 允许局部时间步甚至&lt;strong&gt;没有整数关系&lt;/strong&gt;：&lt;/p&gt;
-\[\frac{h_i}{h_j}\notin\mathbb Q\]&lt;p&gt;也没有原则性问题。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;9-为什么-variational-这部分非常重要&#34;&gt;9. 为什么 Variational 这部分非常重要？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;如果简单地：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;tet A 用 dtA
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;tet B 用 dtB
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;然后凭经验交换力
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;很容易破坏：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;momentum；&lt;/li&gt;
-&lt;li&gt;angular momentum；&lt;/li&gt;
-&lt;li&gt;energy behavior；&lt;/li&gt;
-&lt;li&gt;long-term stability。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;Variational Integrator 的优势是：&lt;/p&gt;
-\[\boxed{\text{离散 Noether theorem}.}\]&lt;p&gt;连续系统中：&lt;/p&gt;
-\[\text{symmetry} \rightarrow \text{conserved quantity}.\]&lt;p&gt;例如空间平移对称：&lt;/p&gt;
-\[\rightarrow \text{linear momentum}.\]&lt;p&gt;旋转对称：&lt;/p&gt;
-\[\rightarrow \text{angular momentum}.\]&lt;p&gt;VI 在离散 action 上保留相应 symmetry 后，会自然得到离散守恒律。Marsden–West 的综述正是把 discrete variational principle 与 discrete &lt;span class=&#34;term-anchor&#34; data-term=&#34;noether&#34; tabindex=&#34;0&#34;&gt;Noether&lt;/span&gt; theorem 作为整个体系的核心联系。&lt;/p&gt;
-&lt;p&gt;AVI 进一步证明异步时空离散仍可以精确保留局部 momentum 和离散 multisymplectic structure。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;10-一个反直觉点avi-不一定严格守恒总能量&#34;&gt;10. 一个反直觉点：AVI 不一定严格守恒总能量
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;这值得特别强调。&lt;/p&gt;
-&lt;p&gt;Symplectic/variational integrator 的优势通常并不是：&lt;/p&gt;
-\[E_n=E_0\]&lt;p&gt;每一步严格成立。&lt;/p&gt;
-&lt;p&gt;更典型的是：&lt;/p&gt;
-\[\boxed{\text{长期能量误差保持有界并振荡。}}\]&lt;p&gt;普通积分器可能出现：&lt;/p&gt;
-\[E_n-E_0 \sim Cn\]&lt;p&gt;长期系统性漂移。&lt;/p&gt;
-&lt;p&gt;Variational/symplectic 方法更常出现：&lt;/p&gt;
-\[E_n-E_0\]&lt;p&gt;在一个小范围内上下摆动。&lt;/p&gt;
-&lt;p&gt;原始 AVI 论文明确指出，虽然局部 energy balance 并没有被强制精确满足，但数值实验中的全局与局部能量行为非常好；作者将这种表现与其 symplectic/variational structure 联系起来。&lt;/p&gt;
-&lt;p&gt;这和软体求解器里的一个常见误区很相关：&lt;/p&gt;
-\[\boxed{ \text{“单步误差小” 并不等于 “长期动力学结构好”。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;11-这与-xpbd-有一个很有意思的对照&#34;&gt;11. 这与 XPBD 有一个很有意思的对照
-&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 的主要思想是：&lt;/p&gt;
-\[\boxed{\text{把刚度编码进 constraint compliance}.}\]&lt;p&gt;解决的是：&lt;/p&gt;
-\[\text{constraint stiffness dependence on } \Delta t.\]&lt;p&gt;AVI 的问题则是：&lt;/p&gt;
-\[\boxed{\text{为什么所有局部物理必须共享 }\Delta t？}\]&lt;p&gt;所以二者攻击的是不同层：&lt;/p&gt;
-\[\text{XPBD} \rightarrow \text{spatial constraint solve}\]\[\text{AVI} \rightarrow \text{temporal scheduling}.\]&lt;p&gt;理论上甚至可以想象：&lt;/p&gt;
-\[\boxed{ \text{局部 constraint/element} + \text{local clock} }\]&lt;p&gt;这种更激进的物理引擎架构。&lt;/p&gt;
-&lt;p&gt;但它马上会遇到后面要说的 GPU 问题。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;12-avi-最大的现代工程问题它天然不喜欢-simdgpu&#34;&gt;12. AVI 最大的现代工程问题：它天然不喜欢 SIMD/GPU
-&lt;/h1&gt;&lt;p&gt;CPU event queue：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;pop event
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;update element
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;push event
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;非常自然。&lt;/p&gt;
-&lt;p&gt;GPU 喜欢的是：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;launch 1,000,000 identical operations
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;AVI 却不断说：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;现在更新 element 18291
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;下一次 element 7
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;然后 element 892033
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;这会产生：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;irregular memory access；&lt;/li&gt;
-&lt;li&gt;synchronization；&lt;/li&gt;
-&lt;li&gt;priority queue overhead；&lt;/li&gt;
-&lt;li&gt;poor occupancy；&lt;/li&gt;
-&lt;li&gt;dependency conflicts。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;所以 AVI 的理论优势：&lt;/p&gt;
-\[\boxed{\text{只计算需要更新的局部区域}}\]&lt;p&gt;会与现代硬件优势：&lt;/p&gt;
-\[\boxed{\text{大量统一并行计算}}\]&lt;p&gt;发生冲突。&lt;/p&gt;
-&lt;p&gt;这是一个非常值得记住的工程规律：&lt;/p&gt;
-\[\boxed{ \text{减少 FLOPs 不一定减少 wall-clock time。} }\]&lt;hr&gt;
-&lt;h1 id=&#34;13-这个问题后来在-asynchronous-contact-mechanics-中表现得非常明显&#34;&gt;13. 这个问题后来在 Asynchronous Contact Mechanics 中表现得非常明显
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;AVI 后来被用于 contact。&lt;/p&gt;
-&lt;p&gt;Harmon、Vouga、Smith、Tamstorf 与 Grinspun 2009 年提出 Asynchronous Contact Mechanics（ACM），把：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;AVI；&lt;/li&gt;
-&lt;li&gt;kinetic data structures；&lt;/li&gt;
-&lt;li&gt;一组嵌套 contact barrier potentials；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;组合起来，希望同时保证：&lt;/p&gt;
-\[\boxed{\text{无穿透、因果性、动量/能量性质以及有限时间完成。}}\]&lt;p&gt;但异步 contact 的 scheduling 很复杂。&lt;/p&gt;
-&lt;p&gt;2012 年，Ainsley、Vouga、Grinspun 与 Tamstorf 又提出 Speculative Parallel ACM。&lt;/p&gt;
-&lt;p&gt;有趣的是，他们获得了约：&lt;/p&gt;
-\[\boxed{100\times}\]&lt;p&gt;的性能提升，而核心思想之一恰恰是：&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;不再每次微小 trajectory change 后立刻重新做碰撞调度，而是在一个时间窗口里先批量处理，再并行检测碰撞。&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;这样原本极难并行的算法变成了高度并行的结构。&lt;/p&gt;
-&lt;p&gt;这是一个很漂亮的例子：&lt;/p&gt;
-\[\boxed{ \text{理论上最细粒度的异步， 未必是硬件上最快的异步。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;14-这件事对今天-gpu-物理求解器特别有启发&#34;&gt;14. 这件事对今天 GPU 物理求解器特别有启发
-&lt;/h1&gt;&lt;p&gt;如果现在重新设计 AVI-like solver，我不会真的给：&lt;/p&gt;
-\[10^6\]&lt;p&gt;个 tet 各维护一个完全独立的 heap event。&lt;/p&gt;
-&lt;p&gt;更现实的路线可能是：&lt;/p&gt;
-\[\boxed{\text{time bins / timestep levels}.}\]&lt;p&gt;例如只允许：&lt;/p&gt;
-\[h, \quad 2h, \quad 4h, \quad 8h.\]&lt;p&gt;把 element 分成：&lt;/p&gt;
-\[G_0,G_1,G_2,G_3.\]&lt;p&gt;于是：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;every h:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    update G0
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;every 2h:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    update G1
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;every 4h:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    update G2
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;every 8h:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    update G3
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;这样牺牲：&lt;/p&gt;
-\[\boxed{\text{完全自由的异步性}}\]&lt;p&gt;换取：&lt;/p&gt;
-\[\boxed{\text{GPU batching}.}\]&lt;p&gt;这和现代 adaptive mesh / multirate integrator / hierarchical timestep 的工程思路很接近。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;15-它和-multi-rate-time-integration-的关系&#34;&gt;15. 它和 Multi-Rate Time Integration 的关系
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;AVI 属于更大的：&lt;/p&gt;
-\[\boxed{\text{multirate integration}}\]&lt;p&gt;思想。&lt;/p&gt;
-&lt;p&gt;Multirate 方法的基本目标都是：&lt;/p&gt;
-\[\boxed{ \text{不同时间尺度的自由度， 不应该以同样频率更新。} }\]&lt;p&gt;但普通 multirate ODE 方法常把变量划分成：&lt;/p&gt;
-\[y_{\rm fast}, \qquad y_{\rm slow}.\]&lt;p&gt;AVI 的特别之处是：&lt;/p&gt;
-\[\boxed{ \text{时间尺度直接附着在有限元 element/potential 上。} }\]&lt;p&gt;这对 continuum mechanics 很自然：&lt;/p&gt;
-\[V(x)=\sum_eV_e(x)\]&lt;p&gt;本来就是局部势能之和。&lt;/p&gt;
-&lt;p&gt;所以：&lt;/p&gt;
-\[\boxed{ \text{空间局部性} \rightarrow \text{时间局部性}. }\]&lt;p&gt;这是 AVI 最漂亮的结构之一。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;16-它和有限元自适应还有一个重要对应&#34;&gt;16. 它和有限元自适应还有一个重要对应
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;空间自适应 FEM 已经非常成熟：&lt;/p&gt;
-&lt;p&gt;高误差区域：&lt;/p&gt;
-\[h_x\downarrow\]&lt;p&gt;网格加密。&lt;/p&gt;
-&lt;p&gt;低误差区域：&lt;/p&gt;
-\[h_x\uparrow.\]&lt;p&gt;AVI 做的事情可以理解成：&lt;/p&gt;
-\[\boxed{\text{temporal adaptivity 的局部化版本}.}\]&lt;p&gt;即：&lt;/p&gt;
-&lt;p&gt;高频区域：&lt;/p&gt;
-\[h_t\downarrow.\]&lt;p&gt;低频区域：&lt;/p&gt;
-\[h_t\uparrow.\]&lt;p&gt;于是完整的时空自适应实际上应该考虑：&lt;/p&gt;
-\[\boxed{ (h_x,h_t) }\]&lt;p&gt;而不是只问：&lt;/p&gt;
-\[\boxed{\text{mesh 要不要加密？}}\]&lt;p&gt;这也是原始 AVI 从 &lt;strong&gt;spacetime discrete variational principle&lt;/strong&gt; 出发的重要原因之一。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;17-对可靠性分析也有一个不太显眼但很实用的迁移&#34;&gt;17. 对可靠性分析也有一个不太显眼但很实用的迁移
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;假设做机构动态可靠性：&lt;/p&gt;
-\[g(\theta) = F_{\rm lim} - \max_tF(t;\theta).\]&lt;p&gt;某些参数样本会进入：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;高频碰撞；&lt;/li&gt;
-&lt;li&gt;高频振动；&lt;/li&gt;
-&lt;li&gt;near-singular configuration。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;另外大量样本动力学非常平缓。&lt;/p&gt;
-&lt;p&gt;传统固定 timestep：&lt;/p&gt;
-\[\Delta t\]&lt;p&gt;必须按照最困难情况选择。&lt;/p&gt;
-&lt;p&gt;于是：&lt;/p&gt;
-\[\boxed{\text{简单样本被严重过计算。}}\]&lt;p&gt;AVI/multirate 的思想提醒我们：&lt;/p&gt;
-\[\boxed{ \text{计算 fidelity 不只可以在样本之间变化， 也可以在单次仿真的时间和空间内部变化。} }\]&lt;p&gt;因此 fidelity allocation 有三个维度：&lt;/p&gt;
-\[\boxed{ \text{sample} \times \text{space} \times \text{time}. }\]&lt;p&gt;这是把 multi-fidelity 思想推进到 solver 内部之后很值得思考的一步。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;18-一个非常适合自己实现的小实验&#34;&gt;18. 一个非常适合自己实现的小实验
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;不用做 FEM。&lt;/p&gt;
-&lt;p&gt;只做三个质量点：&lt;/p&gt;
-\[m_1-m_2-m_3\]&lt;p&gt;其中两根弹簧：&lt;/p&gt;
-\[k_1=10^5, \qquad k_2=10.\]&lt;p&gt;传统 explicit Verlet 必须根据：&lt;/p&gt;
-\[k_1\]&lt;p&gt;选择：&lt;/p&gt;
-\[\Delta t.\]&lt;p&gt;先跑：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;global dt = 0.001
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;然后实现一个极简 multirate 版本：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;spring 1:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    dt = 0.001
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;spring 2:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    dt = 0.01
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;分别统计：&lt;/p&gt;
-\[\text{force evaluations}\]&lt;p&gt;和：&lt;/p&gt;
-\[E(t)=T(t)+V(t).\]&lt;p&gt;你会很快看到：&lt;/p&gt;
-\[\boxed{ \text{减少 force evaluations 很容易； 让异步算法同时保持正确的长期动力学，却并不容易。} }\]&lt;p&gt;然后再阅读 AVI 的 variational construction，就会明白为什么作者没有简单写一个：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;if stiff:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    update more often
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;而是从 Hamilton principle 重新推导整个算法。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;19-对自研软体求解器最值得迁移的思想&#34;&gt;19. 对自研软体求解器最值得迁移的思想
-&lt;/h1&gt;&lt;p&gt;我认为不应该马上去实现完整 AVI。&lt;/p&gt;
-&lt;p&gt;更有价值的是先建立一个 profiler：&lt;/p&gt;
-&lt;p&gt;对每个 tet 估计局部时间尺度：&lt;/p&gt;
-\[\tau_e \sim \frac{h_e}{c_e}\]&lt;p&gt;或者根据：&lt;/p&gt;
-\[\|\Delta x_e\|, \quad \|\Delta\lambda_e\|, \quad J_e, \quad \text{contact activity}\]&lt;p&gt;估计：&lt;/p&gt;
-\[\tau_e.\]&lt;p&gt;然后画：&lt;/p&gt;
-\[\boxed{\text{local required timestep histogram}.}\]&lt;p&gt;如果发现：&lt;/p&gt;
-\[90\%\]&lt;p&gt;tet 都允许：&lt;/p&gt;
-\[8h,\]&lt;p&gt;只有：&lt;/p&gt;
-\[1\%\]&lt;p&gt;必须：&lt;/p&gt;
-\[h,\]&lt;p&gt;那么 multirate/asynchronous architecture 才真正有潜在价值。&lt;/p&gt;
-&lt;p&gt;如果所有 tet 都差不多需要：&lt;/p&gt;
-\[h,\]&lt;p&gt;AVI 再漂亮也不会产生明显收益。&lt;/p&gt;
-&lt;p&gt;这和 Randomized SVD 那张卡片的原则其实一致：&lt;/p&gt;
-\[\boxed{ \text{先证明问题存在可利用的非均匀结构， 再设计利用这种结构的算法。}\]&lt;hr&gt;
-&lt;h1 id=&#34;20-它还给-ai系统工程一个非常一般的启发&#34;&gt;20. 它还给 AI/系统工程一个非常一般的启发
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;很多系统默认：&lt;/p&gt;
-\[\boxed{\text{所有组件以同一个频率更新。}}\]&lt;p&gt;例如 agent pipeline：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;retrieve
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;reason
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;tool call
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;verify
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;summarize
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;每一步都每轮执行。&lt;/p&gt;
-&lt;p&gt;但真实系统里：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;retrieval 可能只偶尔需要更新；&lt;/li&gt;
-&lt;li&gt;planner 更新较慢；&lt;/li&gt;
-&lt;li&gt;executor 更新很快；&lt;/li&gt;
-&lt;li&gt;monitor 可以事件触发。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;AVI 背后的系统思想可以抽象成：&lt;/p&gt;
-\[\boxed{ \text{让每个组件按照自己的信息变化时间尺度运行。} }\]&lt;p&gt;也就是从：&lt;/p&gt;
-\[\boxed{\text{synchronous pipeline}}\]&lt;p&gt;转向：&lt;/p&gt;
-\[\boxed{\text{event-driven multirate system}}.\]&lt;p&gt;这在：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;distributed systems；&lt;/li&gt;
-&lt;li&gt;game ECS；&lt;/li&gt;
-&lt;li&gt;AI agent orchestration；&lt;/li&gt;
-&lt;li&gt;simulation；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;里其实是同一个架构问题。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h1&gt;&lt;p&gt;AVI 最值得记住的不是：&lt;/p&gt;
-\[h_1\neq h_2.\]&lt;p&gt;而是：&lt;/p&gt;
-\[\boxed{ \text{全局最困难的局部区域， 没有天然权利决定整个系统的计算频率。} }\]&lt;p&gt;它在整个知识体系中的位置大致是：&lt;/p&gt;
-\[\text{Hamilton&#39;s Principle}\]\[\downarrow\]\[\text{Variational Integrators}\]\[\downarrow\]\[\boxed{\text{Asynchronous Variational Integrators}}\]\[\downarrow\]\[\text{local temporal resolution}\]\[\downarrow\]\[\text{multirate FEM / asynchronous contact}.\]&lt;p&gt;而它留下的第二层工程教训甚至更重要：&lt;/p&gt;
-\[\boxed{ \text{算法上的“少算”，只有和硬件上的“好算”同时成立， 才真正意味着更快。} }\]&lt;p&gt;AVI 极端强调局部计算；后来的并行 ACM 又不得不重新引入 batching 和 speculative execution 来适配并行硬件。这个历史本身就很值得求解器开发者学习：&lt;strong&gt;数学结构、计算复杂度和硬件执行结构，是三个必须同时设计的层次。&lt;/strong&gt;&lt;/p&gt;
-&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
-&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;ol&gt;
-&lt;li&gt;
-&lt;p&gt;Lew, Marsden, Ortiz &amp;amp; West, &lt;strong&gt;&lt;em&gt;Asynchronous Variational Integrators&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Archive for Rational Mechanics and Analysis&lt;/em&gt;, 2003。AVI 原始工作，重点看 independent element timesteps、spacetime variational principle 和 conservation structure。&lt;br&gt;
-Caltech AVI 论文页&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Jerrold E. Marsden &amp;amp; Matthew West, &lt;strong&gt;&lt;em&gt;Discrete Mechanics and Variational Integrators&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;Acta Numerica&lt;/em&gt;, 2001/2003 online。理解整个 VI 理论体系的经典综述，尤其推荐 discrete Hamilton principle 与 discrete Noether theorem 部分。&lt;br&gt;
-Cambridge Acta Numerica 论文页&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Lew et al., &lt;strong&gt;&lt;em&gt;Variational Time Integrators&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;International Journal for Numerical Methods in Engineering&lt;/em&gt;, 2004。更偏工程有限元，包含同步/异步 VI、收敛证明以及数值效率比较；论文报告的测试中 AVI 在相同精度下相对 explicit Newmark 获得了显著加速。&lt;br&gt;
-Caltech 论文页&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Harmon, Vouga, Smith, Tamstorf &amp;amp; Grinspun, &lt;strong&gt;&lt;em&gt;Asynchronous Contact Mechanics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG / SIGGRAPH 2009&lt;/em&gt;。把 AVI 推到复杂接触问题，目标是同时保证无穿透、因果性、守恒性质和有限时间完成。&lt;br&gt;
-Etienne Vouga 研究页与论文入口&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Ainsley, Vouga, Eitan Grinspun &amp;amp; Tamstorf, &lt;strong&gt;&lt;em&gt;Speculative Parallel Asynchronous Contact Mechanics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;SIGGRAPH Asia 2012&lt;/em&gt;。特别推荐从工程角度读：作者在保持 ACM 的安全、进展和正确性保证下，通过 speculative collision processing 和并行化把性能提高约两个数量级，是“算法结构如何迁就硬件结构”的优秀案例。&lt;br&gt;
-Disney Research / Animation 论文页&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ol&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-</description>
-        </item>
-        <item>
-        <title>Projective Dynamics：为什么把非线性有限元“拆成局部投影 &#43; 固定全局线性系统”会快得惊人？</title>
-        <link>https://assranai.github.io/cards/40-projective-dynamics-2/</link>
-        <pubDate>Tue, 22 Sep 2026 00:00:00 +0000</pubDate>
-        
-        <guid>https://assranai.github.io/cards/40-projective-dynamics-2/</guid>
-        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;Projective Dynamics&lt;/span&gt;（PD，投影动力学）&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;领域：有限元 × 软体动力学 × &lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;/&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; × 非线性优化 × 可微物理&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;今天选 Projective Dynamics，因为它正好卡在一个很有价值的交叉点：&lt;/p&gt;
-\[\boxed{\text{FEM 的能量建模}} \quad+\quad \boxed{\text{PBD 的局部投影}} \quad+\quad \boxed{\text{预分解线性求解器}}\]&lt;p&gt;它解决的是软体模拟里一个很现实的问题：&lt;strong&gt;隐式 FEM 稳定，但每一步都解非线性系统很贵；PBD 很快，但约束投影与严格能量模型之间存在距离。&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;PD 的做法相当聪明：专门选择一类可以写成“到某个约束流形的平方距离”的势能，把一次复杂的非线性优化拆成：&lt;/p&gt;
-\[\boxed{\text{Local：很多便宜的小投影}}\]&lt;p&gt;和&lt;/p&gt;
-\[\boxed{\text{Global：一个矩阵恒定的线性系统}}\]&lt;p&gt;反复交替。&lt;/p&gt;
-&lt;p&gt;2014 年 Bouaziz、Martin、Liu、Ladislav Kavan 与 Mark Pauly 的原始工作将它明确定位为 nodal FEM 与 PBD 之间的桥梁，并展示于 solids、cloth、shell 等问题。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h2 id=&#34;1-先看普通隐式软体为什么贵&#34;&gt;1. 先看普通隐式软体为什么贵
-&lt;/h2&gt;&lt;p&gt;考虑离散弹性系统&lt;/p&gt;
-\[M\ddot x=-\nabla E(x)+f_{\rm ext}.\]&lt;p&gt;隐式 Euler 可以改写成最小化问题：&lt;/p&gt;
-\[\boxed{ x^{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-y\|_M^2 + E(x) \right] }\]&lt;p&gt;其中&lt;/p&gt;
-\[y=x^n+h v^n+h^2M^{-1}f_{\rm ext}.\]&lt;p&gt;如果 \(E(x)\) 是一般 Neo-Hookean 超弹性能，通常需要 Newton：&lt;/p&gt;
-\[H(x_k)\Delta x=-g(x_k).\]&lt;p&gt;麻烦在于：&lt;/p&gt;
-\[\boxed{H(x_k)\text{ 随形变变化。}}\]&lt;p&gt;于是每个时间步、甚至每个 Newton iteration，都可能涉及：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;单元 Hessian；&lt;/li&gt;
-&lt;li&gt;sparse matrix assembly；&lt;/li&gt;
-&lt;li&gt;factorization / iterative linear solve；&lt;/li&gt;
-&lt;li&gt;line search。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;大模型中真正贵的经常不是算力本身，而是不断变化的全局线性系统。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;2-pd-的关键动作限制势能的形式&#34;&gt;2. PD 的关键动作：限制势能的形式
-&lt;/h1&gt;&lt;p&gt;PD 考虑一类势能：&lt;/p&gt;
-\[\boxed{ E_i(x) = \frac{w_i}{2} \min_{p_i\in\mathcal M_i} \|A_i x-p_i\|^2 }\]&lt;p&gt;其中：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;\(A_i x\)：从全局节点状态提取出的局部形变量；&lt;/li&gt;
-&lt;li&gt;\(\mathcal M_i\)：该局部量希望满足的“合法集合”；&lt;/li&gt;
-&lt;li&gt;\(p_i\)：这个集合上的最近点；&lt;/li&gt;
-&lt;li&gt;\(w_i\)：刚度权重。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;于是：&lt;/p&gt;
-\[E(x)=\sum_iE_i(x).\]&lt;p&gt;这一步非常重要。&lt;/p&gt;
-&lt;p&gt;PD 没有试图让&lt;strong&gt;任意&lt;/strong&gt;复杂能量都变简单，而是选择了一类特别适合优化的能量。原论文将这些称为 specially designed energy potentials，并进一步从连续介质力学构造了适合固体、薄壳等模型的势能。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;3-local-step先假设--不动&#34;&gt;3. Local step：先假设 \(x\) 不动
-&lt;/h1&gt;&lt;p&gt;固定当前节点位置：&lt;/p&gt;
-\[x=x_k.\]&lt;p&gt;每个约束独立求：&lt;/p&gt;
-\[\boxed{ p_i = \arg\min_{p\in\mathcal M_i} \|A_ix_k-p\|^2. }\]&lt;p&gt;这通常就是一个&lt;strong&gt;几何投影&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;例如弹簧：&lt;/p&gt;
-\[d=x_i-x_j\]&lt;p&gt;希望长度：&lt;/p&gt;
-\[\|d\|=L.\]&lt;p&gt;那么局部投影就是：&lt;/p&gt;
-\[\boxed{ p=L\frac{d}{\|d\|}. }\]&lt;p&gt;这和 PBD 极其相似：&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;当前约束状态不合法，就求最近的合法状态。&lt;/p&gt;
-&lt;/blockquote&gt;
-&lt;p&gt;更重要的是，各个 \(p_i\) 在给定 \(x\) 后通常相互独立，因此 local step 天然适合并行。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;4-global-step再固定所有&#34;&gt;4. Global step：再固定所有 \(p_i\)
-&lt;/h1&gt;&lt;p&gt;现在：&lt;/p&gt;
-\[p_i\]&lt;p&gt;已知。&lt;/p&gt;
-&lt;p&gt;求：&lt;/p&gt;
-\[\min_x \frac{1}{2h^2} \|x-y\|_M^2 + \sum_i \frac{w_i}{2} \|A_ix-p_i\|^2.\]&lt;p&gt;这是纯二次问题。&lt;/p&gt;
-&lt;p&gt;求导：&lt;/p&gt;
-\[\frac1{h^2}M(x-y) + \sum_iw_iA_i^T(A_ix-p_i)=0.\]&lt;p&gt;整理：&lt;/p&gt;
-\[\boxed{ \left( \frac{M}{h^2} + \sum_iw_iA_i^TA_i \right)x = \frac{M}{h^2}y + \sum_iw_iA_i^Tp_i. }\]&lt;p&gt;记：&lt;/p&gt;
-\[\boxed{ K= \frac{M}{h^2} + \sum_iw_iA_i^TA_i. }\]&lt;p&gt;于是：&lt;/p&gt;
-\[\boxed{Kx=b(p).}\]&lt;p&gt;现在出现了 PD 最重要的工程性质：&lt;/p&gt;
-\[\boxed{K\text{ 与当前形变 }x\text{ 无关。}}\]&lt;p&gt;只要：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;拓扑不变；&lt;/li&gt;
-&lt;li&gt;\(h\) 不变；&lt;/li&gt;
-&lt;li&gt;权重不变；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;就可以在初始化阶段：&lt;/p&gt;
-\[\boxed{K=LL^T}\]&lt;p&gt;做一次 Cholesky factorization。&lt;/p&gt;
-&lt;p&gt;之后每一次 global solve 只是：&lt;/p&gt;
-\[Lz=b, \qquad L^Tx=z.\]&lt;p&gt;这就是 PD 快的核心来源。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;5-所以整个求解器只有这个循环&#34;&gt;5. 所以整个求解器只有这个循环
-&lt;/h1&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;prefactorize K
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;for each timestep:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    predict y
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x = y
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    repeat several iterations:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        # local
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        for each element/constraint in parallel:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            p_i = project(A_i x)
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        # global
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        b = M y / h² + Σ w_i A_iᵀ p_i
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        solve K x = b using prefactorized K
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;可以把它压缩成：&lt;/p&gt;
-\[\boxed{ x \rightarrow p \rightarrow x \rightarrow p \rightarrow\cdots }\]&lt;p&gt;这是 alternating minimization / local-global optimization。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;6-它和-pbd-到底差在哪里&#34;&gt;6. 它和 PBD 到底差在哪里？
-&lt;/h1&gt;&lt;p&gt;表面上二者都做 projection。&lt;/p&gt;
-&lt;p&gt;PBD 更接近：&lt;/p&gt;
-\[C_i(x)=0\]&lt;p&gt;然后逐约束修改：&lt;/p&gt;
-\[x\leftarrow x+\Delta x_i.\]&lt;p&gt;多个约束往往通过 Gauss-Seidel/Jacobi 反复传播。&lt;/p&gt;
-&lt;p&gt;PD 的 local projection 只产生：&lt;/p&gt;
-\[p_i.\]&lt;p&gt;它&lt;strong&gt;不直接修改全局节点&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;所有局部要求最终统一送进：&lt;/p&gt;
-\[\boxed{Kx=b}\]&lt;p&gt;一次全局协调。&lt;/p&gt;
-&lt;p&gt;因此可以把两者直观地区分成：&lt;/p&gt;
-\[\text{PBD:} \quad \boxed{\text{约束逐个拉节点}}\]&lt;p&gt;而&lt;/p&gt;
-\[\text{PD:} \quad \boxed{\text{约束先提出自己的理想状态，再由全局系统统一折中。}}\]&lt;p&gt;这也是为什么原论文称它为 FEM 与 PBD 之间的桥梁。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;7-一个特别重要的理解global-step-本质上在传播信息&#34;&gt;7. 一个特别重要的理解：Global step 本质上在传播信息
-&lt;/h1&gt;&lt;p&gt;考虑长条软体：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[contact] ---- tet ---- tet ---- tet ---- tet
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;某个局部单元发生很大形变。&lt;/p&gt;
-&lt;p&gt;如果完全使用局部约束迭代，影响需要：&lt;/p&gt;
-\[\text{constraint} \rightarrow \text{neighbor} \rightarrow \text{neighbor} \rightarrow\cdots\]&lt;p&gt;慢慢传播。&lt;/p&gt;
-&lt;p&gt;PD 的 global solve：&lt;/p&gt;
-\[Kx=b\]&lt;p&gt;一次就让整个连通系统响应。&lt;/p&gt;
-&lt;p&gt;因此：&lt;/p&gt;
-\[\boxed{ \text{local step 解决材料非线性； global step 解决长程耦合。} }\]&lt;p&gt;这个分工是 PD 很深的一点。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;8-它和普通-newton-fem-的区别可以看得更清楚&#34;&gt;8. 它和普通 Newton FEM 的区别可以看得更清楚
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;Newton：&lt;/p&gt;
-\[H(x_k)\Delta x=-g(x_k).\]&lt;p&gt;每一步都构造当前局部曲率：&lt;/p&gt;
-\[H(x_k).\]&lt;p&gt;因此单次 iteration 很贵，但通常具有更强的局部收敛能力。&lt;/p&gt;
-&lt;p&gt;PD：&lt;/p&gt;
-\[Kx=b(p_k).\]&lt;p&gt;把复杂非线性主要藏在：&lt;/p&gt;
-\[p_k=\Pi_{\mathcal M}(A x_k)\]&lt;p&gt;里，而全局矩阵：&lt;/p&gt;
-\[K\]&lt;p&gt;固定。&lt;/p&gt;
-&lt;p&gt;于是它做了一个很明确的交易：&lt;/p&gt;
-\[\boxed{ \text{牺牲 Newton 的精确局部 Hessian} }\]&lt;p&gt;换取：&lt;/p&gt;
-\[\boxed{ \text{一个可以永久复用的全局线性算子。} }\]&lt;p&gt;对于需要每秒重复几十到几百个时间步的动画/游戏物理，这个交易非常有价值。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;9-为什么这与-anderson-acceleration-那张卡片能连起来&#34;&gt;9. 为什么这与 Anderson Acceleration 那张卡片能连起来？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;PD 的 local-global iteration 本身就是：&lt;/p&gt;
-\[\boxed{x_{k+1}=G(x_k).}\]&lt;p&gt;因此它仍可能出现：&lt;/p&gt;
-\[\text{稳定，但迭代很多次才收敛。}\]&lt;p&gt;尤其在：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;高刚度；&lt;/li&gt;
-&lt;li&gt;材料强异质；&lt;/li&gt;
-&lt;li&gt;强非线性；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;情况下。&lt;/p&gt;
-&lt;p&gt;所以 PD 后续研究中出现各种：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Chebyshev acceleration；&lt;/li&gt;
-&lt;li&gt;quasi-Newton；&lt;/li&gt;
-&lt;li&gt;Anderson acceleration；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;并不偶然。&lt;/p&gt;
-&lt;p&gt;甚至 2026 年的新工作 DiffPhD 仍在研究强异质材料下 PD fixed-point iteration 的稳定性，并使用 Type-II Anderson acceleration 等技术增强收敛。&lt;/p&gt;
-&lt;p&gt;这说明前面两张知识卡其实可以接成：&lt;/p&gt;
-\[\boxed{ \text{PD 提供便宜的 fixed-point map} \rightarrow \text{AA 加速这个 map}. }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;10-pd-最大的限制也正来自它最大的优点&#34;&gt;10. PD 最大的限制也正来自它最大的优点
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;固定：&lt;/p&gt;
-\[K\]&lt;p&gt;之所以可能，是因为势能被限制成：&lt;/p&gt;
-\[\frac{w_i}{2} \|A_ix-p_i\|^2.\]&lt;p&gt;因此对于一般超弹性：&lt;/p&gt;
-\[W(F)\]&lt;p&gt;尤其复杂：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;Neo-Hookean；&lt;/li&gt;
-&lt;li&gt;Mooney-Rivlin；&lt;/li&gt;
-&lt;li&gt;anisotropic material；&lt;/li&gt;
-&lt;li&gt;plasticity；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;你不能无条件期待它们都天然具有漂亮的 projective form。&lt;/p&gt;
-&lt;p&gt;这意味着：&lt;/p&gt;
-\[\boxed{ \text{PD 的速度来自对能量结构的利用， 不是一种免费的通用非线性 FEM 加速器。} }\]&lt;p&gt;因此如果追求严格 constitutive accuracy，一般 Newton FEM 仍有重要优势。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;11-这其实是一种非常普遍的算法设计哲学&#34;&gt;11. 这其实是一种非常普遍的算法设计哲学
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;假设原问题：&lt;/p&gt;
-\[\min_x E(x)\]&lt;p&gt;很难。&lt;/p&gt;
-&lt;p&gt;PD 引入辅助变量：&lt;/p&gt;
-\[p.\]&lt;p&gt;把它变成：&lt;/p&gt;
-\[\min_{x,p} E(x,p).\]&lt;p&gt;然后：&lt;/p&gt;
-&lt;p&gt;固定 \(x\)：&lt;/p&gt;
-\[p\leftarrow\arg\min_pE(x,p)\]&lt;p&gt;很容易。&lt;/p&gt;
-&lt;p&gt;固定 \(p\)：&lt;/p&gt;
-\[x\leftarrow\arg\min_xE(x,p)\]&lt;p&gt;也很容易。&lt;/p&gt;
-&lt;p&gt;这就是：&lt;/p&gt;
-\[\boxed{\text{variable splitting}.}\]&lt;p&gt;同一思想大量存在于：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;ADMM；&lt;/li&gt;
-&lt;li&gt;alternating minimization；&lt;/li&gt;
-&lt;li&gt;proximal methods；&lt;/li&gt;
-&lt;li&gt;EM；&lt;/li&gt;
-&lt;li&gt;block coordinate descent。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;所以 PD 真正值得学的不只是一个软体算法。&lt;/p&gt;
-&lt;p&gt;它展示了一种很强的计算思想：&lt;/p&gt;
-\[\boxed{ \text{如果整体非线性太难， 引入辅助变量，让困难的结构局部化， 再让剩余的全局问题变成可重复求解的简单结构。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;12-更进一步为什么固定矩阵如此值钱&#34;&gt;12. 更进一步：为什么“固定矩阵”如此值钱？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;设一个软体有：&lt;/p&gt;
-\[n=10^5\]&lt;p&gt;自由度。&lt;/p&gt;
-&lt;p&gt;如果每个 Newton iteration 都需要：&lt;/p&gt;
-\[H_k\]&lt;p&gt;重新 factorize，成本很高。&lt;/p&gt;
-&lt;p&gt;而 PD：&lt;/p&gt;
-\[K=LL^T\]&lt;p&gt;一次预分解后，之后几千帧都可能复用。&lt;/p&gt;
-&lt;p&gt;于是昂贵工作从：&lt;/p&gt;
-\[\boxed{\text{per iteration}}\]&lt;p&gt;变成：&lt;/p&gt;
-\[\boxed{\text{one-time preprocessing}.}\]&lt;p&gt;这实际上是在利用游戏/动画模拟的一个重要性质：&lt;/p&gt;
-\[\boxed{\text{拓扑通常长期不变。}}\]&lt;p&gt;所以 PD 并非只利用数学结构，还利用了&lt;strong&gt;应用工作负载结构&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;这条原则对工程开发很重要：&lt;/p&gt;
-&lt;blockquote&gt;
-&lt;p&gt;优化算法时，不只看一次 solve 的复杂度，还要看哪些昂贵结构能够跨时间步缓存。&lt;/p&gt;
-&lt;/blockquote&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;13-这也解释了为什么-pd-很适合可微物理&#34;&gt;13. 这也解释了为什么 PD 很适合可微物理
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;假设要优化材料参数：&lt;/p&gt;
-\[\theta\]&lt;p&gt;使：&lt;/p&gt;
-\[L(x(\theta))\]&lt;p&gt;最小。&lt;/p&gt;
-&lt;p&gt;需要：&lt;/p&gt;
-\[\frac{dL}{d\theta}.\]&lt;p&gt;一般隐式 FEM 的 backward pass 又需要解线性化动力学。&lt;/p&gt;
-&lt;p&gt;DiffPD 的关键观察是：&lt;/p&gt;
-\[\boxed{\text{forward PD 已经拥有一个预分解的全局矩阵。}}\]&lt;p&gt;可以继续利用这种结构加速 backward solve。&lt;/p&gt;
-&lt;p&gt;Tao Du 等人的 DiffPD 因此把 PD 扩展成 differentiable soft-body simulator，并在其论文实验中报告，相比标准 Newton 方法，在 system identification、inverse design、trajectory optimization 和 control 等任务中达到约 &lt;strong&gt;4–19×&lt;/strong&gt; 加速。&lt;/p&gt;
-&lt;p&gt;这是一条很漂亮的路线：&lt;/p&gt;
-\[\boxed{ \text{forward solver 的结构设计} \rightarrow \text{决定 backward 是否也便宜。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;14-对-ai--physics-来说这一点越来越重要&#34;&gt;14. 对 AI + Physics 来说，这一点越来越重要
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;过去我们设计 simulator，通常只问：&lt;/p&gt;
-\[\boxed{\text{forward 快不快？}}\]&lt;p&gt;进入 differentiable simulation 后，需要同时问：&lt;/p&gt;
-\[\boxed{ \text{forward 快不快？} }\]&lt;p&gt;以及：&lt;/p&gt;
-\[\boxed{ \text{Jacobian-vector / adjoint solve 快不快？} }\]&lt;p&gt;一个 forward 极快、但 backward 结构极差的求解器，并不一定适合：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;system identification；&lt;/li&gt;
-&lt;li&gt;reinforcement learning；&lt;/li&gt;
-&lt;li&gt;inverse design；&lt;/li&gt;
-&lt;li&gt;Real2Sim；&lt;/li&gt;
-&lt;li&gt;parameter fitting。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;DiffPD 展示了一个很值得迁移的工程原则：&lt;/p&gt;
-\[\boxed{ \text{如果未来需要 differentiability， solver architecture 最好从一开始就考虑可复用的线性结构。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;15-接触会破坏这个漂亮结构吗&#34;&gt;15. 接触会破坏这个漂亮结构吗？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;这正是实际 PD 的难点之一。&lt;/p&gt;
-&lt;p&gt;普通 PD 的优势来自：&lt;/p&gt;
-\[K=\text{constant}.\]&lt;p&gt;但接触集合：&lt;/p&gt;
-\[\mathcal C(x)\]&lt;p&gt;不断变化。&lt;/p&gt;
-&lt;p&gt;如果每出现一个 contact 都修改：&lt;/p&gt;
-\[K,\]&lt;p&gt;就会失去预分解优势。&lt;/p&gt;
-&lt;p&gt;因此 PD 接触算法往往想办法让 contact：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;进入 RHS；&lt;/li&gt;
-&lt;li&gt;进入独立 local solve；&lt;/li&gt;
-&lt;li&gt;或仅影响很小的自由度子集；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;尽量避免重构整个 global matrix。&lt;/p&gt;
-&lt;p&gt;例如 DiffCloth 在 PD 框架中加入 Signorini–Coulomb dry friction contact，并把 contact 处理设计成额外 local step，从而继续利用 PD 的 global-local 结构。&lt;/p&gt;
-&lt;p&gt;这也是一个非常一般的求解器设计目标：&lt;/p&gt;
-\[\boxed{ \text{动态变化的物理，尽量不要破坏静态可缓存的线性骨架。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;16-对你自研-xpbd-求解器最有价值的迁移点&#34;&gt;16. 对你自研 XPBD 求解器最有价值的迁移点
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;我认为重点不在于“把 XPBD 全部换成 PD”。&lt;/p&gt;
-&lt;p&gt;更值得实验的是：&lt;/p&gt;
-\[\boxed{\text{local-global hybrid architecture}.}\]&lt;p&gt;当前 XPBD 中，每个 constraint：&lt;/p&gt;
-\[C_i(x)\]&lt;p&gt;独立计算：&lt;/p&gt;
-\[\Delta\lambda_i,\quad\Delta x_i.\]&lt;p&gt;如果发现某些低频全局误差需要很多 sweep 才能传播，可以考虑：&lt;/p&gt;
-&lt;ol&gt;
-&lt;li&gt;local constraint kernels 保留；&lt;/li&gt;
-&lt;li&gt;把部分 elastic constraints 解释为 local target \(p_i\)；&lt;/li&gt;
-&lt;li&gt;构造固定 global operator；&lt;/li&gt;
-&lt;li&gt;每若干 local iterations 做一次 global correction。&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;这相当于问：&lt;/p&gt;
-\[\boxed{ \text{哪些物理必须逐约束解决， 哪些耦合其实适合交给一个全局线性传播器？} }\]&lt;p&gt;这比单纯增加：&lt;/p&gt;
-\[\text{solver iterations}\]&lt;p&gt;更值得研究。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;17-一个很适合自己实现的小实验&#34;&gt;17. 一个很适合自己实现的小实验
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;不需要四面体 FEM。&lt;/p&gt;
-&lt;p&gt;先做：&lt;/p&gt;
-\[20\times20\]&lt;p&gt;二维 mass-spring cloth。&lt;/p&gt;
-&lt;p&gt;弹簧势能：&lt;/p&gt;
-\[E_{ij} = \frac{k}{2} (\|x_i-x_j\|-L_{ij})^2.\]&lt;p&gt;PD local step：&lt;/p&gt;
-\[p_{ij} = L_{ij} \frac{x_i-x_j}{\|x_i-x_j\|}.\]&lt;p&gt;预构造：&lt;/p&gt;
-\[K= \frac{M}{h^2} + \sum_{ij}kA_{ij}^TA_{ij}.\]&lt;p&gt;Cholesky：&lt;/p&gt;
-\[K=LL^T.\]&lt;p&gt;然后比较：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;PBD / XPBD Gauss-Seidel；&lt;/li&gt;
-&lt;li&gt;PD local-global；&lt;/li&gt;
-&lt;li&gt;PD + Anderson。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;记录：&lt;/p&gt;
-\[\text{constraint/energy residual}\]&lt;p&gt;随：&lt;/p&gt;
-\[\text{iteration}\]&lt;p&gt;和：&lt;/p&gt;
-\[\text{wall-clock time}\]&lt;p&gt;的变化。&lt;/p&gt;
-&lt;p&gt;尤其观察长程扰动：&lt;/p&gt;
-&lt;p&gt;只拖动 cloth 一个角。&lt;/p&gt;
-&lt;p&gt;你很可能会清楚看到：&lt;/p&gt;
-\[\boxed{ \text{局部方法与 global solve 在误差传播速度上的结构差异。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;18-为什么今天值得专门学-pd&#34;&gt;18. 为什么今天值得专门学 PD？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;因为它能纠正一种常见的算法直觉：&lt;/p&gt;
-&lt;p&gt;面对非线性有限元，人们容易把选择理解成：&lt;/p&gt;
-\[\boxed{ \text{便宜但不够物理的 PBD} }\]&lt;p&gt;或者：&lt;/p&gt;
-\[\boxed{ \text{物理准确但昂贵的 Newton FEM}. }\]&lt;p&gt;PD 展示了第三条路：&lt;/p&gt;
-\[\boxed{ \text{重新设计能量表达，使物理模型主动适应高效数值算法。} }\]&lt;p&gt;这其实是计算物理中非常高级的一种思维。&lt;/p&gt;
-&lt;p&gt;模型形式和 solver 并非完全独立。&lt;/p&gt;
-&lt;p&gt;有时：&lt;/p&gt;
-\[\boxed{\text{选择一种“可解性更好”的物理离散}}\]&lt;p&gt;比：&lt;/p&gt;
-\[\boxed{\text{对一个任意离散疯狂优化 solver}}\]&lt;p&gt;收益更大。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h1&gt;&lt;p&gt;Projective Dynamics 最值得记住的不是 local/global 两个步骤，而是：&lt;/p&gt;
-\[\boxed{ \text{把随状态变化的非线性尽可能压进廉价的局部操作， 让昂贵的全局耦合保持固定、线性、可缓存。} }\]&lt;p&gt;它在知识体系中的位置很漂亮：&lt;/p&gt;
-\[\text{Continuum / FEM energy}\]\[\downarrow\]\[\boxed{\text{projective potentials}}\]\[\begin{array}{ccc} \swarrow&amp;&amp;\searrow\\ \text{local projection}&amp;&amp;\text{global linear coupling} \end{array}\]\[\downarrow\]\[\boxed{\text{Projective Dynamics}}\]&lt;p&gt;再向外延伸：&lt;/p&gt;
-\[\text{PD} \rightarrow \text{Anderson / quasi-Newton acceleration}\]\[\text{PD} \rightarrow \text{contact mechanics}\]\[\text{PD} \rightarrow \boxed{\text{DiffPD / differentiable physics}}.\]&lt;p&gt;所以 PD 真正值得学的地方已经超出软体模拟本身：&lt;/p&gt;
-\[\boxed{ \text{一个高性能 solver 的关键， 经常不是“把每一步算得更快”， 而是重新组织问题，使最昂贵的结构能够跨迭代、跨时间步反复复用。} }\]&lt;p&gt;这条原则对 FEM、物理引擎、ROM，甚至 AI 推理系统里的缓存和固定算子设计都有很强的迁移价值。&lt;/p&gt;
-&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
-&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;ol&gt;
-&lt;li&gt;
-&lt;p&gt;Bouaziz, Martin, Liu, Kavan &amp;amp; Pauly, &lt;strong&gt;&lt;em&gt;Projective Dynamics: Fusing Constraint Projections for Fast Simulation&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG / SIGGRAPH 2014&lt;/em&gt;。原始论文，也是最推荐的入口。&lt;br&gt;
-Projective Dynamics 官方项目页与论文/视频&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Tao Du et al., &lt;strong&gt;&lt;em&gt;DiffPD: Differentiable Projective Dynamics&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2022。重点看如何复用 PD 的 prefactorization 加速 backward/&lt;span class=&#34;term-anchor&#34; data-term=&#34;adjoint&#34; tabindex=&#34;0&#34;&gt;adjoint&lt;/span&gt;，以及 system identification、inverse design 和 control。&lt;br&gt;
-DiffPD 官方项目、论文与代码&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Ly et al. 路线上的 &lt;strong&gt;PD + dry frictional contact&lt;/strong&gt; 可从 Li et al., &lt;strong&gt;&lt;em&gt;DiffCloth: Differentiable Cloth Simulation with Dry Frictional Contact&lt;/em&gt;&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2022 入手。论文完整解释了 velocity-based PD global solve 与 Signorini–Coulomb contact local step 如何结合。&lt;br&gt;
-ACM DiffCloth 论文&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;如果想看这条路线截至 &lt;strong&gt;2026 年&lt;/strong&gt;仍在解决什么，可以关注 &lt;strong&gt;DiffPhD: A Unified Differentiable Solver for Projective Heterogeneous Materials in Elastodynamics with Contact-Rich GPU-Acceleration&lt;/strong&gt;。它把强材料异质性、超弹性、GPU contact、Anderson acceleration 与可微 PD 放到同一框架里，是理解 PD 当前工程边界很有价值的新工作。&lt;/p&gt;
-&lt;/li&gt;
-&lt;/ol&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-</description>
-        </item>
-        <item>
-        <title>Projective Dynamics：为什么把非线性弹性拆成“局部投影 &#43; 全局线性求解”，就能同时获得速度、稳定性与并行性？</title>
-        <link>https://assranai.github.io/cards/50-projective-dynamics-3/</link>
-        <pubDate>Fri, 02 Oct 2026 00:00:00 +0000</pubDate>
-        
-        <guid>https://assranai.github.io/cards/50-projective-dynamics-3/</guid>
-        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;Projective Dynamics&lt;/span&gt;（PD，投影动力学）与 Local–Global Solver&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;领域：物理引擎 × 软体动力学 × 有限元 × 优化算法&lt;/strong&gt;&lt;br&gt;
-&lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;今天选 Projective Dynamics，因为它正好位于一个很有价值的交叉点：&lt;/p&gt;
-\[\boxed{\text{FEM 的能量建模}} \quad+\quad \boxed{\text{PBD 的约束投影}} \quad+\quad \boxed{\text{数值优化的 alternating minimization}}.\]&lt;p&gt;它不是简单的“另一种 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pbd&#34; tabindex=&#34;0&#34;&gt;PBD&lt;/span&gt;”。2014 年 Bouaziz、Martin、Liu、Kavan 与 Pauly 提出的原始工作，就是试图在 nodal FEM 与 Position-Based Dynamics 之间建立桥梁：仍然从能量和隐式时间积分出发，却把某类非线性问题改写成极其便宜的局部投影和一个可预分解的全局线性系统。&lt;/p&gt;
-&lt;p&gt;对自己写软体求解器尤其值得学，因为 PD 揭示了一个比算法本身更通用的设计原则：&lt;/p&gt;
-\[\boxed{\text{不要总想着怎样更快地求非线性方程； 有时应该重新设计问题，使大部分非线性只存在于局部。}}\]&lt;hr&gt;
-&lt;h2 id=&#34;1-从隐式-euler-真正在求什么开始&#34;&gt;1. 从隐式 Euler 真正在求什么开始
-&lt;/h2&gt;&lt;p&gt;设节点位置为&lt;/p&gt;
-\[x,\]&lt;p&gt;上一时刻位置、速度为&lt;/p&gt;
-\[x_n,\quad v_n,\]&lt;p&gt;时间步为 \(h\)。&lt;/p&gt;
-&lt;p&gt;忽略一些细节，隐式 Euler 可以写成一个最小化问题：&lt;/p&gt;
-\[\boxed{ x_{n+1} = \arg\min_x \left[ \frac{1}{2h^2} \|x-y\|_M^2 + E(x) \right] }\]&lt;p&gt;其中&lt;/p&gt;
-\[y=x_n+h v_n+h^2M^{-1}f_{\rm ext},\]&lt;p&gt;而&lt;/p&gt;
-\[E(x)\]&lt;p&gt;是弹性势能。&lt;/p&gt;
-&lt;p&gt;第一项的意义是：&lt;/p&gt;
-\[\boxed{\text{惯性希望 }x\text{ 靠近自由运动预测 }y}\]&lt;p&gt;第二项则是：&lt;/p&gt;
-\[\boxed{\text{材料希望 }x\text{ 满足弹性规律}.}\]&lt;p&gt;所以一次时间步本质上是在求：&lt;/p&gt;
-\[\boxed{\text{惯性与弹性能量之间的最优折中}.}\]&lt;p&gt;这就是所谓 &lt;strong&gt;optimization integrator&lt;/strong&gt; 的视角，也是理解 PD、ADMM-PD、后来的 differentiable PD 等方法的共同入口。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;2-普通非线性-fem-为什么贵&#34;&gt;2. 普通非线性 FEM 为什么贵？
-&lt;/h1&gt;&lt;p&gt;如果&lt;/p&gt;
-\[E(x)\]&lt;p&gt;是一般 Neo-Hookean 能量，那么需要解：&lt;/p&gt;
-\[\nabla E_{\rm total}(x)=0.\]&lt;p&gt;Newton 法每轮大致需要：&lt;/p&gt;
-\[H(x_k)\Delta x=-g(x_k),\]&lt;p&gt;其中 Hessian&lt;/p&gt;
-\[H(x_k)\]&lt;p&gt;随当前形变改变。&lt;/p&gt;
-&lt;p&gt;于是每个时间步内部反复：&lt;/p&gt;
-\[\text{组装 Hessian} \rightarrow \text{factorization / linear solve} \rightarrow \text{更新} \rightarrow \text{再组装}.\]&lt;p&gt;真正昂贵的往往不是计算一个 tetrahedron 的能量，而是：&lt;/p&gt;
-\[\boxed{\text{全局非线性导致全局线性系统不断变化。}}\]&lt;p&gt;PD 的突破口就是这里。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;3-pd-对势能施加了一个特殊结构&#34;&gt;3. PD 对势能施加了一个特殊结构
-&lt;/h1&gt;&lt;p&gt;考虑一个约束能量：&lt;/p&gt;
-\[\boxed{ E_i(x) = \frac{w_i}{2} \min_{p_i\in C_i} \|A_i x-p_i\|^2. }\]&lt;p&gt;这里：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;\(A_ix\)：从全局位置抽取某个局部形变量；&lt;/li&gt;
-&lt;li&gt;\(C_i\)：合法局部状态的集合；&lt;/li&gt;
-&lt;li&gt;\(p_i\)：离 \(A_ix\) 最近的合法状态；&lt;/li&gt;
-&lt;li&gt;\(w_i\)：约束刚度。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;这句话非常关键。&lt;/p&gt;
-&lt;p&gt;PD 没有直接说：&lt;/p&gt;
-\[\boxed{\text{这个约束必须满足}}\]&lt;p&gt;而是定义：&lt;/p&gt;
-\[\boxed{\text{当前状态距离“合法状态集合”有多远。}}\]&lt;p&gt;因此：&lt;/p&gt;
-\[E_i(x) = \frac{w_i}{2} d^2(A_ix,C_i).\]&lt;p&gt;这就是 &lt;strong&gt;projective potential&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;原始 PD 工作正是通过这种特殊势能，使 continuum-based constraints 也能进入统一 local–global 求解结构。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;4-一个最简单的弹簧例子&#34;&gt;4. 一个最简单的弹簧例子
-&lt;/h1&gt;&lt;p&gt;两节点：&lt;/p&gt;
-\[x_1,x_2\]&lt;p&gt;静止长度：&lt;/p&gt;
-\[l_0.\]&lt;p&gt;令：&lt;/p&gt;
-\[A_ix=x_1-x_2.\]&lt;p&gt;合法集合：&lt;/p&gt;
-\[C_i= \{p:\|p\|=l_0\}.\]&lt;p&gt;那么：&lt;/p&gt;
-\[p_i = \operatorname{Proj}_{C_i}(x_1-x_2) = l_0 \frac{x_1-x_2}{\|x_1-x_2\|}.\]&lt;p&gt;于是势能：&lt;/p&gt;
-\[E_i = \frac{k}{2} \| (x_1-x_2)-p_i \|^2.\]&lt;p&gt;你会发现：&lt;/p&gt;
-\[p_i\]&lt;p&gt;的求解完全只依赖这根弹簧。&lt;/p&gt;
-&lt;p&gt;另一根弹簧：&lt;/p&gt;
-\[p_j\]&lt;p&gt;和它无关。&lt;/p&gt;
-&lt;p&gt;因此所有：&lt;/p&gt;
-\[p_1,p_2,\ldots,p_m\]&lt;p&gt;都可以：&lt;/p&gt;
-\[\boxed{\text{并行计算。}}\]&lt;p&gt;这就是 &lt;strong&gt;local step&lt;/strong&gt;。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;5-真正漂亮的地方在-global-step&#34;&gt;5. 真正漂亮的地方在 Global Step
-&lt;/h1&gt;&lt;p&gt;如果暂时把：&lt;/p&gt;
-\[p_i\]&lt;p&gt;固定，那么总目标变成：&lt;/p&gt;
-\[\frac{1}{2h^2}(x-y)^TM(x-y) + \sum_i \frac{w_i}{2} \|A_ix-p_i\|^2.\]&lt;p&gt;这时对 \(x\) 来说已经是一个&lt;strong&gt;纯二次函数&lt;/strong&gt;。&lt;/p&gt;
-&lt;p&gt;求导：&lt;/p&gt;
-\[\frac{1}{h^2}M(x-y) + \sum_iw_iA_i^T(A_ix-p_i) =0.\]&lt;p&gt;整理：&lt;/p&gt;
-\[\boxed{ \left( \frac{M}{h^2} + \sum_iw_iA_i^TA_i \right)x = \frac{M}{h^2}y + \sum_iw_iA_i^Tp_i. }\]&lt;p&gt;定义：&lt;/p&gt;
-\[\boxed{ K_{\rm PD} = \frac{M}{h^2} + \sum_iw_iA_i^TA_i. }\]&lt;p&gt;最重要的事情发生了：&lt;/p&gt;
-\[\boxed{K_{\rm PD}\text{ 不依赖当前 }x.}\]&lt;p&gt;只要：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;拓扑不变；&lt;/li&gt;
-&lt;li&gt;\(h\) 不变；&lt;/li&gt;
-&lt;li&gt;constraint weights 不变；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;那么这个矩阵整个仿真过程中都可以不变。&lt;/p&gt;
-&lt;p&gt;所以可以预先：&lt;/p&gt;
-\[K_{\rm PD}=LL^T\]&lt;p&gt;做一次 Cholesky factorization。&lt;/p&gt;
-&lt;p&gt;之后每次 global step 只是：&lt;/p&gt;
-\[LL^Tx=b(p).\]&lt;p&gt;这正是 PD 获得高性能的关键。原始方法强调的也正是这种 alternating optimization 与可重复使用的全局系统结构。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;6-整个算法因此简单得惊人&#34;&gt;6. 整个算法因此简单得惊人
-&lt;/h1&gt;&lt;p&gt;一次时间步：&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
-&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;y ← inertial prediction
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;repeat N iterations:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    # Local
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    parallel for constraint i:
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        p_i ← projection(A_i x, C_i)
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    # Global
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    b ← M y / h² + Σ w_i A_iᵀ p_i
-&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    solve K_PD x = b
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;于是复杂的非线性动力学被拆成：&lt;/p&gt;
-\[\boxed{\text{很多极小的非线性问题}}\]&lt;p&gt;加上：&lt;/p&gt;
-\[\boxed{\text{一个固定的大线性问题}.}\]&lt;p&gt;这是一种非常有迁移价值的计算架构：&lt;/p&gt;
-\[\boxed{\text{nonlinearity local，coupling global}.}\]&lt;hr&gt;
-&lt;h1 id=&#34;7-为什么-local-step-特别适合-gpu&#34;&gt;7. 为什么 Local Step 特别适合 GPU？
-&lt;/h1&gt;&lt;p&gt;例如一个 tetrahedron 的局部投影可能需要：&lt;/p&gt;
-\[F=DsDm^{-1},\]&lt;p&gt;然后对：&lt;/p&gt;
-\[F\]&lt;p&gt;做极分解或 SVD：&lt;/p&gt;
-\[F=U\Sigma V^T\]&lt;p&gt;并把它投影到某个 admissible set。&lt;/p&gt;
-&lt;p&gt;一个网格有：&lt;/p&gt;
-\[10^5\]&lt;p&gt;个 tetrahedra。&lt;/p&gt;
-&lt;p&gt;那么：&lt;/p&gt;
-\[10^5\]&lt;p&gt;个局部 SVD 基本彼此独立。&lt;/p&gt;
-&lt;p&gt;这是 GPU 非常喜欢的：&lt;/p&gt;
-\[\boxed{\text{大量小型、结构相同、彼此独立的计算}.}\]&lt;p&gt;而 global step 则变成稀疏线性代数。&lt;/p&gt;
-&lt;p&gt;因此 PD 天然把软体求解器拆成两种硬件友好任务：&lt;/p&gt;
-\[\boxed{\text{local embarrassingly parallel kernels}}\]&lt;p&gt;和&lt;/p&gt;
-\[\boxed{\text{global sparse solve}.}\]&lt;p&gt;这比把整个非线性 Newton 系统扔给 GPU 要规整得多。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;8-它和-pbd-到底差在哪里&#34;&gt;8. 它和 PBD 到底差在哪里？
-&lt;/h1&gt;&lt;p&gt;这点非常容易混淆。&lt;/p&gt;
-&lt;p&gt;PBD 大致是：&lt;/p&gt;
-\[x \rightarrow \text{constraint 1 correction} \rightarrow \text{constraint 2 correction} \rightarrow\cdots\]&lt;p&gt;很多实现本质上进行 Gauss–Seidel 式位置修正。&lt;/p&gt;
-&lt;p&gt;PD 则存在一个明确的全局目标：&lt;/p&gt;
-\[\boxed{ \min_{x,p} \frac{1}{2h^2}\|x-y\|_M^2 + \sum_i\frac{w_i}{2}\|A_ix-p_i\|^2. }\]&lt;p&gt;Local：&lt;/p&gt;
-\[p\leftarrow\arg\min_p E(x,p)\]&lt;p&gt;Global：&lt;/p&gt;
-\[x\leftarrow\arg\min_x E(x,p).\]&lt;p&gt;因此它实际上属于：&lt;/p&gt;
-\[\boxed{\text{block coordinate descent / alternating minimization}.}\]&lt;p&gt;这就是为什么原论文称它是在 FEM 与 PBD 之间搭桥，而不是简单地提出一种新的 constraint projection heuristic。&lt;/p&gt;
-&lt;hr&gt;
-&lt;h1 id=&#34;9-这也解释了它和-xpbd-的一个深层区别&#34;&gt;9. 这也解释了它和 XPBD 的一个深层区别
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 的核心变量之一是：&lt;/p&gt;
-\[\lambda.\]&lt;p&gt;通过类似：&lt;/p&gt;
-\[\Delta\lambda = \frac{-C(x)-\tilde\alpha\lambda} {\sum_jw_j\|\nabla C_j\|^2+\tilde\alpha}\]&lt;p&gt;逐约束更新。&lt;/p&gt;
-&lt;p&gt;它的强项是：&lt;/p&gt;
-\[\boxed{\text{直接处理约束，并用 compliance 改善时间步依赖。}}\]&lt;p&gt;PD 则更偏向：&lt;/p&gt;
-\[\boxed{\text{从一个全局能量最小化问题出发。}}\]&lt;p&gt;因此可以粗略理解：&lt;/p&gt;
-\[\text{PBD / XPBD}\]&lt;p&gt;更像：&lt;/p&gt;
-\[\boxed{\text{constraint-centric solver}}\]&lt;p&gt;而：&lt;/p&gt;
-\[\text{PD}\]&lt;p&gt;更像：&lt;/p&gt;
-\[\boxed{\text{energy-centric optimization solver}.}\]&lt;p&gt;这也是为什么 PD 很容易和有限元、优化理论、模型降阶联系起来。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;10-pd-的真正代价它支持的材料模型受到限制&#34;&gt;10. PD 的真正代价：它支持的材料模型受到限制
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;这里必须看到它的交换条件。&lt;/p&gt;
-&lt;p&gt;之所以：&lt;/p&gt;
-\[K_{\rm PD}\]&lt;p&gt;固定，是因为能量必须具有：&lt;/p&gt;
-\[\boxed{ \min_{p_i\in C_i} \|A_ix-p_i\|^2 }\]&lt;p&gt;这种特殊结构。&lt;/p&gt;
-&lt;p&gt;一般 Neo-Hookean：&lt;/p&gt;
-\[\Psi(F) = \frac{\mu}{2}(I_1-3) -\mu\ln J + \frac{\lambda}{2}(\ln J)^2\]&lt;p&gt;并不能天然写成这种简单 projective potential。&lt;/p&gt;
-&lt;p&gt;因此经典 PD 的一个重要限制就是：&lt;/p&gt;
-\[\boxed{\text{材料模型自由度换取了求解器结构。}}\]&lt;p&gt;Liu、Bouaziz 与 Kavan 后来从另一个角度解决了这个问题：证明 PD 可以解释为一种 &lt;strong&gt;quasi-Newton method&lt;/strong&gt;，进而把固定 PD matrix 当作 Hessian 近似，用于 Neo-Hookean 等一般超弹性材料。其工作报告相对常规 Newton 方法约一个数量级的性能优势，同时支持 PD 原本难以表示的材料。&lt;/p&gt;
-&lt;p&gt;这是一个很重要的理论跃迁：&lt;/p&gt;
-\[\boxed{\text{PD 不只是一个材料模型，也可以看成一个 Hessian approximation strategy。}}\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;11-从这个角度重新看-newton&#34;&gt;11. 从这个角度重新看 Newton
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;Newton：&lt;/p&gt;
-\[H(x_k)\Delta x=-g(x_k).\]&lt;p&gt;每次重新构造：&lt;/p&gt;
-\[H(x_k).\]&lt;p&gt;PD-style quasi-Newton 则相当于：&lt;/p&gt;
-\[\boxed{ H(x_k)\approx H_0 }\]&lt;p&gt;其中：&lt;/p&gt;
-\[H_0\]&lt;p&gt;可以提前 factorize。&lt;/p&gt;
-&lt;p&gt;所以问题变成：&lt;/p&gt;
-\[\boxed{\text{我愿意牺牲多少局部曲率精确性，换取 Hessian 可重复使用？}}\]&lt;p&gt;这和很多实时物理引擎的根本设计目标高度一致：&lt;/p&gt;
-\[\boxed{\text{不要追求单次迭代最聪明；追求单位毫秒内减少最多误差。}}\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;12-更深一层pd-其实是-admm-家族的特殊结构&#34;&gt;12. 更深一层：PD 其实是 ADMM 家族的特殊结构
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;2017 年 Overby、Brown、Li 与 Rahul Narain 证明，Alternating Direction Method of Multipliers 可以用来构造一个包含 PD 的更一般框架：&lt;/p&gt;
-\[\boxed{\mathrm{ADMM}\supseteq\mathrm{PD}.}\]&lt;p&gt;引入局部变量：&lt;/p&gt;
-\[z_i=A_ix\]&lt;p&gt;和 dual variables：&lt;/p&gt;
-\[u_i,\]&lt;p&gt;ADMM 交替执行：&lt;/p&gt;
-\[z\text{-update},\]\[x\text{-update},\]\[u\text{-update}.\]&lt;p&gt;这样既保留：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;local parallelism；&lt;/li&gt;
-&lt;li&gt;constant prefactored global matrix；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;又能处理更一般的：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;nonlinear constitutive models；&lt;/li&gt;
-&lt;li&gt;hard constraints；&lt;/li&gt;
-&lt;li&gt;sliding；&lt;/li&gt;
-&lt;li&gt;dynamically changing contact constraints。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;这正是论文的主要动机和结果。&lt;/p&gt;
-&lt;p&gt;所以知识体系实际上是：&lt;/p&gt;
-\[\boxed{ \text{PBD} \longleftrightarrow \text{PD} \longleftrightarrow \text{ADMM} \longleftrightarrow \text{general optimization}. }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;13-这对接触问题尤其有意义&#34;&gt;13. 这对接触问题尤其有意义
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;接触是 PD 固定矩阵结构最容易遭到挑战的地方。&lt;/p&gt;
-&lt;p&gt;因为接触集合：&lt;/p&gt;
-\[\mathcal C(t)\]&lt;p&gt;每帧都可能改变。&lt;/p&gt;
-&lt;p&gt;如果每增加一个 contact constraint 都改变：&lt;/p&gt;
-\[K_{\rm PD},\]&lt;p&gt;那么：&lt;/p&gt;
-\[\boxed{\text{prefactorization 优势就没了。}}\]&lt;p&gt;所以后来很多工作都试图把动态 contact 尽量塞进 local / auxiliary-variable 一侧，而让 global matrix 保持不变。&lt;/p&gt;
-&lt;p&gt;例如 ADMM-PD 明确针对 sliding/contact 设计了动态约束处理，同时维持 constant prefactored system matrix。&lt;/p&gt;
-&lt;p&gt;2020 年的 Projective Dynamics with Dry Frictional Contact 又进一步把 Signorini–Coulomb 干摩擦接触整合进 local–global 架构，而不是简单使用 penalty force。&lt;/p&gt;
-&lt;p&gt;这里能看出一个非常实用的求解器设计原则：&lt;/p&gt;
-\[\boxed{ \text{把变化频繁的物理放在 local side， 把稳定的拓扑耦合留给 global side。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;14-它甚至自然连接-rom&#34;&gt;14. 它甚至自然连接 ROM
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;假设：&lt;/p&gt;
-\[x\approx Uz,\]&lt;p&gt;其中：&lt;/p&gt;
-\[U\in\mathbb R^{3N\times r}.\]&lt;p&gt;代入 global step：&lt;/p&gt;
-\[K_{\rm PD}Uz=b.\]&lt;p&gt;Galerkin projection：&lt;/p&gt;
-\[\boxed{ U^TK_{\rm PD}Uz=U^Tb. }\]&lt;p&gt;于是 global system 从：&lt;/p&gt;
-\[3N\]&lt;p&gt;降到：&lt;/p&gt;
-\[r.\]&lt;p&gt;问题却没有完全解决，因为 local projections 仍然要遍历：&lt;/p&gt;
-\[m\]&lt;p&gt;个约束。&lt;/p&gt;
-&lt;p&gt;这就是：&lt;/p&gt;
-\[\boxed{\text{hyper-reduction}}\]&lt;p&gt;出现的原因。&lt;/p&gt;
-&lt;p&gt;Brandt 等 2018 年的 Hyper-Reduced Projective Dynamics 同时近似 local constraint projections 并构造 sparse reduced bases，使时间积分成本不再直接随原始 mesh resolution 增长；论文展示了大型网格实时模拟，并且不要求训练数据或 modal analysis。&lt;/p&gt;
-&lt;p&gt;这和前一张 Randomized &lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt; 卡片正好接上：&lt;/p&gt;
-\[\text{state reduction}\]&lt;p&gt;解决：&lt;/p&gt;
-\[\boxed{\text{全局自由度太多}}\]&lt;p&gt;而 hyper-reduction 解决：&lt;/p&gt;
-\[\boxed{\text{非线性局部计算仍然太多}.}\]&lt;p&gt;这是 ROM 里一个非常重要的区别。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;15-pd-甚至很适合-differentiable-physics&#34;&gt;15. PD 甚至很适合 differentiable physics
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;如果希望计算：&lt;/p&gt;
-\[\frac{\partial x_T}{\partial\theta},\]&lt;p&gt;普通隐式非线性 FEM 反向传播可能需要不断处理变化的线性化系统。&lt;/p&gt;
-&lt;p&gt;PD 的 global matrix：&lt;/p&gt;
-\[K_{\rm PD}\]&lt;p&gt;却具有高度可重复结构。&lt;/p&gt;
-&lt;p&gt;DiffPD 正是利用这一点构造快速可微软体模拟器，用于 soft-body learning 和 control；其工作强调，与普通 implicit differentiable simulation 中昂贵的线性化动力学求解相比，PD 的结构允许显著加速反向传播。&lt;/p&gt;
-&lt;p&gt;因此 PD 的价值已经不只：&lt;/p&gt;
-\[\boxed{\text{forward simulation 很快}}\]&lt;p&gt;还包括：&lt;/p&gt;
-\[\boxed{\text{它产生了适合 differentiation 的计算图结构}.}\]&lt;p&gt;这对今天 AI + physics 的组合尤其重要。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;16-对你自己的-xpbd-求解器最值得迁移什么&#34;&gt;16. 对你自己的 XPBD 求解器，最值得迁移什么？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;不一定是“把 XPBD 全换成 PD”。&lt;/p&gt;
-&lt;p&gt;更值得迁移的是：&lt;/p&gt;
-\[\boxed{\text{重新审视哪些非线性真的必须进入全局耦合。}}\]&lt;p&gt;例如你之前遇到 tetrahedra 在接触后大量同时进入：&lt;/p&gt;
-\[J&lt;0.3\]&lt;p&gt;并最终锁死。&lt;/p&gt;
-&lt;p&gt;XPBD 当前结构大致是：&lt;/p&gt;
-\[\text{constraint} \rightarrow \Delta\lambda \rightarrow \Delta x \rightarrow \text{next constraint}.\]&lt;p&gt;如果未来研究 PD / ADMM-style solver，可以把问题重新写成：&lt;/p&gt;
-\[\text{Local:} \quad F_e \rightarrow \text{admissible deformation }P_e\]\[\text{Global:} \quad \text{寻找一个全局 }x \text{，尽量同时匹配所有 }P_e.\]&lt;p&gt;于是“局部材料希望每个 tet 成为什么形状”和“共享节点要求所有 tet 必须兼容”被明确拆开。&lt;/p&gt;
-&lt;p&gt;这会提供一个与 XPBD 完全不同的诊断视角：&lt;/p&gt;
-\[\boxed{\text{到底是 local material projection 崩了，还是 global compatibility 无法满足？}}\]&lt;p&gt;这对定位软体坍塌问题很有价值。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;17-一个非常值得自己实现的最小实验&#34;&gt;17. 一个非常值得自己实现的最小实验
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;不要一开始做 tetrahedron。&lt;/p&gt;
-&lt;p&gt;只做：&lt;/p&gt;
-\[10\times10\]&lt;p&gt;二维 mass-spring cloth。&lt;/p&gt;
-&lt;p&gt;实现三个 solver：&lt;/p&gt;
-\[\boxed{\text{XPBD}}\]\[\boxed{\text{Newton implicit Euler}}\]\[\boxed{\text{Projective Dynamics}}.\]&lt;p&gt;PD 中：&lt;/p&gt;
-\[A_ix=x_a-x_b\]&lt;p&gt;以及：&lt;/p&gt;
-\[p_i = l_i \frac{x_a-x_b} {\|x_a-x_b\|}.\]&lt;p&gt;预计算：&lt;/p&gt;
-\[K_{\rm PD} = M/h^2+\sum_iw_iA_i^TA_i\]&lt;p&gt;并做一次 Cholesky。&lt;/p&gt;
-&lt;p&gt;然后比较：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;每步耗时；&lt;/li&gt;
-&lt;li&gt;迭代次数；&lt;/li&gt;
-&lt;li&gt;stretch error；&lt;/li&gt;
-&lt;li&gt;总能量；&lt;/li&gt;
-&lt;li&gt;大时间步稳定性；&lt;/li&gt;
-&lt;li&gt;stiffness 增大后的表现。&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;最值得观察的不是谁“绝对最好”。&lt;/p&gt;
-&lt;p&gt;而是：&lt;/p&gt;
-\[\boxed{\text{三种方法把计算预算花在完全不同的地方。}}\]&lt;p&gt;XPBD：&lt;/p&gt;
-\[\text{大量便宜 constraint iterations}\]&lt;p&gt;Newton：&lt;/p&gt;
-\[\text{少量昂贵、曲率准确的 iterations}\]&lt;p&gt;PD：&lt;/p&gt;
-\[\boxed{\text{大量便宜 local projections + 重复利用一个昂贵的预分解}.}\]&lt;p&gt;这会把三类实时软体求解器的结构差异真正建立起来。&lt;/p&gt;
-
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;18-它在整个知识体系中卡在哪里&#34;&gt;18. 它在整个知识体系中卡在哪里？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;p&gt;可以把你现在接触的求解方法大致放成：&lt;/p&gt;
-\[\text{Explicit FEM}\]&lt;p&gt;简单，但受 CFL 限制。&lt;/p&gt;
-&lt;p&gt;↓&lt;/p&gt;
-\[\text{Implicit Newton FEM}\]&lt;p&gt;材料表达能力强、精度高，但每步非线性求解昂贵。&lt;/p&gt;
-&lt;p&gt;↓&lt;/p&gt;
-&lt;p&gt;一条路线走向：&lt;/p&gt;
-\[\text{PBD} \rightarrow \boxed{\text{XPBD}}\]&lt;p&gt;核心是：&lt;/p&gt;
-\[\boxed{\text{constraint projection}.}\]&lt;p&gt;另一条路线则是：&lt;/p&gt;
-\[\boxed{\text{Projective Dynamics}}\]&lt;p&gt;核心是：&lt;/p&gt;
-\[\boxed{\text{energy optimization + local/global splitting}.}\]&lt;p&gt;再向上：&lt;/p&gt;
-\[\text{PD as quasi-Newton}\]\[\text{ADMM-PD}\]\[\text{hyper-reduced PD}\]\[\text{DiffPD}.\]&lt;p&gt;所以 PD 最重要的位置其实是：&lt;/p&gt;
-\[\boxed{ \text{它是“图形学约束求解器” 通往“现代优化型物理求解器”的一座桥。} }\]
-  &lt;/div&gt;
-&lt;/details&gt;
-
-&lt;hr&gt;
-&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h1&gt;&lt;p&gt;Projective Dynamics 最值得学的并不是那条固定矩阵公式，而是：&lt;/p&gt;
-\[\boxed{ \text{一个复杂非线性问题的高成本， 往往不是因为“非线性很多”， 而是因为这些非线性被迫全局耦合在一起。} }\]&lt;p&gt;PD 做的事情是：&lt;/p&gt;
-\[\boxed{ \text{把非线性留在局部， 把全局耦合变成线性。} }\]&lt;p&gt;于是：&lt;/p&gt;
-\[\text{local} = \text{非线性、便宜、并行}\]&lt;p&gt;而：&lt;/p&gt;
-\[\text{global} = \text{线性、昂贵、但可重复利用}.\]&lt;p&gt;这个模式的迁移价值远超软体模拟。&lt;/p&gt;
-&lt;p&gt;它与：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;ADMM；&lt;/li&gt;
-&lt;li&gt;domain decomposition；&lt;/li&gt;
-&lt;li&gt;alternating minimization；&lt;/li&gt;
-&lt;li&gt;variable splitting；&lt;/li&gt;
-&lt;li&gt;hyper-reduction；&lt;/li&gt;
-&lt;li&gt;differentiable physics；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;共享着同一种算法设计思想：&lt;/p&gt;
-\[\boxed{\text{通过引入辅助变量和问题分裂，主动创造可利用的计算结构。}}\]&lt;p&gt;这就是 PD 真正值得深入理解的位置。&lt;/p&gt;
-&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
-&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
-  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
-  &lt;div class=&#34;reveal-body&#34;&gt;
-    &lt;ol&gt;
-&lt;li&gt;
-&lt;p&gt;Bouaziz, Martin, Liu, Kavan &amp;amp; Pauly, &lt;strong&gt;Projective Dynamics: Fusing Constraint Projections for Fast Simulation&lt;/strong&gt;, &lt;em&gt;ACM Transactions on Graphics&lt;/em&gt;, SIGGRAPH 2014, DOI 10.1145/2601097.2601116。原始论文，优先读能量构造和 local–global solver，而不只是效果图。&lt;br&gt;
-Tiantian Liu 作者论文页与原文入口&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Liu, Bouaziz &amp;amp; Kavan, &lt;strong&gt;Quasi-Newton Methods for Real-time Simulation of Hyperelastic Materials&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2017。最值得看的地方是它如何把 PD 重新解释为 quasi-Newton，从而跨出 projective material 的限制并支持 Neo-Hookean 等超弹性模型。&lt;br&gt;
-作者项目页、论文与视频&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Overby, Brown, Li &amp;amp; Narain, &lt;strong&gt;ADMM ⊇ Projective Dynamics: Fast Simulation of Hyperelastic Models with Dynamic Constraints&lt;/strong&gt;, &lt;em&gt;IEEE TVCG&lt;/em&gt; 23(10), 2017, DOI 10.1109/TVCG.2017.2730875。适合继续理解“为什么 PD 本质上属于 variable splitting / optimization 家族”，以及动态 contact 怎样在不破坏 prefactorization 的情况下进入系统。&lt;br&gt;
-作者项目页：论文、补充材料、视频与源码&lt;/p&gt;
-&lt;/li&gt;
-&lt;li&gt;
-&lt;p&gt;Tao Du et al., &lt;strong&gt;DiffPD: Differentiable Projective Dynamics&lt;/strong&gt;, &lt;em&gt;ACM TOG&lt;/em&gt;, 2022。如果想继续连接“软体求解器 → differentiable physics → AI/控制”，这是很合适的下一站。&lt;br&gt;
-DiffPD 官方项目页&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 
