@@ -392,7 +392,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 6 分钟
+                    阅读时长: 9 分钟
                 </time>
             </div>
         
@@ -814,7 +814,7 @@
 \[\nabla_x f.\]<p>如果输出是一个标量：</p>
 \[f,\]<p>reverse-mode AD 的梯度成本通常可以做到与少量 forward solves 同量级，而不是：</p>
 \[O(m)\]<p>倍。</p>
-<p>对 PDE/FEM，如果有 <span class="term-anchor" data-term="adjoint" tabindex="0">adjoint</span>：</p>
+<p>对 PDE/FEM，如果有 adjoint：</p>
 \[A^T\lambda = \frac{\partial f}{\partial u},\]<p>然后：</p>
 \[\frac{df}{dx} = \frac{\partial f}{\partial x} - \lambda^T \frac{\partial R}{\partial x},\]<p>那么高维参数梯度也能高效获得。</p>
 <p>所以：</p>
@@ -942,6 +942,208 @@
 </details>
 
 <hr>
+<h1 id="25-它和-form-之间其实存在一个有趣联系">25. 它和 FORM 之间其实存在一个有趣联系
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>可靠性中 FORM 会在标准正态空间寻找 Most Probable Point：</p>
+\[ u^\star. \]<p>然后用极限状态面的局部法向：</p>
+\[ \alpha = \frac{\nabla g(u^\star)} {\|\nabla g(u^\star)\|} \]<p>描述：</p>
+\[ \boxed{\text{失效点附近最关键的局部方向}.} \]<p>Active Subspaces 则研究：</p>
+\[ C= \mathbb E[ \nabla g(X)\nabla g(X)^T ]. \]<p>所以可以粗略理解：</p>
+<p>FORM：</p>
+\[ \boxed{\text{局部、失效点附近的关键方向}} \]<p>Active Subspaces：</p>
+\[ \boxed{\text{整个输入分布上的平均关键方向}.} \]<p>两者都在研究：</p>
+\[ \boxed{\text{direction，而不仅是 variable}.} \]<p>但尺度完全不同。</p>
+<p>这也意味着 Active Subspaces <strong>不能直接替代 FORM</strong>：一个在全局平均意义上“不活跃”的方向，仍可能在极小概率失效尾部变得极其重要。</p>
+<p>这是可靠性应用里必须警惕的问题。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="26-一个自然改进改变平均梯度的权重">26. 一个自然改进：改变“平均梯度”的权重
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>标准：</p>
+\[ C= \int \nabla g(x)\nabla g(x)^T \rho(x)\,dx. \]<p>如果真正关心：</p>
+\[ g(x)\approx0, \]<p>可以考虑任务导向权重：</p>
+\[ \boxed{ C_w= \int w(g(x)) \nabla g(x)\nabla g(x)^T \rho(x)\,dx, } \]<p>其中：</p>
+\[ w(g) \]<p>在：</p>
+\[ g\approx0 \]<p>附近更大。</p>
+<p>例如概念上：</p>
+\[ w(g)= \exp\left( -\frac{g^2}{2\tau^2} \right). \]<p>这样得到的方向就更接近：</p>
+\[ \boxed{\text{failure-boundary active directions}.} \]<p>这不是说该公式就是标准可靠性算法，而是展示一个重要研究思路：</p>
+\[ \boxed{\text{降维目标也必须与最终任务对齐。}} \]<p>如果任务是：</p>
+\[ P_f, \]<p>那么“平均解释 \(f\) 的变化”未必是最好的降维准则。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="27-实际上怎样估计-active-subspace">27. 实际上怎样估计 Active Subspace？
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>真实：</p>
+\[ C= \mathbb E[ \nabla f\nabla f^T ] \]<p>通常不知道。</p>
+<p>采样：</p>
+\[ x^{(1)},\ldots,x^{(N)} \sim\rho. \]<p>计算梯度：</p>
+\[ g_i=\nabla f(x^{(i)}). \]<p>Monte Carlo 估计：</p>
+\[ \boxed{ \hat C = \frac1N \sum_{i=1}^N g_ig_i^T. } \]<p>然后：</p>
+\[ \hat C = W\Lambda W^T. \]<p>实际代码甚至可以避免显式形成 \(C\)。</p>
+<p>构造梯度矩阵：</p>
+\[ G= \frac1{\sqrt N} [ g_1,g_2,\ldots,g_N ]. \]<p>因为：</p>
+\[ GG^T=\hat C. \]<p>直接 SVD：</p>
+\[ G=U\Sigma V^T. \]<p>则：</p>
+\[ \boxed{ W=U,\qquad \lambda_i=\sigma_i^2. } \]<p>这和前一张 Randomized SVD 卡片也自然连接起来：当输入参数很多时，梯度矩阵本身也可以用 randomized/sketched linear algebra 处理。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="28-真正的瓶颈其实是梯度">28. 真正的瓶颈其实是梯度
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>如果输入维度：</p>
+\[ m=100, \]<p>用有限差分计算一次：</p>
+\[ \nabla f \]<p>大约需要：</p>
+\[ 101 \]<p>次仿真。</p>
+<p>如果一个 FEM：</p>
+\[ 30\text{ min}, \]<p>显然无法接受。</p>
+<p>因此 Active Subspaces 是否实用，很大程度取决于有没有：</p>
+\[ \boxed{\text{cheap gradients}.} \]<p>典型来源：</p>
+<ul>
+<li>automatic differentiation；</li>
+<li>adjoint method；</li>
+<li>analytic sensitivity；</li>
+<li>surrogate gradients。</li>
+</ul>
+<p>对于 scalar QoI：</p>
+\[ f(x)\in\mathbb R \]<p>且参数很多时，adjoint 尤其重要：</p>
+\[ \boxed{\text{一次 adjoint solve 可以同时得到大量参数方向的梯度信息。}} \]<p>这也是为什么 Active Subspaces 与 PDE-constrained optimization、adjoint FEM 很自然地结合。现代 derivative-based global sensitivity 工作也明确使用 adjoint gradients 来处理高维 PDE 参数。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="29-谱隙比前两个特征值最大更重要">29. 谱隙比“前两个特征值最大”更重要
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设：</p>
+\[ \lambda= [10,\;8,\;7,\;6,\;5,\ldots]. \]<p>虽然：</p>
+\[ \lambda_1,\lambda_2 \]<p>最大，但没有明显：</p>
+\[ \boxed{\text{spectral gap}.} \]<p>此时硬选：</p>
+\[ r=2 \]<p>没有很强依据。</p>
+<p>反之：</p>
+\[ \lambda= [10,\;8,\;0.1,\;0.03,\ldots] \]<p>在：</p>
+\[ \lambda_2 \]<p>和：</p>
+\[ \lambda_3 \]<p>之间存在巨大谱隙。</p>
+<p>这才意味着：</p>
+\[ \boxed{\text{二维 active subspace 具有稳定结构。}} \]<p>所以 Active Subspaces 不是：</p>
+<blockquote>
+<p>算出特征向量，然后永远取前两个。</p>
+</blockquote>
+<p>真正要诊断的是：</p>
+\[ \boxed{\text{这个函数到底有没有低维 ridge structure？}} \]<p>Constantine 的专著明确把随机梯度采样视为<strong>测试函数是否存在 active subspace</strong>的方法，而不是预设低维结构一定存在。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="30-还有一个容易忽略的问题特征向量本身可能不稳定">30. 还有一个容易忽略的问题：特征向量本身可能不稳定
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>如果：</p>
+\[ \lambda_1\approx\lambda_2, \]<p>那么：</p>
+\[ w_1,\;w_2 \]<p>可能因为一点采样误差就大幅旋转。</p>
+<p>但：</p>
+\[ \boxed{\operatorname{span}(w_1,w_2)} \]<p>仍可能非常稳定。</p>
+<p>所以实际分析时更应该关心：</p>
+\[ \boxed{\text{subspace error}} \]<p>而不只是：</p>
+\[ \boxed{\text{单个 eigenvector 的系数。}} \]<p>这也是为什么 bootstrap 很常用：</p>
+<p>反复重采样梯度样本，</p>
+\[ \hat C^{(b)} \]<p>重新计算：</p>
+\[ W_1^{(b)}, \]<p>再观察子空间夹角：</p>
+\[ \|\, W_1W_1^T - W_1^{(b)}W_1^{(b)T} \,\|. \]<p>如果变化巨大：</p>
+\[ \boxed{\text{你可能还没有足够证据声称存在这个 active subspace。}} \]
+  </div>
+</details>
+
+<hr>
+<h1 id="31-active-subspaces-和-sobol-灵敏度不是竞争关系">31. Active Subspaces 和 Sobol 灵敏度不是竞争关系
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>Sobol 指标问：</p>
+\[ \boxed{\text{各个变量贡献了多少输出方差？}} \]<p>Active Subspaces 问：</p>
+\[ \boxed{\text{哪些线性组合方向使函数变化最大？}} \]<p>因此如果：</p>
+\[ f(x)=g(x_1+x_2), \]<p>Sobol 可能告诉你：</p>
+\[ x_1,x_2 \]<p>都重要。</p>
+<p>这完全正确。</p>
+<p>Active Subspace 则进一步告诉你：</p>
+\[ \boxed{\text{它们主要通过 }x_1+x_2\text{ 这一组合起作用。}} \]<p>所以：</p>
+\[ \boxed{\text{Sobol 更适合变量归因；Active Subspaces 更适合方向降维。}} \]<p>如果工程任务是：</p>
+<blockquote>
+<p>哪个制造参数应该控制得更严格？</p>
+</blockquote>
+<p>Sobol 很自然。</p>
+<p>如果任务是：</p>
+<blockquote>
+<p>能不能把 20 维 Kriging 降到 3 维？</p>
+</blockquote>
+<p>Active Subspaces 更直接。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="32-一个很值得做的小实验">32. 一个很值得做的小实验
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>定义：</p>
+\[ f(x) = \sin(a^Tx)+0.05(b^Tx)^2, \]<p>其中：</p>
+\[ x\in[-1,1]^{10}, \]<p>随机生成两个正交单位向量：</p>
+\[ a,b. \]<p>那么真实响应虽然有：</p>
+\[ 10 \]<p>个输入变量，却只依赖：</p>
+\[ a^Tx,\qquad b^Tx. \]<p>采：</p>
+\[ N=200 \]<p>个点。</p>
+<p>计算：</p>
+\[ \nabla f(x) = \cos(a^Tx)a + 0.1(b^Tx)b\,b. \]<p>构造：</p>
+\[ \hat C. \]<p>然后看其 eigenvalues。</p>
+<p>理论上会出现：</p>
+\[ \lambda_1,\lambda_2>0, \]<p>其余：</p>
+\[ \lambda_3,\ldots,\lambda_{10}\approx0. \]<p>然后分别训练：</p>
+\[ \text{10D Kriging: }\hat f(x) \]<p>和：</p>
+\[ \text{2D Kriging: } \hat g(w_1^Tx,w_2^Tx). \]<p>比较：</p>
+\[ R^2,\quad RMSE,\quad \text{training time}. \]<p>最后把第二项改成：</p>
+\[ 0.0001(b^Tx)^2. \]<p>你会看到模型从：</p>
+\[ \boxed{\text{二维 active structure}} \]<p>逐渐退化成：</p>
+\[ \boxed{\text{近似一维 ridge function}.} \]<p>这个实验能非常直观地建立“effective input dimension”的感觉。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="33-它在整个知识体系中卡在哪里">33. 它在整个知识体系中卡在哪里？
+</h1><p>把几种常见降维方法放在一起：</p>
+\[ \text{PCA} \]<p>寻找：</p>
+\[ \boxed{\text{输入数据变化最大的方向}} \]<p>↓</p>
+\[ \text{Sobol / DGSM} \]<p>寻找：</p>
+\[ \boxed{\text{重要变量}} \]<p>↓</p>
+\[ \boxed{\text{Active Subspaces}} \]<p>寻找：</p>
+\[ \boxed{\text{响应最敏感的输入方向}} \]<p>↓</p>
+\[ \text{ridge approximation} \]<p>构造：</p>
+\[ \boxed{f(x)\approx g(W^Tx)} \]<p>而另一条独立轴是：</p>
+\[ \text{POD / Reduced Basis} \]<p>寻找：</p>
+\[ \boxed{\text{高维输出状态的低维空间}.} \]<p>因此参数化物理仿真里一个很完整的结构其实是：</p>
+\[ \boxed{ x \overset{\text{input reduction}}{\longrightarrow} W^Tx \overset{\text{physics}}{\longrightarrow} u \overset{\text{state reduction}}{\longrightarrow} a. } \]<p>这正好把你最近接触的 Kriging、ROM、POD 和高维可靠性连接起来。</p>
+<hr>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
 </h1><p>Active Subspace 最值得记住的并不是：</p>
 \[C=\mathbb E[\nabla f\nabla f^T].\]<p>而是一个关于高维问题非常重要的认识：</p>
@@ -966,7 +1168,7 @@
 <p><strong>Constantine, Dow &amp; Wang, <em>Active Subspace Methods in Theory and Practice: Applications to Kriging Surfaces</em>, SIAM JSC, 2014</strong>。非常适合继续理解 Active Subspace 为什么能直接服务 Kriging，尤其是“重要方向不与坐标轴对齐”这一点。</p>
 </li>
 <li>
-<p><strong>Lam, Zahm, Marzouk &amp; Willcox, <em>Multifidelity Dimension Reduction via Active Subspaces</em>, SIAM JSC, 2020</strong>。把前面 MFMC 中的多保真思想迁移到了“低维结构识别”，适合看低保真模型如何帮助估计高保真 active subspace。</p>
+<p><strong>Lam, Zahm, Marzouk &amp; Willcox, <em>Multifidelity Dimension Reduction via Active Subspaces</em>, SIAM JSC, 2020</strong>。把前面 <span class="term-anchor" data-term="mfmc" tabindex="0">MFMC</span> 中的多保真思想迁移到了“低维结构识别”，适合看低保真模型如何帮助估计高保真 active subspace。</p>
 </li>
 <li>
 <p><strong>Kim, Wang &amp; Song, <em>Adaptive active subspace-based metamodeling for high-dimensional reliability analysis</em>, Structural Safety, 2023</strong>。这是可靠性方向尤其值得看的工作：Active Subspace、异方差 GP 与 active learning 不再简单串联，而是共同适应关键失效区域。</p>
@@ -1083,6 +1285,19 @@
             
                 
 <article class="">
+    <a href="/cards/37-operator-inference/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Operator Inference：从轨迹数据反推出一个 ROM</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
     <a href="/cards/34-shapley-effects/">
         
         
@@ -1115,19 +1330,6 @@
 
         <div class="article-details">
             <h2 class="article-title">Distributionally Robust Reliability：可靠性分析里更危险的，往往不是随机性，而是“你把随机性认错了”</h2>
-        </div>
-    </a>
-</article>
-
-            
-                
-<article class="">
-    <a href="/cards/18-conformal-prediction/">
-        
-        
-
-        <div class="article-details">
-            <h2 class="article-title">Conformal Prediction：给任意代理模型加有限样本覆盖保证</h2>
         </div>
     </a>
 </article>

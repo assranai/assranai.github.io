@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Algebraic Multigrid（AMG，代数多重网格）\n领域：有限元 × 数值线性代数 × 物理求解器 × HPC\n阅读时间：约 4–5 分钟\n今天补充一个此前尚未系统覆盖、但对大型有限元求解器至关重要的概念：代数多重网格。\n它解决的是一个非常基础的问题：随着网格不断细化，为什么许多迭代求解器越来越慢？AMG 的核心发现是：\n迭代方法难以消除的误差，往往可以通过改变表示尺度，转化成容易处理的误差。\n这使得某些大型稀疏线性系统能够以接近 \\(O(N)\\) 的计算复杂度求解，而不必付出传统直接分解的高昂代价。AMG 尤其适合椭圆型 PDE 离散产生的系统，实际表现仍取决于算子性质和粗化策略。\n一、为什么普通迭代法会越算越慢？ 考虑有限元中的线性系统：\n\\[ Ku=f. \\]先用最简单的一维 Poisson 方程理解：\n\\[ -\\frac{d^2u}{dx^2}=f(x). \\]离散以后：\n\\[ K=\\frac{1}{h^2} \\begin{bmatrix} 2&-1&&\\\\ -1&2&-1&\\\\ &\\ddots&\\ddots&\\ddots\\\\ &&-1&2 \\end{bmatrix}. \\]使用 Jacobi 迭代：\n\\[ u^{k+1}=u^k+\\omega D^{-1}(f-Ku^k). \\]其中 \\(D\\) 是 \\(K\\) 的对角部分。\n设误差为：\n\\[ e^k=u^k-u^\\star. \\]那么：\n\\[ e^{k+1}=(I-\\omega D^{-1}K)e^k. \\]对离散正弦误差模式进行分析，可以得到误差放大因子：\n\\[ \\boxed{ \\mu_j=1-\\omega\\left(1-\\cos\\frac{j\\pi}{n+1}\\right). } \\]取 \\(\\omega=2/3\\)。\n对于高频误差，\\(|\\mu_j|\\) 通常较小，意味着误差快速衰减。\n但对于低频误差：\n\\[ j\\ll n, \\]有：\n">
+<title>Algebraic Multigrid：换一个尺度消除难消的误差</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/39-algebraic-multigrid/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Algebraic Multigrid：换一个尺度消除难消的误差">
+<meta property='og:description' content="主题：Algebraic Multigrid（AMG，代数多重网格）\n领域：有限元 × 数值线性代数 × 物理求解器 × HPC\n阅读时间：约 4–5 分钟\n今天补充一个此前尚未系统覆盖、但对大型有限元求解器至关重要的概念：代数多重网格。\n它解决的是一个非常基础的问题：随着网格不断细化，为什么许多迭代求解器越来越慢？AMG 的核心发现是：\n迭代方法难以消除的误差，往往可以通过改变表示尺度，转化成容易处理的误差。\n这使得某些大型稀疏线性系统能够以接近 \\(O(N)\\) 的计算复杂度求解，而不必付出传统直接分解的高昂代价。AMG 尤其适合椭圆型 PDE 离散产生的系统，实际表现仍取决于算子性质和粗化策略。\n一、为什么普通迭代法会越算越慢？ 考虑有限元中的线性系统：\n\\[ Ku=f. \\]先用最简单的一维 Poisson 方程理解：\n\\[ -\\frac{d^2u}{dx^2}=f(x). \\]离散以后：\n\\[ K=\\frac{1}{h^2} \\begin{bmatrix} 2&-1&&\\\\ -1&2&-1&\\\\ &\\ddots&\\ddots&\\ddots\\\\ &&-1&2 \\end{bmatrix}. \\]使用 Jacobi 迭代：\n\\[ u^{k+1}=u^k+\\omega D^{-1}(f-Ku^k). \\]其中 \\(D\\) 是 \\(K\\) 的对角部分。\n设误差为：\n\\[ e^k=u^k-u^\\star. \\]那么：\n\\[ e^{k+1}=(I-\\omega D^{-1}K)e^k. \\]对离散正弦误差模式进行分析，可以得到误差放大因子：\n\\[ \\boxed{ \\mu_j=1-\\omega\\left(1-\\cos\\frac{j\\pi}{n+1}\\right). } \\]取 \\(\\omega=2/3\\)。\n对于高频误差，\\(|\\mu_j|\\) 通常较小，意味着误差快速衰减。\n但对于低频误差：\n\\[ j\\ll n, \\]有：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/39-algebraic-multigrid/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='高性能计算' /><meta property='article:tag' content='物理引擎' /><meta property='article:published_time' content='2026-10-04T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-10-04T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Algebraic Multigrid：换一个尺度消除难消的误差">
+<meta name="twitter:description" content="主题：Algebraic Multigrid（AMG，代数多重网格）\n领域：有限元 × 数值线性代数 × 物理求解器 × HPC\n阅读时间：约 4–5 分钟\n今天补充一个此前尚未系统覆盖、但对大型有限元求解器至关重要的概念：代数多重网格。\n它解决的是一个非常基础的问题：随着网格不断细化，为什么许多迭代求解器越来越慢？AMG 的核心发现是：\n迭代方法难以消除的误差，往往可以通过改变表示尺度，转化成容易处理的误差。\n这使得某些大型稀疏线性系统能够以接近 \\(O(N)\\) 的计算复杂度求解，而不必付出传统直接分解的高昂代价。AMG 尤其适合椭圆型 PDE 离散产生的系统，实际表现仍取决于算子性质和粗化策略。\n一、为什么普通迭代法会越算越慢？ 考虑有限元中的线性系统：\n\\[ Ku=f. \\]先用最简单的一维 Poisson 方程理解：\n\\[ -\\frac{d^2u}{dx^2}=f(x). \\]离散以后：\n\\[ K=\\frac{1}{h^2} \\begin{bmatrix} 2&-1&&\\\\ -1&2&-1&\\\\ &\\ddots&\\ddots&\\ddots\\\\ &&-1&2 \\end{bmatrix}. \\]使用 Jacobi 迭代：\n\\[ u^{k+1}=u^k+\\omega D^{-1}(f-Ku^k). \\]其中 \\(D\\) 是 \\(K\\) 的对角部分。\n设误差为：\n\\[ e^k=u^k-u^\\star. \\]那么：\n\\[ e^{k+1}=(I-\\omega D^{-1}K)e^k. \\]对离散正弦误差模式进行分析，可以得到误差放大因子：\n\\[ \\boxed{ \\mu_j=1-\\omega\\left(1-\\cos\\frac{j\\pi}{n+1}\\right). } \\]取 \\(\\omega=2/3\\)。\n对于高频误差，\\(|\\mu_j|\\) 通常较小，意味着误差快速衰减。\n但对于低频误差：\n\\[ j\\ll n, \\]有：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一为什么普通迭代法会越算越慢">一、为什么普通迭代法会越算越慢？</a></li>
+    <li><a href="#二multigrid-的核心让低频误差变成高频误差">二、Multigrid 的核心：让低频误差变成高频误差</a></li>
+    <li><a href="#三amg-最深刻的一步没有几何网格也能构造粗网格">三、AMG 最深刻的一步：没有几何网格，也能构造粗网格</a></li>
+    <li><a href="#四一个非常重要的概念near-nullspace">四、一个非常重要的概念：Near-nullspace</a></li>
+    <li><a href="#五smoothed-aggregation从粗略分组到低能量插值">五、Smoothed Aggregation：从粗略分组到低能量插值</a></li>
+    <li><a href="#六它对软体动力学求解器有什么价值">六、它对软体动力学求解器有什么价值？</a></li>
+    <li><a href="#七一个很值得做的数值实验">七、一个很值得做的数值实验</a></li>
+    <li><a href="#它在知识体系中卡在哪里">它在知识体系中卡在哪里？</a>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/39-algebraic-multigrid/">Algebraic Multigrid：换一个尺度消除难消的误差</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-10-04T00:00:00Z'>Oct 04, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 3 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <p><strong>主题：<span class="term-anchor" data-term="algebraic-multigrid" tabindex="0">Algebraic Multigrid</span>（AMG，代数多重网格）</strong><br>
+<strong>领域：有限元 × 数值线性代数 × 物理求解器 × HPC</strong><br>
+<strong>阅读时间：约 4–5 分钟</strong></p>
+<p>今天补充一个此前尚未系统覆盖、但对大型有限元求解器至关重要的概念：<strong>代数多重网格</strong>。</p>
+<p>它解决的是一个非常基础的问题：随着网格不断细化，为什么许多迭代求解器越来越慢？AMG 的核心发现是：</p>
+<blockquote>
+<p>迭代方法难以消除的误差，往往可以通过改变表示尺度，转化成容易处理的误差。</p>
+</blockquote>
+<p>这使得某些大型稀疏线性系统能够以接近 \(O(N)\) 的计算复杂度求解，而不必付出传统直接分解的高昂代价。AMG 尤其适合椭圆型 PDE 离散产生的系统，实际表现仍取决于算子性质和粗化策略。</p>
+<hr>
+<h2 id="一为什么普通迭代法会越算越慢">一、为什么普通迭代法会越算越慢？
+</h2><p>考虑有限元中的线性系统：</p>
+\[ Ku=f. \]<p>先用最简单的一维 Poisson 方程理解：</p>
+\[ -\frac{d^2u}{dx^2}=f(x). \]<p>离散以后：</p>
+\[ K=\frac{1}{h^2} \begin{bmatrix} 2&-1&&\\ -1&2&-1&\\ &\ddots&\ddots&\ddots\\ &&-1&2 \end{bmatrix}. \]<p>使用 Jacobi 迭代：</p>
+\[ u^{k+1}=u^k+\omega D^{-1}(f-Ku^k). \]<p>其中 \(D\) 是 \(K\) 的对角部分。</p>
+<p>设误差为：</p>
+\[ e^k=u^k-u^\star. \]<p>那么：</p>
+\[ e^{k+1}=(I-\omega D^{-1}K)e^k. \]<p>对离散正弦误差模式进行分析，可以得到误差放大因子：</p>
+\[ \boxed{ \mu_j=1-\omega\left(1-\cos\frac{j\pi}{n+1}\right). } \]<p>取 \(\omega=2/3\)。</p>
+<p>对于高频误差，\(|\mu_j|\) 通常较小，意味着误差快速衰减。</p>
+<p>但对于低频误差：</p>
+\[ j\ll n, \]<p>有：</p>
+\[ \mu_j\approx1. \]<p>这意味着：</p>
+\[ \boxed{\text{Jacobi 很容易消除剧烈振荡的误差，却很难消除缓慢变化的误差。}} \]<p>随着网格加密，越来越多难以消除的低频误差模式出现。</p>
+<p>这正是传统局部松弛迭代难以保持网格无关收敛速度的根源。</p>
+<hr>
+<h2 id="二multigrid-的核心让低频误差变成高频误差">二、Multigrid 的核心：让低频误差变成高频误差
+</h2><p>假设在细网格上存在一个缓慢变化的误差：</p>
+\[ e(x)=\sin(\pi x). \]<p>对于有 1000 个节点的网格，这个误差变化非常缓慢。</p>
+<p>但如果把它转移到只有几十个节点的粗网格上，它相对于网格尺度就不再那么平缓。</p>
+<p>多重网格利用的正是这种尺度变化。</p>
+<p>一个经典的两层算法包含：</p>
+<p><strong>第一步：细网格平滑</strong></p>
+<p>用 Jacobi 或 Gauss–Seidel 消除高频误差。</p>
+<p><strong>第二步：将残差传递到粗网格</strong></p>
+\[ r_h=f_h-K_hu_h. \]<p>通过限制算子 \(R\)：</p>
+\[ r_H=Rr_h. \]<p><strong>第三步：在粗网格上求误差修正</strong></p>
+\[ K_He_H=r_H. \]<p><strong>第四步：把修正传回细网格</strong></p>
+\[ u_h\leftarrow u_h+Pe_H. \]<p>其中 \(P\) 是插值算子。</p>
+<p>随后再进行若干次平滑。</p>
+<p>这一过程可以递归执行，形成 V-cycle。</p>
+<p>它的本质是：</p>
+\[ \boxed{ \text{细网格消除局部误差，粗网格消除全局误差。} } \]<p>这比单纯增加 Jacobi 迭代次数有效得多。</p>
+<hr>
+<h2 id="三amg-最深刻的一步没有几何网格也能构造粗网格">三、AMG 最深刻的一步：没有几何网格，也能构造粗网格
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>传统 Geometric <span class="term-anchor" data-term="multigrid" tabindex="0">Multigrid</span>（GMG）需要知道网格的几何层级。</p>
+<p>但真实工业有限元往往使用：</p>
+<ul>
+<li>非结构化四面体网格；</li>
+<li>复杂拓扑；</li>
+<li>局部加密；</li>
+<li>不规则材料分布。</li>
+</ul>
+<p>很难直接生成质量良好的几何粗网格。</p>
+<p>AMG 提出了一个更抽象的问题：</p>
+\[ \boxed{\text{能否仅从矩阵 }K\text{ 的代数结构，推断哪些自由度应该一起粗化？}} \]<p>答案是可以。</p>
+<p>AMG 根据矩阵系数、变量之间的强连接关系，以及松弛过程难以消除的误差模式，构造粗层空间。</p>
+<p>它并不要求知道节点的真实坐标。</p>
+<p>然后通过：</p>
+\[ \boxed{ K_H=R K_h P } \]<p>构造粗层算子。</p>
+<p>对于对称正定问题，通常取：</p>
+\[ R=P^T, \]<p>于是：</p>
+\[ \boxed{ K_H=P^TK_hP. } \]<p>这实际上就是一个 Galerkin 投影。</p>
+<p>因此 AMG 可以理解成：</p>
+<blockquote>
+<p>从矩阵本身自动寻找适合误差修正的低维空间，并在多个尺度上反复求解。</p>
+</blockquote>
+<p>SIAM 的经典教材 <em>A Multigrid Tutorial</em> 专门讨论了这一问题：即使未知量没有明确的几何位置，也可以根据代数关系建立多重网格方法。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="四一个非常重要的概念near-nullspace">四、一个非常重要的概念：Near-nullspace
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>AMG 的粗空间应该保留哪些模式？</p>
+<p>答案是：</p>
+\[ \boxed{\text{那些能量很低、局部迭代难以消除的误差模式。}} \]<p>考虑线弹性系统：</p>
+\[ Ku=f. \]<p>对于一个没有约束的三维弹性体，存在六种刚体运动模式：</p>
+\[ \underbrace{3\text{ 个平移}}_{\text{translation}} + \underbrace{3\text{ 个转动}}_{\text{rotation}}. \]<p>这些模式不会产生弹性应变能。</p>
+<p>因此：</p>
+\[ Kz_i=0. \]<p>它们构成刚度矩阵的零空间。</p>
+<p>施加边界条件后，刚体模式通常不再是严格零模态，但相关低能量模式仍可能对迭代收敛十分重要。</p>
+<p>如果 AMG 的粗空间无法表示这些模式，求解器就可能难以消除对应的误差。</p>
+<p>这就是 <strong>Near-nullspace-aware AMG</strong> 的意义。</p>
+<p>在实际工程中，PETSc 明确提供：</p>
+<p><code>MatNullSpaceCreateRigidBody()</code></p>
+<p>和：</p>
+<p><code>MatSetNearNullSpace()</code></p>
+<p>帮助 AMG 预条件器识别弹性系统的刚体运动模式。官方文档指出，这能够显著改善 <code>PCGAMG</code> 对弹性问题的求解效率。</p>
+<p>这说明一个很重要的事实：</p>
+\[ \boxed{\text{优秀的线性求解器不仅利用矩阵数值，还利用矩阵背后的物理结构。}} \]
+  </div>
+</details>
+
+<hr>
+<h2 id="五smoothed-aggregation从粗略分组到低能量插值">五、Smoothed Aggregation：从粗略分组到低能量插值
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>AMG 有多个技术分支，其中 Smoothed Aggregation（SA-AMG）特别值得理解。</p>
+<p>它首先将自由度划分为若干聚合体（aggregates）。</p>
+<p>构造一个初始插值矩阵：</p>
+\[ P_0. \]<p>然后对插值矩阵进行平滑，例如：</p>
+\[ \boxed{ P=(I-\omega D^{-1}K)P_0. } \]<p>这样得到的粗空间更适合表示代数光滑误差。</p>
+<p>其关键思想是：</p>
+\[ \boxed{\text{粗空间不能只由变量分组决定，还应该适应系统的低能量结构。}} \]<p>Vaněk、Mandel 和 Brezina 在 1996 年的经典工作中系统发展了 Smoothed Aggregation，并将其用于二阶和四阶椭圆问题。</p>
+<p>现代 PyAMG 和 PETSc 都实现了相关方法。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="六它对软体动力学求解器有什么价值">六、它对软体动力学求解器有什么价值？
+</h2><p>考虑隐式软体动力学：</p>
+\[ M\ddot x+f_{\rm int}(x)=f_{\rm ext}. \]<p>使用 Newton 法后，需要反复求解：</p>
+\[ \boxed{ \left(\frac{M}{h^2}+K_t\right)\Delta x=-r. } \]<p>对于百万自由度的四面体模型，这个线性系统可能成为主要性能瓶颈。</p>
+<p>AMG 可以作为 CG 等 Krylov 迭代法的预条件器：</p>
+\[ \boxed{\text{AMG-preconditioned CG}.} \]<p>它不要求像传统 ROM 一样提前收集训练轨迹，也不要求模型具有很低的全局秩。</p>
+<p>因此它解决的是另一类问题：</p>
+<ul>
+<li><strong>ROM</strong>：降低需要求解的自由度数量；</li>
+<li><strong>AMG</strong>：在保留完整自由度的情况下，提高线性系统求解效率；</li>
+<li><strong><span class="term-anchor" data-term="pd" tabindex="0">PD</span></strong>：通过特殊能量结构，让全局矩阵可以重复分解。</li>
+</ul>
+<p>这三者具有完全不同的加速机制。</p>
+<p>不过 AMG 也有明显限制。</p>
+<p>对于严重材料非线性、强各向异性、接触激活引起的矩阵突变，或者不定的切线刚度矩阵，普通 AMG 可能退化，需要专门的平滑器、粗空间或块预条件策略。</p>
+<p>此外，构建 AMG 层级本身也有成本。</p>
+<p>如果每个时间步的矩阵都发生显著变化，就必须考虑：</p>
+\[ \boxed{\text{层级重建成本与迭代加速收益之间的平衡。}} \]<p>因此工业实现往往将 AMG 作为预条件器，并针对具体物理系统调整粗化与插值策略。</p>
+<hr>
+<h2 id="七一个很值得做的数值实验">七、一个很值得做的数值实验
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>使用 Python 的 PyAMG，生成不同规模的二维 Poisson 问题：</p>
+\[ n=32,\ 64,\ 128,\ 256. \]<p>比较：</p>
+<ol>
+<li>Jacobi；</li>
+<li>CG；</li>
+<li>AMG-preconditioned CG。</li>
+</ol>
+<p>统一要求：</p>
+\[ \frac{\|Ku-f\|_2}{\|f\|_2}<10^{-8}. \]<p>记录迭代次数、求解时间和 AMG 层级构建时间。</p>
+<p>预期观察到：</p>
+<p>Jacobi 的迭代次数会随着网格细化显著增长。</p>
+<p>CG 也通常表现出一定的网格尺度依赖。</p>
+<p>而配置良好的 AMG-preconditioned CG，在这类规则椭圆问题中，迭代次数往往能够基本保持稳定。</p>
+<p>然后进一步尝试：</p>
+<p><strong>将 Poisson 问题替换为三维线弹性问题，并向 AMG 提供刚体 near-nullspace。</strong></p>
+<p>比较提供和不提供刚体模式时的收敛差异。</p>
+<p>这个实验能够直接说明：<strong>粗空间的质量往往比增加局部迭代次数更重要。</strong></p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="它在知识体系中卡在哪里">它在知识体系中卡在哪里？
+</h2><p>AMG 位于大型物理仿真的底层数值求解层：</p>
+\[ \text{物理方程} \]\[ \downarrow \]\[ \text{FEM / FV 离散} \]\[ \downarrow \]\[ Ku=f \]\[ \downarrow \]\[ \boxed{\text{Krylov 迭代 + AMG 预条件}} \]\[ \downarrow \]\[ \text{高效求解完整离散系统} \]<p>它与之前学习的 <span class="term-anchor" data-term="pod" tabindex="0">POD</span>、<span class="term-anchor" data-term="hyper-reduction" tabindex="0">Hyper-reduction</span>、Projective Dynamics 共同构成了大型物理仿真的不同加速路线。</p>
+<p>其中最值得记住的是：</p>
+\[ \boxed{ \text{一个误差模式难以消除， 可能只是因为你正在错误的尺度上处理它。} } \]<p>AMG 将这一思想从规则几何网格推广到了任意稀疏矩阵的代数结构。</p>
+<p>更深一层，它告诉我们：<strong>预条件器本质上是在为迭代算法重新组织问题的几何结构。</strong></p>
+<p>这也是为什么预条件技术值得与有限元、ROM 和数值优化并列学习。</p>
+<hr>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p><strong>1. Briggs, Henson &amp; McCormick — <em>A Multigrid Tutorial</em>, 2nd Edition</strong></p>
+<p>SIAM，2000。经典入门教材，推荐重点阅读误差平滑、两层方法和第八章 Algebraic Multigrid。</p>
+<p>SIAM 官方教材第八章</p>
+<p><strong>2. Vaněk, Mandel &amp; Brezina — <em>Algebraic Multigrid by Smoothed Aggregation for Second and Fourth Order Elliptic Problems</em></strong></p>
+<p><em>Computing</em>, 56, 179–196，1996。DOI：10.1007/BF02238511。Smoothed Aggregation 的经典论文。</p>
+<p>NASA 技术报告资料</p>
+<p><strong>3. PETSc — PCGAMG 与 Near-nullspace 官方文档</strong></p>
+<p>适合直接进入工业级 FEM 求解器实现。尤其推荐阅读刚体模式如何用于 AMG 粗空间构造。</p>
+<p>PETSc 刚体模式接口文档</p>
+<p><strong>4. hypre — BoomerAMG 官方文档</strong></p>
+<p>hypre 的 BoomerAMG 是广泛应用的并行 AMG 实现。文档介绍了粗化、插值、松弛及并行求解参数。</p>
+<p>BoomerAMG 官方文档</p>
+<p><strong>5. PyAMG — 官方文档与实现</strong></p>
+<p>适合用 Python 快速进行数值实验，包含 Classical AMG、Smoothed Aggregation 和 Krylov 预条件示例。</p>
+<p>PyAMG 官方文档</p>
+<hr>
+<p><strong>知识卡片注册表更新：</strong> 第 55 张，新增主题「Algebraic Multigrid」。所属方向：有限元 / 数值线性代数 / 物理求解器。核心问题：如何利用多尺度误差结构，实现大型稀疏系统的高效迭代求解。与第 35 张 <span class="term-anchor" data-term="anderson" tabindex="0">Anderson Acceleration</span>、第 49–50 张 Projective Dynamics、第 52 张 Hyper-reduction 构成相邻但不重复的求解加速知识分支。</p>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%9C%89%E9%99%90%E5%85%83/">有限元</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E9%AB%98%E6%80%A7%E8%83%BD%E8%AE%A1%E7%AE%97/">高性能计算</a>
+        
+            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-39<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/19-multigrid/">Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉<span class="dep-radar-meta"> · card-19</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-39<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/19-multigrid/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/38-discrete-exterior-calculus/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Discrete Exterior Calculus：先离散几何关系，再谈微分方程</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/33-matrix-free-fem/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/14-anderson-acceleration/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Anderson Acceleration：把固定点迭代外挂成准牛顿求解器</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/30-backward-error-analysis/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程”</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

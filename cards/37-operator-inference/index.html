@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Operator Inference（OpInf，算子推断）\n领域：降阶模型 × 数据驱动动力学 × Scientific ML\n阅读时间：约 4–5 分钟\n上一张 Hyper-reduction 仍默认你能够深入原始求解器：访问单元、残差、Jacobian，再对它们做降阶。但工程中经常只有一个商业软件或遗留代码：\n\\[ (\\mu,u_0)\\longrightarrow \\{u(t_1),u(t_2),\\ldots,u(t_N)\\}, \\]你能得到仿真轨迹，却拿不到内部离散算子。\nOperator Inference 要解决的正是这个缺口：保留 projection-based ROM 的数学结构，但通过数据直接识别低维算子。 它最早由 Benjamin Peherstorfer 和 Karen Willcox 系统提出，用于这种“知道物理结构、拿不到内部算子”的 non-intrusive ROM。\n1. 它与“训练一个神经网络预测下一帧”有根本区别 考虑高维动力系统\n\\[ \\dot x=Ax+H(x\\otimes x)+Bu, \\qquad x\\in\\mathbb R^N. \\]POD 给出\n\\[ x\\approx Vq,\\qquad q\\in\\mathbb R^r. \\]如果拥有原始算子，可以直接 Galerkin 投影：\n\\[ \\dot q = \\underbrace{V^TAV}_{\\hat A}q + \\underbrace{V^TH(V\\otimes V)}_{\\hat H} (q\\otimes q) + \\underbrace{V^TB}_{\\hat B}u. \\]问题在于商业软件通常不会给你 \\(A,H\\)。\n">
+<title>Operator Inference：从轨迹数据反推出一个 ROM</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/37-operator-inference/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Operator Inference：从轨迹数据反推出一个 ROM">
+<meta property='og:description' content="主题：Operator Inference（OpInf，算子推断）\n领域：降阶模型 × 数据驱动动力学 × Scientific ML\n阅读时间：约 4–5 分钟\n上一张 Hyper-reduction 仍默认你能够深入原始求解器：访问单元、残差、Jacobian，再对它们做降阶。但工程中经常只有一个商业软件或遗留代码：\n\\[ (\\mu,u_0)\\longrightarrow \\{u(t_1),u(t_2),\\ldots,u(t_N)\\}, \\]你能得到仿真轨迹，却拿不到内部离散算子。\nOperator Inference 要解决的正是这个缺口：保留 projection-based ROM 的数学结构，但通过数据直接识别低维算子。 它最早由 Benjamin Peherstorfer 和 Karen Willcox 系统提出，用于这种“知道物理结构、拿不到内部算子”的 non-intrusive ROM。\n1. 它与“训练一个神经网络预测下一帧”有根本区别 考虑高维动力系统\n\\[ \\dot x=Ax+H(x\\otimes x)+Bu, \\qquad x\\in\\mathbb R^N. \\]POD 给出\n\\[ x\\approx Vq,\\qquad q\\in\\mathbb R^r. \\]如果拥有原始算子，可以直接 Galerkin 投影：\n\\[ \\dot q = \\underbrace{V^TAV}_{\\hat A}q + \\underbrace{V^TH(V\\otimes V)}_{\\hat H} (q\\otimes q) + \\underbrace{V^TB}_{\\hat B}u. \\]问题在于商业软件通常不会给你 \\(A,H\\)。\n">
+<meta property='og:url' content='https://assranai.github.io/cards/37-operator-inference/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='科学机器学习' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='不确定性量化' /><meta property='article:published_time' content='2026-10-04T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-10-04T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Operator Inference：从轨迹数据反推出一个 ROM">
+<meta name="twitter:description" content="主题：Operator Inference（OpInf，算子推断）\n领域：降阶模型 × 数据驱动动力学 × Scientific ML\n阅读时间：约 4–5 分钟\n上一张 Hyper-reduction 仍默认你能够深入原始求解器：访问单元、残差、Jacobian，再对它们做降阶。但工程中经常只有一个商业软件或遗留代码：\n\\[ (\\mu,u_0)\\longrightarrow \\{u(t_1),u(t_2),\\ldots,u(t_N)\\}, \\]你能得到仿真轨迹，却拿不到内部离散算子。\nOperator Inference 要解决的正是这个缺口：保留 projection-based ROM 的数学结构，但通过数据直接识别低维算子。 它最早由 Benjamin Peherstorfer 和 Karen Willcox 系统提出，用于这种“知道物理结构、拿不到内部算子”的 non-intrusive ROM。\n1. 它与“训练一个神经网络预测下一帧”有根本区别 考虑高维动力系统\n\\[ \\dot x=Ax+H(x\\otimes x)+Bu, \\qquad x\\in\\mathbb R^N. \\]POD 给出\n\\[ x\\approx Vq,\\qquad q\\in\\mathbb R^r. \\]如果拥有原始算子，可以直接 Galerkin 投影：\n\\[ \\dot q = \\underbrace{V^TAV}_{\\hat A}q + \\underbrace{V^TH(V\\otimes V)}_{\\hat H} (q\\otimes q) + \\underbrace{V^TB}_{\\hat B}u. \\]问题在于商业软件通常不会给你 \\(A,H\\)。\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-它与训练一个神经网络预测下一帧有根本区别">1. 它与“训练一个神经网络预测下一帧”有根本区别</a></li>
+    <li><a href="#2-最关键的思想学方程而不是学轨迹">2. 最关键的思想：学“方程”，而不是学“轨迹”</a></li>
+    <li><a href="#3-一个很实用的例子从-adamsfem-批量仿真构造动力学代理">3. 一个很实用的例子：从 Adams/FEM 批量仿真构造动力学代理</a></li>
+    <li><a href="#4-为什么这比-dmd-更进一步">4. 为什么这比 DMD 更进一步？</a></li>
+    <li><a href="#5-它真正困难的地方不是最小二乘而是可辨识性">5. 它真正困难的地方不是最小二乘，而是“可辨识性”</a></li>
+    <li><a href="#6-第二个危险拟合准确不代表动力学稳定">6. 第二个危险：拟合准确不代表动力学稳定</a></li>
+    <li><a href="#7-它与前几张-rom-卡片怎样连接">7. 它与前几张 ROM 卡片怎样连接？</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/37-operator-inference/">Operator Inference：从轨迹数据反推出一个 ROM</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-10-04T00:00:00Z'>Oct 04, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 1 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <p><strong>主题：<span class="term-anchor" data-term="operator-inference" tabindex="0">Operator Inference</span>（OpInf，算子推断）</strong><br>
+<strong>领域：降阶模型 × 数据驱动动力学 × Scientific ML</strong><br>
+<strong>阅读时间：约 4–5 分钟</strong></p>
+<p>上一张 <span class="term-anchor" data-term="hyper-reduction" tabindex="0">Hyper-reduction</span> 仍默认你能够深入原始求解器：访问单元、残差、Jacobian，再对它们做降阶。但工程中经常只有一个商业软件或遗留代码：</p>
+\[ (\mu,u_0)\longrightarrow \{u(t_1),u(t_2),\ldots,u(t_N)\}, \]<p>你能得到仿真轨迹，却拿不到内部离散算子。</p>
+<p><strong>Operator Inference 要解决的正是这个缺口：保留 projection-based ROM 的数学结构，但通过数据直接识别低维算子。</strong> 它最早由 Benjamin Peherstorfer 和 Karen Willcox 系统提出，用于这种“知道物理结构、拿不到内部算子”的 non-intrusive ROM。</p>
+<hr>
+<h2 id="1-它与训练一个神经网络预测下一帧有根本区别">1. 它与“训练一个神经网络预测下一帧”有根本区别
+</h2><p>考虑高维动力系统</p>
+\[ \dot x=Ax+H(x\otimes x)+Bu, \qquad x\in\mathbb R^N. \]<p><span class="term-anchor" data-term="pod" tabindex="0">POD</span> 给出</p>
+\[ x\approx Vq,\qquad q\in\mathbb R^r. \]<p>如果拥有原始算子，可以直接 Galerkin 投影：</p>
+\[ \dot q = \underbrace{V^TAV}_{\hat A}q + \underbrace{V^TH(V\otimes V)}_{\hat H} (q\otimes q) + \underbrace{V^TB}_{\hat B}u. \]<p>问题在于商业软件通常不会给你 \(A,H\)。</p>
+<p>OpInf 换了一个问题：</p>
+<blockquote>
+<p>既然我知道降阶方程<strong>应该长成什么样</strong>，为什么不直接从轨迹拟合 \(\hat A,\hat H,\hat B\)？</p>
+</blockquote>
+<p>从高保真轨迹得到</p>
+\[ q_k=V^Tx_k,\qquad \dot q_k\approx V^T\dot x_k, \]<p>然后求</p>
+\[ \boxed{ \min_{\hat A,\hat H,\hat B} \sum_k \left\| \dot q_k- \hat A q_k- \hat H(q_k\otimes q_k)- \hat B u_k \right\|^2. } \]<p>于是一个高维 PDE/FEM 系统的动力学识别，最终变成一个<strong>低维线性最小二乘问题</strong>。这正是经典 OpInf 的核心。</p>
+<hr>
+<h2 id="2-最关键的思想学方程而不是学轨迹">2. 最关键的思想：学“方程”，而不是学“轨迹”
+</h2><p>假设训练数据覆盖</p>
+\[ 0<t<10. \]<p>纯 trajectory fitting 很容易学成：</p>
+\[ q_{k+1}=F_\theta(q_k), \]<p>本质上是在逼近时间推进映射。</p>
+<p>OpInf 学到的却是：</p>
+\[ \boxed{ \dot q=\hat A q+\hat H(q\otimes q)+\hat B u. } \]<p>因此它显式保留：</p>
+<ul>
+<li>状态；</li>
+<li>动力学算子；</li>
+<li>外部输入；</li>
+<li>连续时间结构。</li>
+</ul>
+<p>随后仍然可以使用 RK、BDF 等普通积分器求解它。</p>
+<p>所以它位于一个很有意思的位置：</p>
+\[ \text{Galerkin ROM} \longleftrightarrow \boxed{\text{Operator Inference}} \longleftrightarrow \text{black-box machine learning}. \]<p>它比 intrusive ROM 少要求求解器内部信息，又比完全黑箱的网络多利用物理结构。这也是当前官方 <code>opinf</code> 文档将其称为适合 <strong>glass-box systems</strong> 的原因：知道 governing-equation structure，但不能直接查询内部离散算子。</p>
+<hr>
+<h2 id="3-一个很实用的例子从-adamsfem-批量仿真构造动力学代理">3. 一个很实用的例子：从 Adams/FEM 批量仿真构造动力学代理
+</h2><p>假设高保真软件输出机构状态：</p>
+\[ x(t)= [ \theta_1,\ldots,\theta_m, \dot\theta_1,\ldots,\dot\theta_m, \text{flexible DOFs} ]^T. \]<p>先收集多组不同载荷、参数、初值下的轨迹：</p>
+\[ X=[x_1,\ldots,x_K]. \]<p>POD：</p>
+\[ X\approx VQ. \]<p>然后拟合：</p>
+\[ \boxed{ \dot q = c+Aq+H(q\otimes q)+Bu. } \]<p>在线阶段就无需再次调用完整仿真器，而只积分几十维 ODE。</p>
+<p>这与普通 <span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span> 有一个重要区别：</p>
+\[ \text{Kriging:}\quad \mu\rightarrow y \]<p>通常学习输入到最终响应；</p>
+<p>而</p>
+\[ \text{OpInf:}\quad (q,u)\rightarrow\dot q \]<p>学习的是<strong>状态演化规律</strong>。</p>
+<p>因此当你需要：</p>
+<ul>
+<li>完整时间历程；</li>
+<li>控制；</li>
+<li>数字孪生；</li>
+<li>参数扫描；</li>
+<li>大量 Monte Carlo 动力学仿真；</li>
+</ul>
+<p>OpInf 往往比单纯做响应面更自然。</p>
+<hr>
+<h2 id="4-为什么这比-dmd-更进一步">4. 为什么这比 DMD 更进一步？
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>Dynamic Mode Decomposition 本质上主要寻找线性动力学：</p>
+\[ \dot q=Aq \]<p>或离散形式</p>
+\[ q_{k+1}=Kq_k. \]<p>而很多物理系统真正需要：</p>
+\[ \dot q = Aq+ H(q\otimes q) + G(q^{\otimes3}) +\cdots. \]<p>OpInf 可以直接利用这种已知的 polynomial structure。</p>
+<p>更有意思的是，如果原方程不是多项式，还可以先 <strong>lifting</strong>。</p>
+<p>例如某个非线性：</p>
+\[ \dot x=f(x) \]<p>在原坐标下非常复杂，但引入辅助变量</p>
+\[ z=\phi(x) \]<p>后可能变成 quadratic system：</p>
+\[ \dot z=Az+H(z\otimes z). \]<p><strong>Lift &amp; Learn</strong> 正是利用物理知识寻找这种 lifted representation，再用 OpInf 学习低维算子；在 FitzHugh–Nagumo 和可压缩 Euler 等案例中，它展示了这种方法对输入变化的泛化能力。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="5-它真正困难的地方不是最小二乘而是可辨识性">5. 它真正困难的地方不是最小二乘，而是“可辨识性”
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>把所有未知算子拼起来，可以写成</p>
+\[ D\,O\approx R. \]<p>如果训练轨迹太单一，例如永远只从同一个初值、同一种载荷运行，那么数据矩阵 \(D\) 可能严重病态：</p>
+\[ \kappa(D)\gg1. \]<p>此时很多完全不同的 \(\hat A,\hat H\) 都能解释训练数据。</p>
+<p>表现就是：</p>
+\[ \boxed{\text{训练轨迹拟合极好，离开训练工况立即发散。}} \]<p>所以 OpInf 的核心工程问题其实变成了：</p>
+\[ \boxed{\text{怎样设计足够“激励系统”的训练仿真？}} \]<p>这和系统辨识中的 persistent excitation 是同一个思想。</p>
+<p>对昂贵仿真而言，这甚至会进一步连接主动学习：Active Operator Inference 已经研究了如何在噪声轨迹下主动选择新的 FOM 查询，使推断出的 reduced operators 更可靠。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="6-第二个危险拟合准确不代表动力学稳定">6. 第二个危险：拟合准确不代表动力学稳定
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>最小二乘可能得到</p>
+\[ \hat A \]<p>带有错误的正实部特征值。</p>
+<p>于是训练区间内：</p>
+\[ q_{\rm ROM}(t)\approx q_{\rm FOM}(t), \]<p>但长时间积分后：</p>
+\[ \|q(t)\|\rightarrow\infty. \]<p>因此近年的重要方向已经从</p>
+\[ \boxed{\text{fit operators}} \]<p>推进到</p>
+\[ \boxed{\text{fit physically admissible operators}}. \]<p>例如可以约束：</p>
+\[ \hat A+\hat A^T\preceq0 \]<p>来施加耗散结构，或者约束矩阵对称性、正定性、Hamiltonian/gradient structure。相关研究显示，结构约束和 physics-informed regularization 可以在普通或 Tikhonov 拟合产生不稳定 ROM 的情况下得到稳定模型。</p>
+<p>这一步非常关键：</p>
+\[ \boxed{ \text{ROM 的最终目标不是重放数据， 而是产生正确的动力系统。} } \]
+  </div>
+</details>
+
+<hr>
+<h2 id="7-它与前几张-rom-卡片怎样连接">7. 它与前几张 ROM 卡片怎样连接？
+</h2><p>现在可以形成一条很清楚的路线：</p>
+\[ \text{POD} \]<p>解决：</p>
+\[ \boxed{\text{状态空间太大}} \]<p>↓</p>
+\[ \text{Galerkin ROM} \]<p>要求：</p>
+\[ \boxed{\text{能访问 FOM 内部算子}} \]<p>若能访问但非线性仍昂贵：</p>
+\[ \boxed{\text{DEIM / ECSW / Hyper-reduction}} \]<p>若<strong>不能访问内部算子</strong>：</p>
+\[ \boxed{\text{Operator Inference}} \]<p>若原物理结构过于复杂：</p>
+\[ \boxed{\text{Lift \& Learn}} \]<p>再进一步：</p>
+\[ \boxed{\text{structure-preserving OpInf}}. \]<p>所以 OpInf 真正卡在：</p>
+\[ \boxed{ \text{传统 projection ROM 与数据驱动 Scientific ML 的接口处。} } \]<hr>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Operator Inference 最值得学的并不是“用最小二乘拟合一个 ODE”，而是：</p>
+\[ \boxed{ \text{当无法获得高保真模型内部算子时， 仍然可以利用已知的物理方程结构， 只从状态轨迹反推出一个 projection-like reduced dynamical system。} } \]<p>这对工程仿真尤其有迁移价值。很多工业软件对用户而言既不是白盒，也不完全是黑盒——你知道里面在解什么物理问题，也能批量获得高质量轨迹，但拿不到组装后的算子和残差实现。</p>
+<p><strong>这正是 OpInf 最适合生存的“灰盒地带”。</strong></p>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <ol>
+<li>
+<p>Peherstorfer &amp; Karen Willcox, <em>Data-driven operator inference for nonintrusive projection-based model reduction</em>, <strong>CMAME 306</strong>, 2016, 196–215，DOI 10.1016/j.cma.2016.03.025。原始论文。<br>
+MIT 开放论文页</p>
+</li>
+<li>
+<p>Kramer, Peherstorfer &amp; Willcox, <em>Learning Nonlinear Reduced Models from Data with Operator Inference</em>, <strong>Annual Review of Fluid Mechanics</strong>。适合建立完整知识体系，覆盖 lifting、稳定性、非线性与后续发展。<br>
+作者公开综述 PDF</p>
+</li>
+<li>
+<p>Willcox Research Group 的 <code>opinf</code> 是目前很适合直接实验的 Python 实现，文档包含连续/离散 ROM、参数化模型和教程；截至检索时官方文档对应 0.6.0，并明确注明项目仍在快速开发。<br>
+Operator Inference 官方文档</p>
+</li>
+<li>
+<p>Qian, Kramer, Peherstorfer &amp; Willcox, <em>Lift &amp; Learn: Physics-informed machine learning for large-scale nonlinear dynamical systems</em>, <strong>Physica D 406</strong>, 2020, 132401。适合继续理解“怎样通过变量提升，把复杂非线性改造成适合 OpInf 的低阶多项式结构”。<br>
+Caltech 开放论文页</p>
+</li>
+</ol>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/">代理模型</a>
+        
+            <a href="/tags/%E7%A7%91%E5%AD%A6%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/">科学机器学习</a>
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E4%B8%8D%E7%A1%AE%E5%AE%9A%E6%80%A7%E9%87%8F%E5%8C%96/">不确定性量化</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-37<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge" title="次要分型">应用案例</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/24-hyper-reduction/">Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快<span class="dep-radar-meta"> · card-24</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-37<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/35-stepwise-uncertainty-reduction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Stepwise Uncertainty Reduction：主动学习真正该优化的，未必是“下一个点最准”，而是“做完这次实验后，最终答案还剩多少不确定性”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/15-active-subspaces/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Active Subspaces：找变量方向的低维组合，而不是删变量</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/32-probabilistic-numerics/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/13-neural-operator/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/36-equilibrated-flux/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Equilibrated Flux：有限元怎样从“误差估计”走到“可认证的误差上界”？</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

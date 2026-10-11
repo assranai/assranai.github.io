@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Fri, 02 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sun, 04 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>IPC：把无穿透写成势能，再用 CCD 守住可行性</title>
         <link>https://assranai.github.io/cards/01-ipc/</link>
         <pubDate>Fri, 18 Sep 2026 00:00:00 +0000</pubDate>
@@ -16286,7 +16286,7 @@ PDHG应用于此鞍点：取 $\tau = \sigma = \rho^{-1}$，$\theta = 1$。代入
 \[\nabla_x f.\]&lt;p&gt;如果输出是一个标量：&lt;/p&gt;
 \[f,\]&lt;p&gt;reverse-mode AD 的梯度成本通常可以做到与少量 forward solves 同量级，而不是：&lt;/p&gt;
 \[O(m)\]&lt;p&gt;倍。&lt;/p&gt;
-&lt;p&gt;对 PDE/FEM，如果有 &lt;span class=&#34;term-anchor&#34; data-term=&#34;adjoint&#34; tabindex=&#34;0&#34;&gt;adjoint&lt;/span&gt;：&lt;/p&gt;
+&lt;p&gt;对 PDE/FEM，如果有 adjoint：&lt;/p&gt;
 \[A^T\lambda = \frac{\partial f}{\partial u},\]&lt;p&gt;然后：&lt;/p&gt;
 \[\frac{df}{dx} = \frac{\partial f}{\partial x} - \lambda^T \frac{\partial R}{\partial x},\]&lt;p&gt;那么高维参数梯度也能高效获得。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
@@ -16414,6 +16414,208 @@ PDHG应用于此鞍点：取 $\tau = \sigma = \rho^{-1}$，$\theta = 1$。代入
 &lt;/details&gt;
 
 &lt;hr&gt;
+&lt;h1 id=&#34;25-它和-form-之间其实存在一个有趣联系&#34;&gt;25. 它和 FORM 之间其实存在一个有趣联系
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可靠性中 FORM 会在标准正态空间寻找 Most Probable Point：&lt;/p&gt;
+\[ u^\star. \]&lt;p&gt;然后用极限状态面的局部法向：&lt;/p&gt;
+\[ \alpha = \frac{\nabla g(u^\star)} {\|\nabla g(u^\star)\|} \]&lt;p&gt;描述：&lt;/p&gt;
+\[ \boxed{\text{失效点附近最关键的局部方向}.} \]&lt;p&gt;Active Subspaces 则研究：&lt;/p&gt;
+\[ C= \mathbb E[ \nabla g(X)\nabla g(X)^T ]. \]&lt;p&gt;所以可以粗略理解：&lt;/p&gt;
+&lt;p&gt;FORM：&lt;/p&gt;
+\[ \boxed{\text{局部、失效点附近的关键方向}} \]&lt;p&gt;Active Subspaces：&lt;/p&gt;
+\[ \boxed{\text{整个输入分布上的平均关键方向}.} \]&lt;p&gt;两者都在研究：&lt;/p&gt;
+\[ \boxed{\text{direction，而不仅是 variable}.} \]&lt;p&gt;但尺度完全不同。&lt;/p&gt;
+&lt;p&gt;这也意味着 Active Subspaces &lt;strong&gt;不能直接替代 FORM&lt;/strong&gt;：一个在全局平均意义上“不活跃”的方向，仍可能在极小概率失效尾部变得极其重要。&lt;/p&gt;
+&lt;p&gt;这是可靠性应用里必须警惕的问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;26-一个自然改进改变平均梯度的权重&#34;&gt;26. 一个自然改进：改变“平均梯度”的权重
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;标准：&lt;/p&gt;
+\[ C= \int \nabla g(x)\nabla g(x)^T \rho(x)\,dx. \]&lt;p&gt;如果真正关心：&lt;/p&gt;
+\[ g(x)\approx0, \]&lt;p&gt;可以考虑任务导向权重：&lt;/p&gt;
+\[ \boxed{ C_w= \int w(g(x)) \nabla g(x)\nabla g(x)^T \rho(x)\,dx, } \]&lt;p&gt;其中：&lt;/p&gt;
+\[ w(g) \]&lt;p&gt;在：&lt;/p&gt;
+\[ g\approx0 \]&lt;p&gt;附近更大。&lt;/p&gt;
+&lt;p&gt;例如概念上：&lt;/p&gt;
+\[ w(g)= \exp\left( -\frac{g^2}{2\tau^2} \right). \]&lt;p&gt;这样得到的方向就更接近：&lt;/p&gt;
+\[ \boxed{\text{failure-boundary active directions}.} \]&lt;p&gt;这不是说该公式就是标准可靠性算法，而是展示一个重要研究思路：&lt;/p&gt;
+\[ \boxed{\text{降维目标也必须与最终任务对齐。}} \]&lt;p&gt;如果任务是：&lt;/p&gt;
+\[ P_f, \]&lt;p&gt;那么“平均解释 \(f\) 的变化”未必是最好的降维准则。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;27-实际上怎样估计-active-subspace&#34;&gt;27. 实际上怎样估计 Active Subspace？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;真实：&lt;/p&gt;
+\[ C= \mathbb E[ \nabla f\nabla f^T ] \]&lt;p&gt;通常不知道。&lt;/p&gt;
+&lt;p&gt;采样：&lt;/p&gt;
+\[ x^{(1)},\ldots,x^{(N)} \sim\rho. \]&lt;p&gt;计算梯度：&lt;/p&gt;
+\[ g_i=\nabla f(x^{(i)}). \]&lt;p&gt;Monte Carlo 估计：&lt;/p&gt;
+\[ \boxed{ \hat C = \frac1N \sum_{i=1}^N g_ig_i^T. } \]&lt;p&gt;然后：&lt;/p&gt;
+\[ \hat C = W\Lambda W^T. \]&lt;p&gt;实际代码甚至可以避免显式形成 \(C\)。&lt;/p&gt;
+&lt;p&gt;构造梯度矩阵：&lt;/p&gt;
+\[ G= \frac1{\sqrt N} [ g_1,g_2,\ldots,g_N ]. \]&lt;p&gt;因为：&lt;/p&gt;
+\[ GG^T=\hat C. \]&lt;p&gt;直接 SVD：&lt;/p&gt;
+\[ G=U\Sigma V^T. \]&lt;p&gt;则：&lt;/p&gt;
+\[ \boxed{ W=U,\qquad \lambda_i=\sigma_i^2. } \]&lt;p&gt;这和前一张 Randomized SVD 卡片也自然连接起来：当输入参数很多时，梯度矩阵本身也可以用 randomized/sketched linear algebra 处理。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;28-真正的瓶颈其实是梯度&#34;&gt;28. 真正的瓶颈其实是梯度
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果输入维度：&lt;/p&gt;
+\[ m=100, \]&lt;p&gt;用有限差分计算一次：&lt;/p&gt;
+\[ \nabla f \]&lt;p&gt;大约需要：&lt;/p&gt;
+\[ 101 \]&lt;p&gt;次仿真。&lt;/p&gt;
+&lt;p&gt;如果一个 FEM：&lt;/p&gt;
+\[ 30\text{ min}, \]&lt;p&gt;显然无法接受。&lt;/p&gt;
+&lt;p&gt;因此 Active Subspaces 是否实用，很大程度取决于有没有：&lt;/p&gt;
+\[ \boxed{\text{cheap gradients}.} \]&lt;p&gt;典型来源：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;automatic differentiation；&lt;/li&gt;
+&lt;li&gt;adjoint method；&lt;/li&gt;
+&lt;li&gt;analytic sensitivity；&lt;/li&gt;
+&lt;li&gt;surrogate gradients。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;对于 scalar QoI：&lt;/p&gt;
+\[ f(x)\in\mathbb R \]&lt;p&gt;且参数很多时，adjoint 尤其重要：&lt;/p&gt;
+\[ \boxed{\text{一次 adjoint solve 可以同时得到大量参数方向的梯度信息。}} \]&lt;p&gt;这也是为什么 Active Subspaces 与 PDE-constrained optimization、adjoint FEM 很自然地结合。现代 derivative-based global sensitivity 工作也明确使用 adjoint gradients 来处理高维 PDE 参数。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;29-谱隙比前两个特征值最大更重要&#34;&gt;29. 谱隙比“前两个特征值最大”更重要
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[ \lambda= [10,\;8,\;7,\;6,\;5,\ldots]. \]&lt;p&gt;虽然：&lt;/p&gt;
+\[ \lambda_1,\lambda_2 \]&lt;p&gt;最大，但没有明显：&lt;/p&gt;
+\[ \boxed{\text{spectral gap}.} \]&lt;p&gt;此时硬选：&lt;/p&gt;
+\[ r=2 \]&lt;p&gt;没有很强依据。&lt;/p&gt;
+&lt;p&gt;反之：&lt;/p&gt;
+\[ \lambda= [10,\;8,\;0.1,\;0.03,\ldots] \]&lt;p&gt;在：&lt;/p&gt;
+\[ \lambda_2 \]&lt;p&gt;和：&lt;/p&gt;
+\[ \lambda_3 \]&lt;p&gt;之间存在巨大谱隙。&lt;/p&gt;
+&lt;p&gt;这才意味着：&lt;/p&gt;
+\[ \boxed{\text{二维 active subspace 具有稳定结构。}} \]&lt;p&gt;所以 Active Subspaces 不是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;算出特征向量，然后永远取前两个。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;真正要诊断的是：&lt;/p&gt;
+\[ \boxed{\text{这个函数到底有没有低维 ridge structure？}} \]&lt;p&gt;Constantine 的专著明确把随机梯度采样视为&lt;strong&gt;测试函数是否存在 active subspace&lt;/strong&gt;的方法，而不是预设低维结构一定存在。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;30-还有一个容易忽略的问题特征向量本身可能不稳定&#34;&gt;30. 还有一个容易忽略的问题：特征向量本身可能不稳定
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果：&lt;/p&gt;
+\[ \lambda_1\approx\lambda_2, \]&lt;p&gt;那么：&lt;/p&gt;
+\[ w_1,\;w_2 \]&lt;p&gt;可能因为一点采样误差就大幅旋转。&lt;/p&gt;
+&lt;p&gt;但：&lt;/p&gt;
+\[ \boxed{\operatorname{span}(w_1,w_2)} \]&lt;p&gt;仍可能非常稳定。&lt;/p&gt;
+&lt;p&gt;所以实际分析时更应该关心：&lt;/p&gt;
+\[ \boxed{\text{subspace error}} \]&lt;p&gt;而不只是：&lt;/p&gt;
+\[ \boxed{\text{单个 eigenvector 的系数。}} \]&lt;p&gt;这也是为什么 bootstrap 很常用：&lt;/p&gt;
+&lt;p&gt;反复重采样梯度样本，&lt;/p&gt;
+\[ \hat C^{(b)} \]&lt;p&gt;重新计算：&lt;/p&gt;
+\[ W_1^{(b)}, \]&lt;p&gt;再观察子空间夹角：&lt;/p&gt;
+\[ \|\, W_1W_1^T - W_1^{(b)}W_1^{(b)T} \,\|. \]&lt;p&gt;如果变化巨大：&lt;/p&gt;
+\[ \boxed{\text{你可能还没有足够证据声称存在这个 active subspace。}} \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;31-active-subspaces-和-sobol-灵敏度不是竞争关系&#34;&gt;31. Active Subspaces 和 Sobol 灵敏度不是竞争关系
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Sobol 指标问：&lt;/p&gt;
+\[ \boxed{\text{各个变量贡献了多少输出方差？}} \]&lt;p&gt;Active Subspaces 问：&lt;/p&gt;
+\[ \boxed{\text{哪些线性组合方向使函数变化最大？}} \]&lt;p&gt;因此如果：&lt;/p&gt;
+\[ f(x)=g(x_1+x_2), \]&lt;p&gt;Sobol 可能告诉你：&lt;/p&gt;
+\[ x_1,x_2 \]&lt;p&gt;都重要。&lt;/p&gt;
+&lt;p&gt;这完全正确。&lt;/p&gt;
+&lt;p&gt;Active Subspace 则进一步告诉你：&lt;/p&gt;
+\[ \boxed{\text{它们主要通过 }x_1+x_2\text{ 这一组合起作用。}} \]&lt;p&gt;所以：&lt;/p&gt;
+\[ \boxed{\text{Sobol 更适合变量归因；Active Subspaces 更适合方向降维。}} \]&lt;p&gt;如果工程任务是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;哪个制造参数应该控制得更严格？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Sobol 很自然。&lt;/p&gt;
+&lt;p&gt;如果任务是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;能不能把 20 维 Kriging 降到 3 维？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Active Subspaces 更直接。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;32-一个很值得做的小实验&#34;&gt;32. 一个很值得做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;定义：&lt;/p&gt;
+\[ f(x) = \sin(a^Tx)+0.05(b^Tx)^2, \]&lt;p&gt;其中：&lt;/p&gt;
+\[ x\in[-1,1]^{10}, \]&lt;p&gt;随机生成两个正交单位向量：&lt;/p&gt;
+\[ a,b. \]&lt;p&gt;那么真实响应虽然有：&lt;/p&gt;
+\[ 10 \]&lt;p&gt;个输入变量，却只依赖：&lt;/p&gt;
+\[ a^Tx,\qquad b^Tx. \]&lt;p&gt;采：&lt;/p&gt;
+\[ N=200 \]&lt;p&gt;个点。&lt;/p&gt;
+&lt;p&gt;计算：&lt;/p&gt;
+\[ \nabla f(x) = \cos(a^Tx)a + 0.1(b^Tx)b\,b. \]&lt;p&gt;构造：&lt;/p&gt;
+\[ \hat C. \]&lt;p&gt;然后看其 eigenvalues。&lt;/p&gt;
+&lt;p&gt;理论上会出现：&lt;/p&gt;
+\[ \lambda_1,\lambda_2&gt;0, \]&lt;p&gt;其余：&lt;/p&gt;
+\[ \lambda_3,\ldots,\lambda_{10}\approx0. \]&lt;p&gt;然后分别训练：&lt;/p&gt;
+\[ \text{10D Kriging: }\hat f(x) \]&lt;p&gt;和：&lt;/p&gt;
+\[ \text{2D Kriging: } \hat g(w_1^Tx,w_2^Tx). \]&lt;p&gt;比较：&lt;/p&gt;
+\[ R^2,\quad RMSE,\quad \text{training time}. \]&lt;p&gt;最后把第二项改成：&lt;/p&gt;
+\[ 0.0001(b^Tx)^2. \]&lt;p&gt;你会看到模型从：&lt;/p&gt;
+\[ \boxed{\text{二维 active structure}} \]&lt;p&gt;逐渐退化成：&lt;/p&gt;
+\[ \boxed{\text{近似一维 ridge function}.} \]&lt;p&gt;这个实验能非常直观地建立“effective input dimension”的感觉。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;33-它在整个知识体系中卡在哪里&#34;&gt;33. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;p&gt;把几种常见降维方法放在一起：&lt;/p&gt;
+\[ \text{PCA} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{输入数据变化最大的方向}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{Sobol / DGSM} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{重要变量}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \boxed{\text{Active Subspaces}} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{响应最敏感的输入方向}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{ridge approximation} \]&lt;p&gt;构造：&lt;/p&gt;
+\[ \boxed{f(x)\approx g(W^Tx)} \]&lt;p&gt;而另一条独立轴是：&lt;/p&gt;
+\[ \text{POD / Reduced Basis} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{高维输出状态的低维空间}.} \]&lt;p&gt;因此参数化物理仿真里一个很完整的结构其实是：&lt;/p&gt;
+\[ \boxed{ x \overset{\text{input reduction}}{\longrightarrow} W^Tx \overset{\text{physics}}{\longrightarrow} u \overset{\text{state reduction}}{\longrightarrow} a. } \]&lt;p&gt;这正好把你最近接触的 Kriging、ROM、POD 和高维可靠性连接起来。&lt;/p&gt;
+&lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Active Subspace 最值得记住的并不是：&lt;/p&gt;
 \[C=\mathbb E[\nabla f\nabla f^T].\]&lt;p&gt;而是一个关于高维问题非常重要的认识：&lt;/p&gt;
@@ -16438,7 +16640,7 @@ PDHG应用于此鞍点：取 $\tau = \sigma = \rho^{-1}$，$\theta = 1$。代入
 &lt;p&gt;&lt;strong&gt;Constantine, Dow &amp;amp; Wang, &lt;em&gt;Active Subspace Methods in Theory and Practice: Applications to Kriging Surfaces&lt;/em&gt;, SIAM JSC, 2014&lt;/strong&gt;。非常适合继续理解 Active Subspace 为什么能直接服务 Kriging，尤其是“重要方向不与坐标轴对齐”这一点。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;&lt;strong&gt;Lam, Zahm, Marzouk &amp;amp; Willcox, &lt;em&gt;Multifidelity Dimension Reduction via Active Subspaces&lt;/em&gt;, SIAM JSC, 2020&lt;/strong&gt;。把前面 MFMC 中的多保真思想迁移到了“低维结构识别”，适合看低保真模型如何帮助估计高保真 active subspace。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Lam, Zahm, Marzouk &amp;amp; Willcox, &lt;em&gt;Multifidelity Dimension Reduction via Active Subspaces&lt;/em&gt;, SIAM JSC, 2020&lt;/strong&gt;。把前面 &lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt; 中的多保真思想迁移到了“低维结构识别”，适合看低保真模型如何帮助估计高保真 active subspace。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Kim, Wang &amp;amp; Song, &lt;em&gt;Adaptive active subspace-based metamodeling for high-dimensional reliability analysis&lt;/em&gt;, Structural Safety, 2023&lt;/strong&gt;。这是可靠性方向尤其值得看的工作：Active Subspace、异方差 GP 与 active learning 不再简单串联，而是共同适应关键失效区域。&lt;/p&gt;
@@ -20827,7 +21029,7 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
         <pubDate>Mon, 07 Sep 2026 00:00:00 +0000</pubDate>
         
         <guid>https://assranai.github.io/cards/24-hyper-reduction/</guid>
-        <description>&lt;p&gt;&lt;strong&gt;主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW&lt;/strong&gt;&lt;br&gt;
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;hyper-reduction&#34; tabindex=&#34;0&#34;&gt;Hyper-reduction&lt;/span&gt;（超降阶），重点理解 DEIM 与 ECSW&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：有限元 × 数值方法 × 代理模型 × 软体动力学&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：&lt;/p&gt;
@@ -21032,7 +21234,10 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 
 &lt;hr&gt;
 &lt;h1 id=&#34;10-ecsw与其重构整条-nonlinear-force不如直接挑少数代表单元&#34;&gt;10. ECSW：与其重构整条 nonlinear force，不如直接挑少数“代表单元”
-&lt;/h1&gt;&lt;p&gt;有限元内力天然可以写成单元求和：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;有限元内力天然可以写成单元求和：&lt;/p&gt;
 \[f_{\rm int}(u) = \sum_{e=1}^{N_e} L_e^T f_e(u_e).\]&lt;p&gt;Galerkin 投影：&lt;/p&gt;
 \[V^Tf_{\rm int}(Vq) = \sum_{e=1}^{N_e} V_e^T f_e(V_eq).\]&lt;p&gt;这提供了一个非常自然的机会：&lt;/p&gt;
 &lt;blockquote&gt;
@@ -21064,9 +21269,16 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 &lt;/div&gt;&lt;p&gt;在线阶段只有这：&lt;/p&gt;
 \[500\]&lt;p&gt;个单元真正调用 constitutive model。&lt;/p&gt;
 &lt;p&gt;Farhat 等最初正是基于 mesh sampling、virtual work 和 energy structure 构造这一方法，并在 nonlinear finite-element structural dynamics 上获得最高约四个数量级的 CPU 加速案例。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;11-为什么-ecsw-的权重必须认真学&#34;&gt;11. 为什么 ECSW 的权重必须认真学？
-&lt;/h1&gt;&lt;p&gt;如果只是随机取：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果只是随机取：&lt;/p&gt;
 \[1\%\]&lt;p&gt;单元：&lt;/p&gt;
 \[\sum_{e\in S}V_e^Tf_e\]&lt;p&gt;通常会严重低估整个结构的内力。&lt;/p&gt;
 &lt;p&gt;ECSW 使用：&lt;/p&gt;
@@ -21092,9 +21304,16 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 \[\boxed{ \text{寻找少数代表单元 + 合适 quadrature weights} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;从这个角度看，ECSW 很像一种：&lt;/p&gt;
 \[\boxed{\text{data-driven reduced quadrature}}\]&lt;p&gt;。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;12-为什么-ecsw-会比直接重构-nonlinear-vector更适合结构力学&#34;&gt;12. 为什么 ECSW 会比“直接重构 nonlinear vector”更适合结构力学？
-&lt;/h1&gt;&lt;p&gt;因为有限元本身就是按单元积分/装配建立的。&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为有限元本身就是按单元积分/装配建立的。&lt;/p&gt;
 &lt;p&gt;ECSW 不打破：&lt;/p&gt;
 \[\text{element contribution}\]&lt;p&gt;这个基本结构。&lt;/p&gt;
 &lt;p&gt;如果原始 reduced internal force 是：&lt;/p&gt;
@@ -21106,9 +21325,16 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 &lt;p&gt;这就是所谓：&lt;/p&gt;
 \[\boxed{\text{structure preserving}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;2015 年 ECSW 理论工作证明了其对 Lagrangian structure 和相应数值稳定性质的保持，并报告在完整汽车发动机 nonlinear transient structural simulation 中获得超过四个数量级的 CPU 加速，同时维持较好准确度。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;13-deim-与-ecsw-最值得记住的区别&#34;&gt;13. DEIM 与 ECSW 最值得记住的区别
-&lt;/h1&gt;&lt;p&gt;可以这样理解：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以这样理解：&lt;/p&gt;
 &lt;table&gt;
 	&lt;thead&gt;
 			&lt;tr&gt;
@@ -21153,9 +21379,16 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 &lt;p&gt;所以对一般 nonlinear PDE：&lt;/p&gt;
 \[\boxed{\text{DEIM 是非常自然的入口}}\]&lt;p&gt;而对 nonlinear FEM / structural dynamics：&lt;/p&gt;
 \[\boxed{\text{ECSW 往往具有更强的物理结构优势}}\]&lt;p&gt;。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;14-hyper-reduction-和普通网格粗化不是一回事&#34;&gt;14. Hyper-reduction 和普通“网格粗化”不是一回事
-&lt;/h1&gt;&lt;p&gt;假设原模型：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设原模型：&lt;/p&gt;
 \[100000\]&lt;p&gt;个单元。&lt;/p&gt;
 &lt;p&gt;直接做 coarse mesh：&lt;/p&gt;
 \[1000\]&lt;p&gt;个单元。&lt;/p&gt;
@@ -21172,9 +21405,16 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 \[\boxed{ \text{coarsening：改变离散模型} }\]&lt;p&gt;而：&lt;/p&gt;
 \[\boxed{ \text{hyper-reduction：稀疏评估原模型的投影贡献} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这是很重要的区别。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;15-为什么它与代理模型有本质区别&#34;&gt;15. 为什么它与代理模型有本质区别？
-&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; / &lt;span class=&#34;term-anchor&#34; data-term=&#34;neural-operator&#34; tabindex=&#34;0&#34;&gt;Neural Operator&lt;/span&gt; 通常直接学习：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; / &lt;span class=&#34;term-anchor&#34; data-term=&#34;neural-operator&#34; tabindex=&#34;0&#34;&gt;Neural Operator&lt;/span&gt; 通常直接学习：&lt;/p&gt;
 \[\mu \rightarrow y\]&lt;p&gt;或者：&lt;/p&gt;
 \[\mu \rightarrow u.\]&lt;p&gt;Hyper-reduced ROM 仍然显式保留：&lt;/p&gt;
 \[\boxed{ \text{reduced equations of motion} }\]&lt;p&gt;例如：&lt;/p&gt;
@@ -21188,9 +21428,16 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 &lt;p&gt;因此它属于：&lt;/p&gt;
 \[\boxed{\text{physics-based surrogate}}\]&lt;p&gt;，而不是纯粹 response fitting。&lt;/p&gt;
 &lt;p&gt;这使它在动力学、控制和反问题中非常有价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;16-但-hyper-reduction-仍然有一个非常明显的训练域问题&#34;&gt;16. 但 Hyper-reduction 仍然有一个非常明显的“训练域”问题
-&lt;/h1&gt;&lt;p&gt;假设 ECSW 只在：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设 ECSW 只在：&lt;/p&gt;
 \[\text{small deformation}\]&lt;p&gt;数据上训练。&lt;/p&gt;
 &lt;p&gt;然后在线进入：&lt;/p&gt;
 \[\text{large bending + contact}.\]&lt;p&gt;原来选择的：&lt;/p&gt;
@@ -21203,6 +21450,10 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 \[\boxed{ \text{Hyper-reduction 并没有消灭 extrapolation problem。} }\]&lt;p&gt;它只是把问题从：&lt;/p&gt;
 \[\text{response surrogate}\]&lt;p&gt;转移到了：&lt;/p&gt;
 \[\text{operator surrogate}.\]&lt;p&gt;Localized DEIM 之所以出现，就是因为一个 global nonlinear subspace 可能无法覆盖具有多个不同局部行为区域的系统，因此改用多个 local subspaces。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;17-这和你的软体动力学尤其有一个值得注意的冲突接触高度局部且会移动&#34;&gt;17. 这和你的软体动力学尤其有一个值得注意的冲突：接触高度局部且会移动
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
@@ -21236,7 +21487,10 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 
 &lt;hr&gt;
 &lt;h1 id=&#34;18-一个特别值得迁移到物理引擎的思想不要降整个系统降最贵的算子调用次数&#34;&gt;18. 一个特别值得迁移到物理引擎的思想：不要降整个系统，降“最贵的算子调用次数”
-&lt;/h1&gt;&lt;p&gt;Hyper-reduction 给物理引擎开发最大的启发，甚至不一定要真正做 ROM。&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Hyper-reduction 给物理引擎开发最大的启发，甚至不一定要真正做 ROM。&lt;/p&gt;
 &lt;p&gt;假设一个 solver 每帧最贵的是：&lt;/p&gt;
 \[\boxed{\text{100 万个 tet constitutive evaluations}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;传统优化会问：&lt;/p&gt;
@@ -21263,15 +21517,26 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 &lt;li&gt;sparse collision detection；&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;属于同一种更高级的工程思想：&lt;/p&gt;
-\[\boxed{ \text{最便宜的一次计算，是根本没有执行的那次计算。} }\]&lt;hr&gt;
+\[\boxed{ \text{最便宜的一次计算，是根本没有执行的那次计算。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
 &lt;h1 id=&#34;19-它对代理模型还有一个很强的启发可以代理算子不一定代理最终输出&#34;&gt;19. 它对代理模型还有一个很强的启发：可以代理“算子”，不一定代理最终输出
-&lt;/h1&gt;&lt;p&gt;通常代理模型研究：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;通常代理模型研究：&lt;/p&gt;
 \[x\rightarrow y.\]&lt;p&gt;但 DEIM 实际做的是：&lt;/p&gt;
 \[\boxed{ \text{学习 nonlinear operator }f(u)\text{ 的低维表示} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;ECSW 更进一步：&lt;/p&gt;
 \[\boxed{ \text{学习哪些局部 operator contributions 值得计算} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;所以代理建模其实可以分成三层：&lt;/p&gt;
-\[\text{output surrogate}\]\[y\approx\hat y(x)\]&lt;hr&gt;
+\[\text{output surrogate}\]\[y\approx\hat y(x)\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
 \[\text{state surrogate}\]\[u\approx Vq\]&lt;hr&gt;
 \[\boxed{\text{operator surrogate}}\]\[F(u)\approx\tilde F(u).\]&lt;p&gt;第三层通常保留最多物理结构。&lt;/p&gt;
 &lt;p&gt;这对未来做：&lt;/p&gt;
@@ -21312,6 +21577,96 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 &lt;/details&gt;
 
 &lt;hr&gt;
+&lt;h1 id=&#34;21-deim不要计算完整非线性场只看几个最有信息量的位置&#34;&gt;21. DEIM：不要计算完整非线性场，只看几个“最有信息量”的位置
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设 nonlinear-force snapshots 可以低秩表示：&lt;/p&gt;
+\[ f_{\rm int}(u)\approx Uc, \qquad U\in\mathbb R^{N\times m}, \quad m\ll N. \]&lt;p&gt;如果仍然计算完整 \(f_{\rm int}\) 来求 \(c\)，当然没有意义。&lt;/p&gt;
+&lt;p&gt;DEIM 于是选择 \(m\) 个特殊自由度，用选择矩阵 \(P\) 只观察：&lt;/p&gt;
+\[ P^Tf_{\rm int}(u). \]&lt;p&gt;要求插值：&lt;/p&gt;
+\[ P^TUc=P^Tf_{\rm int}(u), \]&lt;p&gt;于是&lt;/p&gt;
+\[ c=(P^TU)^{-1}P^Tf_{\rm int}(u), \]&lt;p&gt;得到&lt;/p&gt;
+\[ \boxed{ f_{\rm int}(u) \approx U(P^TU)^{-1}P^Tf_{\rm int}(u) }. \]&lt;p&gt;真正关键的是右边只需要计算：&lt;/p&gt;
+\[ \boxed{m\text{ 个被选位置的非线性响应}} \]&lt;p&gt;而不是全部 \(N\) 个。&lt;/p&gt;
+&lt;p&gt;因此 reduced nonlinear force：&lt;/p&gt;
+\[ V^Tf_{\rm int}(Va) \approx \underbrace{V^TU(P^TU)^{-1}}_{\text{offline 预计算}} P^Tf_{\rm int}(Va). \]&lt;p&gt;如果 \(m=50\)，在线阶段的主要非线性计算就可能从百万量级降到几十量级。DEIM 的误差则同时受到非线性快照被截断的程度以及插值选择条件数影响；后续 POD-DEIM 分析给出了相应的状态空间误差界。&lt;/p&gt;
+&lt;p&gt;直观上，它做的事情类似：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;我已经知道这种非线性场大致只能呈现几十种模式，那么无需观察整张场；挑几十个有代表性的“传感器”，就足以重建它。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;22-ecsw对非线性-fem更自然的是只计算少量单元&#34;&gt;22. ECSW：对非线性 FEM，更自然的是“只计算少量单元”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;结构 FEM 还有一种更物理的思路。&lt;/p&gt;
+&lt;p&gt;内部力本来就是单元贡献之和：&lt;/p&gt;
+\[ f_{\rm int}(u) = \sum_{e=1}^{n_e}f_e(u). \]&lt;p&gt;所以&lt;/p&gt;
+\[ V^Tf_{\rm int}(Va) = \sum_{e=1}^{n_e} V^Tf_e(Va). \]&lt;p&gt;ECSW 不重建整个 \(f_{\rm int}\)，而是寻找一个很小的单元子集：&lt;/p&gt;
+\[ \mathcal E_s\subset\{1,\ldots,n_e\} \]&lt;p&gt;以及正权重 \(\xi_e\)，使&lt;/p&gt;
+\[ \boxed{ V^Tf_{\rm int}(Va) \approx \sum_{e\in\mathcal E_s} \xi_eV^Tf_e(Va) }. \]&lt;p&gt;例如原模型有：&lt;/p&gt;
+\[ 500\,000\text{ 个 tetrahedra}, \]&lt;p&gt;训练后可能在线只计算几千个代表单元。&lt;/p&gt;
+&lt;p&gt;这就形成一个 &lt;strong&gt;reduced mesh&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;ECSW 特别值得结构动力学研究者注意，因为它并非单纯追求稀疏采样。Farhat、Chapman 与 Avery 的分析表明，对于非线性有限元动力系统，ECSW 可以保持与 Hamilton 原理相关的 Lagrangian 结构，并继承相应的数值稳定性性质；论文中的完整汽车发动机非线性瞬态算例报告了超过四个数量级的 CPU 时间缩减，同时保持良好精度。&lt;/p&gt;
+&lt;p&gt;因此 DEIM 与 ECSW 的区别可以抓成一句话：&lt;/p&gt;
+\[ \boxed{ \text{DEIM 采样“场的坐标”，ECSW 采样“物理单元的贡献”。} } \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;23-为什么这件事对软体动力学尤其重要&#34;&gt;23. 为什么这件事对软体动力学尤其重要？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设未来对四面体 Neo-Hookean 求解器做 POD：&lt;/p&gt;
+\[ x\approx \bar x+Vq. \]&lt;p&gt;即使 \(q\) 只有 30 维，每步如果仍需对全部 tetrahedra 计算&lt;/p&gt;
+\[ F_e,\quad J_e,\quad P_e,\quad f_e, \]&lt;p&gt;那么真正昂贵的 constitutive evaluation 根本没有消失。&lt;/p&gt;
+&lt;p&gt;Hyper-reduction 的目标就是：&lt;/p&gt;
+\[ \boxed{ 10^6\text{ DOF} \rightarrow 30\text{ reduced coordinates} } \]&lt;p&gt;同时再做到&lt;/p&gt;
+\[ \boxed{ 10^5\text{ constitutive evaluations} \rightarrow 10^2\sim10^3\text{ sampled evaluations}. } \]&lt;p&gt;这也是为什么上一张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;Projective Dynamics&lt;/span&gt; 卡片中提到的 &lt;strong&gt;Hyper-Reduced PD&lt;/strong&gt; 很重要：仅降低 global state dimension 还不够，local projection 的数量同样必须减少。&lt;/p&gt;
+&lt;p&gt;这里还揭示了一个更一般的工程原则：&lt;/p&gt;
+\[ \boxed{\text{降维 ≠ 降计算量。}} \]&lt;p&gt;判断一个 ROM 是否真正在线加速，应检查它的 online complexity 中是否还残留：&lt;/p&gt;
+\[ N,\qquad n_e,\qquad n_{\rm quad}. \]&lt;p&gt;如果存在，往往说明 ROM 尚未真正摆脱 FOM。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;24-但-hyper-reduction-会制造一种新的危险破坏物理结构&#34;&gt;24. 但 Hyper-reduction 会制造一种新的危险：破坏物理结构
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;普通 DEIM 的目标主要是：&lt;/p&gt;
+\[ \text{把非线性场重建得准}. \]&lt;p&gt;但一个近似力场即使点值误差很小，也可能不再来自某个势能：&lt;/p&gt;
+\[ f(q)\neq\nabla_q E(q). \]&lt;p&gt;对于 Hamiltonian 系统，这意味着可能破坏：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;能量结构；&lt;/li&gt;
+&lt;li&gt;守恒量；&lt;/li&gt;
+&lt;li&gt;长时间稳定性。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这也是 ECSW 在结构动力学中的特殊价值：它直接近似投影后的单元虚功，并通过正权重采样保持重要的变分结构。2015 年的系统比较中，ECSW 保持了稳定性，而所测试的 DEIM 类方案在部分非线性动力学问题上出现数值不稳定。&lt;/p&gt;
+&lt;p&gt;而这一问题今天仍在发展。2023 年的 gradient-preserving DEIM 工作专门针对 Hamiltonian systems 和 gradient flows，原因正是传统 hyper-reduction 虽然高效，却可能破坏原系统的梯度结构。&lt;/p&gt;
+&lt;p&gt;因此 Hyper-reduction 的成熟问题已经从：&lt;/p&gt;
+\[ \boxed{\text{“怎样少算几个点？”}} \]&lt;p&gt;推进到了：&lt;/p&gt;
+\[ \boxed{\text{“怎样少算，同时不破坏原 PDE/动力系统的结构？”}} \]&lt;p&gt;这正是它与 structure-preserving ROM 汇合的位置。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;25-它在知识体系中卡在哪里&#34;&gt;25. 它在知识体系中卡在哪里？
+&lt;/h1&gt;&lt;p&gt;可以把非线性 ROM 的完整链条记成：&lt;/p&gt;
+\[ \text{FOM} \]\[ \downarrow \]\[ \boxed{\text{POD / Reduced Basis}} \]&lt;p&gt;解决：&lt;strong&gt;状态太大&lt;/strong&gt;&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{DEIM / ECSW / GNAT}} \]&lt;p&gt;解决：&lt;strong&gt;非线性算子仍然太贵&lt;/strong&gt;&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{Structure-preserving hyper-reduction}} \]&lt;p&gt;解决：&lt;strong&gt;加速以后物理结构是否还在&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;其中 GNAT 又走了一条略不同的路线：它采用 residual-minimizing Petrov–Galerkin ROM，再通过 gappy POD 和 sample mesh 对残差/Jacobian 进行 hyper-reduction。其大型 CFD 案例包含超过 1700 万自由度，并报告了超过两个数量级的计算资源缩减且与高维结果差异低于 1%。&lt;/p&gt;
+&lt;p&gt;所以今天最值得留下的一句话是：&lt;/p&gt;
+\[ \boxed{ \text{POD 告诉你系统只需要几十个状态变量描述； Hyper-reduction 才让计算机真的只做与这几十维相称的工作。} } \]&lt;p&gt;这一步是很多“论文里的 ROM”能否真正变成&lt;strong&gt;在线实时模型、优化内循环模型或数字孪生模型&lt;/strong&gt;的分水岭。&lt;/p&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Hyper-reduction 最重要的公式并不是：&lt;/p&gt;
 \[f \approx U(P^TU)^{-1}P^Tf.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
@@ -27560,6 +27915,849 @@ Cambridge Core 论文页&lt;/p&gt;
 Oxford Academic 论文页&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Operator Inference：从轨迹数据反推出一个 ROM</title>
+        <link>https://assranai.github.io/cards/37-operator-inference/</link>
+        <pubDate>Sun, 04 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/37-operator-inference/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;operator-inference&#34; tabindex=&#34;0&#34;&gt;Operator Inference&lt;/span&gt;（OpInf，算子推断）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：降阶模型 × 数据驱动动力学 × Scientific ML&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;阅读时间：约 4–5 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;上一张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;hyper-reduction&#34; tabindex=&#34;0&#34;&gt;Hyper-reduction&lt;/span&gt; 仍默认你能够深入原始求解器：访问单元、残差、Jacobian，再对它们做降阶。但工程中经常只有一个商业软件或遗留代码：&lt;/p&gt;
+\[ (\mu,u_0)\longrightarrow \{u(t_1),u(t_2),\ldots,u(t_N)\}, \]&lt;p&gt;你能得到仿真轨迹，却拿不到内部离散算子。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Operator Inference 要解决的正是这个缺口：保留 projection-based ROM 的数学结构，但通过数据直接识别低维算子。&lt;/strong&gt; 它最早由 Benjamin Peherstorfer 和 Karen Willcox 系统提出，用于这种“知道物理结构、拿不到内部算子”的 non-intrusive ROM。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-它与训练一个神经网络预测下一帧有根本区别&#34;&gt;1. 它与“训练一个神经网络预测下一帧”有根本区别
+&lt;/h2&gt;&lt;p&gt;考虑高维动力系统&lt;/p&gt;
+\[ \dot x=Ax+H(x\otimes x)+Bu, \qquad x\in\mathbb R^N. \]&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt; 给出&lt;/p&gt;
+\[ x\approx Vq,\qquad q\in\mathbb R^r. \]&lt;p&gt;如果拥有原始算子，可以直接 Galerkin 投影：&lt;/p&gt;
+\[ \dot q = \underbrace{V^TAV}_{\hat A}q + \underbrace{V^TH(V\otimes V)}_{\hat H} (q\otimes q) + \underbrace{V^TB}_{\hat B}u. \]&lt;p&gt;问题在于商业软件通常不会给你 \(A,H\)。&lt;/p&gt;
+&lt;p&gt;OpInf 换了一个问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;既然我知道降阶方程&lt;strong&gt;应该长成什么样&lt;/strong&gt;，为什么不直接从轨迹拟合 \(\hat A,\hat H,\hat B\)？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;从高保真轨迹得到&lt;/p&gt;
+\[ q_k=V^Tx_k,\qquad \dot q_k\approx V^T\dot x_k, \]&lt;p&gt;然后求&lt;/p&gt;
+\[ \boxed{ \min_{\hat A,\hat H,\hat B} \sum_k \left\| \dot q_k- \hat A q_k- \hat H(q_k\otimes q_k)- \hat B u_k \right\|^2. } \]&lt;p&gt;于是一个高维 PDE/FEM 系统的动力学识别，最终变成一个&lt;strong&gt;低维线性最小二乘问题&lt;/strong&gt;。这正是经典 OpInf 的核心。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;2-最关键的思想学方程而不是学轨迹&#34;&gt;2. 最关键的思想：学“方程”，而不是学“轨迹”
+&lt;/h2&gt;&lt;p&gt;假设训练数据覆盖&lt;/p&gt;
+\[ 0&lt;t&lt;10. \]&lt;p&gt;纯 trajectory fitting 很容易学成：&lt;/p&gt;
+\[ q_{k+1}=F_\theta(q_k), \]&lt;p&gt;本质上是在逼近时间推进映射。&lt;/p&gt;
+&lt;p&gt;OpInf 学到的却是：&lt;/p&gt;
+\[ \boxed{ \dot q=\hat A q+\hat H(q\otimes q)+\hat B u. } \]&lt;p&gt;因此它显式保留：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;状态；&lt;/li&gt;
+&lt;li&gt;动力学算子；&lt;/li&gt;
+&lt;li&gt;外部输入；&lt;/li&gt;
+&lt;li&gt;连续时间结构。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;随后仍然可以使用 RK、BDF 等普通积分器求解它。&lt;/p&gt;
+&lt;p&gt;所以它位于一个很有意思的位置：&lt;/p&gt;
+\[ \text{Galerkin ROM} \longleftrightarrow \boxed{\text{Operator Inference}} \longleftrightarrow \text{black-box machine learning}. \]&lt;p&gt;它比 intrusive ROM 少要求求解器内部信息，又比完全黑箱的网络多利用物理结构。这也是当前官方 &lt;code&gt;opinf&lt;/code&gt; 文档将其称为适合 &lt;strong&gt;glass-box systems&lt;/strong&gt; 的原因：知道 governing-equation structure，但不能直接查询内部离散算子。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;3-一个很实用的例子从-adamsfem-批量仿真构造动力学代理&#34;&gt;3. 一个很实用的例子：从 Adams/FEM 批量仿真构造动力学代理
+&lt;/h2&gt;&lt;p&gt;假设高保真软件输出机构状态：&lt;/p&gt;
+\[ x(t)= [ \theta_1,\ldots,\theta_m, \dot\theta_1,\ldots,\dot\theta_m, \text{flexible DOFs} ]^T. \]&lt;p&gt;先收集多组不同载荷、参数、初值下的轨迹：&lt;/p&gt;
+\[ X=[x_1,\ldots,x_K]. \]&lt;p&gt;POD：&lt;/p&gt;
+\[ X\approx VQ. \]&lt;p&gt;然后拟合：&lt;/p&gt;
+\[ \boxed{ \dot q = c+Aq+H(q\otimes q)+Bu. } \]&lt;p&gt;在线阶段就无需再次调用完整仿真器，而只积分几十维 ODE。&lt;/p&gt;
+&lt;p&gt;这与普通 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; 有一个重要区别：&lt;/p&gt;
+\[ \text{Kriging:}\quad \mu\rightarrow y \]&lt;p&gt;通常学习输入到最终响应；&lt;/p&gt;
+&lt;p&gt;而&lt;/p&gt;
+\[ \text{OpInf:}\quad (q,u)\rightarrow\dot q \]&lt;p&gt;学习的是&lt;strong&gt;状态演化规律&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;因此当你需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;完整时间历程；&lt;/li&gt;
+&lt;li&gt;控制；&lt;/li&gt;
+&lt;li&gt;数字孪生；&lt;/li&gt;
+&lt;li&gt;参数扫描；&lt;/li&gt;
+&lt;li&gt;大量 Monte Carlo 动力学仿真；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;OpInf 往往比单纯做响应面更自然。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;4-为什么这比-dmd-更进一步&#34;&gt;4. 为什么这比 DMD 更进一步？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Dynamic Mode Decomposition 本质上主要寻找线性动力学：&lt;/p&gt;
+\[ \dot q=Aq \]&lt;p&gt;或离散形式&lt;/p&gt;
+\[ q_{k+1}=Kq_k. \]&lt;p&gt;而很多物理系统真正需要：&lt;/p&gt;
+\[ \dot q = Aq+ H(q\otimes q) + G(q^{\otimes3}) +\cdots. \]&lt;p&gt;OpInf 可以直接利用这种已知的 polynomial structure。&lt;/p&gt;
+&lt;p&gt;更有意思的是，如果原方程不是多项式，还可以先 &lt;strong&gt;lifting&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;例如某个非线性：&lt;/p&gt;
+\[ \dot x=f(x) \]&lt;p&gt;在原坐标下非常复杂，但引入辅助变量&lt;/p&gt;
+\[ z=\phi(x) \]&lt;p&gt;后可能变成 quadratic system：&lt;/p&gt;
+\[ \dot z=Az+H(z\otimes z). \]&lt;p&gt;&lt;strong&gt;Lift &amp;amp; Learn&lt;/strong&gt; 正是利用物理知识寻找这种 lifted representation，再用 OpInf 学习低维算子；在 FitzHugh–Nagumo 和可压缩 Euler 等案例中，它展示了这种方法对输入变化的泛化能力。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;5-它真正困难的地方不是最小二乘而是可辨识性&#34;&gt;5. 它真正困难的地方不是最小二乘，而是“可辨识性”
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;把所有未知算子拼起来，可以写成&lt;/p&gt;
+\[ D\,O\approx R. \]&lt;p&gt;如果训练轨迹太单一，例如永远只从同一个初值、同一种载荷运行，那么数据矩阵 \(D\) 可能严重病态：&lt;/p&gt;
+\[ \kappa(D)\gg1. \]&lt;p&gt;此时很多完全不同的 \(\hat A,\hat H\) 都能解释训练数据。&lt;/p&gt;
+&lt;p&gt;表现就是：&lt;/p&gt;
+\[ \boxed{\text{训练轨迹拟合极好，离开训练工况立即发散。}} \]&lt;p&gt;所以 OpInf 的核心工程问题其实变成了：&lt;/p&gt;
+\[ \boxed{\text{怎样设计足够“激励系统”的训练仿真？}} \]&lt;p&gt;这和系统辨识中的 persistent excitation 是同一个思想。&lt;/p&gt;
+&lt;p&gt;对昂贵仿真而言，这甚至会进一步连接主动学习：Active Operator Inference 已经研究了如何在噪声轨迹下主动选择新的 FOM 查询，使推断出的 reduced operators 更可靠。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;6-第二个危险拟合准确不代表动力学稳定&#34;&gt;6. 第二个危险：拟合准确不代表动力学稳定
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;最小二乘可能得到&lt;/p&gt;
+\[ \hat A \]&lt;p&gt;带有错误的正实部特征值。&lt;/p&gt;
+&lt;p&gt;于是训练区间内：&lt;/p&gt;
+\[ q_{\rm ROM}(t)\approx q_{\rm FOM}(t), \]&lt;p&gt;但长时间积分后：&lt;/p&gt;
+\[ \|q(t)\|\rightarrow\infty. \]&lt;p&gt;因此近年的重要方向已经从&lt;/p&gt;
+\[ \boxed{\text{fit operators}} \]&lt;p&gt;推进到&lt;/p&gt;
+\[ \boxed{\text{fit physically admissible operators}}. \]&lt;p&gt;例如可以约束：&lt;/p&gt;
+\[ \hat A+\hat A^T\preceq0 \]&lt;p&gt;来施加耗散结构，或者约束矩阵对称性、正定性、Hamiltonian/gradient structure。相关研究显示，结构约束和 physics-informed regularization 可以在普通或 Tikhonov 拟合产生不稳定 ROM 的情况下得到稳定模型。&lt;/p&gt;
+&lt;p&gt;这一步非常关键：&lt;/p&gt;
+\[ \boxed{ \text{ROM 的最终目标不是重放数据， 而是产生正确的动力系统。} } \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;7-它与前几张-rom-卡片怎样连接&#34;&gt;7. 它与前几张 ROM 卡片怎样连接？
+&lt;/h2&gt;&lt;p&gt;现在可以形成一条很清楚的路线：&lt;/p&gt;
+\[ \text{POD} \]&lt;p&gt;解决：&lt;/p&gt;
+\[ \boxed{\text{状态空间太大}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{Galerkin ROM} \]&lt;p&gt;要求：&lt;/p&gt;
+\[ \boxed{\text{能访问 FOM 内部算子}} \]&lt;p&gt;若能访问但非线性仍昂贵：&lt;/p&gt;
+\[ \boxed{\text{DEIM / ECSW / Hyper-reduction}} \]&lt;p&gt;若&lt;strong&gt;不能访问内部算子&lt;/strong&gt;：&lt;/p&gt;
+\[ \boxed{\text{Operator Inference}} \]&lt;p&gt;若原物理结构过于复杂：&lt;/p&gt;
+\[ \boxed{\text{Lift \&amp; Learn}} \]&lt;p&gt;再进一步：&lt;/p&gt;
+\[ \boxed{\text{structure-preserving OpInf}}. \]&lt;p&gt;所以 OpInf 真正卡在：&lt;/p&gt;
+\[ \boxed{ \text{传统 projection ROM 与数据驱动 Scientific ML 的接口处。} } \]&lt;hr&gt;
+&lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h2&gt;&lt;p&gt;Operator Inference 最值得学的并不是“用最小二乘拟合一个 ODE”，而是：&lt;/p&gt;
+\[ \boxed{ \text{当无法获得高保真模型内部算子时， 仍然可以利用已知的物理方程结构， 只从状态轨迹反推出一个 projection-like reduced dynamical system。} } \]&lt;p&gt;这对工程仿真尤其有迁移价值。很多工业软件对用户而言既不是白盒，也不完全是黑盒——你知道里面在解什么物理问题，也能批量获得高质量轨迹，但拿不到组装后的算子和残差实现。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;这正是 OpInf 最适合生存的“灰盒地带”。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Peherstorfer &amp;amp; Karen Willcox, &lt;em&gt;Data-driven operator inference for nonintrusive projection-based model reduction&lt;/em&gt;, &lt;strong&gt;CMAME 306&lt;/strong&gt;, 2016, 196–215，DOI 10.1016/j.cma.2016.03.025。原始论文。&lt;br&gt;
+MIT 开放论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Kramer, Peherstorfer &amp;amp; Willcox, &lt;em&gt;Learning Nonlinear Reduced Models from Data with Operator Inference&lt;/em&gt;, &lt;strong&gt;Annual Review of Fluid Mechanics&lt;/strong&gt;。适合建立完整知识体系，覆盖 lifting、稳定性、非线性与后续发展。&lt;br&gt;
+作者公开综述 PDF&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Willcox Research Group 的 &lt;code&gt;opinf&lt;/code&gt; 是目前很适合直接实验的 Python 实现，文档包含连续/离散 ROM、参数化模型和教程；截至检索时官方文档对应 0.6.0，并明确注明项目仍在快速开发。&lt;br&gt;
+Operator Inference 官方文档&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Qian, Kramer, Peherstorfer &amp;amp; Willcox, &lt;em&gt;Lift &amp;amp; Learn: Physics-informed machine learning for large-scale nonlinear dynamical systems&lt;/em&gt;, &lt;strong&gt;Physica D 406&lt;/strong&gt;, 2020, 132401。适合继续理解“怎样通过变量提升，把复杂非线性改造成适合 OpInf 的低阶多项式结构”。&lt;br&gt;
+Caltech 开放论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Discrete Exterior Calculus：先离散几何关系，再谈微分方程</title>
+        <link>https://assranai.github.io/cards/38-discrete-exterior-calculus/</link>
+        <pubDate>Sun, 04 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/38-discrete-exterior-calculus/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;discrete-exterior-calculus&#34; tabindex=&#34;0&#34;&gt;Discrete Exterior Calculus&lt;/span&gt;（DEC，离散外微分）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 几何计算 × 物理引擎 × 结构保持离散&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;阅读时间：约 4–5 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天补一个此前注册表中明显空缺、但对 FEM 和物理求解器很有迁移价值的方向：&lt;strong&gt;DEC 的核心不是提高某个导数的逼近精度，而是让某些连续世界中严格成立的几何恒等式，在离散网格上仍然严格成立。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这与普通的“先写 PDE，再近似导数”有很不一样的出发点。Desbrun、Kanso、Tong 的经典 SIGGRAPH 课程甚至直接把问题表述为：传统离散可能在计算机只能存储有限数据时丢掉连续模型中的几何结构，而 DEC 的目标就是在离散层面保留这些结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看一个看似普通的恒等式&#34;&gt;1. 先看一个看似普通的恒等式
+&lt;/h2&gt;&lt;p&gt;连续向量分析中：&lt;/p&gt;
+\[ \nabla\times(\nabla \phi)=0, \]&lt;p&gt;以及&lt;/p&gt;
+\[ \nabla\cdot(\nabla\times u)=0. \]&lt;p&gt;它们不是某个具体 PDE 的经验性质，而是：&lt;/p&gt;
+\[ \boxed{\text{微分算子本身的结构恒等式。}} \]&lt;p&gt;用外微分形式写得更简洁：&lt;/p&gt;
+\[ \boxed{d^2=0.} \]&lt;p&gt;其中 \(d\) 是 exterior derivative。&lt;/p&gt;
+&lt;p&gt;如果我们直接在不规则网格上分别设计一个：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;离散 gradient；&lt;/li&gt;
+&lt;li&gt;离散 curl；&lt;/li&gt;
+&lt;li&gt;离散 divergence；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;即使每个算子单独都“挺准确”，组合后也未必严格满足：&lt;/p&gt;
+\[ \operatorname{curl}_h\operatorname{grad}_h=0, \]\[ \operatorname{div}_h\operatorname{curl}_h=0. \]&lt;p&gt;这会制造一种很麻烦的数值误差：&lt;/p&gt;
+\[ \boxed{\text{离散系统产生连续物理中根本不存在的自由度。}} \]&lt;p&gt;电磁学中的伪模态、流体中的非物理源汇，都与这类结构破坏密切相关。&lt;/p&gt;
+&lt;p&gt;DEC 的思路则是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;与其分别逼近这些导数，不如先设计一个离散微积分，使 \(d_h^2=0\) 从代数结构上自动成立。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-最关键的一步物理量并不都放在节点上&#34;&gt;2. 最关键的一步：物理量并不都放在“节点”上
+&lt;/h1&gt;&lt;p&gt;普通入门 FEM 很容易形成一种习惯：&lt;/p&gt;
+\[ \boxed{\text{未知量 = 节点上的数字。}} \]&lt;p&gt;DEC 会强迫你重新考虑这件事。&lt;/p&gt;
+&lt;p&gt;在一个三角网格上：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;0-form&lt;/strong&gt; 放在顶点；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;1-form&lt;/strong&gt; 放在边；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;2-form&lt;/strong&gt; 放在面。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;例如温度：&lt;/p&gt;
+\[ T_i \]&lt;p&gt;可以作为顶点上的 0-form。&lt;/p&gt;
+&lt;p&gt;但速度的线积分：&lt;/p&gt;
+\[ \int_{e}u\cdot dl \]&lt;p&gt;天然属于一条边，是 1-form。&lt;/p&gt;
+&lt;p&gt;通量：&lt;/p&gt;
+\[ \int_f u\cdot n\,dA \]&lt;p&gt;天然属于一个面，是 2-form。&lt;/p&gt;
+&lt;p&gt;所以 DEC 的基本思想不是：&lt;/p&gt;
+\[ \boxed{\text{把所有场都采样到节点。}} \]&lt;p&gt;而是：&lt;/p&gt;
+\[ \boxed{\text{根据物理量“被什么几何对象积分”，决定它住在哪里。}} \]&lt;p&gt;这正是 differential forms 视角的工程意义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-一个极漂亮的结果离散微分可以完全不依赖几何尺寸&#34;&gt;3. 一个极漂亮的结果：离散微分可以完全不依赖几何尺寸
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;设一条有向边：&lt;/p&gt;
+\[ e=(i,j). \]&lt;p&gt;对顶点标量 \(\phi\)，离散 exterior derivative 就是：&lt;/p&gt;
+\[ (d_0\phi)_e=\phi_j-\phi_i. \]&lt;p&gt;写成矩阵：&lt;/p&gt;
+\[ d_0= \text{vertex-edge incidence matrix}. \]&lt;p&gt;再看三角形：&lt;/p&gt;
+\[ f=(i,j,k). \]&lt;p&gt;边上的 1-form 为：&lt;/p&gt;
+\[ \omega_{ij},\omega_{jk},\omega_{ki}. \]&lt;p&gt;则：&lt;/p&gt;
+\[ (d_1\omega)_f = \omega_{ij}+\omega_{jk}+\omega_{ki}. \]&lt;p&gt;这只是：&lt;/p&gt;
+\[ d_1= \text{edge-face incidence matrix}. \]&lt;p&gt;于是：&lt;/p&gt;
+\[ d_1d_0\phi = (\phi_j-\phi_i) + (\phi_k-\phi_j) + (\phi_i-\phi_k) =0. \]&lt;p&gt;所以：&lt;/p&gt;
+\[ \boxed{d_1d_0=0} \]&lt;p&gt;不是“网格足够细以后近似为零”。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[ \boxed{\text{机器精度下由拓扑直接保证为零。}} \]&lt;p&gt;这里甚至没有出现：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;边长；&lt;/li&gt;
+&lt;li&gt;面积；&lt;/li&gt;
+&lt;li&gt;角度。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因为：&lt;/p&gt;
+\[ \boxed{d\text{ 描述的是拓扑关系，而不是度量关系。}} \]&lt;p&gt;这就是 DEC 最值得建立的第一个直觉。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;4-那几何信息去哪了&#34;&gt;4. 那几何信息去哪了？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;当然不能只靠拓扑解物理问题。&lt;/p&gt;
+&lt;p&gt;几何信息被集中进另一个算子：&lt;/p&gt;
+\[ \boxed{\star} \]&lt;p&gt;即 &lt;strong&gt;Hodge star&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;它负责把：&lt;/p&gt;
+\[ \text{拓扑} \]&lt;p&gt;和：&lt;/p&gt;
+\[ \text{metric / geometry} \]&lt;p&gt;连接起来。&lt;/p&gt;
+&lt;p&gt;于是离散 Laplace–Beltrami 算子可以写成类似：&lt;/p&gt;
+\[ \boxed{ \Delta_h = \star^{-1}d^T\star d. } \]&lt;p&gt;这背后有一个非常重要的算法设计思想：&lt;/p&gt;
+\[ \boxed{ \text{拓扑关系与度量关系分离。} } \]&lt;p&gt;网格连接关系决定：&lt;/p&gt;
+\[ d. \]&lt;p&gt;边长、面积、对偶单元等决定：&lt;/p&gt;
+\[ \star. \]&lt;p&gt;因此改变几何形状但不改变 connectivity 时，某些离散结构根本无需重建。&lt;/p&gt;
+&lt;p&gt;经典三角网格上的 cotangent Laplacian、Voronoi/mixed area 等几何算子，与这套离散微分几何思想有紧密联系。Meyer、Mathieu Desbrun、Schröder、Barr 的经典工作系统构造了三角网格上的曲率和微分几何算子，并强调这些离散算子尽可能继承连续对应物的内在性质。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;5-这与-fem--feec-是什么关系&#34;&gt;5. 这与 FEM / FEEC 是什么关系？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;DEC 并不是 FEM 的竞争对手。&lt;/p&gt;
+&lt;p&gt;更准确地说，两者后来在一个更大的结构里汇合：&lt;/p&gt;
+\[ \boxed{\text{de Rham complex}.} \]&lt;p&gt;连续层面：&lt;/p&gt;
+\[ H^1 \xrightarrow{\nabla} H(\mathrm{curl}) \xrightarrow{\nabla\times} H(\mathrm{div}) \xrightarrow{\nabla\cdot} L^2. \]&lt;p&gt;有限元希望构造对应的离散空间，使：&lt;/p&gt;
+\[ \boxed{\text{离散算子之间仍保持同样的 exact sequence。}} \]&lt;p&gt;这就是此前 Equilibrated Flux 卡片里短暂出现过的 &lt;strong&gt;Finite Element Exterior Calculus（FEEC）&lt;/strong&gt; 背后的核心结构。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[ \text{DEC} \]&lt;p&gt;更偏向：&lt;/p&gt;
+\[ \boxed{\text{从离散网格、cochain 和几何算子出发}} \]&lt;p&gt;而：&lt;/p&gt;
+\[ \text{FEEC} \]&lt;p&gt;更偏向：&lt;/p&gt;
+\[ \boxed{\text{从有限元函数空间与微分复形出发}}. \]&lt;p&gt;二者共享一个非常深的原则：&lt;/p&gt;
+\[ \boxed{\text{离散 PDE 时，应当同时离散 PDE 背后的几何结构。}} \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么物理引擎开发者值得理解它&#34;&gt;6. 为什么物理引擎开发者值得理解它？
+&lt;/h1&gt;&lt;p&gt;考虑不可压流体：&lt;/p&gt;
+\[ \nabla\cdot u=0. \]&lt;p&gt;普通实现容易把它理解成：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;每一步算完速度，再努力把 divergence 压小。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;DEC/compatible discretization 提供的是另一种视角：&lt;/p&gt;
+\[ \boxed{\text{能否选择离散变量和算子，使守恒关系天然嵌入离散空间？}} \]&lt;p&gt;这在流体模拟里并非纯理论。Elcott、Tong、Kanso、Schröder 与 Desbrun 的 simplicial fluid 工作就是利用离散 differential forms，在非规则 simplicial mesh 上构造保持离散涡量结构的流体算法。&lt;/p&gt;
+&lt;p&gt;同样的思维还能迁移到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Maxwell 电磁场；&lt;/li&gt;
+&lt;li&gt;壳/薄膜几何；&lt;/li&gt;
+&lt;li&gt;网格曲率；&lt;/li&gt;
+&lt;li&gt;流体；&lt;/li&gt;
+&lt;li&gt;弹性；&lt;/li&gt;
+&lt;li&gt;离散连接与旋转场。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;2025 年 IMSI 甚至专门举办了 DEC workshop，主题已经延伸到流体、弹性、光子学、机器学习、量子电动力学和离散向量丛，说明这套思想仍在继续扩展，而不是一个已经封闭的老方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-一个对自研求解器很实用的启发&#34;&gt;7. 一个对自研求解器很实用的启发
+&lt;/h1&gt;&lt;p&gt;写物理代码时，经常会出现：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute_gradient()
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute_divergence()
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute_flux()
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute_normals()
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每个函数分别推公式。&lt;/p&gt;
+&lt;p&gt;DEC 会让你多问一步：&lt;/p&gt;
+\[ \boxed{\text{这些算子之间本来应该满足哪些恒等关系？}} \]&lt;p&gt;然后把这些关系直接变成单元测试：&lt;/p&gt;
+\[ \|d_1d_0\|=0, \]&lt;p&gt;或者检查：&lt;/p&gt;
+\[ \text{boundary of boundary}=0. \]&lt;p&gt;这种测试比“某个案例看起来没炸”强得多，因为它检查的是&lt;strong&gt;求解器离散数学结构本身&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;对于未来自己写 FEM / 软体求解器，这种思想很值得迁移：&lt;/p&gt;
+\[ \boxed{ \text{先确定必须精确保持的结构， 再决定怎样近似数值。} } \]&lt;p&gt;而不是所有性质都等网格加密后“自然收敛回来”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;它在知识体系中卡在哪里&#34;&gt;它在知识体系中卡在哪里？
+&lt;/h1&gt;&lt;p&gt;可以把数值离散粗略分成三个层次：&lt;/p&gt;
+\[ \text{Finite Difference} \]&lt;p&gt;主要问：&lt;/p&gt;
+\[ \boxed{\text{导数怎样逼近？}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{FEM / FV} \]&lt;p&gt;进一步问：&lt;/p&gt;
+\[ \boxed{\text{弱形式、守恒和函数空间怎样离散？}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \boxed{\text{DEC / FEEC / compatible discretization}} \]&lt;p&gt;进一步追问：&lt;/p&gt;
+\[ \boxed{\text{连续物理背后的几何与拓扑结构怎样在离散世界仍然严格成立？}} \]&lt;p&gt;今天最值得留下的一句话因此是：&lt;/p&gt;
+\[ \boxed{ \text{高质量离散方法追求的不只是“数值接近真实解”， 还包括“离散系统本身仍像那个物理系统”。} } \]&lt;p&gt;这也是 DEC 对物理引擎、FEM 和结构保持 ROM 最有迁移价值的地方。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Desbrun、Kanso、Yiying Tong，&lt;strong&gt;Discrete Differential Forms for Computational Modeling&lt;/strong&gt;, SIGGRAPH Course。最推荐的入门材料，重点看 differential forms、primal/dual mesh、Hodge star 和离散 Stokes 定理怎样连起来。&lt;br&gt;
+ACM SIGGRAPH 原课程&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Meyer、Desbrun、Schröder、Barr，&lt;strong&gt;Discrete Differential-Geometry Operators for Triangulated 2-Manifolds&lt;/strong&gt;。如果更关心游戏/几何处理中的法向、曲率、cotangent 类算子，这是很好的工程入口。&lt;br&gt;
+Caltech 开放论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Elcott et al., &lt;strong&gt;Discrete, Vorticity-Preserving, and Stable Simplicial Fluids&lt;/strong&gt;，SIGGRAPH 2005。适合继续追问“结构保持到底怎样改变一个真正的物理求解器”。&lt;br&gt;
+ACM 原论文&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Braune、Tong、Gay-Balmaz、Desbrun，&lt;strong&gt;A Discrete Exterior Calculus of Bundle-valued Forms&lt;/strong&gt;, 2024。属于明显更前沿的扩展：把 DEC 从普通标量 differential forms 推向带 connection 的 vector-bundle-valued forms，并构造满足离散 Bianchi identities 且在网格细化下收敛的 exterior covariant derivative。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2406.05383&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文预印本&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Algebraic Multigrid：换一个尺度消除难消的误差</title>
+        <link>https://assranai.github.io/cards/39-algebraic-multigrid/</link>
+        <pubDate>Sun, 04 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/39-algebraic-multigrid/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;algebraic-multigrid&#34; tabindex=&#34;0&#34;&gt;Algebraic Multigrid&lt;/span&gt;（AMG，代数多重网格）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 数值线性代数 × 物理求解器 × HPC&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;阅读时间：约 4–5 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天补充一个此前尚未系统覆盖、但对大型有限元求解器至关重要的概念：&lt;strong&gt;代数多重网格&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;它解决的是一个非常基础的问题：随着网格不断细化，为什么许多迭代求解器越来越慢？AMG 的核心发现是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;迭代方法难以消除的误差，往往可以通过改变表示尺度，转化成容易处理的误差。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这使得某些大型稀疏线性系统能够以接近 \(O(N)\) 的计算复杂度求解，而不必付出传统直接分解的高昂代价。AMG 尤其适合椭圆型 PDE 离散产生的系统，实际表现仍取决于算子性质和粗化策略。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一为什么普通迭代法会越算越慢&#34;&gt;一、为什么普通迭代法会越算越慢？
+&lt;/h2&gt;&lt;p&gt;考虑有限元中的线性系统：&lt;/p&gt;
+\[ Ku=f. \]&lt;p&gt;先用最简单的一维 Poisson 方程理解：&lt;/p&gt;
+\[ -\frac{d^2u}{dx^2}=f(x). \]&lt;p&gt;离散以后：&lt;/p&gt;
+\[ K=\frac{1}{h^2} \begin{bmatrix} 2&amp;-1&amp;&amp;\\ -1&amp;2&amp;-1&amp;\\ &amp;\ddots&amp;\ddots&amp;\ddots\\ &amp;&amp;-1&amp;2 \end{bmatrix}. \]&lt;p&gt;使用 Jacobi 迭代：&lt;/p&gt;
+\[ u^{k+1}=u^k+\omega D^{-1}(f-Ku^k). \]&lt;p&gt;其中 \(D\) 是 \(K\) 的对角部分。&lt;/p&gt;
+&lt;p&gt;设误差为：&lt;/p&gt;
+\[ e^k=u^k-u^\star. \]&lt;p&gt;那么：&lt;/p&gt;
+\[ e^{k+1}=(I-\omega D^{-1}K)e^k. \]&lt;p&gt;对离散正弦误差模式进行分析，可以得到误差放大因子：&lt;/p&gt;
+\[ \boxed{ \mu_j=1-\omega\left(1-\cos\frac{j\pi}{n+1}\right). } \]&lt;p&gt;取 \(\omega=2/3\)。&lt;/p&gt;
+&lt;p&gt;对于高频误差，\(|\mu_j|\) 通常较小，意味着误差快速衰减。&lt;/p&gt;
+&lt;p&gt;但对于低频误差：&lt;/p&gt;
+\[ j\ll n, \]&lt;p&gt;有：&lt;/p&gt;
+\[ \mu_j\approx1. \]&lt;p&gt;这意味着：&lt;/p&gt;
+\[ \boxed{\text{Jacobi 很容易消除剧烈振荡的误差，却很难消除缓慢变化的误差。}} \]&lt;p&gt;随着网格加密，越来越多难以消除的低频误差模式出现。&lt;/p&gt;
+&lt;p&gt;这正是传统局部松弛迭代难以保持网格无关收敛速度的根源。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;二multigrid-的核心让低频误差变成高频误差&#34;&gt;二、Multigrid 的核心：让低频误差变成高频误差
+&lt;/h2&gt;&lt;p&gt;假设在细网格上存在一个缓慢变化的误差：&lt;/p&gt;
+\[ e(x)=\sin(\pi x). \]&lt;p&gt;对于有 1000 个节点的网格，这个误差变化非常缓慢。&lt;/p&gt;
+&lt;p&gt;但如果把它转移到只有几十个节点的粗网格上，它相对于网格尺度就不再那么平缓。&lt;/p&gt;
+&lt;p&gt;多重网格利用的正是这种尺度变化。&lt;/p&gt;
+&lt;p&gt;一个经典的两层算法包含：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第一步：细网格平滑&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;用 Jacobi 或 Gauss–Seidel 消除高频误差。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第二步：将残差传递到粗网格&lt;/strong&gt;&lt;/p&gt;
+\[ r_h=f_h-K_hu_h. \]&lt;p&gt;通过限制算子 \(R\)：&lt;/p&gt;
+\[ r_H=Rr_h. \]&lt;p&gt;&lt;strong&gt;第三步：在粗网格上求误差修正&lt;/strong&gt;&lt;/p&gt;
+\[ K_He_H=r_H. \]&lt;p&gt;&lt;strong&gt;第四步：把修正传回细网格&lt;/strong&gt;&lt;/p&gt;
+\[ u_h\leftarrow u_h+Pe_H. \]&lt;p&gt;其中 \(P\) 是插值算子。&lt;/p&gt;
+&lt;p&gt;随后再进行若干次平滑。&lt;/p&gt;
+&lt;p&gt;这一过程可以递归执行，形成 V-cycle。&lt;/p&gt;
+&lt;p&gt;它的本质是：&lt;/p&gt;
+\[ \boxed{ \text{细网格消除局部误差，粗网格消除全局误差。} } \]&lt;p&gt;这比单纯增加 Jacobi 迭代次数有效得多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;三amg-最深刻的一步没有几何网格也能构造粗网格&#34;&gt;三、AMG 最深刻的一步：没有几何网格，也能构造粗网格
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;传统 Geometric &lt;span class=&#34;term-anchor&#34; data-term=&#34;multigrid&#34; tabindex=&#34;0&#34;&gt;Multigrid&lt;/span&gt;（GMG）需要知道网格的几何层级。&lt;/p&gt;
+&lt;p&gt;但真实工业有限元往往使用：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;非结构化四面体网格；&lt;/li&gt;
+&lt;li&gt;复杂拓扑；&lt;/li&gt;
+&lt;li&gt;局部加密；&lt;/li&gt;
+&lt;li&gt;不规则材料分布。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;很难直接生成质量良好的几何粗网格。&lt;/p&gt;
+&lt;p&gt;AMG 提出了一个更抽象的问题：&lt;/p&gt;
+\[ \boxed{\text{能否仅从矩阵 }K\text{ 的代数结构，推断哪些自由度应该一起粗化？}} \]&lt;p&gt;答案是可以。&lt;/p&gt;
+&lt;p&gt;AMG 根据矩阵系数、变量之间的强连接关系，以及松弛过程难以消除的误差模式，构造粗层空间。&lt;/p&gt;
+&lt;p&gt;它并不要求知道节点的真实坐标。&lt;/p&gt;
+&lt;p&gt;然后通过：&lt;/p&gt;
+\[ \boxed{ K_H=R K_h P } \]&lt;p&gt;构造粗层算子。&lt;/p&gt;
+&lt;p&gt;对于对称正定问题，通常取：&lt;/p&gt;
+\[ R=P^T, \]&lt;p&gt;于是：&lt;/p&gt;
+\[ \boxed{ K_H=P^TK_hP. } \]&lt;p&gt;这实际上就是一个 Galerkin 投影。&lt;/p&gt;
+&lt;p&gt;因此 AMG 可以理解成：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;从矩阵本身自动寻找适合误差修正的低维空间，并在多个尺度上反复求解。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;SIAM 的经典教材 &lt;em&gt;A Multigrid Tutorial&lt;/em&gt; 专门讨论了这一问题：即使未知量没有明确的几何位置，也可以根据代数关系建立多重网格方法。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;四一个非常重要的概念near-nullspace&#34;&gt;四、一个非常重要的概念：Near-nullspace
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;AMG 的粗空间应该保留哪些模式？&lt;/p&gt;
+&lt;p&gt;答案是：&lt;/p&gt;
+\[ \boxed{\text{那些能量很低、局部迭代难以消除的误差模式。}} \]&lt;p&gt;考虑线弹性系统：&lt;/p&gt;
+\[ Ku=f. \]&lt;p&gt;对于一个没有约束的三维弹性体，存在六种刚体运动模式：&lt;/p&gt;
+\[ \underbrace{3\text{ 个平移}}_{\text{translation}} + \underbrace{3\text{ 个转动}}_{\text{rotation}}. \]&lt;p&gt;这些模式不会产生弹性应变能。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[ Kz_i=0. \]&lt;p&gt;它们构成刚度矩阵的零空间。&lt;/p&gt;
+&lt;p&gt;施加边界条件后，刚体模式通常不再是严格零模态，但相关低能量模式仍可能对迭代收敛十分重要。&lt;/p&gt;
+&lt;p&gt;如果 AMG 的粗空间无法表示这些模式，求解器就可能难以消除对应的误差。&lt;/p&gt;
+&lt;p&gt;这就是 &lt;strong&gt;Near-nullspace-aware AMG&lt;/strong&gt; 的意义。&lt;/p&gt;
+&lt;p&gt;在实际工程中，PETSc 明确提供：&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;MatNullSpaceCreateRigidBody()&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;和：&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;MatSetNearNullSpace()&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;帮助 AMG 预条件器识别弹性系统的刚体运动模式。官方文档指出，这能够显著改善 &lt;code&gt;PCGAMG&lt;/code&gt; 对弹性问题的求解效率。&lt;/p&gt;
+&lt;p&gt;这说明一个很重要的事实：&lt;/p&gt;
+\[ \boxed{\text{优秀的线性求解器不仅利用矩阵数值，还利用矩阵背后的物理结构。}} \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;五smoothed-aggregation从粗略分组到低能量插值&#34;&gt;五、Smoothed Aggregation：从粗略分组到低能量插值
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;AMG 有多个技术分支，其中 Smoothed Aggregation（SA-AMG）特别值得理解。&lt;/p&gt;
+&lt;p&gt;它首先将自由度划分为若干聚合体（aggregates）。&lt;/p&gt;
+&lt;p&gt;构造一个初始插值矩阵：&lt;/p&gt;
+\[ P_0. \]&lt;p&gt;然后对插值矩阵进行平滑，例如：&lt;/p&gt;
+\[ \boxed{ P=(I-\omega D^{-1}K)P_0. } \]&lt;p&gt;这样得到的粗空间更适合表示代数光滑误差。&lt;/p&gt;
+&lt;p&gt;其关键思想是：&lt;/p&gt;
+\[ \boxed{\text{粗空间不能只由变量分组决定，还应该适应系统的低能量结构。}} \]&lt;p&gt;Vaněk、Mandel 和 Brezina 在 1996 年的经典工作中系统发展了 Smoothed Aggregation，并将其用于二阶和四阶椭圆问题。&lt;/p&gt;
+&lt;p&gt;现代 PyAMG 和 PETSc 都实现了相关方法。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;六它对软体动力学求解器有什么价值&#34;&gt;六、它对软体动力学求解器有什么价值？
+&lt;/h2&gt;&lt;p&gt;考虑隐式软体动力学：&lt;/p&gt;
+\[ M\ddot x+f_{\rm int}(x)=f_{\rm ext}. \]&lt;p&gt;使用 Newton 法后，需要反复求解：&lt;/p&gt;
+\[ \boxed{ \left(\frac{M}{h^2}+K_t\right)\Delta x=-r. } \]&lt;p&gt;对于百万自由度的四面体模型，这个线性系统可能成为主要性能瓶颈。&lt;/p&gt;
+&lt;p&gt;AMG 可以作为 CG 等 Krylov 迭代法的预条件器：&lt;/p&gt;
+\[ \boxed{\text{AMG-preconditioned CG}.} \]&lt;p&gt;它不要求像传统 ROM 一样提前收集训练轨迹，也不要求模型具有很低的全局秩。&lt;/p&gt;
+&lt;p&gt;因此它解决的是另一类问题：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;ROM&lt;/strong&gt;：降低需要求解的自由度数量；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;AMG&lt;/strong&gt;：在保留完整自由度的情况下，提高线性系统求解效率；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;PD&lt;/span&gt;&lt;/strong&gt;：通过特殊能量结构，让全局矩阵可以重复分解。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这三者具有完全不同的加速机制。&lt;/p&gt;
+&lt;p&gt;不过 AMG 也有明显限制。&lt;/p&gt;
+&lt;p&gt;对于严重材料非线性、强各向异性、接触激活引起的矩阵突变，或者不定的切线刚度矩阵，普通 AMG 可能退化，需要专门的平滑器、粗空间或块预条件策略。&lt;/p&gt;
+&lt;p&gt;此外，构建 AMG 层级本身也有成本。&lt;/p&gt;
+&lt;p&gt;如果每个时间步的矩阵都发生显著变化，就必须考虑：&lt;/p&gt;
+\[ \boxed{\text{层级重建成本与迭代加速收益之间的平衡。}} \]&lt;p&gt;因此工业实现往往将 AMG 作为预条件器，并针对具体物理系统调整粗化与插值策略。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;七一个很值得做的数值实验&#34;&gt;七、一个很值得做的数值实验
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;使用 Python 的 PyAMG，生成不同规模的二维 Poisson 问题：&lt;/p&gt;
+\[ n=32,\ 64,\ 128,\ 256. \]&lt;p&gt;比较：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Jacobi；&lt;/li&gt;
+&lt;li&gt;CG；&lt;/li&gt;
+&lt;li&gt;AMG-preconditioned CG。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;统一要求：&lt;/p&gt;
+\[ \frac{\|Ku-f\|_2}{\|f\|_2}&lt;10^{-8}. \]&lt;p&gt;记录迭代次数、求解时间和 AMG 层级构建时间。&lt;/p&gt;
+&lt;p&gt;预期观察到：&lt;/p&gt;
+&lt;p&gt;Jacobi 的迭代次数会随着网格细化显著增长。&lt;/p&gt;
+&lt;p&gt;CG 也通常表现出一定的网格尺度依赖。&lt;/p&gt;
+&lt;p&gt;而配置良好的 AMG-preconditioned CG，在这类规则椭圆问题中，迭代次数往往能够基本保持稳定。&lt;/p&gt;
+&lt;p&gt;然后进一步尝试：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;将 Poisson 问题替换为三维线弹性问题，并向 AMG 提供刚体 near-nullspace。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;比较提供和不提供刚体模式时的收敛差异。&lt;/p&gt;
+&lt;p&gt;这个实验能够直接说明：&lt;strong&gt;粗空间的质量往往比增加局部迭代次数更重要。&lt;/strong&gt;&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;它在知识体系中卡在哪里&#34;&gt;它在知识体系中卡在哪里？
+&lt;/h2&gt;&lt;p&gt;AMG 位于大型物理仿真的底层数值求解层：&lt;/p&gt;
+\[ \text{物理方程} \]\[ \downarrow \]\[ \text{FEM / FV 离散} \]\[ \downarrow \]\[ Ku=f \]\[ \downarrow \]\[ \boxed{\text{Krylov 迭代 + AMG 预条件}} \]\[ \downarrow \]\[ \text{高效求解完整离散系统} \]&lt;p&gt;它与之前学习的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt;、&lt;span class=&#34;term-anchor&#34; data-term=&#34;hyper-reduction&#34; tabindex=&#34;0&#34;&gt;Hyper-reduction&lt;/span&gt;、Projective Dynamics 共同构成了大型物理仿真的不同加速路线。&lt;/p&gt;
+&lt;p&gt;其中最值得记住的是：&lt;/p&gt;
+\[ \boxed{ \text{一个误差模式难以消除， 可能只是因为你正在错误的尺度上处理它。} } \]&lt;p&gt;AMG 将这一思想从规则几何网格推广到了任意稀疏矩阵的代数结构。&lt;/p&gt;
+&lt;p&gt;更深一层，它告诉我们：&lt;strong&gt;预条件器本质上是在为迭代算法重新组织问题的几何结构。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这也是为什么预条件技术值得与有限元、ROM 和数值优化并列学习。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;strong&gt;1. Briggs, Henson &amp;amp; McCormick — &lt;em&gt;A Multigrid Tutorial&lt;/em&gt;, 2nd Edition&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;SIAM，2000。经典入门教材，推荐重点阅读误差平滑、两层方法和第八章 Algebraic Multigrid。&lt;/p&gt;
+&lt;p&gt;SIAM 官方教材第八章&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;2. Vaněk, Mandel &amp;amp; Brezina — &lt;em&gt;Algebraic Multigrid by Smoothed Aggregation for Second and Fourth Order Elliptic Problems&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Computing&lt;/em&gt;, 56, 179–196，1996。DOI：10.1007/BF02238511。Smoothed Aggregation 的经典论文。&lt;/p&gt;
+&lt;p&gt;NASA 技术报告资料&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;3. PETSc — PCGAMG 与 Near-nullspace 官方文档&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;适合直接进入工业级 FEM 求解器实现。尤其推荐阅读刚体模式如何用于 AMG 粗空间构造。&lt;/p&gt;
+&lt;p&gt;PETSc 刚体模式接口文档&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;4. hypre — BoomerAMG 官方文档&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;hypre 的 BoomerAMG 是广泛应用的并行 AMG 实现。文档介绍了粗化、插值、松弛及并行求解参数。&lt;/p&gt;
+&lt;p&gt;BoomerAMG 官方文档&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;5. PyAMG — 官方文档与实现&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;适合用 Python 快速进行数值实验，包含 Classical AMG、Smoothed Aggregation 和 Krylov 预条件示例。&lt;/p&gt;
+&lt;p&gt;PyAMG 官方文档&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;知识卡片注册表更新：&lt;/strong&gt; 第 55 张，新增主题「Algebraic Multigrid」。所属方向：有限元 / 数值线性代数 / 物理求解器。核心问题：如何利用多尺度误差结构，实现大型稀疏系统的高效迭代求解。与第 35 张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;anderson&#34; tabindex=&#34;0&#34;&gt;Anderson Acceleration&lt;/span&gt;、第 49–50 张 Projective Dynamics、第 52 张 Hyper-reduction 构成相邻但不重复的求解加速知识分支。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Durable Execution：工业 Agent 如何正确处理“执行了一半”</title>
+        <link>https://assranai.github.io/cards/40-durable-execution/</link>
+        <pubDate>Sun, 04 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/40-durable-execution/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;durable-execution&#34; tabindex=&#34;0&#34;&gt;Durable Execution&lt;/span&gt;（持久化执行）与幂等性设计&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：Agent 工业应用 × 分布式系统 × AI 全栈工程&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;阅读时间：约 4–5 分钟&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;关键词：Event History、Replay、Idempotency、Exactly-once Effect&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;本期转向此前覆盖较少的 Agent 工业应用。&lt;/p&gt;
+&lt;p&gt;一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。&lt;/p&gt;
+&lt;p&gt;问题在于，&lt;strong&gt;Agent 的某一步执行成功，并不意味着系统知道它已经成功。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。&lt;/p&gt;
+&lt;p&gt;重启后，它应该重新提交，还是等待原任务？&lt;/p&gt;
+&lt;p&gt;这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：&lt;strong&gt;如何在无法确定上一次操作是否成功的情况下安全恢复执行。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Temporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一为什么简单保存-agent-状态还不够&#34;&gt;一、为什么简单保存 Agent 状态还不够？
+&lt;/h2&gt;&lt;p&gt;假设工作流为：&lt;/p&gt;
+\[ A\rightarrow B\rightarrow C \]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(A\)：生成仿真输入；&lt;/li&gt;
+&lt;li&gt;\(B\)：向服务器提交仿真；&lt;/li&gt;
+&lt;li&gt;\(C\)：下载结果。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Agent 在完成 \(B\) 后，需要保存：&lt;/p&gt;
+\[ \text{state}=\text{B completed}. \]&lt;p&gt;但可能发生以下事件：&lt;/p&gt;
+\[ \underbrace{\text{服务器接受任务}}_{t_1} \rightarrow \underbrace{\text{Agent 崩溃}}_{t_2} \rightarrow \underbrace{\text{状态写入数据库}}_{t_3} \]&lt;p&gt;由于：&lt;/p&gt;
+\[ t_2&lt;t_3, \]&lt;p&gt;状态数据库仍然认为：&lt;/p&gt;
+\[ B=\text{未完成}. \]&lt;p&gt;如果 Agent 直接重试 \(B\)，就可能产生两个仿真任务。&lt;/p&gt;
+&lt;p&gt;这里存在一个重要的分布式系统事实：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;外部操作的执行与本地状态的保存，通常无法天然组成一个原子事务。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;因此，单纯增加 checkpoint 并不能彻底解决问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;二durable-execution-如何恢复执行&#34;&gt;二、Durable Execution 如何恢复执行？
+&lt;/h2&gt;&lt;p&gt;持久化执行通常将工作流拆分为两类操作：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Workflow：&lt;/strong&gt; 决定下一步做什么。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Activity：&lt;/strong&gt; 真正执行外部操作，例如调用 API、写入文件或启动仿真。&lt;/p&gt;
+&lt;p&gt;Workflow 的执行过程被记录为 Event History：&lt;/p&gt;
+\[ H=\{e_1,e_2,\ldots,e_n\}. \]&lt;p&gt;例如：&lt;/p&gt;
+\[ e_1=\text{WorkflowStarted} \]\[ e_2=\text{ActivityScheduled}(B) \]\[ e_3=\text{ActivityCompleted}(B,r_B) \]&lt;p&gt;其中 \(r_B\) 是 Activity 的返回结果。&lt;/p&gt;
+&lt;p&gt;当 Worker 崩溃并重启时，系统可以通过 &lt;strong&gt;Replay（重放）&lt;/strong&gt; 恢复工作流状态。&lt;/p&gt;
+&lt;p&gt;如果历史已经记录：&lt;/p&gt;
+\[ \text{ActivityCompleted}(B,r_B), \]&lt;p&gt;重放时直接使用：&lt;/p&gt;
+\[ r_B \]&lt;p&gt;继续执行，不必再次运行 \(B\)。&lt;/p&gt;
+&lt;p&gt;Temporal 官方文档明确指出，Workflow 恢复依赖持久化 Event History；已经完成的 Activity 在重放期间返回历史结果，而不会重新执行。&lt;/p&gt;
+&lt;p&gt;但有一个关键限制：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;如果外部操作已经成功，而 Activity 的完成事件尚未被持久化，Activity 仍可能被重新执行。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;因此，还需要第二个机制。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;三idempotency让重复执行不会产生重复效果&#34;&gt;三、Idempotency：让重复执行不会产生重复效果
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;幂等性的数学定义非常简洁：&lt;/p&gt;
+\[ \boxed{f(f(x))=f(x)} \]&lt;p&gt;在工程系统中，可以理解为：&lt;/p&gt;
+\[ \boxed{\text{同一个逻辑请求重复执行，不应产生额外业务效果。}} \]&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;submit_simulation(
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    task_id=&amp;#34;case_001&amp;#34;,
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    parameters=...
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;第一次调用：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;case_001 → 创建任务 → 返回 job_872
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;第二次调用：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;case_001 → 发现任务已存在 → 返回 job_872
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此，即使 Agent 重试十次，仍然只有一个逻辑仿真任务。&lt;/p&gt;
+&lt;p&gt;这种设计通常通过 &lt;strong&gt;Idempotency Key（幂等键）&lt;/strong&gt; 实现。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[ k= \operatorname{Hash}( \text{workflow\_id}, \text{step\_id}, \text{input\_version} ). \]&lt;p&gt;服务端保存：&lt;/p&gt;
+\[ k\rightarrow(\text{request hash},\text{job id},\text{status}). \]&lt;p&gt;同一个 \(k\) 对应相同请求时返回既有结果；如果同一个 \(k\) 对应不同参数，则拒绝请求。&lt;/p&gt;
+&lt;p&gt;Amazon Web Services 的工程实践特别强调：重试本身并不危险，危险的是重试可能产生新的副作用。通过幂等请求标识与参数一致性检查，可以显著简化客户端的故障恢复逻辑。&lt;/p&gt;
+&lt;p&gt;需要注意，&lt;strong&gt;幂等键必须由真正执行副作用的服务端原子地检查和登记&lt;/strong&gt;。如果只是 Agent 在内存中检查任务是否存在，仍然可能出现并发重复提交。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;四真正重要的区分at-least-once-与-exactly-once-effect&#34;&gt;四、真正重要的区分：At-least-once 与 Exactly-once Effect
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;分布式系统经常使用三种执行语义：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;语义&lt;/th&gt;
+					&lt;th&gt;含义&lt;/th&gt;
+					&lt;th&gt;主要风险&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;At-most-once&lt;/td&gt;
+					&lt;td&gt;最多执行一次&lt;/td&gt;
+					&lt;td&gt;失败后可能丢失任务&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;At-least-once&lt;/td&gt;
+					&lt;td&gt;至少执行一次&lt;/td&gt;
+					&lt;td&gt;可能重复执行&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Exactly-once effect&lt;/td&gt;
+					&lt;td&gt;业务效果恰好发生一次&lt;/td&gt;
+					&lt;td&gt;需要额外去重与一致性机制&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;对于工业 Agent，常见的合理选择是：&lt;/p&gt;
+\[ \boxed{ \text{At-least-once execution} + \text{Idempotency} \Rightarrow \text{Exactly-once effect} } \]&lt;p&gt;这里的箭头表示一种&lt;strong&gt;需要满足严格条件才能实现的工程设计目标&lt;/strong&gt;，并非无条件的数学保证。&lt;/p&gt;
+&lt;p&gt;例如，仿真服务必须保证同一个任务键只创建一个任务，任务结果也必须能够被重复查询。&lt;/p&gt;
+&lt;p&gt;如果底层工具不支持幂等提交，工作流框架本身无法保证外部副作用恰好发生一次。&lt;/p&gt;
+&lt;p&gt;这也是为什么工业 Agent 的可靠性最终会深入到 API、数据库和任务调度器层面。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;五一个科研-agent-的最小可靠架构&#34;&gt;五、一个科研 Agent 的最小可靠架构
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑自动执行：&lt;/p&gt;
+\[ \text{生成参数} \rightarrow \text{运行 FEM} \rightarrow \text{提取响应} \rightarrow \text{更新 Kriging}. \]&lt;p&gt;可以设计如下伪代码：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;def&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;simulation_activity&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;case&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;):&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;key&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;stable_hash&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;case&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;case&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;version&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;job&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;scheduler&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;find_by_key&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;key&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;job&lt;/span&gt; &lt;span class=&#34;ow&#34;&gt;is&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;None&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;n&#34;&gt;job&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;scheduler&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;submit&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;k&#34;&gt;case&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;n&#34;&gt;idempotency_key&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;key&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;result&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;scheduler&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;wait&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;job&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;job_id&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;job&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;result_hash&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;hash_file&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;result&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;result_path&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;result&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这段代码隐含一个重要前提：&lt;code&gt;scheduler.submit()&lt;/code&gt; 必须支持服务端幂等处理，或者任务登记与提交具有等效的一致性保障。单纯的 &lt;code&gt;find_by_key()&lt;/code&gt; 再 &lt;code&gt;submit()&lt;/code&gt; 不能防止并发竞争。&lt;/p&gt;
+&lt;p&gt;随后由持久化工作流记录：&lt;/p&gt;
+\[ \text{ActivityCompleted} \]&lt;p&gt;及其返回结果。&lt;/p&gt;
+&lt;p&gt;这样即使发生：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Agent 进程崩溃；&lt;/li&gt;
+&lt;li&gt;LLM API 超时；&lt;/li&gt;
+&lt;li&gt;仿真运行两小时后网络中断；&lt;/li&gt;
+&lt;li&gt;数据处理阶段异常；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;系统也可以根据持久化历史与外部任务标识恢复进度。&lt;/p&gt;
+&lt;p&gt;如果涉及多个数据库或消息队列，还可以进一步引入 &lt;strong&gt;Transactional Outbox&lt;/strong&gt;，解决数据库状态更新与事件发布之间的双写一致性问题。AWS 的官方架构指南提供了相应实现。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;六为什么这对-llm-agent-尤其重要&#34;&gt;六、为什么这对 LLM Agent 尤其重要？
+&lt;/h2&gt;&lt;p&gt;传统工作流通常具有确定性：&lt;/p&gt;
+\[ s_{t+1}=F(s_t,a_t). \]&lt;p&gt;但 LLM Agent 可能包含：&lt;/p&gt;
+\[ a_t=\pi_\theta(s_t,\xi_t), \]&lt;p&gt;其中 \(\xi_t\) 表示采样等随机因素。&lt;/p&gt;
+&lt;p&gt;如果恢复执行时重新调用 LLM：&lt;/p&gt;
+\[ a_t&#39;\neq a_t \]&lt;p&gt;完全可能发生。&lt;/p&gt;
+&lt;p&gt;因此，工业 Agent 需要区分两类行为：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;决策结果可以记录和重放。&lt;/strong&gt; 已经生成并确认的计划、工具参数、人工审批结果，应作为持久化数据保存。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;外部操作必须能够安全重试。&lt;/strong&gt; 文件写入、数据库更新、任务提交等，应通过幂等键、唯一约束或外部状态核对处理。&lt;/p&gt;
+&lt;p&gt;LangGraph 的持久化机制使用 checkpointer 保存工作流状态，并支持中断恢复与 human-in-the-loop。其官方文档也特别提醒：内存型 checkpointer 无法跨进程重启保存数据，生产环境应使用持久化存储。&lt;/p&gt;
+&lt;p&gt;这里还存在一个容易忽略的问题：&lt;strong&gt;代码升级可能破坏重放的一致性。&lt;/strong&gt; 如果旧工作流记录的是执行 A 后执行 B，而新版本代码改成执行 A 后执行 C，就需要工作流版本管理或迁移机制。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;七局限与工程代价&#34;&gt;七、局限与工程代价
+&lt;/h2&gt;&lt;p&gt;Durable Execution 解决的是&lt;strong&gt;执行可靠性&lt;/strong&gt;，并不能保证 Agent 的决策正确。&lt;/p&gt;
+&lt;p&gt;即使一个工作流可以完美恢复，它仍然可能稳定地执行一个错误的仿真方案。&lt;/p&gt;
+&lt;p&gt;此外，持久化机制还会引入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;事件历史与检查点的存储开销；&lt;/li&gt;
+&lt;li&gt;工作流版本兼容问题；&lt;/li&gt;
+&lt;li&gt;外部任务状态与本地记录的对账成本；&lt;/li&gt;
+&lt;li&gt;不可逆操作的补偿处理；&lt;/li&gt;
+&lt;li&gt;长期运行任务的资源回收问题。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此，可靠工业 Agent 还需要权限控制、结果验证、人工审批和审计机制。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;它在整个知识体系中卡在哪里&#34;&gt;它在整个知识体系中卡在哪里？
+&lt;/h2&gt;&lt;p&gt;Agent 工程可以粗略分成四层：&lt;/p&gt;
+\[ \boxed{\text{Reasoning}} \]&lt;p&gt;决定做什么。&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{Planning / Tool Use}} \]&lt;p&gt;决定怎样调用工具。&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{Durable Execution}} \]&lt;p&gt;保证任务在故障、重试和中断后能够正确推进。&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{External Systems}} \]&lt;p&gt;真正执行仿真、数据库操作、文件处理和工程任务。&lt;/p&gt;
+&lt;p&gt;前三层中，LLM 研究通常最关注 Reasoning 和 Planning。&lt;/p&gt;
+&lt;p&gt;但从工业落地角度看，&lt;strong&gt;Durable Execution 是 Agent 从交互式助手走向长期自主运行系统时必须补齐的基础设施。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;它的价值在于把一个模糊的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Agent 失败以后怎么办？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;转化为一组可以明确设计和验证的工程契约：&lt;/p&gt;
+\[ \boxed{ \text{可恢复状态} + \text{确定性重放} + \text{安全重试} + \text{外部副作用一致性} } \]&lt;p&gt;&lt;strong&gt;今天最值得记住的一句话：&lt;/strong&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;工业 Agent 的可靠性，不取决于它永远不失败，而取决于它能否在失败发生后，准确判断哪些事情已经完成、哪些事情可以重试，以及哪些事情绝不能重复。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;strong&gt;1. Temporal — Event History&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://docs.temporal.io/encyclopedia/event-history&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Temporal 官方事件历史文档&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;最适合深入理解 Workflow Replay、Activity 与持久化事件历史的关系。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;2. Malcolm Featonby — Making Retries Safe with Idempotent APIs&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Amazon Builders&amp;rsquo; Library 原文&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;AWS 一线工程实践，重点讨论请求标识、重试语义和重复副作用。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;3. LangGraph — Persistence&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://docs.langchain.com/oss/python/langgraph/persistence&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;LangGraph 官方持久化文档&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;适合从 Agent 框架层面理解 Checkpointer、线程状态、故障恢复和长期记忆之间的区别。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;4. AWS — Transactional Outbox Pattern&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;AWS 官方架构指南与实现示例&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;适合进一步理解数据库事务、事件发布和重复消息处理之间的一致性问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;知识卡片注册表更新：第 56 张。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;新增主题：Durable Execution 与幂等性设计。所属方向：Agent 工业应用 / 分布式系统 / AI 全栈工程。核心问题：如何使长期运行的 Agent 在进程崩溃、网络中断和外部任务状态不确定的情况下安全恢复。&lt;/p&gt;
+&lt;p&gt;与此前的数值求解器、ROM 和可靠性方法卡片无主题重复；它补充的是&lt;strong&gt;科研自动化系统自身的执行可靠性&lt;/strong&gt;。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;

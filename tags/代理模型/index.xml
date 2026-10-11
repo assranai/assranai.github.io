@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Sun, 27 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sun, 04 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E4%BB%A3%E7%90%86%E6%A8%A1%E5%9E%8B/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>AK-MCS：可靠性代理模型真正该“学”的，其实是失效边界</title>
         <link>https://assranai.github.io/cards/02-ak-mcs/</link>
         <pubDate>Sat, 15 Aug 2026 00:00:00 +0000</pubDate>
@@ -2684,7 +2684,7 @@
 \[\nabla_x f.\]&lt;p&gt;如果输出是一个标量：&lt;/p&gt;
 \[f,\]&lt;p&gt;reverse-mode AD 的梯度成本通常可以做到与少量 forward solves 同量级，而不是：&lt;/p&gt;
 \[O(m)\]&lt;p&gt;倍。&lt;/p&gt;
-&lt;p&gt;对 PDE/FEM，如果有 &lt;span class=&#34;term-anchor&#34; data-term=&#34;adjoint&#34; tabindex=&#34;0&#34;&gt;adjoint&lt;/span&gt;：&lt;/p&gt;
+&lt;p&gt;对 PDE/FEM，如果有 adjoint：&lt;/p&gt;
 \[A^T\lambda = \frac{\partial f}{\partial u},\]&lt;p&gt;然后：&lt;/p&gt;
 \[\frac{df}{dx} = \frac{\partial f}{\partial x} - \lambda^T \frac{\partial R}{\partial x},\]&lt;p&gt;那么高维参数梯度也能高效获得。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
@@ -2812,6 +2812,208 @@
 &lt;/details&gt;
 
 &lt;hr&gt;
+&lt;h1 id=&#34;25-它和-form-之间其实存在一个有趣联系&#34;&gt;25. 它和 FORM 之间其实存在一个有趣联系
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可靠性中 FORM 会在标准正态空间寻找 Most Probable Point：&lt;/p&gt;
+\[ u^\star. \]&lt;p&gt;然后用极限状态面的局部法向：&lt;/p&gt;
+\[ \alpha = \frac{\nabla g(u^\star)} {\|\nabla g(u^\star)\|} \]&lt;p&gt;描述：&lt;/p&gt;
+\[ \boxed{\text{失效点附近最关键的局部方向}.} \]&lt;p&gt;Active Subspaces 则研究：&lt;/p&gt;
+\[ C= \mathbb E[ \nabla g(X)\nabla g(X)^T ]. \]&lt;p&gt;所以可以粗略理解：&lt;/p&gt;
+&lt;p&gt;FORM：&lt;/p&gt;
+\[ \boxed{\text{局部、失效点附近的关键方向}} \]&lt;p&gt;Active Subspaces：&lt;/p&gt;
+\[ \boxed{\text{整个输入分布上的平均关键方向}.} \]&lt;p&gt;两者都在研究：&lt;/p&gt;
+\[ \boxed{\text{direction，而不仅是 variable}.} \]&lt;p&gt;但尺度完全不同。&lt;/p&gt;
+&lt;p&gt;这也意味着 Active Subspaces &lt;strong&gt;不能直接替代 FORM&lt;/strong&gt;：一个在全局平均意义上“不活跃”的方向，仍可能在极小概率失效尾部变得极其重要。&lt;/p&gt;
+&lt;p&gt;这是可靠性应用里必须警惕的问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;26-一个自然改进改变平均梯度的权重&#34;&gt;26. 一个自然改进：改变“平均梯度”的权重
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;标准：&lt;/p&gt;
+\[ C= \int \nabla g(x)\nabla g(x)^T \rho(x)\,dx. \]&lt;p&gt;如果真正关心：&lt;/p&gt;
+\[ g(x)\approx0, \]&lt;p&gt;可以考虑任务导向权重：&lt;/p&gt;
+\[ \boxed{ C_w= \int w(g(x)) \nabla g(x)\nabla g(x)^T \rho(x)\,dx, } \]&lt;p&gt;其中：&lt;/p&gt;
+\[ w(g) \]&lt;p&gt;在：&lt;/p&gt;
+\[ g\approx0 \]&lt;p&gt;附近更大。&lt;/p&gt;
+&lt;p&gt;例如概念上：&lt;/p&gt;
+\[ w(g)= \exp\left( -\frac{g^2}{2\tau^2} \right). \]&lt;p&gt;这样得到的方向就更接近：&lt;/p&gt;
+\[ \boxed{\text{failure-boundary active directions}.} \]&lt;p&gt;这不是说该公式就是标准可靠性算法，而是展示一个重要研究思路：&lt;/p&gt;
+\[ \boxed{\text{降维目标也必须与最终任务对齐。}} \]&lt;p&gt;如果任务是：&lt;/p&gt;
+\[ P_f, \]&lt;p&gt;那么“平均解释 \(f\) 的变化”未必是最好的降维准则。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;27-实际上怎样估计-active-subspace&#34;&gt;27. 实际上怎样估计 Active Subspace？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;真实：&lt;/p&gt;
+\[ C= \mathbb E[ \nabla f\nabla f^T ] \]&lt;p&gt;通常不知道。&lt;/p&gt;
+&lt;p&gt;采样：&lt;/p&gt;
+\[ x^{(1)},\ldots,x^{(N)} \sim\rho. \]&lt;p&gt;计算梯度：&lt;/p&gt;
+\[ g_i=\nabla f(x^{(i)}). \]&lt;p&gt;Monte Carlo 估计：&lt;/p&gt;
+\[ \boxed{ \hat C = \frac1N \sum_{i=1}^N g_ig_i^T. } \]&lt;p&gt;然后：&lt;/p&gt;
+\[ \hat C = W\Lambda W^T. \]&lt;p&gt;实际代码甚至可以避免显式形成 \(C\)。&lt;/p&gt;
+&lt;p&gt;构造梯度矩阵：&lt;/p&gt;
+\[ G= \frac1{\sqrt N} [ g_1,g_2,\ldots,g_N ]. \]&lt;p&gt;因为：&lt;/p&gt;
+\[ GG^T=\hat C. \]&lt;p&gt;直接 SVD：&lt;/p&gt;
+\[ G=U\Sigma V^T. \]&lt;p&gt;则：&lt;/p&gt;
+\[ \boxed{ W=U,\qquad \lambda_i=\sigma_i^2. } \]&lt;p&gt;这和前一张 Randomized SVD 卡片也自然连接起来：当输入参数很多时，梯度矩阵本身也可以用 randomized/sketched linear algebra 处理。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;28-真正的瓶颈其实是梯度&#34;&gt;28. 真正的瓶颈其实是梯度
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果输入维度：&lt;/p&gt;
+\[ m=100, \]&lt;p&gt;用有限差分计算一次：&lt;/p&gt;
+\[ \nabla f \]&lt;p&gt;大约需要：&lt;/p&gt;
+\[ 101 \]&lt;p&gt;次仿真。&lt;/p&gt;
+&lt;p&gt;如果一个 FEM：&lt;/p&gt;
+\[ 30\text{ min}, \]&lt;p&gt;显然无法接受。&lt;/p&gt;
+&lt;p&gt;因此 Active Subspaces 是否实用，很大程度取决于有没有：&lt;/p&gt;
+\[ \boxed{\text{cheap gradients}.} \]&lt;p&gt;典型来源：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;automatic differentiation；&lt;/li&gt;
+&lt;li&gt;adjoint method；&lt;/li&gt;
+&lt;li&gt;analytic sensitivity；&lt;/li&gt;
+&lt;li&gt;surrogate gradients。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;对于 scalar QoI：&lt;/p&gt;
+\[ f(x)\in\mathbb R \]&lt;p&gt;且参数很多时，adjoint 尤其重要：&lt;/p&gt;
+\[ \boxed{\text{一次 adjoint solve 可以同时得到大量参数方向的梯度信息。}} \]&lt;p&gt;这也是为什么 Active Subspaces 与 PDE-constrained optimization、adjoint FEM 很自然地结合。现代 derivative-based global sensitivity 工作也明确使用 adjoint gradients 来处理高维 PDE 参数。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;29-谱隙比前两个特征值最大更重要&#34;&gt;29. 谱隙比“前两个特征值最大”更重要
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[ \lambda= [10,\;8,\;7,\;6,\;5,\ldots]. \]&lt;p&gt;虽然：&lt;/p&gt;
+\[ \lambda_1,\lambda_2 \]&lt;p&gt;最大，但没有明显：&lt;/p&gt;
+\[ \boxed{\text{spectral gap}.} \]&lt;p&gt;此时硬选：&lt;/p&gt;
+\[ r=2 \]&lt;p&gt;没有很强依据。&lt;/p&gt;
+&lt;p&gt;反之：&lt;/p&gt;
+\[ \lambda= [10,\;8,\;0.1,\;0.03,\ldots] \]&lt;p&gt;在：&lt;/p&gt;
+\[ \lambda_2 \]&lt;p&gt;和：&lt;/p&gt;
+\[ \lambda_3 \]&lt;p&gt;之间存在巨大谱隙。&lt;/p&gt;
+&lt;p&gt;这才意味着：&lt;/p&gt;
+\[ \boxed{\text{二维 active subspace 具有稳定结构。}} \]&lt;p&gt;所以 Active Subspaces 不是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;算出特征向量，然后永远取前两个。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;真正要诊断的是：&lt;/p&gt;
+\[ \boxed{\text{这个函数到底有没有低维 ridge structure？}} \]&lt;p&gt;Constantine 的专著明确把随机梯度采样视为&lt;strong&gt;测试函数是否存在 active subspace&lt;/strong&gt;的方法，而不是预设低维结构一定存在。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;30-还有一个容易忽略的问题特征向量本身可能不稳定&#34;&gt;30. 还有一个容易忽略的问题：特征向量本身可能不稳定
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果：&lt;/p&gt;
+\[ \lambda_1\approx\lambda_2, \]&lt;p&gt;那么：&lt;/p&gt;
+\[ w_1,\;w_2 \]&lt;p&gt;可能因为一点采样误差就大幅旋转。&lt;/p&gt;
+&lt;p&gt;但：&lt;/p&gt;
+\[ \boxed{\operatorname{span}(w_1,w_2)} \]&lt;p&gt;仍可能非常稳定。&lt;/p&gt;
+&lt;p&gt;所以实际分析时更应该关心：&lt;/p&gt;
+\[ \boxed{\text{subspace error}} \]&lt;p&gt;而不只是：&lt;/p&gt;
+\[ \boxed{\text{单个 eigenvector 的系数。}} \]&lt;p&gt;这也是为什么 bootstrap 很常用：&lt;/p&gt;
+&lt;p&gt;反复重采样梯度样本，&lt;/p&gt;
+\[ \hat C^{(b)} \]&lt;p&gt;重新计算：&lt;/p&gt;
+\[ W_1^{(b)}, \]&lt;p&gt;再观察子空间夹角：&lt;/p&gt;
+\[ \|\, W_1W_1^T - W_1^{(b)}W_1^{(b)T} \,\|. \]&lt;p&gt;如果变化巨大：&lt;/p&gt;
+\[ \boxed{\text{你可能还没有足够证据声称存在这个 active subspace。}} \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;31-active-subspaces-和-sobol-灵敏度不是竞争关系&#34;&gt;31. Active Subspaces 和 Sobol 灵敏度不是竞争关系
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Sobol 指标问：&lt;/p&gt;
+\[ \boxed{\text{各个变量贡献了多少输出方差？}} \]&lt;p&gt;Active Subspaces 问：&lt;/p&gt;
+\[ \boxed{\text{哪些线性组合方向使函数变化最大？}} \]&lt;p&gt;因此如果：&lt;/p&gt;
+\[ f(x)=g(x_1+x_2), \]&lt;p&gt;Sobol 可能告诉你：&lt;/p&gt;
+\[ x_1,x_2 \]&lt;p&gt;都重要。&lt;/p&gt;
+&lt;p&gt;这完全正确。&lt;/p&gt;
+&lt;p&gt;Active Subspace 则进一步告诉你：&lt;/p&gt;
+\[ \boxed{\text{它们主要通过 }x_1+x_2\text{ 这一组合起作用。}} \]&lt;p&gt;所以：&lt;/p&gt;
+\[ \boxed{\text{Sobol 更适合变量归因；Active Subspaces 更适合方向降维。}} \]&lt;p&gt;如果工程任务是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;哪个制造参数应该控制得更严格？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Sobol 很自然。&lt;/p&gt;
+&lt;p&gt;如果任务是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;能不能把 20 维 Kriging 降到 3 维？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Active Subspaces 更直接。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;32-一个很值得做的小实验&#34;&gt;32. 一个很值得做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;定义：&lt;/p&gt;
+\[ f(x) = \sin(a^Tx)+0.05(b^Tx)^2, \]&lt;p&gt;其中：&lt;/p&gt;
+\[ x\in[-1,1]^{10}, \]&lt;p&gt;随机生成两个正交单位向量：&lt;/p&gt;
+\[ a,b. \]&lt;p&gt;那么真实响应虽然有：&lt;/p&gt;
+\[ 10 \]&lt;p&gt;个输入变量，却只依赖：&lt;/p&gt;
+\[ a^Tx,\qquad b^Tx. \]&lt;p&gt;采：&lt;/p&gt;
+\[ N=200 \]&lt;p&gt;个点。&lt;/p&gt;
+&lt;p&gt;计算：&lt;/p&gt;
+\[ \nabla f(x) = \cos(a^Tx)a + 0.1(b^Tx)b\,b. \]&lt;p&gt;构造：&lt;/p&gt;
+\[ \hat C. \]&lt;p&gt;然后看其 eigenvalues。&lt;/p&gt;
+&lt;p&gt;理论上会出现：&lt;/p&gt;
+\[ \lambda_1,\lambda_2&gt;0, \]&lt;p&gt;其余：&lt;/p&gt;
+\[ \lambda_3,\ldots,\lambda_{10}\approx0. \]&lt;p&gt;然后分别训练：&lt;/p&gt;
+\[ \text{10D Kriging: }\hat f(x) \]&lt;p&gt;和：&lt;/p&gt;
+\[ \text{2D Kriging: } \hat g(w_1^Tx,w_2^Tx). \]&lt;p&gt;比较：&lt;/p&gt;
+\[ R^2,\quad RMSE,\quad \text{training time}. \]&lt;p&gt;最后把第二项改成：&lt;/p&gt;
+\[ 0.0001(b^Tx)^2. \]&lt;p&gt;你会看到模型从：&lt;/p&gt;
+\[ \boxed{\text{二维 active structure}} \]&lt;p&gt;逐渐退化成：&lt;/p&gt;
+\[ \boxed{\text{近似一维 ridge function}.} \]&lt;p&gt;这个实验能非常直观地建立“effective input dimension”的感觉。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;33-它在整个知识体系中卡在哪里&#34;&gt;33. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;p&gt;把几种常见降维方法放在一起：&lt;/p&gt;
+\[ \text{PCA} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{输入数据变化最大的方向}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{Sobol / DGSM} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{重要变量}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \boxed{\text{Active Subspaces}} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{响应最敏感的输入方向}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{ridge approximation} \]&lt;p&gt;构造：&lt;/p&gt;
+\[ \boxed{f(x)\approx g(W^Tx)} \]&lt;p&gt;而另一条独立轴是：&lt;/p&gt;
+\[ \text{POD / Reduced Basis} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{高维输出状态的低维空间}.} \]&lt;p&gt;因此参数化物理仿真里一个很完整的结构其实是：&lt;/p&gt;
+\[ \boxed{ x \overset{\text{input reduction}}{\longrightarrow} W^Tx \overset{\text{physics}}{\longrightarrow} u \overset{\text{state reduction}}{\longrightarrow} a. } \]&lt;p&gt;这正好把你最近接触的 Kriging、ROM、POD 和高维可靠性连接起来。&lt;/p&gt;
+&lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Active Subspace 最值得记住的并不是：&lt;/p&gt;
 \[C=\mathbb E[\nabla f\nabla f^T].\]&lt;p&gt;而是一个关于高维问题非常重要的认识：&lt;/p&gt;
@@ -2836,7 +3038,7 @@
 &lt;p&gt;&lt;strong&gt;Constantine, Dow &amp;amp; Wang, &lt;em&gt;Active Subspace Methods in Theory and Practice: Applications to Kriging Surfaces&lt;/em&gt;, SIAM JSC, 2014&lt;/strong&gt;。非常适合继续理解 Active Subspace 为什么能直接服务 Kriging，尤其是“重要方向不与坐标轴对齐”这一点。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;&lt;strong&gt;Lam, Zahm, Marzouk &amp;amp; Willcox, &lt;em&gt;Multifidelity Dimension Reduction via Active Subspaces&lt;/em&gt;, SIAM JSC, 2020&lt;/strong&gt;。把前面 MFMC 中的多保真思想迁移到了“低维结构识别”，适合看低保真模型如何帮助估计高保真 active subspace。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Lam, Zahm, Marzouk &amp;amp; Willcox, &lt;em&gt;Multifidelity Dimension Reduction via Active Subspaces&lt;/em&gt;, SIAM JSC, 2020&lt;/strong&gt;。把前面 &lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt; 中的多保真思想迁移到了“低维结构识别”，适合看低保真模型如何帮助估计高保真 active subspace。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Kim, Wang &amp;amp; Song, &lt;em&gt;Adaptive active subspace-based metamodeling for high-dimensional reliability analysis&lt;/em&gt;, Structural Safety, 2023&lt;/strong&gt;。这是可靠性方向尤其值得看的工作：Active Subspace、异方差 GP 与 active learning 不再简单串联，而是共同适应关键失效区域。&lt;/p&gt;
@@ -4609,7 +4811,7 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
         <pubDate>Mon, 07 Sep 2026 00:00:00 +0000</pubDate>
         
         <guid>https://assranai.github.io/cards/24-hyper-reduction/</guid>
-        <description>&lt;p&gt;&lt;strong&gt;主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW&lt;/strong&gt;&lt;br&gt;
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;hyper-reduction&#34; tabindex=&#34;0&#34;&gt;Hyper-reduction&lt;/span&gt;（超降阶），重点理解 DEIM 与 ECSW&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：有限元 × 数值方法 × 代理模型 × 软体动力学&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：&lt;/p&gt;
@@ -4814,7 +5016,10 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 
 &lt;hr&gt;
 &lt;h1 id=&#34;10-ecsw与其重构整条-nonlinear-force不如直接挑少数代表单元&#34;&gt;10. ECSW：与其重构整条 nonlinear force，不如直接挑少数“代表单元”
-&lt;/h1&gt;&lt;p&gt;有限元内力天然可以写成单元求和：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;有限元内力天然可以写成单元求和：&lt;/p&gt;
 \[f_{\rm int}(u) = \sum_{e=1}^{N_e} L_e^T f_e(u_e).\]&lt;p&gt;Galerkin 投影：&lt;/p&gt;
 \[V^Tf_{\rm int}(Vq) = \sum_{e=1}^{N_e} V_e^T f_e(V_eq).\]&lt;p&gt;这提供了一个非常自然的机会：&lt;/p&gt;
 &lt;blockquote&gt;
@@ -4846,9 +5051,16 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/div&gt;&lt;p&gt;在线阶段只有这：&lt;/p&gt;
 \[500\]&lt;p&gt;个单元真正调用 constitutive model。&lt;/p&gt;
 &lt;p&gt;Farhat 等最初正是基于 mesh sampling、virtual work 和 energy structure 构造这一方法，并在 nonlinear finite-element structural dynamics 上获得最高约四个数量级的 CPU 加速案例。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;11-为什么-ecsw-的权重必须认真学&#34;&gt;11. 为什么 ECSW 的权重必须认真学？
-&lt;/h1&gt;&lt;p&gt;如果只是随机取：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果只是随机取：&lt;/p&gt;
 \[1\%\]&lt;p&gt;单元：&lt;/p&gt;
 \[\sum_{e\in S}V_e^Tf_e\]&lt;p&gt;通常会严重低估整个结构的内力。&lt;/p&gt;
 &lt;p&gt;ECSW 使用：&lt;/p&gt;
@@ -4874,9 +5086,16 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[\boxed{ \text{寻找少数代表单元 + 合适 quadrature weights} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;从这个角度看，ECSW 很像一种：&lt;/p&gt;
 \[\boxed{\text{data-driven reduced quadrature}}\]&lt;p&gt;。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;12-为什么-ecsw-会比直接重构-nonlinear-vector更适合结构力学&#34;&gt;12. 为什么 ECSW 会比“直接重构 nonlinear vector”更适合结构力学？
-&lt;/h1&gt;&lt;p&gt;因为有限元本身就是按单元积分/装配建立的。&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;因为有限元本身就是按单元积分/装配建立的。&lt;/p&gt;
 &lt;p&gt;ECSW 不打破：&lt;/p&gt;
 \[\text{element contribution}\]&lt;p&gt;这个基本结构。&lt;/p&gt;
 &lt;p&gt;如果原始 reduced internal force 是：&lt;/p&gt;
@@ -4888,9 +5107,16 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;这就是所谓：&lt;/p&gt;
 \[\boxed{\text{structure preserving}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;2015 年 ECSW 理论工作证明了其对 Lagrangian structure 和相应数值稳定性质的保持，并报告在完整汽车发动机 nonlinear transient structural simulation 中获得超过四个数量级的 CPU 加速，同时维持较好准确度。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;13-deim-与-ecsw-最值得记住的区别&#34;&gt;13. DEIM 与 ECSW 最值得记住的区别
-&lt;/h1&gt;&lt;p&gt;可以这样理解：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可以这样理解：&lt;/p&gt;
 &lt;table&gt;
 	&lt;thead&gt;
 			&lt;tr&gt;
@@ -4935,9 +5161,16 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;所以对一般 nonlinear PDE：&lt;/p&gt;
 \[\boxed{\text{DEIM 是非常自然的入口}}\]&lt;p&gt;而对 nonlinear FEM / structural dynamics：&lt;/p&gt;
 \[\boxed{\text{ECSW 往往具有更强的物理结构优势}}\]&lt;p&gt;。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;14-hyper-reduction-和普通网格粗化不是一回事&#34;&gt;14. Hyper-reduction 和普通“网格粗化”不是一回事
-&lt;/h1&gt;&lt;p&gt;假设原模型：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设原模型：&lt;/p&gt;
 \[100000\]&lt;p&gt;个单元。&lt;/p&gt;
 &lt;p&gt;直接做 coarse mesh：&lt;/p&gt;
 \[1000\]&lt;p&gt;个单元。&lt;/p&gt;
@@ -4954,9 +5187,16 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[\boxed{ \text{coarsening：改变离散模型} }\]&lt;p&gt;而：&lt;/p&gt;
 \[\boxed{ \text{hyper-reduction：稀疏评估原模型的投影贡献} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这是很重要的区别。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;15-为什么它与代理模型有本质区别&#34;&gt;15. 为什么它与代理模型有本质区别？
-&lt;/h1&gt;&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; / &lt;span class=&#34;term-anchor&#34; data-term=&#34;neural-operator&#34; tabindex=&#34;0&#34;&gt;Neural Operator&lt;/span&gt; 通常直接学习：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; / &lt;span class=&#34;term-anchor&#34; data-term=&#34;neural-operator&#34; tabindex=&#34;0&#34;&gt;Neural Operator&lt;/span&gt; 通常直接学习：&lt;/p&gt;
 \[\mu \rightarrow y\]&lt;p&gt;或者：&lt;/p&gt;
 \[\mu \rightarrow u.\]&lt;p&gt;Hyper-reduced ROM 仍然显式保留：&lt;/p&gt;
 \[\boxed{ \text{reduced equations of motion} }\]&lt;p&gt;例如：&lt;/p&gt;
@@ -4970,9 +5210,16 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;p&gt;因此它属于：&lt;/p&gt;
 \[\boxed{\text{physics-based surrogate}}\]&lt;p&gt;，而不是纯粹 response fitting。&lt;/p&gt;
 &lt;p&gt;这使它在动力学、控制和反问题中非常有价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;16-但-hyper-reduction-仍然有一个非常明显的训练域问题&#34;&gt;16. 但 Hyper-reduction 仍然有一个非常明显的“训练域”问题
-&lt;/h1&gt;&lt;p&gt;假设 ECSW 只在：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设 ECSW 只在：&lt;/p&gt;
 \[\text{small deformation}\]&lt;p&gt;数据上训练。&lt;/p&gt;
 &lt;p&gt;然后在线进入：&lt;/p&gt;
 \[\text{large bending + contact}.\]&lt;p&gt;原来选择的：&lt;/p&gt;
@@ -4985,6 +5232,10 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 \[\boxed{ \text{Hyper-reduction 并没有消灭 extrapolation problem。} }\]&lt;p&gt;它只是把问题从：&lt;/p&gt;
 \[\text{response surrogate}\]&lt;p&gt;转移到了：&lt;/p&gt;
 \[\text{operator surrogate}.\]&lt;p&gt;Localized DEIM 之所以出现，就是因为一个 global nonlinear subspace 可能无法覆盖具有多个不同局部行为区域的系统，因此改用多个 local subspaces。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
 &lt;hr&gt;
 &lt;h1 id=&#34;17-这和你的软体动力学尤其有一个值得注意的冲突接触高度局部且会移动&#34;&gt;17. 这和你的软体动力学尤其有一个值得注意的冲突：接触高度局部且会移动
 &lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
@@ -5018,7 +5269,10 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 
 &lt;hr&gt;
 &lt;h1 id=&#34;18-一个特别值得迁移到物理引擎的思想不要降整个系统降最贵的算子调用次数&#34;&gt;18. 一个特别值得迁移到物理引擎的思想：不要降整个系统，降“最贵的算子调用次数”
-&lt;/h1&gt;&lt;p&gt;Hyper-reduction 给物理引擎开发最大的启发，甚至不一定要真正做 ROM。&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Hyper-reduction 给物理引擎开发最大的启发，甚至不一定要真正做 ROM。&lt;/p&gt;
 &lt;p&gt;假设一个 solver 每帧最贵的是：&lt;/p&gt;
 \[\boxed{\text{100 万个 tet constitutive evaluations}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;传统优化会问：&lt;/p&gt;
@@ -5045,15 +5299,26 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;li&gt;sparse collision detection；&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;属于同一种更高级的工程思想：&lt;/p&gt;
-\[\boxed{ \text{最便宜的一次计算，是根本没有执行的那次计算。} }\]&lt;hr&gt;
+\[\boxed{ \text{最便宜的一次计算，是根本没有执行的那次计算。} }\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
 &lt;h1 id=&#34;19-它对代理模型还有一个很强的启发可以代理算子不一定代理最终输出&#34;&gt;19. 它对代理模型还有一个很强的启发：可以代理“算子”，不一定代理最终输出
-&lt;/h1&gt;&lt;p&gt;通常代理模型研究：&lt;/p&gt;
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;通常代理模型研究：&lt;/p&gt;
 \[x\rightarrow y.\]&lt;p&gt;但 DEIM 实际做的是：&lt;/p&gt;
 \[\boxed{ \text{学习 nonlinear operator }f(u)\text{ 的低维表示} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;ECSW 更进一步：&lt;/p&gt;
 \[\boxed{ \text{学习哪些局部 operator contributions 值得计算} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;所以代理建模其实可以分成三层：&lt;/p&gt;
-\[\text{output surrogate}\]\[y\approx\hat y(x)\]&lt;hr&gt;
+\[\text{output surrogate}\]\[y\approx\hat y(x)\]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
 \[\text{state surrogate}\]\[u\approx Vq\]&lt;hr&gt;
 \[\boxed{\text{operator surrogate}}\]\[F(u)\approx\tilde F(u).\]&lt;p&gt;第三层通常保留最多物理结构。&lt;/p&gt;
 &lt;p&gt;这对未来做：&lt;/p&gt;
@@ -5094,6 +5359,96 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/details&gt;
 
 &lt;hr&gt;
+&lt;h1 id=&#34;21-deim不要计算完整非线性场只看几个最有信息量的位置&#34;&gt;21. DEIM：不要计算完整非线性场，只看几个“最有信息量”的位置
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设 nonlinear-force snapshots 可以低秩表示：&lt;/p&gt;
+\[ f_{\rm int}(u)\approx Uc, \qquad U\in\mathbb R^{N\times m}, \quad m\ll N. \]&lt;p&gt;如果仍然计算完整 \(f_{\rm int}\) 来求 \(c\)，当然没有意义。&lt;/p&gt;
+&lt;p&gt;DEIM 于是选择 \(m\) 个特殊自由度，用选择矩阵 \(P\) 只观察：&lt;/p&gt;
+\[ P^Tf_{\rm int}(u). \]&lt;p&gt;要求插值：&lt;/p&gt;
+\[ P^TUc=P^Tf_{\rm int}(u), \]&lt;p&gt;于是&lt;/p&gt;
+\[ c=(P^TU)^{-1}P^Tf_{\rm int}(u), \]&lt;p&gt;得到&lt;/p&gt;
+\[ \boxed{ f_{\rm int}(u) \approx U(P^TU)^{-1}P^Tf_{\rm int}(u) }. \]&lt;p&gt;真正关键的是右边只需要计算：&lt;/p&gt;
+\[ \boxed{m\text{ 个被选位置的非线性响应}} \]&lt;p&gt;而不是全部 \(N\) 个。&lt;/p&gt;
+&lt;p&gt;因此 reduced nonlinear force：&lt;/p&gt;
+\[ V^Tf_{\rm int}(Va) \approx \underbrace{V^TU(P^TU)^{-1}}_{\text{offline 预计算}} P^Tf_{\rm int}(Va). \]&lt;p&gt;如果 \(m=50\)，在线阶段的主要非线性计算就可能从百万量级降到几十量级。DEIM 的误差则同时受到非线性快照被截断的程度以及插值选择条件数影响；后续 POD-DEIM 分析给出了相应的状态空间误差界。&lt;/p&gt;
+&lt;p&gt;直观上，它做的事情类似：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;我已经知道这种非线性场大致只能呈现几十种模式，那么无需观察整张场；挑几十个有代表性的“传感器”，就足以重建它。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;22-ecsw对非线性-fem更自然的是只计算少量单元&#34;&gt;22. ECSW：对非线性 FEM，更自然的是“只计算少量单元”
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;结构 FEM 还有一种更物理的思路。&lt;/p&gt;
+&lt;p&gt;内部力本来就是单元贡献之和：&lt;/p&gt;
+\[ f_{\rm int}(u) = \sum_{e=1}^{n_e}f_e(u). \]&lt;p&gt;所以&lt;/p&gt;
+\[ V^Tf_{\rm int}(Va) = \sum_{e=1}^{n_e} V^Tf_e(Va). \]&lt;p&gt;ECSW 不重建整个 \(f_{\rm int}\)，而是寻找一个很小的单元子集：&lt;/p&gt;
+\[ \mathcal E_s\subset\{1,\ldots,n_e\} \]&lt;p&gt;以及正权重 \(\xi_e\)，使&lt;/p&gt;
+\[ \boxed{ V^Tf_{\rm int}(Va) \approx \sum_{e\in\mathcal E_s} \xi_eV^Tf_e(Va) }. \]&lt;p&gt;例如原模型有：&lt;/p&gt;
+\[ 500\,000\text{ 个 tetrahedra}, \]&lt;p&gt;训练后可能在线只计算几千个代表单元。&lt;/p&gt;
+&lt;p&gt;这就形成一个 &lt;strong&gt;reduced mesh&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;ECSW 特别值得结构动力学研究者注意，因为它并非单纯追求稀疏采样。Farhat、Chapman 与 Avery 的分析表明，对于非线性有限元动力系统，ECSW 可以保持与 Hamilton 原理相关的 Lagrangian 结构，并继承相应的数值稳定性性质；论文中的完整汽车发动机非线性瞬态算例报告了超过四个数量级的 CPU 时间缩减，同时保持良好精度。&lt;/p&gt;
+&lt;p&gt;因此 DEIM 与 ECSW 的区别可以抓成一句话：&lt;/p&gt;
+\[ \boxed{ \text{DEIM 采样“场的坐标”，ECSW 采样“物理单元的贡献”。} } \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;23-为什么这件事对软体动力学尤其重要&#34;&gt;23. 为什么这件事对软体动力学尤其重要？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设未来对四面体 Neo-Hookean 求解器做 POD：&lt;/p&gt;
+\[ x\approx \bar x+Vq. \]&lt;p&gt;即使 \(q\) 只有 30 维，每步如果仍需对全部 tetrahedra 计算&lt;/p&gt;
+\[ F_e,\quad J_e,\quad P_e,\quad f_e, \]&lt;p&gt;那么真正昂贵的 constitutive evaluation 根本没有消失。&lt;/p&gt;
+&lt;p&gt;Hyper-reduction 的目标就是：&lt;/p&gt;
+\[ \boxed{ 10^6\text{ DOF} \rightarrow 30\text{ reduced coordinates} } \]&lt;p&gt;同时再做到&lt;/p&gt;
+\[ \boxed{ 10^5\text{ constitutive evaluations} \rightarrow 10^2\sim10^3\text{ sampled evaluations}. } \]&lt;p&gt;这也是为什么上一张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;Projective Dynamics&lt;/span&gt; 卡片中提到的 &lt;strong&gt;Hyper-Reduced PD&lt;/strong&gt; 很重要：仅降低 global state dimension 还不够，local projection 的数量同样必须减少。&lt;/p&gt;
+&lt;p&gt;这里还揭示了一个更一般的工程原则：&lt;/p&gt;
+\[ \boxed{\text{降维 ≠ 降计算量。}} \]&lt;p&gt;判断一个 ROM 是否真正在线加速，应检查它的 online complexity 中是否还残留：&lt;/p&gt;
+\[ N,\qquad n_e,\qquad n_{\rm quad}. \]&lt;p&gt;如果存在，往往说明 ROM 尚未真正摆脱 FOM。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;24-但-hyper-reduction-会制造一种新的危险破坏物理结构&#34;&gt;24. 但 Hyper-reduction 会制造一种新的危险：破坏物理结构
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;普通 DEIM 的目标主要是：&lt;/p&gt;
+\[ \text{把非线性场重建得准}. \]&lt;p&gt;但一个近似力场即使点值误差很小，也可能不再来自某个势能：&lt;/p&gt;
+\[ f(q)\neq\nabla_q E(q). \]&lt;p&gt;对于 Hamiltonian 系统，这意味着可能破坏：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;能量结构；&lt;/li&gt;
+&lt;li&gt;守恒量；&lt;/li&gt;
+&lt;li&gt;长时间稳定性。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这也是 ECSW 在结构动力学中的特殊价值：它直接近似投影后的单元虚功，并通过正权重采样保持重要的变分结构。2015 年的系统比较中，ECSW 保持了稳定性，而所测试的 DEIM 类方案在部分非线性动力学问题上出现数值不稳定。&lt;/p&gt;
+&lt;p&gt;而这一问题今天仍在发展。2023 年的 gradient-preserving DEIM 工作专门针对 Hamiltonian systems 和 gradient flows，原因正是传统 hyper-reduction 虽然高效，却可能破坏原系统的梯度结构。&lt;/p&gt;
+&lt;p&gt;因此 Hyper-reduction 的成熟问题已经从：&lt;/p&gt;
+\[ \boxed{\text{“怎样少算几个点？”}} \]&lt;p&gt;推进到了：&lt;/p&gt;
+\[ \boxed{\text{“怎样少算，同时不破坏原 PDE/动力系统的结构？”}} \]&lt;p&gt;这正是它与 structure-preserving ROM 汇合的位置。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;25-它在知识体系中卡在哪里&#34;&gt;25. 它在知识体系中卡在哪里？
+&lt;/h1&gt;&lt;p&gt;可以把非线性 ROM 的完整链条记成：&lt;/p&gt;
+\[ \text{FOM} \]\[ \downarrow \]\[ \boxed{\text{POD / Reduced Basis}} \]&lt;p&gt;解决：&lt;strong&gt;状态太大&lt;/strong&gt;&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{DEIM / ECSW / GNAT}} \]&lt;p&gt;解决：&lt;strong&gt;非线性算子仍然太贵&lt;/strong&gt;&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{Structure-preserving hyper-reduction}} \]&lt;p&gt;解决：&lt;strong&gt;加速以后物理结构是否还在&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;其中 GNAT 又走了一条略不同的路线：它采用 residual-minimizing Petrov–Galerkin ROM，再通过 gappy POD 和 sample mesh 对残差/Jacobian 进行 hyper-reduction。其大型 CFD 案例包含超过 1700 万自由度，并报告了超过两个数量级的计算资源缩减且与高维结果差异低于 1%。&lt;/p&gt;
+&lt;p&gt;所以今天最值得留下的一句话是：&lt;/p&gt;
+\[ \boxed{ \text{POD 告诉你系统只需要几十个状态变量描述； Hyper-reduction 才让计算机真的只做与这几十维相称的工作。} } \]&lt;p&gt;这一步是很多“论文里的 ROM”能否真正变成&lt;strong&gt;在线实时模型、优化内循环模型或数字孪生模型&lt;/strong&gt;的分水岭。&lt;/p&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Hyper-reduction 最重要的公式并不是：&lt;/p&gt;
 \[f \approx U(P^TU)^{-1}P^Tf.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;
@@ -7109,6 +7464,163 @@ SIAM 论文页&lt;/p&gt;
 &lt;li&gt;
 &lt;p&gt;Azzimonti, Ginsbourger, Chevalier, Bect &amp;amp; Richet, &lt;strong&gt;Adaptive Design of Experiments for Conservative Estimation of Excursion Sets&lt;/strong&gt;, &lt;em&gt;Technometrics&lt;/em&gt; 63(1), 2021。值得看的重点是：当 false-safe 与 false-alarm 的工程代价不对称时，SUR 如何从“准确识别边界”进一步变成“保守地识别安全/危险域”。&lt;br&gt;
 Technometrics 论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Operator Inference：从轨迹数据反推出一个 ROM</title>
+        <link>https://assranai.github.io/cards/37-operator-inference/</link>
+        <pubDate>Sun, 04 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/37-operator-inference/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;operator-inference&#34; tabindex=&#34;0&#34;&gt;Operator Inference&lt;/span&gt;（OpInf，算子推断）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：降阶模型 × 数据驱动动力学 × Scientific ML&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;阅读时间：约 4–5 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;上一张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;hyper-reduction&#34; tabindex=&#34;0&#34;&gt;Hyper-reduction&lt;/span&gt; 仍默认你能够深入原始求解器：访问单元、残差、Jacobian，再对它们做降阶。但工程中经常只有一个商业软件或遗留代码：&lt;/p&gt;
+\[ (\mu,u_0)\longrightarrow \{u(t_1),u(t_2),\ldots,u(t_N)\}, \]&lt;p&gt;你能得到仿真轨迹，却拿不到内部离散算子。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Operator Inference 要解决的正是这个缺口：保留 projection-based ROM 的数学结构，但通过数据直接识别低维算子。&lt;/strong&gt; 它最早由 Benjamin Peherstorfer 和 Karen Willcox 系统提出，用于这种“知道物理结构、拿不到内部算子”的 non-intrusive ROM。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-它与训练一个神经网络预测下一帧有根本区别&#34;&gt;1. 它与“训练一个神经网络预测下一帧”有根本区别
+&lt;/h2&gt;&lt;p&gt;考虑高维动力系统&lt;/p&gt;
+\[ \dot x=Ax+H(x\otimes x)+Bu, \qquad x\in\mathbb R^N. \]&lt;p&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt; 给出&lt;/p&gt;
+\[ x\approx Vq,\qquad q\in\mathbb R^r. \]&lt;p&gt;如果拥有原始算子，可以直接 Galerkin 投影：&lt;/p&gt;
+\[ \dot q = \underbrace{V^TAV}_{\hat A}q + \underbrace{V^TH(V\otimes V)}_{\hat H} (q\otimes q) + \underbrace{V^TB}_{\hat B}u. \]&lt;p&gt;问题在于商业软件通常不会给你 \(A,H\)。&lt;/p&gt;
+&lt;p&gt;OpInf 换了一个问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;既然我知道降阶方程&lt;strong&gt;应该长成什么样&lt;/strong&gt;，为什么不直接从轨迹拟合 \(\hat A,\hat H,\hat B\)？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;从高保真轨迹得到&lt;/p&gt;
+\[ q_k=V^Tx_k,\qquad \dot q_k\approx V^T\dot x_k, \]&lt;p&gt;然后求&lt;/p&gt;
+\[ \boxed{ \min_{\hat A,\hat H,\hat B} \sum_k \left\| \dot q_k- \hat A q_k- \hat H(q_k\otimes q_k)- \hat B u_k \right\|^2. } \]&lt;p&gt;于是一个高维 PDE/FEM 系统的动力学识别，最终变成一个&lt;strong&gt;低维线性最小二乘问题&lt;/strong&gt;。这正是经典 OpInf 的核心。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;2-最关键的思想学方程而不是学轨迹&#34;&gt;2. 最关键的思想：学“方程”，而不是学“轨迹”
+&lt;/h2&gt;&lt;p&gt;假设训练数据覆盖&lt;/p&gt;
+\[ 0&lt;t&lt;10. \]&lt;p&gt;纯 trajectory fitting 很容易学成：&lt;/p&gt;
+\[ q_{k+1}=F_\theta(q_k), \]&lt;p&gt;本质上是在逼近时间推进映射。&lt;/p&gt;
+&lt;p&gt;OpInf 学到的却是：&lt;/p&gt;
+\[ \boxed{ \dot q=\hat A q+\hat H(q\otimes q)+\hat B u. } \]&lt;p&gt;因此它显式保留：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;状态；&lt;/li&gt;
+&lt;li&gt;动力学算子；&lt;/li&gt;
+&lt;li&gt;外部输入；&lt;/li&gt;
+&lt;li&gt;连续时间结构。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;随后仍然可以使用 RK、BDF 等普通积分器求解它。&lt;/p&gt;
+&lt;p&gt;所以它位于一个很有意思的位置：&lt;/p&gt;
+\[ \text{Galerkin ROM} \longleftrightarrow \boxed{\text{Operator Inference}} \longleftrightarrow \text{black-box machine learning}. \]&lt;p&gt;它比 intrusive ROM 少要求求解器内部信息，又比完全黑箱的网络多利用物理结构。这也是当前官方 &lt;code&gt;opinf&lt;/code&gt; 文档将其称为适合 &lt;strong&gt;glass-box systems&lt;/strong&gt; 的原因：知道 governing-equation structure，但不能直接查询内部离散算子。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;3-一个很实用的例子从-adamsfem-批量仿真构造动力学代理&#34;&gt;3. 一个很实用的例子：从 Adams/FEM 批量仿真构造动力学代理
+&lt;/h2&gt;&lt;p&gt;假设高保真软件输出机构状态：&lt;/p&gt;
+\[ x(t)= [ \theta_1,\ldots,\theta_m, \dot\theta_1,\ldots,\dot\theta_m, \text{flexible DOFs} ]^T. \]&lt;p&gt;先收集多组不同载荷、参数、初值下的轨迹：&lt;/p&gt;
+\[ X=[x_1,\ldots,x_K]. \]&lt;p&gt;POD：&lt;/p&gt;
+\[ X\approx VQ. \]&lt;p&gt;然后拟合：&lt;/p&gt;
+\[ \boxed{ \dot q = c+Aq+H(q\otimes q)+Bu. } \]&lt;p&gt;在线阶段就无需再次调用完整仿真器，而只积分几十维 ODE。&lt;/p&gt;
+&lt;p&gt;这与普通 &lt;span class=&#34;term-anchor&#34; data-term=&#34;kriging&#34; tabindex=&#34;0&#34;&gt;Kriging&lt;/span&gt; 有一个重要区别：&lt;/p&gt;
+\[ \text{Kriging:}\quad \mu\rightarrow y \]&lt;p&gt;通常学习输入到最终响应；&lt;/p&gt;
+&lt;p&gt;而&lt;/p&gt;
+\[ \text{OpInf:}\quad (q,u)\rightarrow\dot q \]&lt;p&gt;学习的是&lt;strong&gt;状态演化规律&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;因此当你需要：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;完整时间历程；&lt;/li&gt;
+&lt;li&gt;控制；&lt;/li&gt;
+&lt;li&gt;数字孪生；&lt;/li&gt;
+&lt;li&gt;参数扫描；&lt;/li&gt;
+&lt;li&gt;大量 Monte Carlo 动力学仿真；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;OpInf 往往比单纯做响应面更自然。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;4-为什么这比-dmd-更进一步&#34;&gt;4. 为什么这比 DMD 更进一步？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Dynamic Mode Decomposition 本质上主要寻找线性动力学：&lt;/p&gt;
+\[ \dot q=Aq \]&lt;p&gt;或离散形式&lt;/p&gt;
+\[ q_{k+1}=Kq_k. \]&lt;p&gt;而很多物理系统真正需要：&lt;/p&gt;
+\[ \dot q = Aq+ H(q\otimes q) + G(q^{\otimes3}) +\cdots. \]&lt;p&gt;OpInf 可以直接利用这种已知的 polynomial structure。&lt;/p&gt;
+&lt;p&gt;更有意思的是，如果原方程不是多项式，还可以先 &lt;strong&gt;lifting&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;例如某个非线性：&lt;/p&gt;
+\[ \dot x=f(x) \]&lt;p&gt;在原坐标下非常复杂，但引入辅助变量&lt;/p&gt;
+\[ z=\phi(x) \]&lt;p&gt;后可能变成 quadratic system：&lt;/p&gt;
+\[ \dot z=Az+H(z\otimes z). \]&lt;p&gt;&lt;strong&gt;Lift &amp;amp; Learn&lt;/strong&gt; 正是利用物理知识寻找这种 lifted representation，再用 OpInf 学习低维算子；在 FitzHugh–Nagumo 和可压缩 Euler 等案例中，它展示了这种方法对输入变化的泛化能力。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;5-它真正困难的地方不是最小二乘而是可辨识性&#34;&gt;5. 它真正困难的地方不是最小二乘，而是“可辨识性”
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;把所有未知算子拼起来，可以写成&lt;/p&gt;
+\[ D\,O\approx R. \]&lt;p&gt;如果训练轨迹太单一，例如永远只从同一个初值、同一种载荷运行，那么数据矩阵 \(D\) 可能严重病态：&lt;/p&gt;
+\[ \kappa(D)\gg1. \]&lt;p&gt;此时很多完全不同的 \(\hat A,\hat H\) 都能解释训练数据。&lt;/p&gt;
+&lt;p&gt;表现就是：&lt;/p&gt;
+\[ \boxed{\text{训练轨迹拟合极好，离开训练工况立即发散。}} \]&lt;p&gt;所以 OpInf 的核心工程问题其实变成了：&lt;/p&gt;
+\[ \boxed{\text{怎样设计足够“激励系统”的训练仿真？}} \]&lt;p&gt;这和系统辨识中的 persistent excitation 是同一个思想。&lt;/p&gt;
+&lt;p&gt;对昂贵仿真而言，这甚至会进一步连接主动学习：Active Operator Inference 已经研究了如何在噪声轨迹下主动选择新的 FOM 查询，使推断出的 reduced operators 更可靠。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;6-第二个危险拟合准确不代表动力学稳定&#34;&gt;6. 第二个危险：拟合准确不代表动力学稳定
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;最小二乘可能得到&lt;/p&gt;
+\[ \hat A \]&lt;p&gt;带有错误的正实部特征值。&lt;/p&gt;
+&lt;p&gt;于是训练区间内：&lt;/p&gt;
+\[ q_{\rm ROM}(t)\approx q_{\rm FOM}(t), \]&lt;p&gt;但长时间积分后：&lt;/p&gt;
+\[ \|q(t)\|\rightarrow\infty. \]&lt;p&gt;因此近年的重要方向已经从&lt;/p&gt;
+\[ \boxed{\text{fit operators}} \]&lt;p&gt;推进到&lt;/p&gt;
+\[ \boxed{\text{fit physically admissible operators}}. \]&lt;p&gt;例如可以约束：&lt;/p&gt;
+\[ \hat A+\hat A^T\preceq0 \]&lt;p&gt;来施加耗散结构，或者约束矩阵对称性、正定性、Hamiltonian/gradient structure。相关研究显示，结构约束和 physics-informed regularization 可以在普通或 Tikhonov 拟合产生不稳定 ROM 的情况下得到稳定模型。&lt;/p&gt;
+&lt;p&gt;这一步非常关键：&lt;/p&gt;
+\[ \boxed{ \text{ROM 的最终目标不是重放数据， 而是产生正确的动力系统。} } \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;7-它与前几张-rom-卡片怎样连接&#34;&gt;7. 它与前几张 ROM 卡片怎样连接？
+&lt;/h2&gt;&lt;p&gt;现在可以形成一条很清楚的路线：&lt;/p&gt;
+\[ \text{POD} \]&lt;p&gt;解决：&lt;/p&gt;
+\[ \boxed{\text{状态空间太大}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{Galerkin ROM} \]&lt;p&gt;要求：&lt;/p&gt;
+\[ \boxed{\text{能访问 FOM 内部算子}} \]&lt;p&gt;若能访问但非线性仍昂贵：&lt;/p&gt;
+\[ \boxed{\text{DEIM / ECSW / Hyper-reduction}} \]&lt;p&gt;若&lt;strong&gt;不能访问内部算子&lt;/strong&gt;：&lt;/p&gt;
+\[ \boxed{\text{Operator Inference}} \]&lt;p&gt;若原物理结构过于复杂：&lt;/p&gt;
+\[ \boxed{\text{Lift \&amp; Learn}} \]&lt;p&gt;再进一步：&lt;/p&gt;
+\[ \boxed{\text{structure-preserving OpInf}}. \]&lt;p&gt;所以 OpInf 真正卡在：&lt;/p&gt;
+\[ \boxed{ \text{传统 projection ROM 与数据驱动 Scientific ML 的接口处。} } \]&lt;hr&gt;
+&lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h2&gt;&lt;p&gt;Operator Inference 最值得学的并不是“用最小二乘拟合一个 ODE”，而是：&lt;/p&gt;
+\[ \boxed{ \text{当无法获得高保真模型内部算子时， 仍然可以利用已知的物理方程结构， 只从状态轨迹反推出一个 projection-like reduced dynamical system。} } \]&lt;p&gt;这对工程仿真尤其有迁移价值。很多工业软件对用户而言既不是白盒，也不完全是黑盒——你知道里面在解什么物理问题，也能批量获得高质量轨迹，但拿不到组装后的算子和残差实现。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;这正是 OpInf 最适合生存的“灰盒地带”。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Peherstorfer &amp;amp; Karen Willcox, &lt;em&gt;Data-driven operator inference for nonintrusive projection-based model reduction&lt;/em&gt;, &lt;strong&gt;CMAME 306&lt;/strong&gt;, 2016, 196–215，DOI 10.1016/j.cma.2016.03.025。原始论文。&lt;br&gt;
+MIT 开放论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Kramer, Peherstorfer &amp;amp; Willcox, &lt;em&gt;Learning Nonlinear Reduced Models from Data with Operator Inference&lt;/em&gt;, &lt;strong&gt;Annual Review of Fluid Mechanics&lt;/strong&gt;。适合建立完整知识体系，覆盖 lifting、稳定性、非线性与后续发展。&lt;br&gt;
+作者公开综述 PDF&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Willcox Research Group 的 &lt;code&gt;opinf&lt;/code&gt; 是目前很适合直接实验的 Python 实现，文档包含连续/离散 ROM、参数化模型和教程；截至检索时官方文档对应 0.6.0，并明确注明项目仍在快速开发。&lt;br&gt;
+Operator Inference 官方文档&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Qian, Kramer, Peherstorfer &amp;amp; Willcox, &lt;em&gt;Lift &amp;amp; Learn: Physics-informed machine learning for large-scale nonlinear dynamical systems&lt;/em&gt;, &lt;strong&gt;Physica D 406&lt;/strong&gt;, 2020, 132401。适合继续理解“怎样通过变量提升，把复杂非线性改造成适合 OpInf 的低阶多项式结构”。&lt;br&gt;
+Caltech 开放论文页&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

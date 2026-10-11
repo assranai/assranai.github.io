@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Mon, 14 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sun, 04 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</title>
         <link>https://assranai.github.io/cards/13-neural-operator/</link>
         <pubDate>Wed, 26 Aug 2026 00:00:00 +0000</pubDate>
@@ -4664,6 +4664,287 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
     &gt;Randomized POD 论文&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Durable Execution：工业 Agent 如何正确处理“执行了一半”</title>
+        <link>https://assranai.github.io/cards/40-durable-execution/</link>
+        <pubDate>Sun, 04 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/40-durable-execution/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;durable-execution&#34; tabindex=&#34;0&#34;&gt;Durable Execution&lt;/span&gt;（持久化执行）与幂等性设计&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：Agent 工业应用 × 分布式系统 × AI 全栈工程&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;阅读时间：约 4–5 分钟&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;关键词：Event History、Replay、Idempotency、Exactly-once Effect&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;本期转向此前覆盖较少的 Agent 工业应用。&lt;/p&gt;
+&lt;p&gt;一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。&lt;/p&gt;
+&lt;p&gt;问题在于，&lt;strong&gt;Agent 的某一步执行成功，并不意味着系统知道它已经成功。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。&lt;/p&gt;
+&lt;p&gt;重启后，它应该重新提交，还是等待原任务？&lt;/p&gt;
+&lt;p&gt;这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：&lt;strong&gt;如何在无法确定上一次操作是否成功的情况下安全恢复执行。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Temporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一为什么简单保存-agent-状态还不够&#34;&gt;一、为什么简单保存 Agent 状态还不够？
+&lt;/h2&gt;&lt;p&gt;假设工作流为：&lt;/p&gt;
+\[ A\rightarrow B\rightarrow C \]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(A\)：生成仿真输入；&lt;/li&gt;
+&lt;li&gt;\(B\)：向服务器提交仿真；&lt;/li&gt;
+&lt;li&gt;\(C\)：下载结果。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Agent 在完成 \(B\) 后，需要保存：&lt;/p&gt;
+\[ \text{state}=\text{B completed}. \]&lt;p&gt;但可能发生以下事件：&lt;/p&gt;
+\[ \underbrace{\text{服务器接受任务}}_{t_1} \rightarrow \underbrace{\text{Agent 崩溃}}_{t_2} \rightarrow \underbrace{\text{状态写入数据库}}_{t_3} \]&lt;p&gt;由于：&lt;/p&gt;
+\[ t_2&lt;t_3, \]&lt;p&gt;状态数据库仍然认为：&lt;/p&gt;
+\[ B=\text{未完成}. \]&lt;p&gt;如果 Agent 直接重试 \(B\)，就可能产生两个仿真任务。&lt;/p&gt;
+&lt;p&gt;这里存在一个重要的分布式系统事实：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;外部操作的执行与本地状态的保存，通常无法天然组成一个原子事务。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;因此，单纯增加 checkpoint 并不能彻底解决问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;二durable-execution-如何恢复执行&#34;&gt;二、Durable Execution 如何恢复执行？
+&lt;/h2&gt;&lt;p&gt;持久化执行通常将工作流拆分为两类操作：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Workflow：&lt;/strong&gt; 决定下一步做什么。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Activity：&lt;/strong&gt; 真正执行外部操作，例如调用 API、写入文件或启动仿真。&lt;/p&gt;
+&lt;p&gt;Workflow 的执行过程被记录为 Event History：&lt;/p&gt;
+\[ H=\{e_1,e_2,\ldots,e_n\}. \]&lt;p&gt;例如：&lt;/p&gt;
+\[ e_1=\text{WorkflowStarted} \]\[ e_2=\text{ActivityScheduled}(B) \]\[ e_3=\text{ActivityCompleted}(B,r_B) \]&lt;p&gt;其中 \(r_B\) 是 Activity 的返回结果。&lt;/p&gt;
+&lt;p&gt;当 Worker 崩溃并重启时，系统可以通过 &lt;strong&gt;Replay（重放）&lt;/strong&gt; 恢复工作流状态。&lt;/p&gt;
+&lt;p&gt;如果历史已经记录：&lt;/p&gt;
+\[ \text{ActivityCompleted}(B,r_B), \]&lt;p&gt;重放时直接使用：&lt;/p&gt;
+\[ r_B \]&lt;p&gt;继续执行，不必再次运行 \(B\)。&lt;/p&gt;
+&lt;p&gt;Temporal 官方文档明确指出，Workflow 恢复依赖持久化 Event History；已经完成的 Activity 在重放期间返回历史结果，而不会重新执行。&lt;/p&gt;
+&lt;p&gt;但有一个关键限制：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;如果外部操作已经成功，而 Activity 的完成事件尚未被持久化，Activity 仍可能被重新执行。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;因此，还需要第二个机制。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;三idempotency让重复执行不会产生重复效果&#34;&gt;三、Idempotency：让重复执行不会产生重复效果
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;幂等性的数学定义非常简洁：&lt;/p&gt;
+\[ \boxed{f(f(x))=f(x)} \]&lt;p&gt;在工程系统中，可以理解为：&lt;/p&gt;
+\[ \boxed{\text{同一个逻辑请求重复执行，不应产生额外业务效果。}} \]&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;submit_simulation(
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    task_id=&amp;#34;case_001&amp;#34;,
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    parameters=...
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;第一次调用：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;case_001 → 创建任务 → 返回 job_872
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;第二次调用：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;case_001 → 发现任务已存在 → 返回 job_872
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;因此，即使 Agent 重试十次，仍然只有一个逻辑仿真任务。&lt;/p&gt;
+&lt;p&gt;这种设计通常通过 &lt;strong&gt;Idempotency Key（幂等键）&lt;/strong&gt; 实现。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+\[ k= \operatorname{Hash}( \text{workflow\_id}, \text{step\_id}, \text{input\_version} ). \]&lt;p&gt;服务端保存：&lt;/p&gt;
+\[ k\rightarrow(\text{request hash},\text{job id},\text{status}). \]&lt;p&gt;同一个 \(k\) 对应相同请求时返回既有结果；如果同一个 \(k\) 对应不同参数，则拒绝请求。&lt;/p&gt;
+&lt;p&gt;Amazon Web Services 的工程实践特别强调：重试本身并不危险，危险的是重试可能产生新的副作用。通过幂等请求标识与参数一致性检查，可以显著简化客户端的故障恢复逻辑。&lt;/p&gt;
+&lt;p&gt;需要注意，&lt;strong&gt;幂等键必须由真正执行副作用的服务端原子地检查和登记&lt;/strong&gt;。如果只是 Agent 在内存中检查任务是否存在，仍然可能出现并发重复提交。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;四真正重要的区分at-least-once-与-exactly-once-effect&#34;&gt;四、真正重要的区分：At-least-once 与 Exactly-once Effect
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;分布式系统经常使用三种执行语义：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;语义&lt;/th&gt;
+					&lt;th&gt;含义&lt;/th&gt;
+					&lt;th&gt;主要风险&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;At-most-once&lt;/td&gt;
+					&lt;td&gt;最多执行一次&lt;/td&gt;
+					&lt;td&gt;失败后可能丢失任务&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;At-least-once&lt;/td&gt;
+					&lt;td&gt;至少执行一次&lt;/td&gt;
+					&lt;td&gt;可能重复执行&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Exactly-once effect&lt;/td&gt;
+					&lt;td&gt;业务效果恰好发生一次&lt;/td&gt;
+					&lt;td&gt;需要额外去重与一致性机制&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;对于工业 Agent，常见的合理选择是：&lt;/p&gt;
+\[ \boxed{ \text{At-least-once execution} + \text{Idempotency} \Rightarrow \text{Exactly-once effect} } \]&lt;p&gt;这里的箭头表示一种&lt;strong&gt;需要满足严格条件才能实现的工程设计目标&lt;/strong&gt;，并非无条件的数学保证。&lt;/p&gt;
+&lt;p&gt;例如，仿真服务必须保证同一个任务键只创建一个任务，任务结果也必须能够被重复查询。&lt;/p&gt;
+&lt;p&gt;如果底层工具不支持幂等提交，工作流框架本身无法保证外部副作用恰好发生一次。&lt;/p&gt;
+&lt;p&gt;这也是为什么工业 Agent 的可靠性最终会深入到 API、数据库和任务调度器层面。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;五一个科研-agent-的最小可靠架构&#34;&gt;五、一个科研 Agent 的最小可靠架构
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看代码与实现&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑自动执行：&lt;/p&gt;
+\[ \text{生成参数} \rightarrow \text{运行 FEM} \rightarrow \text{提取响应} \rightarrow \text{更新 Kriging}. \]&lt;p&gt;可以设计如下伪代码：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;def&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;simulation_activity&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;case&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;):&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;key&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;stable_hash&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;case&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;case&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;version&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;job&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;scheduler&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;find_by_key&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;key&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;job&lt;/span&gt; &lt;span class=&#34;ow&#34;&gt;is&lt;/span&gt; &lt;span class=&#34;kc&#34;&gt;None&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;n&#34;&gt;job&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;scheduler&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;submit&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;k&#34;&gt;case&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;n&#34;&gt;idempotency_key&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;key&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;result&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;scheduler&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;wait&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;job&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;job_id&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;job&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;result_hash&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;hash_file&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;result&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;),&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;result_path&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;result&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这段代码隐含一个重要前提：&lt;code&gt;scheduler.submit()&lt;/code&gt; 必须支持服务端幂等处理，或者任务登记与提交具有等效的一致性保障。单纯的 &lt;code&gt;find_by_key()&lt;/code&gt; 再 &lt;code&gt;submit()&lt;/code&gt; 不能防止并发竞争。&lt;/p&gt;
+&lt;p&gt;随后由持久化工作流记录：&lt;/p&gt;
+\[ \text{ActivityCompleted} \]&lt;p&gt;及其返回结果。&lt;/p&gt;
+&lt;p&gt;这样即使发生：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Agent 进程崩溃；&lt;/li&gt;
+&lt;li&gt;LLM API 超时；&lt;/li&gt;
+&lt;li&gt;仿真运行两小时后网络中断；&lt;/li&gt;
+&lt;li&gt;数据处理阶段异常；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;系统也可以根据持久化历史与外部任务标识恢复进度。&lt;/p&gt;
+&lt;p&gt;如果涉及多个数据库或消息队列，还可以进一步引入 &lt;strong&gt;Transactional Outbox&lt;/strong&gt;，解决数据库状态更新与事件发布之间的双写一致性问题。AWS 的官方架构指南提供了相应实现。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;六为什么这对-llm-agent-尤其重要&#34;&gt;六、为什么这对 LLM Agent 尤其重要？
+&lt;/h2&gt;&lt;p&gt;传统工作流通常具有确定性：&lt;/p&gt;
+\[ s_{t+1}=F(s_t,a_t). \]&lt;p&gt;但 LLM Agent 可能包含：&lt;/p&gt;
+\[ a_t=\pi_\theta(s_t,\xi_t), \]&lt;p&gt;其中 \(\xi_t\) 表示采样等随机因素。&lt;/p&gt;
+&lt;p&gt;如果恢复执行时重新调用 LLM：&lt;/p&gt;
+\[ a_t&#39;\neq a_t \]&lt;p&gt;完全可能发生。&lt;/p&gt;
+&lt;p&gt;因此，工业 Agent 需要区分两类行为：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;决策结果可以记录和重放。&lt;/strong&gt; 已经生成并确认的计划、工具参数、人工审批结果，应作为持久化数据保存。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;外部操作必须能够安全重试。&lt;/strong&gt; 文件写入、数据库更新、任务提交等，应通过幂等键、唯一约束或外部状态核对处理。&lt;/p&gt;
+&lt;p&gt;LangGraph 的持久化机制使用 checkpointer 保存工作流状态，并支持中断恢复与 human-in-the-loop。其官方文档也特别提醒：内存型 checkpointer 无法跨进程重启保存数据，生产环境应使用持久化存储。&lt;/p&gt;
+&lt;p&gt;这里还存在一个容易忽略的问题：&lt;strong&gt;代码升级可能破坏重放的一致性。&lt;/strong&gt; 如果旧工作流记录的是执行 A 后执行 B，而新版本代码改成执行 A 后执行 C，就需要工作流版本管理或迁移机制。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;七局限与工程代价&#34;&gt;七、局限与工程代价
+&lt;/h2&gt;&lt;p&gt;Durable Execution 解决的是&lt;strong&gt;执行可靠性&lt;/strong&gt;，并不能保证 Agent 的决策正确。&lt;/p&gt;
+&lt;p&gt;即使一个工作流可以完美恢复，它仍然可能稳定地执行一个错误的仿真方案。&lt;/p&gt;
+&lt;p&gt;此外，持久化机制还会引入：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;事件历史与检查点的存储开销；&lt;/li&gt;
+&lt;li&gt;工作流版本兼容问题；&lt;/li&gt;
+&lt;li&gt;外部任务状态与本地记录的对账成本；&lt;/li&gt;
+&lt;li&gt;不可逆操作的补偿处理；&lt;/li&gt;
+&lt;li&gt;长期运行任务的资源回收问题。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此，可靠工业 Agent 还需要权限控制、结果验证、人工审批和审计机制。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;它在整个知识体系中卡在哪里&#34;&gt;它在整个知识体系中卡在哪里？
+&lt;/h2&gt;&lt;p&gt;Agent 工程可以粗略分成四层：&lt;/p&gt;
+\[ \boxed{\text{Reasoning}} \]&lt;p&gt;决定做什么。&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{Planning / Tool Use}} \]&lt;p&gt;决定怎样调用工具。&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{Durable Execution}} \]&lt;p&gt;保证任务在故障、重试和中断后能够正确推进。&lt;/p&gt;
+\[ \downarrow \]\[ \boxed{\text{External Systems}} \]&lt;p&gt;真正执行仿真、数据库操作、文件处理和工程任务。&lt;/p&gt;
+&lt;p&gt;前三层中，LLM 研究通常最关注 Reasoning 和 Planning。&lt;/p&gt;
+&lt;p&gt;但从工业落地角度看，&lt;strong&gt;Durable Execution 是 Agent 从交互式助手走向长期自主运行系统时必须补齐的基础设施。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;它的价值在于把一个模糊的问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Agent 失败以后怎么办？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;转化为一组可以明确设计和验证的工程契约：&lt;/p&gt;
+\[ \boxed{ \text{可恢复状态} + \text{确定性重放} + \text{安全重试} + \text{外部副作用一致性} } \]&lt;p&gt;&lt;strong&gt;今天最值得记住的一句话：&lt;/strong&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;工业 Agent 的可靠性，不取决于它永远不失败，而取决于它能否在失败发生后，准确判断哪些事情已经完成、哪些事情可以重试，以及哪些事情绝不能重复。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;strong&gt;1. Temporal — Event History&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://docs.temporal.io/encyclopedia/event-history&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Temporal 官方事件历史文档&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;最适合深入理解 Workflow Replay、Activity 与持久化事件历史的关系。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;2. Malcolm Featonby — Making Retries Safe with Idempotent APIs&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Amazon Builders&amp;rsquo; Library 原文&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;AWS 一线工程实践，重点讨论请求标识、重试语义和重复副作用。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;3. LangGraph — Persistence&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://docs.langchain.com/oss/python/langgraph/persistence&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;LangGraph 官方持久化文档&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;适合从 Agent 框架层面理解 Checkpointer、线程状态、故障恢复和长期记忆之间的区别。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;4. AWS — Transactional Outbox Pattern&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;AWS 官方架构指南与实现示例&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;适合进一步理解数据库事务、事件发布和重复消息处理之间的一致性问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;知识卡片注册表更新：第 56 张。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;新增主题：Durable Execution 与幂等性设计。所属方向：Agent 工业应用 / 分布式系统 / AI 全栈工程。核心问题：如何使长期运行的 Agent 在进程崩溃、网络中断和外部任务状态不确定的情况下安全恢复。&lt;/p&gt;
+&lt;p&gt;与此前的数值求解器、ROM 和可靠性方法卡片无主题重复；它补充的是&lt;strong&gt;科研自动化系统自身的执行可靠性&lt;/strong&gt;。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;

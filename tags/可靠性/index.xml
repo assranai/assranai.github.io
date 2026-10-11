@@ -2526,7 +2526,7 @@
 \[\nabla_x f.\]&lt;p&gt;如果输出是一个标量：&lt;/p&gt;
 \[f,\]&lt;p&gt;reverse-mode AD 的梯度成本通常可以做到与少量 forward solves 同量级，而不是：&lt;/p&gt;
 \[O(m)\]&lt;p&gt;倍。&lt;/p&gt;
-&lt;p&gt;对 PDE/FEM，如果有 &lt;span class=&#34;term-anchor&#34; data-term=&#34;adjoint&#34; tabindex=&#34;0&#34;&gt;adjoint&lt;/span&gt;：&lt;/p&gt;
+&lt;p&gt;对 PDE/FEM，如果有 adjoint：&lt;/p&gt;
 \[A^T\lambda = \frac{\partial f}{\partial u},\]&lt;p&gt;然后：&lt;/p&gt;
 \[\frac{df}{dx} = \frac{\partial f}{\partial x} - \lambda^T \frac{\partial R}{\partial x},\]&lt;p&gt;那么高维参数梯度也能高效获得。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
@@ -2654,6 +2654,208 @@
 &lt;/details&gt;
 
 &lt;hr&gt;
+&lt;h1 id=&#34;25-它和-form-之间其实存在一个有趣联系&#34;&gt;25. 它和 FORM 之间其实存在一个有趣联系
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;可靠性中 FORM 会在标准正态空间寻找 Most Probable Point：&lt;/p&gt;
+\[ u^\star. \]&lt;p&gt;然后用极限状态面的局部法向：&lt;/p&gt;
+\[ \alpha = \frac{\nabla g(u^\star)} {\|\nabla g(u^\star)\|} \]&lt;p&gt;描述：&lt;/p&gt;
+\[ \boxed{\text{失效点附近最关键的局部方向}.} \]&lt;p&gt;Active Subspaces 则研究：&lt;/p&gt;
+\[ C= \mathbb E[ \nabla g(X)\nabla g(X)^T ]. \]&lt;p&gt;所以可以粗略理解：&lt;/p&gt;
+&lt;p&gt;FORM：&lt;/p&gt;
+\[ \boxed{\text{局部、失效点附近的关键方向}} \]&lt;p&gt;Active Subspaces：&lt;/p&gt;
+\[ \boxed{\text{整个输入分布上的平均关键方向}.} \]&lt;p&gt;两者都在研究：&lt;/p&gt;
+\[ \boxed{\text{direction，而不仅是 variable}.} \]&lt;p&gt;但尺度完全不同。&lt;/p&gt;
+&lt;p&gt;这也意味着 Active Subspaces &lt;strong&gt;不能直接替代 FORM&lt;/strong&gt;：一个在全局平均意义上“不活跃”的方向，仍可能在极小概率失效尾部变得极其重要。&lt;/p&gt;
+&lt;p&gt;这是可靠性应用里必须警惕的问题。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;26-一个自然改进改变平均梯度的权重&#34;&gt;26. 一个自然改进：改变“平均梯度”的权重
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;标准：&lt;/p&gt;
+\[ C= \int \nabla g(x)\nabla g(x)^T \rho(x)\,dx. \]&lt;p&gt;如果真正关心：&lt;/p&gt;
+\[ g(x)\approx0, \]&lt;p&gt;可以考虑任务导向权重：&lt;/p&gt;
+\[ \boxed{ C_w= \int w(g(x)) \nabla g(x)\nabla g(x)^T \rho(x)\,dx, } \]&lt;p&gt;其中：&lt;/p&gt;
+\[ w(g) \]&lt;p&gt;在：&lt;/p&gt;
+\[ g\approx0 \]&lt;p&gt;附近更大。&lt;/p&gt;
+&lt;p&gt;例如概念上：&lt;/p&gt;
+\[ w(g)= \exp\left( -\frac{g^2}{2\tau^2} \right). \]&lt;p&gt;这样得到的方向就更接近：&lt;/p&gt;
+\[ \boxed{\text{failure-boundary active directions}.} \]&lt;p&gt;这不是说该公式就是标准可靠性算法，而是展示一个重要研究思路：&lt;/p&gt;
+\[ \boxed{\text{降维目标也必须与最终任务对齐。}} \]&lt;p&gt;如果任务是：&lt;/p&gt;
+\[ P_f, \]&lt;p&gt;那么“平均解释 \(f\) 的变化”未必是最好的降维准则。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;27-实际上怎样估计-active-subspace&#34;&gt;27. 实际上怎样估计 Active Subspace？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;真实：&lt;/p&gt;
+\[ C= \mathbb E[ \nabla f\nabla f^T ] \]&lt;p&gt;通常不知道。&lt;/p&gt;
+&lt;p&gt;采样：&lt;/p&gt;
+\[ x^{(1)},\ldots,x^{(N)} \sim\rho. \]&lt;p&gt;计算梯度：&lt;/p&gt;
+\[ g_i=\nabla f(x^{(i)}). \]&lt;p&gt;Monte Carlo 估计：&lt;/p&gt;
+\[ \boxed{ \hat C = \frac1N \sum_{i=1}^N g_ig_i^T. } \]&lt;p&gt;然后：&lt;/p&gt;
+\[ \hat C = W\Lambda W^T. \]&lt;p&gt;实际代码甚至可以避免显式形成 \(C\)。&lt;/p&gt;
+&lt;p&gt;构造梯度矩阵：&lt;/p&gt;
+\[ G= \frac1{\sqrt N} [ g_1,g_2,\ldots,g_N ]. \]&lt;p&gt;因为：&lt;/p&gt;
+\[ GG^T=\hat C. \]&lt;p&gt;直接 SVD：&lt;/p&gt;
+\[ G=U\Sigma V^T. \]&lt;p&gt;则：&lt;/p&gt;
+\[ \boxed{ W=U,\qquad \lambda_i=\sigma_i^2. } \]&lt;p&gt;这和前一张 Randomized SVD 卡片也自然连接起来：当输入参数很多时，梯度矩阵本身也可以用 randomized/sketched linear algebra 处理。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;28-真正的瓶颈其实是梯度&#34;&gt;28. 真正的瓶颈其实是梯度
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果输入维度：&lt;/p&gt;
+\[ m=100, \]&lt;p&gt;用有限差分计算一次：&lt;/p&gt;
+\[ \nabla f \]&lt;p&gt;大约需要：&lt;/p&gt;
+\[ 101 \]&lt;p&gt;次仿真。&lt;/p&gt;
+&lt;p&gt;如果一个 FEM：&lt;/p&gt;
+\[ 30\text{ min}, \]&lt;p&gt;显然无法接受。&lt;/p&gt;
+&lt;p&gt;因此 Active Subspaces 是否实用，很大程度取决于有没有：&lt;/p&gt;
+\[ \boxed{\text{cheap gradients}.} \]&lt;p&gt;典型来源：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;automatic differentiation；&lt;/li&gt;
+&lt;li&gt;adjoint method；&lt;/li&gt;
+&lt;li&gt;analytic sensitivity；&lt;/li&gt;
+&lt;li&gt;surrogate gradients。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;对于 scalar QoI：&lt;/p&gt;
+\[ f(x)\in\mathbb R \]&lt;p&gt;且参数很多时，adjoint 尤其重要：&lt;/p&gt;
+\[ \boxed{\text{一次 adjoint solve 可以同时得到大量参数方向的梯度信息。}} \]&lt;p&gt;这也是为什么 Active Subspaces 与 PDE-constrained optimization、adjoint FEM 很自然地结合。现代 derivative-based global sensitivity 工作也明确使用 adjoint gradients 来处理高维 PDE 参数。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;29-谱隙比前两个特征值最大更重要&#34;&gt;29. 谱隙比“前两个特征值最大”更重要
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设：&lt;/p&gt;
+\[ \lambda= [10,\;8,\;7,\;6,\;5,\ldots]. \]&lt;p&gt;虽然：&lt;/p&gt;
+\[ \lambda_1,\lambda_2 \]&lt;p&gt;最大，但没有明显：&lt;/p&gt;
+\[ \boxed{\text{spectral gap}.} \]&lt;p&gt;此时硬选：&lt;/p&gt;
+\[ r=2 \]&lt;p&gt;没有很强依据。&lt;/p&gt;
+&lt;p&gt;反之：&lt;/p&gt;
+\[ \lambda= [10,\;8,\;0.1,\;0.03,\ldots] \]&lt;p&gt;在：&lt;/p&gt;
+\[ \lambda_2 \]&lt;p&gt;和：&lt;/p&gt;
+\[ \lambda_3 \]&lt;p&gt;之间存在巨大谱隙。&lt;/p&gt;
+&lt;p&gt;这才意味着：&lt;/p&gt;
+\[ \boxed{\text{二维 active subspace 具有稳定结构。}} \]&lt;p&gt;所以 Active Subspaces 不是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;算出特征向量，然后永远取前两个。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;真正要诊断的是：&lt;/p&gt;
+\[ \boxed{\text{这个函数到底有没有低维 ridge structure？}} \]&lt;p&gt;Constantine 的专著明确把随机梯度采样视为&lt;strong&gt;测试函数是否存在 active subspace&lt;/strong&gt;的方法，而不是预设低维结构一定存在。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;30-还有一个容易忽略的问题特征向量本身可能不稳定&#34;&gt;30. 还有一个容易忽略的问题：特征向量本身可能不稳定
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;如果：&lt;/p&gt;
+\[ \lambda_1\approx\lambda_2, \]&lt;p&gt;那么：&lt;/p&gt;
+\[ w_1,\;w_2 \]&lt;p&gt;可能因为一点采样误差就大幅旋转。&lt;/p&gt;
+&lt;p&gt;但：&lt;/p&gt;
+\[ \boxed{\operatorname{span}(w_1,w_2)} \]&lt;p&gt;仍可能非常稳定。&lt;/p&gt;
+&lt;p&gt;所以实际分析时更应该关心：&lt;/p&gt;
+\[ \boxed{\text{subspace error}} \]&lt;p&gt;而不只是：&lt;/p&gt;
+\[ \boxed{\text{单个 eigenvector 的系数。}} \]&lt;p&gt;这也是为什么 bootstrap 很常用：&lt;/p&gt;
+&lt;p&gt;反复重采样梯度样本，&lt;/p&gt;
+\[ \hat C^{(b)} \]&lt;p&gt;重新计算：&lt;/p&gt;
+\[ W_1^{(b)}, \]&lt;p&gt;再观察子空间夹角：&lt;/p&gt;
+\[ \|\, W_1W_1^T - W_1^{(b)}W_1^{(b)T} \,\|. \]&lt;p&gt;如果变化巨大：&lt;/p&gt;
+\[ \boxed{\text{你可能还没有足够证据声称存在这个 active subspace。}} \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;31-active-subspaces-和-sobol-灵敏度不是竞争关系&#34;&gt;31. Active Subspaces 和 Sobol 灵敏度不是竞争关系
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;Sobol 指标问：&lt;/p&gt;
+\[ \boxed{\text{各个变量贡献了多少输出方差？}} \]&lt;p&gt;Active Subspaces 问：&lt;/p&gt;
+\[ \boxed{\text{哪些线性组合方向使函数变化最大？}} \]&lt;p&gt;因此如果：&lt;/p&gt;
+\[ f(x)=g(x_1+x_2), \]&lt;p&gt;Sobol 可能告诉你：&lt;/p&gt;
+\[ x_1,x_2 \]&lt;p&gt;都重要。&lt;/p&gt;
+&lt;p&gt;这完全正确。&lt;/p&gt;
+&lt;p&gt;Active Subspace 则进一步告诉你：&lt;/p&gt;
+\[ \boxed{\text{它们主要通过 }x_1+x_2\text{ 这一组合起作用。}} \]&lt;p&gt;所以：&lt;/p&gt;
+\[ \boxed{\text{Sobol 更适合变量归因；Active Subspaces 更适合方向降维。}} \]&lt;p&gt;如果工程任务是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;哪个制造参数应该控制得更严格？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Sobol 很自然。&lt;/p&gt;
+&lt;p&gt;如果任务是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;能不能把 20 维 Kriging 降到 3 维？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Active Subspaces 更直接。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;32-一个很值得做的小实验&#34;&gt;32. 一个很值得做的小实验
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;定义：&lt;/p&gt;
+\[ f(x) = \sin(a^Tx)+0.05(b^Tx)^2, \]&lt;p&gt;其中：&lt;/p&gt;
+\[ x\in[-1,1]^{10}, \]&lt;p&gt;随机生成两个正交单位向量：&lt;/p&gt;
+\[ a,b. \]&lt;p&gt;那么真实响应虽然有：&lt;/p&gt;
+\[ 10 \]&lt;p&gt;个输入变量，却只依赖：&lt;/p&gt;
+\[ a^Tx,\qquad b^Tx. \]&lt;p&gt;采：&lt;/p&gt;
+\[ N=200 \]&lt;p&gt;个点。&lt;/p&gt;
+&lt;p&gt;计算：&lt;/p&gt;
+\[ \nabla f(x) = \cos(a^Tx)a + 0.1(b^Tx)b\,b. \]&lt;p&gt;构造：&lt;/p&gt;
+\[ \hat C. \]&lt;p&gt;然后看其 eigenvalues。&lt;/p&gt;
+&lt;p&gt;理论上会出现：&lt;/p&gt;
+\[ \lambda_1,\lambda_2&gt;0, \]&lt;p&gt;其余：&lt;/p&gt;
+\[ \lambda_3,\ldots,\lambda_{10}\approx0. \]&lt;p&gt;然后分别训练：&lt;/p&gt;
+\[ \text{10D Kriging: }\hat f(x) \]&lt;p&gt;和：&lt;/p&gt;
+\[ \text{2D Kriging: } \hat g(w_1^Tx,w_2^Tx). \]&lt;p&gt;比较：&lt;/p&gt;
+\[ R^2,\quad RMSE,\quad \text{training time}. \]&lt;p&gt;最后把第二项改成：&lt;/p&gt;
+\[ 0.0001(b^Tx)^2. \]&lt;p&gt;你会看到模型从：&lt;/p&gt;
+\[ \boxed{\text{二维 active structure}} \]&lt;p&gt;逐渐退化成：&lt;/p&gt;
+\[ \boxed{\text{近似一维 ridge function}.} \]&lt;p&gt;这个实验能非常直观地建立“effective input dimension”的感觉。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;33-它在整个知识体系中卡在哪里&#34;&gt;33. 它在整个知识体系中卡在哪里？
+&lt;/h1&gt;&lt;p&gt;把几种常见降维方法放在一起：&lt;/p&gt;
+\[ \text{PCA} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{输入数据变化最大的方向}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{Sobol / DGSM} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{重要变量}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \boxed{\text{Active Subspaces}} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{响应最敏感的输入方向}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{ridge approximation} \]&lt;p&gt;构造：&lt;/p&gt;
+\[ \boxed{f(x)\approx g(W^Tx)} \]&lt;p&gt;而另一条独立轴是：&lt;/p&gt;
+\[ \text{POD / Reduced Basis} \]&lt;p&gt;寻找：&lt;/p&gt;
+\[ \boxed{\text{高维输出状态的低维空间}.} \]&lt;p&gt;因此参数化物理仿真里一个很完整的结构其实是：&lt;/p&gt;
+\[ \boxed{ x \overset{\text{input reduction}}{\longrightarrow} W^Tx \overset{\text{physics}}{\longrightarrow} u \overset{\text{state reduction}}{\longrightarrow} a. } \]&lt;p&gt;这正好把你最近接触的 Kriging、ROM、POD 和高维可靠性连接起来。&lt;/p&gt;
+&lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Active Subspace 最值得记住的并不是：&lt;/p&gt;
 \[C=\mathbb E[\nabla f\nabla f^T].\]&lt;p&gt;而是一个关于高维问题非常重要的认识：&lt;/p&gt;
@@ -2678,7 +2880,7 @@
 &lt;p&gt;&lt;strong&gt;Constantine, Dow &amp;amp; Wang, &lt;em&gt;Active Subspace Methods in Theory and Practice: Applications to Kriging Surfaces&lt;/em&gt;, SIAM JSC, 2014&lt;/strong&gt;。非常适合继续理解 Active Subspace 为什么能直接服务 Kriging，尤其是“重要方向不与坐标轴对齐”这一点。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;&lt;strong&gt;Lam, Zahm, Marzouk &amp;amp; Willcox, &lt;em&gt;Multifidelity Dimension Reduction via Active Subspaces&lt;/em&gt;, SIAM JSC, 2020&lt;/strong&gt;。把前面 MFMC 中的多保真思想迁移到了“低维结构识别”，适合看低保真模型如何帮助估计高保真 active subspace。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Lam, Zahm, Marzouk &amp;amp; Willcox, &lt;em&gt;Multifidelity Dimension Reduction via Active Subspaces&lt;/em&gt;, SIAM JSC, 2020&lt;/strong&gt;。把前面 &lt;span class=&#34;term-anchor&#34; data-term=&#34;mfmc&#34; tabindex=&#34;0&#34;&gt;MFMC&lt;/span&gt; 中的多保真思想迁移到了“低维结构识别”，适合看低保真模型如何帮助估计高保真 active subspace。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Kim, Wang &amp;amp; Song, &lt;em&gt;Adaptive active subspace-based metamodeling for high-dimensional reliability analysis&lt;/em&gt;, Structural Safety, 2023&lt;/strong&gt;。这是可靠性方向尤其值得看的工作：Active Subspace、异方差 GP 与 active learning 不再简单串联，而是共同适应关键失效区域。&lt;/p&gt;

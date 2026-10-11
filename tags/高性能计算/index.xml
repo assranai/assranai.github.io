@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Wed, 23 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E9%AB%98%E6%80%A7%E8%83%BD%E8%AE%A1%E7%AE%97/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sun, 04 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E9%AB%98%E6%80%A7%E8%83%BD%E8%AE%A1%E7%AE%97/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉</title>
         <link>https://assranai.github.io/cards/19-multigrid/</link>
         <pubDate>Wed, 02 Sep 2026 00:00:00 +0000</pubDate>
@@ -2199,6 +2199,211 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
 &lt;p&gt;Arndt et al., &lt;strong&gt;ExaDG: High-Order Discontinuous Galerkin for the Exa-scale&lt;/strong&gt;。如果想看这一整套技术怎样组成真正的大规模求解器：matrix-free operator + sum factorization + massively parallel multigrid + optimized smoothers，就是很好的系统案例；相关工作报告实际软件贡献在不同硬件上带来约 3–4× 加速。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Algebraic Multigrid：换一个尺度消除难消的误差</title>
+        <link>https://assranai.github.io/cards/39-algebraic-multigrid/</link>
+        <pubDate>Sun, 04 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/39-algebraic-multigrid/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;algebraic-multigrid&#34; tabindex=&#34;0&#34;&gt;Algebraic Multigrid&lt;/span&gt;（AMG，代数多重网格）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 数值线性代数 × 物理求解器 × HPC&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;阅读时间：约 4–5 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天补充一个此前尚未系统覆盖、但对大型有限元求解器至关重要的概念：&lt;strong&gt;代数多重网格&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;它解决的是一个非常基础的问题：随着网格不断细化，为什么许多迭代求解器越来越慢？AMG 的核心发现是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;迭代方法难以消除的误差，往往可以通过改变表示尺度，转化成容易处理的误差。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这使得某些大型稀疏线性系统能够以接近 \(O(N)\) 的计算复杂度求解，而不必付出传统直接分解的高昂代价。AMG 尤其适合椭圆型 PDE 离散产生的系统，实际表现仍取决于算子性质和粗化策略。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一为什么普通迭代法会越算越慢&#34;&gt;一、为什么普通迭代法会越算越慢？
+&lt;/h2&gt;&lt;p&gt;考虑有限元中的线性系统：&lt;/p&gt;
+\[ Ku=f. \]&lt;p&gt;先用最简单的一维 Poisson 方程理解：&lt;/p&gt;
+\[ -\frac{d^2u}{dx^2}=f(x). \]&lt;p&gt;离散以后：&lt;/p&gt;
+\[ K=\frac{1}{h^2} \begin{bmatrix} 2&amp;-1&amp;&amp;\\ -1&amp;2&amp;-1&amp;\\ &amp;\ddots&amp;\ddots&amp;\ddots\\ &amp;&amp;-1&amp;2 \end{bmatrix}. \]&lt;p&gt;使用 Jacobi 迭代：&lt;/p&gt;
+\[ u^{k+1}=u^k+\omega D^{-1}(f-Ku^k). \]&lt;p&gt;其中 \(D\) 是 \(K\) 的对角部分。&lt;/p&gt;
+&lt;p&gt;设误差为：&lt;/p&gt;
+\[ e^k=u^k-u^\star. \]&lt;p&gt;那么：&lt;/p&gt;
+\[ e^{k+1}=(I-\omega D^{-1}K)e^k. \]&lt;p&gt;对离散正弦误差模式进行分析，可以得到误差放大因子：&lt;/p&gt;
+\[ \boxed{ \mu_j=1-\omega\left(1-\cos\frac{j\pi}{n+1}\right). } \]&lt;p&gt;取 \(\omega=2/3\)。&lt;/p&gt;
+&lt;p&gt;对于高频误差，\(|\mu_j|\) 通常较小，意味着误差快速衰减。&lt;/p&gt;
+&lt;p&gt;但对于低频误差：&lt;/p&gt;
+\[ j\ll n, \]&lt;p&gt;有：&lt;/p&gt;
+\[ \mu_j\approx1. \]&lt;p&gt;这意味着：&lt;/p&gt;
+\[ \boxed{\text{Jacobi 很容易消除剧烈振荡的误差，却很难消除缓慢变化的误差。}} \]&lt;p&gt;随着网格加密，越来越多难以消除的低频误差模式出现。&lt;/p&gt;
+&lt;p&gt;这正是传统局部松弛迭代难以保持网格无关收敛速度的根源。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;二multigrid-的核心让低频误差变成高频误差&#34;&gt;二、Multigrid 的核心：让低频误差变成高频误差
+&lt;/h2&gt;&lt;p&gt;假设在细网格上存在一个缓慢变化的误差：&lt;/p&gt;
+\[ e(x)=\sin(\pi x). \]&lt;p&gt;对于有 1000 个节点的网格，这个误差变化非常缓慢。&lt;/p&gt;
+&lt;p&gt;但如果把它转移到只有几十个节点的粗网格上，它相对于网格尺度就不再那么平缓。&lt;/p&gt;
+&lt;p&gt;多重网格利用的正是这种尺度变化。&lt;/p&gt;
+&lt;p&gt;一个经典的两层算法包含：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第一步：细网格平滑&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;用 Jacobi 或 Gauss–Seidel 消除高频误差。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第二步：将残差传递到粗网格&lt;/strong&gt;&lt;/p&gt;
+\[ r_h=f_h-K_hu_h. \]&lt;p&gt;通过限制算子 \(R\)：&lt;/p&gt;
+\[ r_H=Rr_h. \]&lt;p&gt;&lt;strong&gt;第三步：在粗网格上求误差修正&lt;/strong&gt;&lt;/p&gt;
+\[ K_He_H=r_H. \]&lt;p&gt;&lt;strong&gt;第四步：把修正传回细网格&lt;/strong&gt;&lt;/p&gt;
+\[ u_h\leftarrow u_h+Pe_H. \]&lt;p&gt;其中 \(P\) 是插值算子。&lt;/p&gt;
+&lt;p&gt;随后再进行若干次平滑。&lt;/p&gt;
+&lt;p&gt;这一过程可以递归执行，形成 V-cycle。&lt;/p&gt;
+&lt;p&gt;它的本质是：&lt;/p&gt;
+\[ \boxed{ \text{细网格消除局部误差，粗网格消除全局误差。} } \]&lt;p&gt;这比单纯增加 Jacobi 迭代次数有效得多。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;三amg-最深刻的一步没有几何网格也能构造粗网格&#34;&gt;三、AMG 最深刻的一步：没有几何网格，也能构造粗网格
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;传统 Geometric &lt;span class=&#34;term-anchor&#34; data-term=&#34;multigrid&#34; tabindex=&#34;0&#34;&gt;Multigrid&lt;/span&gt;（GMG）需要知道网格的几何层级。&lt;/p&gt;
+&lt;p&gt;但真实工业有限元往往使用：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;非结构化四面体网格；&lt;/li&gt;
+&lt;li&gt;复杂拓扑；&lt;/li&gt;
+&lt;li&gt;局部加密；&lt;/li&gt;
+&lt;li&gt;不规则材料分布。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;很难直接生成质量良好的几何粗网格。&lt;/p&gt;
+&lt;p&gt;AMG 提出了一个更抽象的问题：&lt;/p&gt;
+\[ \boxed{\text{能否仅从矩阵 }K\text{ 的代数结构，推断哪些自由度应该一起粗化？}} \]&lt;p&gt;答案是可以。&lt;/p&gt;
+&lt;p&gt;AMG 根据矩阵系数、变量之间的强连接关系，以及松弛过程难以消除的误差模式，构造粗层空间。&lt;/p&gt;
+&lt;p&gt;它并不要求知道节点的真实坐标。&lt;/p&gt;
+&lt;p&gt;然后通过：&lt;/p&gt;
+\[ \boxed{ K_H=R K_h P } \]&lt;p&gt;构造粗层算子。&lt;/p&gt;
+&lt;p&gt;对于对称正定问题，通常取：&lt;/p&gt;
+\[ R=P^T, \]&lt;p&gt;于是：&lt;/p&gt;
+\[ \boxed{ K_H=P^TK_hP. } \]&lt;p&gt;这实际上就是一个 Galerkin 投影。&lt;/p&gt;
+&lt;p&gt;因此 AMG 可以理解成：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;从矩阵本身自动寻找适合误差修正的低维空间，并在多个尺度上反复求解。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;SIAM 的经典教材 &lt;em&gt;A Multigrid Tutorial&lt;/em&gt; 专门讨论了这一问题：即使未知量没有明确的几何位置，也可以根据代数关系建立多重网格方法。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;四一个非常重要的概念near-nullspace&#34;&gt;四、一个非常重要的概念：Near-nullspace
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;AMG 的粗空间应该保留哪些模式？&lt;/p&gt;
+&lt;p&gt;答案是：&lt;/p&gt;
+\[ \boxed{\text{那些能量很低、局部迭代难以消除的误差模式。}} \]&lt;p&gt;考虑线弹性系统：&lt;/p&gt;
+\[ Ku=f. \]&lt;p&gt;对于一个没有约束的三维弹性体，存在六种刚体运动模式：&lt;/p&gt;
+\[ \underbrace{3\text{ 个平移}}_{\text{translation}} + \underbrace{3\text{ 个转动}}_{\text{rotation}}. \]&lt;p&gt;这些模式不会产生弹性应变能。&lt;/p&gt;
+&lt;p&gt;因此：&lt;/p&gt;
+\[ Kz_i=0. \]&lt;p&gt;它们构成刚度矩阵的零空间。&lt;/p&gt;
+&lt;p&gt;施加边界条件后，刚体模式通常不再是严格零模态，但相关低能量模式仍可能对迭代收敛十分重要。&lt;/p&gt;
+&lt;p&gt;如果 AMG 的粗空间无法表示这些模式，求解器就可能难以消除对应的误差。&lt;/p&gt;
+&lt;p&gt;这就是 &lt;strong&gt;Near-nullspace-aware AMG&lt;/strong&gt; 的意义。&lt;/p&gt;
+&lt;p&gt;在实际工程中，PETSc 明确提供：&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;MatNullSpaceCreateRigidBody()&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;和：&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;MatSetNearNullSpace()&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;帮助 AMG 预条件器识别弹性系统的刚体运动模式。官方文档指出，这能够显著改善 &lt;code&gt;PCGAMG&lt;/code&gt; 对弹性问题的求解效率。&lt;/p&gt;
+&lt;p&gt;这说明一个很重要的事实：&lt;/p&gt;
+\[ \boxed{\text{优秀的线性求解器不仅利用矩阵数值，还利用矩阵背后的物理结构。}} \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;五smoothed-aggregation从粗略分组到低能量插值&#34;&gt;五、Smoothed Aggregation：从粗略分组到低能量插值
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;AMG 有多个技术分支，其中 Smoothed Aggregation（SA-AMG）特别值得理解。&lt;/p&gt;
+&lt;p&gt;它首先将自由度划分为若干聚合体（aggregates）。&lt;/p&gt;
+&lt;p&gt;构造一个初始插值矩阵：&lt;/p&gt;
+\[ P_0. \]&lt;p&gt;然后对插值矩阵进行平滑，例如：&lt;/p&gt;
+\[ \boxed{ P=(I-\omega D^{-1}K)P_0. } \]&lt;p&gt;这样得到的粗空间更适合表示代数光滑误差。&lt;/p&gt;
+&lt;p&gt;其关键思想是：&lt;/p&gt;
+\[ \boxed{\text{粗空间不能只由变量分组决定，还应该适应系统的低能量结构。}} \]&lt;p&gt;Vaněk、Mandel 和 Brezina 在 1996 年的经典工作中系统发展了 Smoothed Aggregation，并将其用于二阶和四阶椭圆问题。&lt;/p&gt;
+&lt;p&gt;现代 PyAMG 和 PETSc 都实现了相关方法。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;六它对软体动力学求解器有什么价值&#34;&gt;六、它对软体动力学求解器有什么价值？
+&lt;/h2&gt;&lt;p&gt;考虑隐式软体动力学：&lt;/p&gt;
+\[ M\ddot x+f_{\rm int}(x)=f_{\rm ext}. \]&lt;p&gt;使用 Newton 法后，需要反复求解：&lt;/p&gt;
+\[ \boxed{ \left(\frac{M}{h^2}+K_t\right)\Delta x=-r. } \]&lt;p&gt;对于百万自由度的四面体模型，这个线性系统可能成为主要性能瓶颈。&lt;/p&gt;
+&lt;p&gt;AMG 可以作为 CG 等 Krylov 迭代法的预条件器：&lt;/p&gt;
+\[ \boxed{\text{AMG-preconditioned CG}.} \]&lt;p&gt;它不要求像传统 ROM 一样提前收集训练轨迹，也不要求模型具有很低的全局秩。&lt;/p&gt;
+&lt;p&gt;因此它解决的是另一类问题：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;ROM&lt;/strong&gt;：降低需要求解的自由度数量；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;AMG&lt;/strong&gt;：在保留完整自由度的情况下，提高线性系统求解效率；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;PD&lt;/span&gt;&lt;/strong&gt;：通过特殊能量结构，让全局矩阵可以重复分解。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这三者具有完全不同的加速机制。&lt;/p&gt;
+&lt;p&gt;不过 AMG 也有明显限制。&lt;/p&gt;
+&lt;p&gt;对于严重材料非线性、强各向异性、接触激活引起的矩阵突变，或者不定的切线刚度矩阵，普通 AMG 可能退化，需要专门的平滑器、粗空间或块预条件策略。&lt;/p&gt;
+&lt;p&gt;此外，构建 AMG 层级本身也有成本。&lt;/p&gt;
+&lt;p&gt;如果每个时间步的矩阵都发生显著变化，就必须考虑：&lt;/p&gt;
+\[ \boxed{\text{层级重建成本与迭代加速收益之间的平衡。}} \]&lt;p&gt;因此工业实现往往将 AMG 作为预条件器，并针对具体物理系统调整粗化与插值策略。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;七一个很值得做的数值实验&#34;&gt;七、一个很值得做的数值实验
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;使用 Python 的 PyAMG，生成不同规模的二维 Poisson 问题：&lt;/p&gt;
+\[ n=32,\ 64,\ 128,\ 256. \]&lt;p&gt;比较：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Jacobi；&lt;/li&gt;
+&lt;li&gt;CG；&lt;/li&gt;
+&lt;li&gt;AMG-preconditioned CG。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;统一要求：&lt;/p&gt;
+\[ \frac{\|Ku-f\|_2}{\|f\|_2}&lt;10^{-8}. \]&lt;p&gt;记录迭代次数、求解时间和 AMG 层级构建时间。&lt;/p&gt;
+&lt;p&gt;预期观察到：&lt;/p&gt;
+&lt;p&gt;Jacobi 的迭代次数会随着网格细化显著增长。&lt;/p&gt;
+&lt;p&gt;CG 也通常表现出一定的网格尺度依赖。&lt;/p&gt;
+&lt;p&gt;而配置良好的 AMG-preconditioned CG，在这类规则椭圆问题中，迭代次数往往能够基本保持稳定。&lt;/p&gt;
+&lt;p&gt;然后进一步尝试：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;将 Poisson 问题替换为三维线弹性问题，并向 AMG 提供刚体 near-nullspace。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;比较提供和不提供刚体模式时的收敛差异。&lt;/p&gt;
+&lt;p&gt;这个实验能够直接说明：&lt;strong&gt;粗空间的质量往往比增加局部迭代次数更重要。&lt;/strong&gt;&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;它在知识体系中卡在哪里&#34;&gt;它在知识体系中卡在哪里？
+&lt;/h2&gt;&lt;p&gt;AMG 位于大型物理仿真的底层数值求解层：&lt;/p&gt;
+\[ \text{物理方程} \]\[ \downarrow \]\[ \text{FEM / FV 离散} \]\[ \downarrow \]\[ Ku=f \]\[ \downarrow \]\[ \boxed{\text{Krylov 迭代 + AMG 预条件}} \]\[ \downarrow \]\[ \text{高效求解完整离散系统} \]&lt;p&gt;它与之前学习的 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pod&#34; tabindex=&#34;0&#34;&gt;POD&lt;/span&gt;、&lt;span class=&#34;term-anchor&#34; data-term=&#34;hyper-reduction&#34; tabindex=&#34;0&#34;&gt;Hyper-reduction&lt;/span&gt;、Projective Dynamics 共同构成了大型物理仿真的不同加速路线。&lt;/p&gt;
+&lt;p&gt;其中最值得记住的是：&lt;/p&gt;
+\[ \boxed{ \text{一个误差模式难以消除， 可能只是因为你正在错误的尺度上处理它。} } \]&lt;p&gt;AMG 将这一思想从规则几何网格推广到了任意稀疏矩阵的代数结构。&lt;/p&gt;
+&lt;p&gt;更深一层，它告诉我们：&lt;strong&gt;预条件器本质上是在为迭代算法重新组织问题的几何结构。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这也是为什么预条件技术值得与有限元、ROM 和数值优化并列学习。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;strong&gt;1. Briggs, Henson &amp;amp; McCormick — &lt;em&gt;A Multigrid Tutorial&lt;/em&gt;, 2nd Edition&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;SIAM，2000。经典入门教材，推荐重点阅读误差平滑、两层方法和第八章 Algebraic Multigrid。&lt;/p&gt;
+&lt;p&gt;SIAM 官方教材第八章&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;2. Vaněk, Mandel &amp;amp; Brezina — &lt;em&gt;Algebraic Multigrid by Smoothed Aggregation for Second and Fourth Order Elliptic Problems&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Computing&lt;/em&gt;, 56, 179–196，1996。DOI：10.1007/BF02238511。Smoothed Aggregation 的经典论文。&lt;/p&gt;
+&lt;p&gt;NASA 技术报告资料&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;3. PETSc — PCGAMG 与 Near-nullspace 官方文档&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;适合直接进入工业级 FEM 求解器实现。尤其推荐阅读刚体模式如何用于 AMG 粗空间构造。&lt;/p&gt;
+&lt;p&gt;PETSc 刚体模式接口文档&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;4. hypre — BoomerAMG 官方文档&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;hypre 的 BoomerAMG 是广泛应用的并行 AMG 实现。文档介绍了粗化、插值、松弛及并行求解参数。&lt;/p&gt;
+&lt;p&gt;BoomerAMG 官方文档&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;5. PyAMG — 官方文档与实现&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;适合用 Python 快速进行数值实验，包含 Classical AMG、Smoothed Aggregation 和 Krylov 预条件示例。&lt;/p&gt;
+&lt;p&gt;PyAMG 官方文档&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;知识卡片注册表更新：&lt;/strong&gt; 第 55 张，新增主题「Algebraic Multigrid」。所属方向：有限元 / 数值线性代数 / 物理求解器。核心问题：如何利用多尺度误差结构，实现大型稀疏系统的高效迭代求解。与第 35 张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;anderson&#34; tabindex=&#34;0&#34;&gt;Anderson Acceleration&lt;/span&gt;、第 49–50 张 Projective Dynamics、第 52 张 Hyper-reduction 构成相邻但不重复的求解加速知识分支。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;

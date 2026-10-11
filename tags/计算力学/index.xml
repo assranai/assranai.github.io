@@ -7,7 +7,7 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en-us</language>
         <copyright>Assranai</copyright>
-        <lastBuildDate>Fri, 02 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E8%AE%A1%E7%AE%97%E5%8A%9B%E5%AD%A6/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sun, 04 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/%E8%AE%A1%E7%AE%97%E5%8A%9B%E5%AD%A6/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>Projective Dynamics：local–global 分解如何同时得到速度、稳定性与并行性</title>
         <link>https://assranai.github.io/cards/03-projective-dynamics/</link>
         <pubDate>Fri, 02 Oct 2026 00:00:00 +0000</pubDate>
@@ -2291,6 +2291,206 @@ Disney Research / Animation 论文页&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;&lt;strong&gt;Massing, Larson &amp;amp; Logg, &lt;em&gt;Efficient Implementation of Finite Element Methods on Nonmatching and Overlapping Meshes in Three Dimensions&lt;/em&gt;, SIAM JSC&lt;/strong&gt;。如果以后自己写 solver，这篇尤其有价值，因为它把真正困难的 intersection detection、cut-cell integration 和三维工程实现摆到了台面上。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
+        <item>
+        <title>Discrete Exterior Calculus：先离散几何关系，再谈微分方程</title>
+        <link>https://assranai.github.io/cards/38-discrete-exterior-calculus/</link>
+        <pubDate>Sun, 04 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/38-discrete-exterior-calculus/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;discrete-exterior-calculus&#34; tabindex=&#34;0&#34;&gt;Discrete Exterior Calculus&lt;/span&gt;（DEC，离散外微分）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：有限元 × 几何计算 × 物理引擎 × 结构保持离散&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;阅读时间：约 4–5 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;今天补一个此前注册表中明显空缺、但对 FEM 和物理求解器很有迁移价值的方向：&lt;strong&gt;DEC 的核心不是提高某个导数的逼近精度，而是让某些连续世界中严格成立的几何恒等式，在离散网格上仍然严格成立。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这与普通的“先写 PDE，再近似导数”有很不一样的出发点。Desbrun、Kanso、Tong 的经典 SIGGRAPH 课程甚至直接把问题表述为：传统离散可能在计算机只能存储有限数据时丢掉连续模型中的几何结构，而 DEC 的目标就是在离散层面保留这些结构。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;1-先看一个看似普通的恒等式&#34;&gt;1. 先看一个看似普通的恒等式
+&lt;/h2&gt;&lt;p&gt;连续向量分析中：&lt;/p&gt;
+\[ \nabla\times(\nabla \phi)=0, \]&lt;p&gt;以及&lt;/p&gt;
+\[ \nabla\cdot(\nabla\times u)=0. \]&lt;p&gt;它们不是某个具体 PDE 的经验性质，而是：&lt;/p&gt;
+\[ \boxed{\text{微分算子本身的结构恒等式。}} \]&lt;p&gt;用外微分形式写得更简洁：&lt;/p&gt;
+\[ \boxed{d^2=0.} \]&lt;p&gt;其中 \(d\) 是 exterior derivative。&lt;/p&gt;
+&lt;p&gt;如果我们直接在不规则网格上分别设计一个：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;离散 gradient；&lt;/li&gt;
+&lt;li&gt;离散 curl；&lt;/li&gt;
+&lt;li&gt;离散 divergence；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;即使每个算子单独都“挺准确”，组合后也未必严格满足：&lt;/p&gt;
+\[ \operatorname{curl}_h\operatorname{grad}_h=0, \]\[ \operatorname{div}_h\operatorname{curl}_h=0. \]&lt;p&gt;这会制造一种很麻烦的数值误差：&lt;/p&gt;
+\[ \boxed{\text{离散系统产生连续物理中根本不存在的自由度。}} \]&lt;p&gt;电磁学中的伪模态、流体中的非物理源汇，都与这类结构破坏密切相关。&lt;/p&gt;
+&lt;p&gt;DEC 的思路则是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;与其分别逼近这些导数，不如先设计一个离散微积分，使 \(d_h^2=0\) 从代数结构上自动成立。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;2-最关键的一步物理量并不都放在节点上&#34;&gt;2. 最关键的一步：物理量并不都放在“节点”上
+&lt;/h1&gt;&lt;p&gt;普通入门 FEM 很容易形成一种习惯：&lt;/p&gt;
+\[ \boxed{\text{未知量 = 节点上的数字。}} \]&lt;p&gt;DEC 会强迫你重新考虑这件事。&lt;/p&gt;
+&lt;p&gt;在一个三角网格上：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;0-form&lt;/strong&gt; 放在顶点；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;1-form&lt;/strong&gt; 放在边；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;2-form&lt;/strong&gt; 放在面。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;例如温度：&lt;/p&gt;
+\[ T_i \]&lt;p&gt;可以作为顶点上的 0-form。&lt;/p&gt;
+&lt;p&gt;但速度的线积分：&lt;/p&gt;
+\[ \int_{e}u\cdot dl \]&lt;p&gt;天然属于一条边，是 1-form。&lt;/p&gt;
+&lt;p&gt;通量：&lt;/p&gt;
+\[ \int_f u\cdot n\,dA \]&lt;p&gt;天然属于一个面，是 2-form。&lt;/p&gt;
+&lt;p&gt;所以 DEC 的基本思想不是：&lt;/p&gt;
+\[ \boxed{\text{把所有场都采样到节点。}} \]&lt;p&gt;而是：&lt;/p&gt;
+\[ \boxed{\text{根据物理量“被什么几何对象积分”，决定它住在哪里。}} \]&lt;p&gt;这正是 differential forms 视角的工程意义。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;3-一个极漂亮的结果离散微分可以完全不依赖几何尺寸&#34;&gt;3. 一个极漂亮的结果：离散微分可以完全不依赖几何尺寸
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;设一条有向边：&lt;/p&gt;
+\[ e=(i,j). \]&lt;p&gt;对顶点标量 \(\phi\)，离散 exterior derivative 就是：&lt;/p&gt;
+\[ (d_0\phi)_e=\phi_j-\phi_i. \]&lt;p&gt;写成矩阵：&lt;/p&gt;
+\[ d_0= \text{vertex-edge incidence matrix}. \]&lt;p&gt;再看三角形：&lt;/p&gt;
+\[ f=(i,j,k). \]&lt;p&gt;边上的 1-form 为：&lt;/p&gt;
+\[ \omega_{ij},\omega_{jk},\omega_{ki}. \]&lt;p&gt;则：&lt;/p&gt;
+\[ (d_1\omega)_f = \omega_{ij}+\omega_{jk}+\omega_{ki}. \]&lt;p&gt;这只是：&lt;/p&gt;
+\[ d_1= \text{edge-face incidence matrix}. \]&lt;p&gt;于是：&lt;/p&gt;
+\[ d_1d_0\phi = (\phi_j-\phi_i) + (\phi_k-\phi_j) + (\phi_i-\phi_k) =0. \]&lt;p&gt;所以：&lt;/p&gt;
+\[ \boxed{d_1d_0=0} \]&lt;p&gt;不是“网格足够细以后近似为零”。&lt;/p&gt;
+&lt;p&gt;而是：&lt;/p&gt;
+\[ \boxed{\text{机器精度下由拓扑直接保证为零。}} \]&lt;p&gt;这里甚至没有出现：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;边长；&lt;/li&gt;
+&lt;li&gt;面积；&lt;/li&gt;
+&lt;li&gt;角度。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因为：&lt;/p&gt;
+\[ \boxed{d\text{ 描述的是拓扑关系，而不是度量关系。}} \]&lt;p&gt;这就是 DEC 最值得建立的第一个直觉。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;4-那几何信息去哪了&#34;&gt;4. 那几何信息去哪了？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;当然不能只靠拓扑解物理问题。&lt;/p&gt;
+&lt;p&gt;几何信息被集中进另一个算子：&lt;/p&gt;
+\[ \boxed{\star} \]&lt;p&gt;即 &lt;strong&gt;Hodge star&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;它负责把：&lt;/p&gt;
+\[ \text{拓扑} \]&lt;p&gt;和：&lt;/p&gt;
+\[ \text{metric / geometry} \]&lt;p&gt;连接起来。&lt;/p&gt;
+&lt;p&gt;于是离散 Laplace–Beltrami 算子可以写成类似：&lt;/p&gt;
+\[ \boxed{ \Delta_h = \star^{-1}d^T\star d. } \]&lt;p&gt;这背后有一个非常重要的算法设计思想：&lt;/p&gt;
+\[ \boxed{ \text{拓扑关系与度量关系分离。} } \]&lt;p&gt;网格连接关系决定：&lt;/p&gt;
+\[ d. \]&lt;p&gt;边长、面积、对偶单元等决定：&lt;/p&gt;
+\[ \star. \]&lt;p&gt;因此改变几何形状但不改变 connectivity 时，某些离散结构根本无需重建。&lt;/p&gt;
+&lt;p&gt;经典三角网格上的 cotangent Laplacian、Voronoi/mixed area 等几何算子，与这套离散微分几何思想有紧密联系。Meyer、Mathieu Desbrun、Schröder、Barr 的经典工作系统构造了三角网格上的曲率和微分几何算子，并强调这些离散算子尽可能继承连续对应物的内在性质。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;5-这与-fem--feec-是什么关系&#34;&gt;5. 这与 FEM / FEEC 是什么关系？
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;DEC 并不是 FEM 的竞争对手。&lt;/p&gt;
+&lt;p&gt;更准确地说，两者后来在一个更大的结构里汇合：&lt;/p&gt;
+\[ \boxed{\text{de Rham complex}.} \]&lt;p&gt;连续层面：&lt;/p&gt;
+\[ H^1 \xrightarrow{\nabla} H(\mathrm{curl}) \xrightarrow{\nabla\times} H(\mathrm{div}) \xrightarrow{\nabla\cdot} L^2. \]&lt;p&gt;有限元希望构造对应的离散空间，使：&lt;/p&gt;
+\[ \boxed{\text{离散算子之间仍保持同样的 exact sequence。}} \]&lt;p&gt;这就是此前 Equilibrated Flux 卡片里短暂出现过的 &lt;strong&gt;Finite Element Exterior Calculus（FEEC）&lt;/strong&gt; 背后的核心结构。&lt;/p&gt;
+&lt;p&gt;所以：&lt;/p&gt;
+\[ \text{DEC} \]&lt;p&gt;更偏向：&lt;/p&gt;
+\[ \boxed{\text{从离散网格、cochain 和几何算子出发}} \]&lt;p&gt;而：&lt;/p&gt;
+\[ \text{FEEC} \]&lt;p&gt;更偏向：&lt;/p&gt;
+\[ \boxed{\text{从有限元函数空间与微分复形出发}}. \]&lt;p&gt;二者共享一个非常深的原则：&lt;/p&gt;
+\[ \boxed{\text{离散 PDE 时，应当同时离散 PDE 背后的几何结构。}} \]
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;6-为什么物理引擎开发者值得理解它&#34;&gt;6. 为什么物理引擎开发者值得理解它？
+&lt;/h1&gt;&lt;p&gt;考虑不可压流体：&lt;/p&gt;
+\[ \nabla\cdot u=0. \]&lt;p&gt;普通实现容易把它理解成：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;每一步算完速度，再努力把 divergence 压小。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;DEC/compatible discretization 提供的是另一种视角：&lt;/p&gt;
+\[ \boxed{\text{能否选择离散变量和算子，使守恒关系天然嵌入离散空间？}} \]&lt;p&gt;这在流体模拟里并非纯理论。Elcott、Tong、Kanso、Schröder 与 Desbrun 的 simplicial fluid 工作就是利用离散 differential forms，在非规则 simplicial mesh 上构造保持离散涡量结构的流体算法。&lt;/p&gt;
+&lt;p&gt;同样的思维还能迁移到：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Maxwell 电磁场；&lt;/li&gt;
+&lt;li&gt;壳/薄膜几何；&lt;/li&gt;
+&lt;li&gt;网格曲率；&lt;/li&gt;
+&lt;li&gt;流体；&lt;/li&gt;
+&lt;li&gt;弹性；&lt;/li&gt;
+&lt;li&gt;离散连接与旋转场。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;2025 年 IMSI 甚至专门举办了 DEC workshop，主题已经延伸到流体、弹性、光子学、机器学习、量子电动力学和离散向量丛，说明这套思想仍在继续扩展，而不是一个已经封闭的老方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;7-一个对自研求解器很实用的启发&#34;&gt;7. 一个对自研求解器很实用的启发
+&lt;/h1&gt;&lt;p&gt;写物理代码时，经常会出现：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute_gradient()
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute_divergence()
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute_flux()
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;compute_normals()
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;每个函数分别推公式。&lt;/p&gt;
+&lt;p&gt;DEC 会让你多问一步：&lt;/p&gt;
+\[ \boxed{\text{这些算子之间本来应该满足哪些恒等关系？}} \]&lt;p&gt;然后把这些关系直接变成单元测试：&lt;/p&gt;
+\[ \|d_1d_0\|=0, \]&lt;p&gt;或者检查：&lt;/p&gt;
+\[ \text{boundary of boundary}=0. \]&lt;p&gt;这种测试比“某个案例看起来没炸”强得多，因为它检查的是&lt;strong&gt;求解器离散数学结构本身&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;对于未来自己写 FEM / 软体求解器，这种思想很值得迁移：&lt;/p&gt;
+\[ \boxed{ \text{先确定必须精确保持的结构， 再决定怎样近似数值。} } \]&lt;p&gt;而不是所有性质都等网格加密后“自然收敛回来”。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;它在知识体系中卡在哪里&#34;&gt;它在知识体系中卡在哪里？
+&lt;/h1&gt;&lt;p&gt;可以把数值离散粗略分成三个层次：&lt;/p&gt;
+\[ \text{Finite Difference} \]&lt;p&gt;主要问：&lt;/p&gt;
+\[ \boxed{\text{导数怎样逼近？}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \text{FEM / FV} \]&lt;p&gt;进一步问：&lt;/p&gt;
+\[ \boxed{\text{弱形式、守恒和函数空间怎样离散？}} \]&lt;p&gt;↓&lt;/p&gt;
+\[ \boxed{\text{DEC / FEEC / compatible discretization}} \]&lt;p&gt;进一步追问：&lt;/p&gt;
+\[ \boxed{\text{连续物理背后的几何与拓扑结构怎样在离散世界仍然严格成立？}} \]&lt;p&gt;今天最值得留下的一句话因此是：&lt;/p&gt;
+\[ \boxed{ \text{高质量离散方法追求的不只是“数值接近真实解”， 还包括“离散系统本身仍像那个物理系统”。} } \]&lt;p&gt;这也是 DEC 对物理引擎、FEM 和结构保持 ROM 最有迁移价值的地方。&lt;/p&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;Desbrun、Kanso、Yiying Tong，&lt;strong&gt;Discrete Differential Forms for Computational Modeling&lt;/strong&gt;, SIGGRAPH Course。最推荐的入门材料，重点看 differential forms、primal/dual mesh、Hodge star 和离散 Stokes 定理怎样连起来。&lt;br&gt;
+ACM SIGGRAPH 原课程&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Meyer、Desbrun、Schröder、Barr，&lt;strong&gt;Discrete Differential-Geometry Operators for Triangulated 2-Manifolds&lt;/strong&gt;。如果更关心游戏/几何处理中的法向、曲率、cotangent 类算子，这是很好的工程入口。&lt;br&gt;
+Caltech 开放论文页&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Elcott et al., &lt;strong&gt;Discrete, Vorticity-Preserving, and Stable Simplicial Fluids&lt;/strong&gt;，SIGGRAPH 2005。适合继续追问“结构保持到底怎样改变一个真正的物理求解器”。&lt;br&gt;
+ACM 原论文&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Braune、Tong、Gay-Balmaz、Desbrun，&lt;strong&gt;A Discrete Exterior Calculus of Bundle-valued Forms&lt;/strong&gt;, 2024。属于明显更前沿的扩展：把 DEC 从普通标量 differential forms 推向带 connection 的 vector-bundle-valued forms，并构造满足离散 Bianchi identities 且在网格细化下收敛的 exterior covariant derivative。&lt;br&gt;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2406.05383&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;论文预印本&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
 

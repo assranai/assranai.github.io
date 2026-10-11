@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Durable Execution（持久化执行）与幂等性设计\n领域：Agent 工业应用 × 分布式系统 × AI 全栈工程\n阅读时间：约 4–5 分钟\n关键词：Event History、Replay、Idempotency、Exactly-once Effect\n本期转向此前覆盖较少的 Agent 工业应用。\n一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。\n问题在于，Agent 的某一步执行成功，并不意味着系统知道它已经成功。\n假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。\n重启后，它应该重新提交，还是等待原任务？\n这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：如何在无法确定上一次操作是否成功的情况下安全恢复执行。\nTemporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。\n一、为什么简单保存 Agent 状态还不够？ 假设工作流为：\n\\[ A\\rightarrow B\\rightarrow C \\]其中：\n\\(A\\)：生成仿真输入； \\(B\\)：向服务器提交仿真； \\(C\\)：下载结果。 Agent 在完成 \\(B\\) 后，需要保存：\n\\[ \\text{state}=\\text{B completed}. \\]但可能发生以下事件：\n\\[ \\underbrace{\\text{服务器接受任务}}_{t_1} \\rightarrow \\underbrace{\\text{Agent 崩溃}}_{t_2} \\rightarrow \\underbrace{\\text{状态写入数据库}}_{t_3} \\]由于：\n\\[ t_2">
+<title>Durable Execution：工业 Agent 如何正确处理“执行了一半”</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/40-durable-execution/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Durable Execution：工业 Agent 如何正确处理“执行了一半”">
+<meta property='og:description' content="主题：Durable Execution（持久化执行）与幂等性设计\n领域：Agent 工业应用 × 分布式系统 × AI 全栈工程\n阅读时间：约 4–5 分钟\n关键词：Event History、Replay、Idempotency、Exactly-once Effect\n本期转向此前覆盖较少的 Agent 工业应用。\n一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。\n问题在于，Agent 的某一步执行成功，并不意味着系统知道它已经成功。\n假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。\n重启后，它应该重新提交，还是等待原任务？\n这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：如何在无法确定上一次操作是否成功的情况下安全恢复执行。\nTemporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。\n一、为什么简单保存 Agent 状态还不够？ 假设工作流为：\n\\[ A\\rightarrow B\\rightarrow C \\]其中：\n\\(A\\)：生成仿真输入； \\(B\\)：向服务器提交仿真； \\(C\\)：下载结果。 Agent 在完成 \\(B\\) 后，需要保存：\n\\[ \\text{state}=\\text{B completed}. \\]但可能发生以下事件：\n\\[ \\underbrace{\\text{服务器接受任务}}_{t_1} \\rightarrow \\underbrace{\\text{Agent 崩溃}}_{t_2} \\rightarrow \\underbrace{\\text{状态写入数据库}}_{t_3} \\]由于：\n\\[ t_2">
+<meta property='og:url' content='https://assranai.github.io/cards/40-durable-execution/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:tag' content='大模型推理' /><meta property='article:tag' content='GPU 系统' /><meta property='article:published_time' content='2026-10-04T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-10-04T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Durable Execution：工业 Agent 如何正确处理“执行了一半”">
+<meta name="twitter:description" content="主题：Durable Execution（持久化执行）与幂等性设计\n领域：Agent 工业应用 × 分布式系统 × AI 全栈工程\n阅读时间：约 4–5 分钟\n关键词：Event History、Replay、Idempotency、Exactly-once Effect\n本期转向此前覆盖较少的 Agent 工业应用。\n一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。\n问题在于，Agent 的某一步执行成功，并不意味着系统知道它已经成功。\n假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。\n重启后，它应该重新提交，还是等待原任务？\n这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：如何在无法确定上一次操作是否成功的情况下安全恢复执行。\nTemporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。\n一、为什么简单保存 Agent 状态还不够？ 假设工作流为：\n\\[ A\\rightarrow B\\rightarrow C \\]其中：\n\\(A\\)：生成仿真输入； \\(B\\)：向服务器提交仿真； \\(C\\)：下载结果。 Agent 在完成 \\(B\\) 后，需要保存：\n\\[ \\text{state}=\\text{B completed}. \\]但可能发生以下事件：\n\\[ \\underbrace{\\text{服务器接受任务}}_{t_1} \\rightarrow \\underbrace{\\text{Agent 崩溃}}_{t_2} \\rightarrow \\underbrace{\\text{状态写入数据库}}_{t_3} \\]由于：\n\\[ t_2">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一为什么简单保存-agent-状态还不够">一、为什么简单保存 Agent 状态还不够？</a></li>
+    <li><a href="#二durable-execution-如何恢复执行">二、Durable Execution 如何恢复执行？</a></li>
+    <li><a href="#三idempotency让重复执行不会产生重复效果">三、Idempotency：让重复执行不会产生重复效果</a></li>
+    <li><a href="#四真正重要的区分at-least-once-与-exactly-once-effect">四、真正重要的区分：At-least-once 与 Exactly-once Effect</a></li>
+    <li><a href="#五一个科研-agent-的最小可靠架构">五、一个科研 Agent 的最小可靠架构</a></li>
+    <li><a href="#六为什么这对-llm-agent-尤其重要">六、为什么这对 LLM Agent 尤其重要？</a></li>
+    <li><a href="#七局限与工程代价">七、局限与工程代价</a></li>
+    <li><a href="#它在整个知识体系中卡在哪里">它在整个知识体系中卡在哪里？</a>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/40-durable-execution/">Durable Execution：工业 Agent 如何正确处理“执行了一半”</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-10-04T00:00:00Z'>Oct 04, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 1 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <p><strong>主题：<span class="term-anchor" data-term="durable-execution" tabindex="0">Durable Execution</span>（持久化执行）与幂等性设计</strong><br>
+<strong>领域：Agent 工业应用 × 分布式系统 × AI 全栈工程</strong><br>
+<strong>阅读时间：约 4–5 分钟</strong><br>
+<strong>关键词：Event History、Replay、Idempotency、Exactly-once Effect</strong></p>
+<p>本期转向此前覆盖较少的 Agent 工业应用。</p>
+<p>一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。</p>
+<p>问题在于，<strong>Agent 的某一步执行成功，并不意味着系统知道它已经成功。</strong></p>
+<p>假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。</p>
+<p>重启后，它应该重新提交，还是等待原任务？</p>
+<p>这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：<strong>如何在无法确定上一次操作是否成功的情况下安全恢复执行。</strong></p>
+<p>Temporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。</p>
+<hr>
+<h2 id="一为什么简单保存-agent-状态还不够">一、为什么简单保存 Agent 状态还不够？
+</h2><p>假设工作流为：</p>
+\[ A\rightarrow B\rightarrow C \]<p>其中：</p>
+<ul>
+<li>\(A\)：生成仿真输入；</li>
+<li>\(B\)：向服务器提交仿真；</li>
+<li>\(C\)：下载结果。</li>
+</ul>
+<p>Agent 在完成 \(B\) 后，需要保存：</p>
+\[ \text{state}=\text{B completed}. \]<p>但可能发生以下事件：</p>
+\[ \underbrace{\text{服务器接受任务}}_{t_1} \rightarrow \underbrace{\text{Agent 崩溃}}_{t_2} \rightarrow \underbrace{\text{状态写入数据库}}_{t_3} \]<p>由于：</p>
+\[ t_2<t_3, \]<p>状态数据库仍然认为：</p>
+\[ B=\text{未完成}. \]<p>如果 Agent 直接重试 \(B\)，就可能产生两个仿真任务。</p>
+<p>这里存在一个重要的分布式系统事实：</p>
+<p><strong>外部操作的执行与本地状态的保存，通常无法天然组成一个原子事务。</strong></p>
+<p>因此，单纯增加 checkpoint 并不能彻底解决问题。</p>
+<hr>
+<h2 id="二durable-execution-如何恢复执行">二、Durable Execution 如何恢复执行？
+</h2><p>持久化执行通常将工作流拆分为两类操作：</p>
+<p><strong>Workflow：</strong> 决定下一步做什么。</p>
+<p><strong>Activity：</strong> 真正执行外部操作，例如调用 API、写入文件或启动仿真。</p>
+<p>Workflow 的执行过程被记录为 Event History：</p>
+\[ H=\{e_1,e_2,\ldots,e_n\}. \]<p>例如：</p>
+\[ e_1=\text{WorkflowStarted} \]\[ e_2=\text{ActivityScheduled}(B) \]\[ e_3=\text{ActivityCompleted}(B,r_B) \]<p>其中 \(r_B\) 是 Activity 的返回结果。</p>
+<p>当 Worker 崩溃并重启时，系统可以通过 <strong>Replay（重放）</strong> 恢复工作流状态。</p>
+<p>如果历史已经记录：</p>
+\[ \text{ActivityCompleted}(B,r_B), \]<p>重放时直接使用：</p>
+\[ r_B \]<p>继续执行，不必再次运行 \(B\)。</p>
+<p>Temporal 官方文档明确指出，Workflow 恢复依赖持久化 Event History；已经完成的 Activity 在重放期间返回历史结果，而不会重新执行。</p>
+<p>但有一个关键限制：</p>
+<p><strong>如果外部操作已经成功，而 Activity 的完成事件尚未被持久化，Activity 仍可能被重新执行。</strong></p>
+<p>因此，还需要第二个机制。</p>
+<hr>
+<h2 id="三idempotency让重复执行不会产生重复效果">三、Idempotency：让重复执行不会产生重复效果
+</h2><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>幂等性的数学定义非常简洁：</p>
+\[ \boxed{f(f(x))=f(x)} \]<p>在工程系统中，可以理解为：</p>
+\[ \boxed{\text{同一个逻辑请求重复执行，不应产生额外业务效果。}} \]<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">submit_simulation(
+</span></span><span class="line"><span class="cl">    task_id=&#34;case_001&#34;,
+</span></span><span class="line"><span class="cl">    parameters=...
+</span></span><span class="line"><span class="cl">)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>第一次调用：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">case_001 → 创建任务 → 返回 job_872
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>第二次调用：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">case_001 → 发现任务已存在 → 返回 job_872
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>因此，即使 Agent 重试十次，仍然只有一个逻辑仿真任务。</p>
+<p>这种设计通常通过 <strong>Idempotency Key（幂等键）</strong> 实现。</p>
+<p>例如：</p>
+\[ k= \operatorname{Hash}( \text{workflow\_id}, \text{step\_id}, \text{input\_version} ). \]<p>服务端保存：</p>
+\[ k\rightarrow(\text{request hash},\text{job id},\text{status}). \]<p>同一个 \(k\) 对应相同请求时返回既有结果；如果同一个 \(k\) 对应不同参数，则拒绝请求。</p>
+<p>Amazon Web Services 的工程实践特别强调：重试本身并不危险，危险的是重试可能产生新的副作用。通过幂等请求标识与参数一致性检查，可以显著简化客户端的故障恢复逻辑。</p>
+<p>需要注意，<strong>幂等键必须由真正执行副作用的服务端原子地检查和登记</strong>。如果只是 Agent 在内存中检查任务是否存在，仍然可能出现并发重复提交。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="四真正重要的区分at-least-once-与-exactly-once-effect">四、真正重要的区分：At-least-once 与 Exactly-once Effect
+</h2><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p>分布式系统经常使用三种执行语义：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>语义</th>
+					<th>含义</th>
+					<th>主要风险</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>At-most-once</td>
+					<td>最多执行一次</td>
+					<td>失败后可能丢失任务</td>
+			</tr>
+			<tr>
+					<td>At-least-once</td>
+					<td>至少执行一次</td>
+					<td>可能重复执行</td>
+			</tr>
+			<tr>
+					<td>Exactly-once effect</td>
+					<td>业务效果恰好发生一次</td>
+					<td>需要额外去重与一致性机制</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>对于工业 Agent，常见的合理选择是：</p>
+\[ \boxed{ \text{At-least-once execution} + \text{Idempotency} \Rightarrow \text{Exactly-once effect} } \]<p>这里的箭头表示一种<strong>需要满足严格条件才能实现的工程设计目标</strong>，并非无条件的数学保证。</p>
+<p>例如，仿真服务必须保证同一个任务键只创建一个任务，任务结果也必须能够被重复查询。</p>
+<p>如果底层工具不支持幂等提交，工作流框架本身无法保证外部副作用恰好发生一次。</p>
+<p>这也是为什么工业 Agent 的可靠性最终会深入到 API、数据库和任务调度器层面。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="五一个科研-agent-的最小可靠架构">五、一个科研 Agent 的最小可靠架构
+</h2><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>考虑自动执行：</p>
+\[ \text{生成参数} \rightarrow \text{运行 FEM} \rightarrow \text{提取响应} \rightarrow \text{更新 Kriging}. \]<p>可以设计如下伪代码：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">simulation_activity</span><span class="p">(</span><span class="k">case</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="n">key</span> <span class="o">=</span> <span class="n">stable_hash</span><span class="p">(</span><span class="k">case</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="k">case</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">job</span> <span class="o">=</span> <span class="n">scheduler</span><span class="o">.</span><span class="n">find_by_key</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="n">job</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">        <span class="n">job</span> <span class="o">=</span> <span class="n">scheduler</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">            <span class="k">case</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="n">idempotency_key</span><span class="o">=</span><span class="n">key</span>
+</span></span><span class="line"><span class="cl">        <span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">result</span> <span class="o">=</span> <span class="n">scheduler</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;job_id&#34;</span><span class="p">:</span> <span class="n">job</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;result_hash&#34;</span><span class="p">:</span> <span class="n">hash_file</span><span class="p">(</span><span class="n">result</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;result_path&#34;</span><span class="p">:</span> <span class="n">result</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这段代码隐含一个重要前提：<code>scheduler.submit()</code> 必须支持服务端幂等处理，或者任务登记与提交具有等效的一致性保障。单纯的 <code>find_by_key()</code> 再 <code>submit()</code> 不能防止并发竞争。</p>
+<p>随后由持久化工作流记录：</p>
+\[ \text{ActivityCompleted} \]<p>及其返回结果。</p>
+<p>这样即使发生：</p>
+<ul>
+<li>Agent 进程崩溃；</li>
+<li>LLM API 超时；</li>
+<li>仿真运行两小时后网络中断；</li>
+<li>数据处理阶段异常；</li>
+</ul>
+<p>系统也可以根据持久化历史与外部任务标识恢复进度。</p>
+<p>如果涉及多个数据库或消息队列，还可以进一步引入 <strong>Transactional Outbox</strong>，解决数据库状态更新与事件发布之间的双写一致性问题。AWS 的官方架构指南提供了相应实现。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="六为什么这对-llm-agent-尤其重要">六、为什么这对 LLM Agent 尤其重要？
+</h2><p>传统工作流通常具有确定性：</p>
+\[ s_{t+1}=F(s_t,a_t). \]<p>但 LLM Agent 可能包含：</p>
+\[ a_t=\pi_\theta(s_t,\xi_t), \]<p>其中 \(\xi_t\) 表示采样等随机因素。</p>
+<p>如果恢复执行时重新调用 LLM：</p>
+\[ a_t'\neq a_t \]<p>完全可能发生。</p>
+<p>因此，工业 Agent 需要区分两类行为：</p>
+<p><strong>决策结果可以记录和重放。</strong> 已经生成并确认的计划、工具参数、人工审批结果，应作为持久化数据保存。</p>
+<p><strong>外部操作必须能够安全重试。</strong> 文件写入、数据库更新、任务提交等，应通过幂等键、唯一约束或外部状态核对处理。</p>
+<p>LangGraph 的持久化机制使用 checkpointer 保存工作流状态，并支持中断恢复与 human-in-the-loop。其官方文档也特别提醒：内存型 checkpointer 无法跨进程重启保存数据，生产环境应使用持久化存储。</p>
+<p>这里还存在一个容易忽略的问题：<strong>代码升级可能破坏重放的一致性。</strong> 如果旧工作流记录的是执行 A 后执行 B，而新版本代码改成执行 A 后执行 C，就需要工作流版本管理或迁移机制。</p>
+<hr>
+<h2 id="七局限与工程代价">七、局限与工程代价
+</h2><p>Durable Execution 解决的是<strong>执行可靠性</strong>，并不能保证 Agent 的决策正确。</p>
+<p>即使一个工作流可以完美恢复，它仍然可能稳定地执行一个错误的仿真方案。</p>
+<p>此外，持久化机制还会引入：</p>
+<ul>
+<li>事件历史与检查点的存储开销；</li>
+<li>工作流版本兼容问题；</li>
+<li>外部任务状态与本地记录的对账成本；</li>
+<li>不可逆操作的补偿处理；</li>
+<li>长期运行任务的资源回收问题。</li>
+</ul>
+<p>因此，可靠工业 Agent 还需要权限控制、结果验证、人工审批和审计机制。</p>
+<hr>
+<h2 id="它在整个知识体系中卡在哪里">它在整个知识体系中卡在哪里？
+</h2><p>Agent 工程可以粗略分成四层：</p>
+\[ \boxed{\text{Reasoning}} \]<p>决定做什么。</p>
+\[ \downarrow \]\[ \boxed{\text{Planning / Tool Use}} \]<p>决定怎样调用工具。</p>
+\[ \downarrow \]\[ \boxed{\text{Durable Execution}} \]<p>保证任务在故障、重试和中断后能够正确推进。</p>
+\[ \downarrow \]\[ \boxed{\text{External Systems}} \]<p>真正执行仿真、数据库操作、文件处理和工程任务。</p>
+<p>前三层中，LLM 研究通常最关注 Reasoning 和 Planning。</p>
+<p>但从工业落地角度看，<strong>Durable Execution 是 Agent 从交互式助手走向长期自主运行系统时必须补齐的基础设施。</strong></p>
+<p>它的价值在于把一个模糊的问题：</p>
+<blockquote>
+<p>Agent 失败以后怎么办？</p>
+</blockquote>
+<p>转化为一组可以明确设计和验证的工程契约：</p>
+\[ \boxed{ \text{可恢复状态} + \text{确定性重放} + \text{安全重试} + \text{外部副作用一致性} } \]<p><strong>今天最值得记住的一句话：</strong></p>
+<blockquote>
+<p>工业 Agent 的可靠性，不取决于它永远不失败，而取决于它能否在失败发生后，准确判断哪些事情已经完成、哪些事情可以重试，以及哪些事情绝不能重复。</p>
+</blockquote>
+<hr>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p><strong>1. Temporal — Event History</strong></p>
+<p><a class="link" href="https://docs.temporal.io/encyclopedia/event-history"  target="_blank" rel="noopener"
+    >Temporal 官方事件历史文档</a></p>
+<p>最适合深入理解 Workflow Replay、Activity 与持久化事件历史的关系。</p>
+<p><strong>2. Malcolm Featonby — Making Retries Safe with Idempotent APIs</strong></p>
+<p><a class="link" href="https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/"  target="_blank" rel="noopener"
+    >Amazon Builders&rsquo; Library 原文</a></p>
+<p>AWS 一线工程实践，重点讨论请求标识、重试语义和重复副作用。</p>
+<p><strong>3. LangGraph — Persistence</strong></p>
+<p><a class="link" href="https://docs.langchain.com/oss/python/langgraph/persistence"  target="_blank" rel="noopener"
+    >LangGraph 官方持久化文档</a></p>
+<p>适合从 Agent 框架层面理解 Checkpointer、线程状态、故障恢复和长期记忆之间的区别。</p>
+<p><strong>4. AWS — Transactional Outbox Pattern</strong></p>
+<p><a class="link" href="https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"  target="_blank" rel="noopener"
+    >AWS 官方架构指南与实现示例</a></p>
+<p>适合进一步理解数据库事务、事件发布和重复消息处理之间的一致性问题。</p>
+<hr>
+<p><strong>知识卡片注册表更新：第 56 张。</strong></p>
+<p>新增主题：Durable Execution 与幂等性设计。所属方向：Agent 工业应用 / 分布式系统 / AI 全栈工程。核心问题：如何使长期运行的 Agent 在进程崩溃、网络中断和外部任务状态不确定的情况下安全恢复。</p>
+<p>与此前的数值求解器、ROM 和可靠性方法卡片无主题重复；它补充的是<strong>科研自动化系统自身的执行可靠性</strong>。</p>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/ai-%E5%85%A8%E6%A0%88%E5%B7%A5%E7%A8%8B/">AI 全栈工程</a>
+        
+            <a href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86/">大模型推理</a>
+        
+            <a href="/tags/gpu-%E7%B3%BB%E7%BB%9F/">GPU 系统</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/28-continuous-batching/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Continuous Batching：大模型推理真正的“批处理单位”，为什么不是请求，而是一次 token 迭代</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/17-paged-attention/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/29-speculative-decoding/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Speculative Decoding：为什么一个“小模型猜答案 &#43; 大模型批量验算”的系统，可以在**不改变目标分布**的前提下加速大模型</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/23-lora/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
