@@ -397,7 +397,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 6 分钟
+                    阅读时长: 8 分钟
                 </time>
             </div>
         
@@ -412,7 +412,7 @@
     <section class="article-content">
     
     
-    <p><strong>主题：Nitsche Method（Nitsche 方法）</strong><br>
+    <p><strong>主题：<span class="term-anchor" data-term="nitsche" tabindex="0">Nitsche</span> Method（Nitsche 方法）</strong><br>
 <strong>领域：有限元 × 计算力学 × 接触力学 × 数值方法</strong><br>
 <strong>推荐阅读时间：约 8–10 分钟</strong></p>
 <p>今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：</p>
@@ -857,6 +857,141 @@
 </details>
 
 <hr>
+<h1 id="22-普通有限元为什么需要直接固定节点">22. 普通有限元为什么需要直接固定节点？
+</h1><p>考虑最简单的 Poisson 方程：</p>
+\[ -\Delta u=f,\qquad x\in\Omega, \]<p>边界条件：</p>
+\[ u=g,\qquad x\in\Gamma_D. \]<p>传统 Galerkin FEM 将方程乘以测试函数 \(v\)，积分分部：</p>
+\[ \int_\Omega\nabla u\cdot\nabla v\,d\Omega - \int_{\Gamma_D}\frac{\partial u}{\partial n}v\,d\Gamma = \int_\Omega fv\,d\Omega. \]<p>如果使用强制 Dirichlet 条件，测试函数在对应边界满足：</p>
+\[ v|_{\Gamma_D}=0. \]<p>于是边界积分消失。</p>
+<p>最后得到熟悉的：</p>
+\[ Ku=f. \]<p>这种处理十分自然，但存在一个隐含要求：</p>
+\[ \boxed{\text{有限元空间必须事先满足边界约束。}} \]<p>对于规则、边界匹配的网格，这很容易实现。</p>
+<p>但如果边界穿过单元内部，或者两个网格的节点并不重合，强制约束就可能需要复杂的自由度映射。</p>
+<hr>
+<h1 id="23-最简单的替代方案penalty-method">23. 最简单的替代方案：Penalty Method
+</h1><p>既然希望：</p>
+\[ u=g, \]<p>可以直接给边界偏差增加惩罚：</p>
+\[ \boxed{ E_p(u)= \frac{\eta}{2h} \int_{\Gamma_D}(u-g)^2\,d\Gamma. } \]<p>其中：</p>
+<ul>
+<li>\(h\)：边界附近的网格尺寸；</li>
+<li>\(\eta\)：惩罚参数。</li>
+</ul>
+<p>当：</p>
+\[ \eta\rightarrow\infty, \]<p>边界偏差趋向零。</p>
+<p>但这里有两个问题。</p>
+<p><strong>第一，有限惩罚参数会引入边界误差。</strong></p>
+<p><strong>第二，惩罚参数过大会恶化刚度矩阵的条件数。</strong></p>
+<p>因此普通 Penalty Method 存在典型的权衡：</p>
+\[ \boxed{ \text{约束越严格} \quad\Longrightarrow\quad \text{线性系统可能越难求解}. } \]<p>Nitsche 方法的关键突破，是发现<strong>仅增加惩罚能量还不够，必须把边界上的物理通量也纳入构造</strong>。</p>
+<hr>
+<h1 id="24-nitsche-方法怎样修改弱形式">24. Nitsche 方法怎样修改弱形式？
+</h1><p>对于上述 Poisson 方程，经典对称 Nitsche 方法定义：</p>
+\[ \boxed{ \begin{aligned} a_h(u,v) ={}& \int_\Omega\nabla u\cdot\nabla v\,d\Omega\\ &-\int_{\Gamma_D} \frac{\partial u}{\partial n}v\,d\Gamma\\ &-\int_{\Gamma_D} \frac{\partial v}{\partial n}u\,d\Gamma\\ &+\int_{\Gamma_D} \frac{\gamma}{h}uv\,d\Gamma. \end{aligned} } \]<p>右端为：</p>
+\[ \boxed{ \begin{aligned} l_h(v) ={}&\int_\Omega fv\,d\Omega\\ &-\int_{\Gamma_D} \frac{\partial v}{\partial n}g\,d\Gamma\\ &+\int_{\Gamma_D} \frac{\gamma}{h}gv\,d\Gamma. \end{aligned} } \]<p>其中 \(\gamma\) 是无量纲稳定化参数，实际扩散问题还需考虑扩散系数。</p>
+<p>这几个边界项具有不同作用。</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>项</th>
+					<th>作用</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>\(-\int_{\Gamma_D}\partial_nu\,v\)</td>
+					<td>保留积分分部产生的物理通量</td>
+			</tr>
+			<tr>
+					<td>\(-\int_{\Gamma_D}\partial_nv\,u\)</td>
+					<td>保持双线性形式的对称性及<span class="term-anchor" data-term="adjoint" tabindex="0">伴随</span>一致性</td>
+			</tr>
+			<tr>
+					<td>\(\int_{\Gamma_D}(\gamma/h)uv\)</td>
+					<td>提供稳定化，控制边界偏差</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>最重要的性质是：</p>
+<p>如果 \(u\) 是满足原 PDE 和 \(u=g\) 的精确解，将它代入 Nitsche 弱形式，方程仍然成立。</p>
+<p>这称为：</p>
+\[ \boxed{\text{Consistency（一致性）}.} \]<p>相比之下，单纯增加有限强度的边界惩罚通常无法保持这种一致性。</p>
+<p>Feel++ 的官方教程正是按照“通量一致性项 → 对称项 → 稳定化项”的顺序介绍 Nitsche 方法。</p>
+<hr>
+<h1 id="25-一个深刻区别一致性与稳定性可以分别设计">25. 一个深刻区别：一致性与稳定性可以分别设计
+</h1><p>Nitsche 方法的重要性还在于，它把两个经常混淆的要求分开了。</p>
+<p><strong>一致性：</strong></p>
+\[ u_{\mathrm{exact}} \]<p>必须满足离散弱方程。</p>
+<p><strong>稳定性：</strong></p>
+<p>离散双线性形式必须具有足够的控制能力，使数值解不会出现不稳定模式。</p>
+<p>对于经典对称 Nitsche 方法，需要选择足够大的 \(\gamma\)，以保证 coercivity（强制性）。</p>
+<p>但并不是所有 Nitsche 方法都必须依赖正惩罚参数。</p>
+<p>Burman 在 2012 年证明，一类<strong>非对称 Nitsche 方法可以在没有惩罚项的情况下保持稳定性</strong>，但其误差性质与经典对称方法有所不同。</p>
+<p>这揭示了一个值得迁移的数值方法设计思想：</p>
+\[ \boxed{ \text{物理一致性、代数对称性和数值稳定性， 是可以分别分析和设计的性质。} } \]<hr>
+<h1 id="26-为什么它特别适合接触有限元">26. 为什么它特别适合接触有限元？
+</h1><p>考虑弹性体与刚性平面的无摩擦接触。</p>
+<p>接触条件可以写成 Signorini 互补关系：</p>
+\[ g_n\geq0, \]\[ p_n\geq0, \]\[ \boxed{g_np_n=0.} \]<p>其中：</p>
+<ul>
+<li>\(g_n\)：法向间隙；</li>
+<li>\(p_n\)：接触压力，取压缩为正。</li>
+</ul>
+<p>这些条件意味着：</p>
+<p>物体可以离开接触面，但不能穿透；只有间隙为零时才可能产生接触压力。</p>
+<p>传统方法通常使用：</p>
+\[ \text{Penalty} \]<p>或：</p>
+\[ \text{Lagrange Multipliers}. \]<p>Nitsche 型接触方法则通过一致的边界项与适当的非线性投影表达接触条件。</p>
+<p>其优势之一是：</p>
+\[ \boxed{\text{可以不增加接触压力的独立未知量。}} \]<p>Chouly 与 Hild 在 2013 年的 <em>SIAM Journal on Numerical Analysis</em> 论文中，针对二维线弹性单侧接触问题证明了 Nitsche 型方法的最优阶收敛性，并且不需要拉格朗日乘子方法中的离散 inf-sup 条件。</p>
+<p>这对于接触边界复杂、网格不匹配的工程模型尤其有吸引力。</p>
+<p>不过，Nitsche 接触仍然需要处理接触状态切换带来的非光滑性；不引入乘子，并不意味着接触问题自动变成简单的线性问题。</p>
+<hr>
+<h1 id="27-它与-cutfem-的关系更值得注意">27. 它与 CutFEM 的关系更值得注意
+</h1><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p>假设要模拟一个圆形弹性体。</p>
+<p>传统 FEM 通常需要生成贴合圆形边界的网格。</p>
+<p>CutFEM 则允许使用规则背景网格，让真实物体边界直接穿过单元。</p>
+<p>这样可以减少复杂几何的网格生成成本。</p>
+<p>但随之产生一个问题：</p>
+<p><strong>真实边界没有对应的一整排网格节点，怎样施加位移边界条件？</strong></p>
+<p>Nitsche 方法可以直接在真实边界与被切割单元的交线上施加弱边界条件。</p>
+<p>不过，极小的 cut cells 可能导致矩阵严重病态。</p>
+<p>因此实际 CutFEM 往往还需要 Ghost Penalty 等稳定化机制。</p>
+<p>Burman 与 Hansbo 在 2012 年的工作中，将 Nitsche 方法推广到 cut-element fictitious domain，并通过额外的面跳跃稳定化，使矩阵条件数不依赖于边界切割网格的具体位置。</p>
+<p>这里的技术链条非常清晰：</p>
+\[ \boxed{ \text{复杂几何} \rightarrow \text{非贴体背景网格} \rightarrow \text{Nitsche 弱边界} \rightarrow \text{Ghost Penalty 稳定化}. } \]<p>这对复杂机构接触、自动网格生成和几何快速变化的物理仿真具有直接启发。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="28-对自研-fem--软体求解器的启发">28. 对自研 FEM / 软体求解器的启发
+</h1><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p>假设未来需要模拟大量形状不同的软体对象。</p>
+<p>如果每个对象都必须重新生成贴体四面体网格，几何预处理可能成为很大的成本。</p>
+<p>另一条路线是：</p>
+<p>使用背景网格表达体内场，通过隐式几何描述真实边界，再利用 Nitsche 类方法施加边界条件。</p>
+<p>这种路线尤其适合研究：</p>
+<ul>
+<li>复杂几何自动离散；</li>
+<li>非匹配网格耦合；</li>
+<li>刚柔接触；</li>
+<li>immersed FEM；</li>
+<li>大规模几何参数扫描。</li>
+</ul>
+<p>但它也有代价。</p>
+<p>Nitsche 方法依赖物理模型的边界通量表达。对于非线性弹性，需要正确计算边界牵引及其线性化；对于接触，还需要设计适当的非线性接触算子。</p>
+<p>此外，稳定化参数和网格尺寸之间存在明确的尺度关系，不能简单照搬 PBD 中任意设定的约束刚度。</p>
+<p>因此，它更适合作为<strong>变分有限元中的约束处理技术</strong>理解，而不宜直接当成一个通用的位置投影算法。</p>
+
+  </div>
+</details>
+
+<hr>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
 </h1><p>Nitsche 方法最值得记住的不是：</p>
 \[-\langle\partial_nu,v\rangle -\langle\partial_nv,u\rangle + \frac{\gamma}{h}\langle u,v\rangle.\]<p>真正值得记住的是：</p>
@@ -1034,12 +1169,12 @@
             
                 
 <article class="">
-    <a href="/cards/36-equilibrated-flux/">
+    <a href="/cards/41-jacobian-free-newton-krylov/">
         
         
 
         <div class="article-details">
-            <h2 class="article-title">Equilibrated Flux：有限元怎样从“误差估计”走到“可认证的误差上界”？</h2>
+            <h2 class="article-title">Jacobian-Free Newton–Krylov：不构造 Jacobian 也能解非线性有限元</h2>
         </div>
     </a>
 </article>

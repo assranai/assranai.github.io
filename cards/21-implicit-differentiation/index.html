@@ -351,6 +351,23 @@
   <ol>
     <li>
       <ol>
+        <li><a href="#一个简单到不能再简单的例子">一个简单到不能再简单的例子</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
+        <li><a href="#路线-aunrolled-automatic-differentiation">路线 A：Unrolled Automatic Differentiation</a></li>
+        <li><a href="#路线-bequation-level-implicit-differentiation">路线 B：Equation-Level Implicit Differentiation</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
+    <li>
+      <ol>
         <li><a href="#拓展阅读">拓展阅读</a></li>
       </ol>
     </li>
@@ -969,6 +986,143 @@
 </details>
 
 <hr>
+<h1 id="21-问题根源物理方程的解与求解器的输出并不完全相同">21. 问题根源：物理方程的解，与求解器的输出并不完全相同
+</h1><p>考虑隐式软体动力学中的一个时间步。</p>
+<p>设当前位置为 \(x\)，材料参数为 \(\theta\)，需要求解：</p>
+\[ \boxed{ R(x,\theta)=0. } \]<p>例如：</p>
+\[ R(x,\theta) = \frac{M}{h^2}(x-y) + \nabla_x E(x,\theta). \]<p>其中 \(y\) 是惯性预测位置，\(E\) 是弹性势能。</p>
+<p>理论上，求解器应返回：</p>
+\[ x^\star(\theta). \]<p>但真实游戏物理引擎通常不会让非线性迭代完全收敛。</p>
+<p>为了满足实时计算预算，可能只执行：</p>
+\[ K=5 \]<p>次迭代。</p>
+<p>实际得到的是：</p>
+\[ \boxed{x_K(\theta)} \]<p>而非严格的 \(x^\star(\theta)\)。</p>
+<p>如果需要计算最终位置对材料参数的敏感度，就出现两种不同的问题：</p>
+\[ \frac{dx^\star}{d\theta} \]<p>与</p>
+\[ \frac{dx_K}{d\theta}. \]<p>这两个导数只有在适当收敛条件下才会趋于一致。</p>
+<h3 id="一个简单到不能再简单的例子">一个简单到不能再简单的例子
+</h3><p>假设某迭代算法为：</p>
+\[ x_{k+1}=\frac{x_k+\theta}{2}, \qquad x_0=0. \]<p>其固定点满足：</p>
+\[ x^\star=\frac{x^\star+\theta}{2}, \]<p>因此：</p>
+\[ x^\star=\theta, \qquad \frac{dx^\star}{d\theta}=1. \]<p>但如果只执行两次：</p>
+\[ x_1=\frac{\theta}{2}, \]\[ x_2=\frac{3\theta}{4}. \]<p>那么：</p>
+\[ \boxed{ \frac{dx_2}{d\theta}=\frac34. } \]<p>两种梯度分别为：</p>
+\[ \underbrace{1}_{\text{收敛方程的梯度}} \qquad \underbrace{0.75}_{\text{实际算法的梯度}}. \]<p>即使收敛方程完全正确，使用它的导数，也不能准确描述只执行两次迭代的程序。</p>
+<p><strong>这就是 Solver-Level Differentiation 要解决的根本问题。</strong></p>
+<hr>
+<h1 id="22-传统两条路线各有什么代价">22. 传统两条路线各有什么代价？
+</h1><h3 id="路线-aunrolled-automatic-differentiation">路线 A：Unrolled Automatic Differentiation
+</h3><p>直接将每次迭代展开：</p>
+\[ x_0 \xrightarrow{S_1} x_1 \xrightarrow{S_2} \cdots \xrightarrow{S_K} x_K. \]<p>然后使用自动微分反向传播。</p>
+<p>其优势是能够对实际执行的计算图求导。</p>
+<p>但如果每个时间步包含大量迭代，并且需要模拟几千帧，那么反向传播可能需要保存大量中间状态。</p>
+<p>内存开销通常随着迭代深度、时间步数和计算图规模增长。</p>
+<p>可以通过 checkpointing 降低存储需求，但需要额外的重计算。</p>
+<h3 id="路线-bequation-level-implicit-differentiation">路线 B：Equation-Level Implicit Differentiation
+</h3><p>使用隐函数定理。</p>
+<p>由：</p>
+\[ R(x^\star,\theta)=0 \]<p>得到：</p>
+\[ R_x\frac{dx^\star}{d\theta}+R_\theta=0. \]<p>因此：</p>
+\[ \boxed{ \frac{dx^\star}{d\theta} = -R_x^{-1}R_\theta. } \]<p>对于标量目标函数 \(L(x^\star,\theta)\)，通常通过伴随方程：</p>
+\[ R_x^T\lambda=\nabla_xL \]<p>计算：</p>
+\[ \boxed{ \frac{dL}{d\theta} = \frac{\partial L}{\partial\theta} - \lambda^TR_\theta. } \]<p>这种方法无需反向穿过全部求解器迭代，因此非常适合高精度收敛的隐式问题。</p>
+<p>2022 年 NeurIPS 论文 <em>Efficient and Modular Implicit Differentiation</em> 已经将这套思想系统化，使用户能够通过定义最优性条件，为不同求解器构造隐式导数。</p>
+<p>但它计算的是<strong>方程解的敏感度</strong>。</p>
+<p>如果前向求解器只执行少量迭代，直接使用收敛方程的伴随导数，可能无法正确描述实际程序的输出。</p>
+<hr>
+<h1 id="23-2026-年的新思路让反向传播继承前向求解器的局部结构">23. 2026 年的新思路：让反向传播继承前向求解器的局部结构
+</h1><p>考虑采用 Gauss–Seidel 思想的块迭代求解器。</p>
+<p>一个完整扫描由多个局部更新组成：</p>
+\[ S=S_n\circ S_{n-1}\circ\cdots\circ S_1. \]<p>每个 \(S_i\) 只修改一小组自由度。</p>
+<p>例如三维四面体网格中，一个顶点的位置：</p>
+\[ x_i\in\mathbb R^3 \]<p>就是一个块。</p>
+<p>假设局部 Newton 更新满足：</p>
+\[ \boxed{ H_i\Delta x_i=-g_i, } \]<p>其中：</p>
+\[ g_i=\nabla_{x_i}G, \qquad H_i=\nabla_{x_ix_i}^2G. \]<p>前向求解只需要一个 \(3\times3\) 线性系统。</p>
+<p>那么反向传播能否也只使用 \(3\times3\) 的局部计算？</p>
+<p>答案是可以，但必须正确计算整个局部更新的导数。</p>
+<p>根据链式法则：</p>
+\[ \boxed{ \left(\frac{\partial S}{\partial x}\right)^T = \left(\frac{\partial S_1}{\partial x}\right)^T \cdots \left(\frac{\partial S_n}{\partial x}\right)^T. } \]<p>这意味着：</p>
+<p><strong>前向按照 \(1\rightarrow n\) 更新，反向就按照 \(n\rightarrow1\) 传播伴随量。</strong></p>
+<p>对于局部更新：</p>
+\[ H_i\Delta x_i=-g_i, \]<p>对任意参数 \(z\) 求导：</p>
+\[ \boxed{ \frac{d\Delta x_i}{dz} = -H_i^{-1} \left( \frac{\partial g_i}{\partial z} + \frac{\partial H_i}{\partial z}\Delta x_i \right). } \]<p>设传入该局部更新的伴随向量为 \(\bar x_i\)，可以先解：</p>
+\[ \boxed{ H_i^Tp_i=\bar x_i. } \]<p>然后利用 \(p_i\) 将梯度贡献传播到相邻顶点和材料参数。</p>
+<p>整个过程不需要构造完整的全局 Jacobian。</p>
+<p>其核心结构为：</p>
+\[ \boxed{ \text{Forward：局部块求解} \quad\Longleftrightarrow\quad \text{Backward：反向局部伴随求解}. } \]<p>不过，公式中的</p>
+\[ \frac{\partial H_i}{\partial z}\Delta x_i \]<p>不能随意忽略。</p>
+<p>它描述局部 Hessian 随状态或参数变化产生的导数贡献。若将其省略，即使局部线性方程求解准确，也可能得到错误梯度。</p>
+<p>2026 年的研究还指出，更新限幅、正则化及其他数值保护操作同样必须纳入反向微分。</p>
+<hr>
+<h1 id="24-实际效果从全局伴随系统转向局部-gpu-计算">24. 实际效果：从全局伴随系统转向局部 GPU 计算
+</h1><p>Shu 等将该方法应用于 Vertex Block Descent（VBD）软体求解器。</p>
+<p>其前向计算具有两个特点：</p>
+<p>第一，每个顶点求解一个小型 \(3\times3\) 系统。</p>
+<p>第二，通过图着色，将不相互干扰的顶点划分为可并行处理的颜色组。</p>
+<p>反向传播则按相反的颜色顺序执行局部伴随更新。</p>
+<p>论文报告，在同一代码库、同一 GPU 的受控比较中：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>指标</th>
+					<th>论文报告结果</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>相比展开式自动微分的反向速度</td>
+					<td>最高约 <strong>33 倍</strong></td>
+			</tr>
+			<tr>
+					<td>相比展开式自动微分的内存节省</td>
+					<td>约 <strong>71 倍</strong></td>
+			</tr>
+			<tr>
+					<td>有限迭代深度下的梯度</td>
+					<td>与对应执行过程的自动微分结果达到机器精度级一致</td>
+			</tr>
+			<tr>
+					<td>可扩展的求解器结构</td>
+					<td>VBD，并给出 <span class="term-anchor" data-term="pd" tabindex="0">PD</span>、<span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 的验证</td>
+			</tr>
+	</tbody>
+</table></div>
+<p>研究还展示了百万个接触耦合软体对象的 GPU 仿真实验。</p>
+<p>这些是作者在特定实现和测试条件下报告的结果，并不意味着任意 XPBD 或 FEM 求解器都能直接获得相同加速。目前该工作是 2026 年 8 月发布的预印本，尚不宜将其性能结论视为经过广泛独立验证的通用规律。</p>
+<hr>
+<h1 id="25-为什么它与-xpbd-和-projective-dynamics-有直接关系">25. 为什么它与 XPBD 和 Projective Dynamics 有直接关系？
+</h1><p>此前多次介绍过 Projective Dynamics，也讨论过 XPBD 的 Gauss–Seidel 约束迭代。</p>
+<p>这些求解器的共同特点是：</p>
+\[ \boxed{ \text{复杂全局运动} \rightarrow \text{大量简单局部更新}. } \]<p>例如 XPBD 中，单个约束的典型更新为：</p>
+\[ \Delta\lambda = \frac{-C(x)-\tilde\alpha\lambda} {\sum_iw_i\|\nabla_iC\|^2+\tilde\alpha}, \]<p>随后：</p>
+\[ \Delta x_i=w_i\nabla_iC\,\Delta\lambda. \]<p>如果希望计算：</p>
+\[ \frac{\partial x_{\mathrm{final}}} {\partial\alpha}, \]<p>其中 \(\alpha\) 是材料或约束参数，就需要考虑每次局部约束投影如何影响后续更新。</p>
+<p>对于只执行有限次约束迭代的 XPBD，直接对理想收敛状态求导，可能无法准确描述实际输出。</p>
+<p>反向扫描方法提供了一个值得研究的方向：</p>
+<p><strong>在保留原有局部求解器和并行调度结构的基础上，为它设计相应的局部伴随更新。</strong></p>
+<p>这与 DiffPD 的研究目标具有明显关联。</p>
+<p>DiffPD 在 2022 年发表于 <em>ACM Transactions on Graphics</em>，利用 PD 前向求解中的预分解矩阵加速反向计算，在系统辨识、逆向设计和控制等任务中展示了实际效果。</p>
+<p>不过，两者的主要创新点不同：DiffPD 着重利用 PD 的线性代数结构，而反向扫描伴随法着重利用<strong>实际执行的局部迭代结构</strong>。</p>
+<hr>
+<h1 id="26-一个必须警惕的局限梯度正确不代表物理正确">26. 一个必须警惕的局限：梯度正确，不代表物理正确
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>假设某个接触求解器存在系统性穿透误差。</p>
+<p>反向扫描可以准确计算：</p>
+\[ \frac{\partial x_K}{\partial\theta}. \]<p>但这只能保证梯度正确反映当前离散算法。</p>
+<p>如果算法本身没有准确描述真实接触物理，那么这个梯度也可能缺乏真实物理意义。</p>
+<p>此外，接触激活、摩擦粘滑切换和碰撞事件会产生非光滑性。</p>
+<p>在这些位置，经典导数可能不存在，或者只能在固定接触分支内定义局部导数。</p>
+<p>2023 年的研究 <em>Improving Gradient Computation for Differentiable Physics Simulation with Contacts</em> 已经发现，部分可微接触模型在接触法向发生变化时会产生错误梯度，并利用连续碰撞检测和碰撞时刻信息改善这一问题。</p>
+<p>因此，可微物理至少需要区分三个层次：</p>
+\[ \boxed{\text{物理模型是否正确？}} \]\[ \boxed{\text{离散求解是否足够准确？}} \]\[ \boxed{\text{梯度是否对应实际执行的计算？}} \]<p>这三者需要分别验证。</p>
+
+  </div>
+</details>
+
+<hr>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
 </h1><p>Implicit Differentiation 最重要的不是：</p>
 \[\frac{dx^*}{d\theta} = -F_x^{-1}F_\theta.\]<p>真正值得记住的是：</p>
@@ -1125,6 +1279,19 @@
             
                 
 <article class="">
+    <a href="/cards/41-jacobian-free-newton-krylov/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Jacobian-Free Newton–Krylov：不构造 Jacobian 也能解非线性有限元</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
     <a href="/cards/36-equilibrated-flux/">
         
         
@@ -1144,19 +1311,6 @@
 
         <div class="article-details">
             <h2 class="article-title">Anderson Acceleration：把固定点迭代外挂成准牛顿求解器</h2>
-        </div>
-    </a>
-</article>
-
-            
-                
-<article class="">
-    <a href="/cards/32-probabilistic-numerics/">
-        
-        
-
-        <div class="article-details">
-            <h2 class="article-title">Probabilistic Numerics：如果有限元求解器本身也会犯错，为什么它通常只返回一个数字？</h2>
         </div>
     </a>
 </article>

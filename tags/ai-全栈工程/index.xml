@@ -2169,6 +2169,143 @@ $$\boxed{ \text{模型在最重要、最稀少的区域错了以后，是否还�
 &lt;/details&gt;
 
 &lt;hr&gt;
+&lt;h1 id=&#34;21-问题根源物理方程的解与求解器的输出并不完全相同&#34;&gt;21. 问题根源：物理方程的解，与求解器的输出并不完全相同
+&lt;/h1&gt;&lt;p&gt;考虑隐式软体动力学中的一个时间步。&lt;/p&gt;
+&lt;p&gt;设当前位置为 \(x\)，材料参数为 \(\theta\)，需要求解：&lt;/p&gt;
+\[ \boxed{ R(x,\theta)=0. } \]&lt;p&gt;例如：&lt;/p&gt;
+\[ R(x,\theta) = \frac{M}{h^2}(x-y) + \nabla_x E(x,\theta). \]&lt;p&gt;其中 \(y\) 是惯性预测位置，\(E\) 是弹性势能。&lt;/p&gt;
+&lt;p&gt;理论上，求解器应返回：&lt;/p&gt;
+\[ x^\star(\theta). \]&lt;p&gt;但真实游戏物理引擎通常不会让非线性迭代完全收敛。&lt;/p&gt;
+&lt;p&gt;为了满足实时计算预算，可能只执行：&lt;/p&gt;
+\[ K=5 \]&lt;p&gt;次迭代。&lt;/p&gt;
+&lt;p&gt;实际得到的是：&lt;/p&gt;
+\[ \boxed{x_K(\theta)} \]&lt;p&gt;而非严格的 \(x^\star(\theta)\)。&lt;/p&gt;
+&lt;p&gt;如果需要计算最终位置对材料参数的敏感度，就出现两种不同的问题：&lt;/p&gt;
+\[ \frac{dx^\star}{d\theta} \]&lt;p&gt;与&lt;/p&gt;
+\[ \frac{dx_K}{d\theta}. \]&lt;p&gt;这两个导数只有在适当收敛条件下才会趋于一致。&lt;/p&gt;
+&lt;h3 id=&#34;一个简单到不能再简单的例子&#34;&gt;一个简单到不能再简单的例子
+&lt;/h3&gt;&lt;p&gt;假设某迭代算法为：&lt;/p&gt;
+\[ x_{k+1}=\frac{x_k+\theta}{2}, \qquad x_0=0. \]&lt;p&gt;其固定点满足：&lt;/p&gt;
+\[ x^\star=\frac{x^\star+\theta}{2}, \]&lt;p&gt;因此：&lt;/p&gt;
+\[ x^\star=\theta, \qquad \frac{dx^\star}{d\theta}=1. \]&lt;p&gt;但如果只执行两次：&lt;/p&gt;
+\[ x_1=\frac{\theta}{2}, \]\[ x_2=\frac{3\theta}{4}. \]&lt;p&gt;那么：&lt;/p&gt;
+\[ \boxed{ \frac{dx_2}{d\theta}=\frac34. } \]&lt;p&gt;两种梯度分别为：&lt;/p&gt;
+\[ \underbrace{1}_{\text{收敛方程的梯度}} \qquad \underbrace{0.75}_{\text{实际算法的梯度}}. \]&lt;p&gt;即使收敛方程完全正确，使用它的导数，也不能准确描述只执行两次迭代的程序。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;这就是 Solver-Level Differentiation 要解决的根本问题。&lt;/strong&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;22-传统两条路线各有什么代价&#34;&gt;22. 传统两条路线各有什么代价？
+&lt;/h1&gt;&lt;h3 id=&#34;路线-aunrolled-automatic-differentiation&#34;&gt;路线 A：Unrolled Automatic Differentiation
+&lt;/h3&gt;&lt;p&gt;直接将每次迭代展开：&lt;/p&gt;
+\[ x_0 \xrightarrow{S_1} x_1 \xrightarrow{S_2} \cdots \xrightarrow{S_K} x_K. \]&lt;p&gt;然后使用自动微分反向传播。&lt;/p&gt;
+&lt;p&gt;其优势是能够对实际执行的计算图求导。&lt;/p&gt;
+&lt;p&gt;但如果每个时间步包含大量迭代，并且需要模拟几千帧，那么反向传播可能需要保存大量中间状态。&lt;/p&gt;
+&lt;p&gt;内存开销通常随着迭代深度、时间步数和计算图规模增长。&lt;/p&gt;
+&lt;p&gt;可以通过 checkpointing 降低存储需求，但需要额外的重计算。&lt;/p&gt;
+&lt;h3 id=&#34;路线-bequation-level-implicit-differentiation&#34;&gt;路线 B：Equation-Level Implicit Differentiation
+&lt;/h3&gt;&lt;p&gt;使用隐函数定理。&lt;/p&gt;
+&lt;p&gt;由：&lt;/p&gt;
+\[ R(x^\star,\theta)=0 \]&lt;p&gt;得到：&lt;/p&gt;
+\[ R_x\frac{dx^\star}{d\theta}+R_\theta=0. \]&lt;p&gt;因此：&lt;/p&gt;
+\[ \boxed{ \frac{dx^\star}{d\theta} = -R_x^{-1}R_\theta. } \]&lt;p&gt;对于标量目标函数 \(L(x^\star,\theta)\)，通常通过伴随方程：&lt;/p&gt;
+\[ R_x^T\lambda=\nabla_xL \]&lt;p&gt;计算：&lt;/p&gt;
+\[ \boxed{ \frac{dL}{d\theta} = \frac{\partial L}{\partial\theta} - \lambda^TR_\theta. } \]&lt;p&gt;这种方法无需反向穿过全部求解器迭代，因此非常适合高精度收敛的隐式问题。&lt;/p&gt;
+&lt;p&gt;2022 年 NeurIPS 论文 &lt;em&gt;Efficient and Modular Implicit Differentiation&lt;/em&gt; 已经将这套思想系统化，使用户能够通过定义最优性条件，为不同求解器构造隐式导数。&lt;/p&gt;
+&lt;p&gt;但它计算的是&lt;strong&gt;方程解的敏感度&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;如果前向求解器只执行少量迭代，直接使用收敛方程的伴随导数，可能无法正确描述实际程序的输出。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;23-2026-年的新思路让反向传播继承前向求解器的局部结构&#34;&gt;23. 2026 年的新思路：让反向传播继承前向求解器的局部结构
+&lt;/h1&gt;&lt;p&gt;考虑采用 Gauss–Seidel 思想的块迭代求解器。&lt;/p&gt;
+&lt;p&gt;一个完整扫描由多个局部更新组成：&lt;/p&gt;
+\[ S=S_n\circ S_{n-1}\circ\cdots\circ S_1. \]&lt;p&gt;每个 \(S_i\) 只修改一小组自由度。&lt;/p&gt;
+&lt;p&gt;例如三维四面体网格中，一个顶点的位置：&lt;/p&gt;
+\[ x_i\in\mathbb R^3 \]&lt;p&gt;就是一个块。&lt;/p&gt;
+&lt;p&gt;假设局部 Newton 更新满足：&lt;/p&gt;
+\[ \boxed{ H_i\Delta x_i=-g_i, } \]&lt;p&gt;其中：&lt;/p&gt;
+\[ g_i=\nabla_{x_i}G, \qquad H_i=\nabla_{x_ix_i}^2G. \]&lt;p&gt;前向求解只需要一个 \(3\times3\) 线性系统。&lt;/p&gt;
+&lt;p&gt;那么反向传播能否也只使用 \(3\times3\) 的局部计算？&lt;/p&gt;
+&lt;p&gt;答案是可以，但必须正确计算整个局部更新的导数。&lt;/p&gt;
+&lt;p&gt;根据链式法则：&lt;/p&gt;
+\[ \boxed{ \left(\frac{\partial S}{\partial x}\right)^T = \left(\frac{\partial S_1}{\partial x}\right)^T \cdots \left(\frac{\partial S_n}{\partial x}\right)^T. } \]&lt;p&gt;这意味着：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;前向按照 \(1\rightarrow n\) 更新，反向就按照 \(n\rightarrow1\) 传播伴随量。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;对于局部更新：&lt;/p&gt;
+\[ H_i\Delta x_i=-g_i, \]&lt;p&gt;对任意参数 \(z\) 求导：&lt;/p&gt;
+\[ \boxed{ \frac{d\Delta x_i}{dz} = -H_i^{-1} \left( \frac{\partial g_i}{\partial z} + \frac{\partial H_i}{\partial z}\Delta x_i \right). } \]&lt;p&gt;设传入该局部更新的伴随向量为 \(\bar x_i\)，可以先解：&lt;/p&gt;
+\[ \boxed{ H_i^Tp_i=\bar x_i. } \]&lt;p&gt;然后利用 \(p_i\) 将梯度贡献传播到相邻顶点和材料参数。&lt;/p&gt;
+&lt;p&gt;整个过程不需要构造完整的全局 Jacobian。&lt;/p&gt;
+&lt;p&gt;其核心结构为：&lt;/p&gt;
+\[ \boxed{ \text{Forward：局部块求解} \quad\Longleftrightarrow\quad \text{Backward：反向局部伴随求解}. } \]&lt;p&gt;不过，公式中的&lt;/p&gt;
+\[ \frac{\partial H_i}{\partial z}\Delta x_i \]&lt;p&gt;不能随意忽略。&lt;/p&gt;
+&lt;p&gt;它描述局部 Hessian 随状态或参数变化产生的导数贡献。若将其省略，即使局部线性方程求解准确，也可能得到错误梯度。&lt;/p&gt;
+&lt;p&gt;2026 年的研究还指出，更新限幅、正则化及其他数值保护操作同样必须纳入反向微分。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;24-实际效果从全局伴随系统转向局部-gpu-计算&#34;&gt;24. 实际效果：从全局伴随系统转向局部 GPU 计算
+&lt;/h1&gt;&lt;p&gt;Shu 等将该方法应用于 Vertex Block Descent（VBD）软体求解器。&lt;/p&gt;
+&lt;p&gt;其前向计算具有两个特点：&lt;/p&gt;
+&lt;p&gt;第一，每个顶点求解一个小型 \(3\times3\) 系统。&lt;/p&gt;
+&lt;p&gt;第二，通过图着色，将不相互干扰的顶点划分为可并行处理的颜色组。&lt;/p&gt;
+&lt;p&gt;反向传播则按相反的颜色顺序执行局部伴随更新。&lt;/p&gt;
+&lt;p&gt;论文报告，在同一代码库、同一 GPU 的受控比较中：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;指标&lt;/th&gt;
+					&lt;th&gt;论文报告结果&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;相比展开式自动微分的反向速度&lt;/td&gt;
+					&lt;td&gt;最高约 &lt;strong&gt;33 倍&lt;/strong&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;相比展开式自动微分的内存节省&lt;/td&gt;
+					&lt;td&gt;约 &lt;strong&gt;71 倍&lt;/strong&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;有限迭代深度下的梯度&lt;/td&gt;
+					&lt;td&gt;与对应执行过程的自动微分结果达到机器精度级一致&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;可扩展的求解器结构&lt;/td&gt;
+					&lt;td&gt;VBD，并给出 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;PD&lt;/span&gt;、&lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt; 的验证&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;研究还展示了百万个接触耦合软体对象的 GPU 仿真实验。&lt;/p&gt;
+&lt;p&gt;这些是作者在特定实现和测试条件下报告的结果，并不意味着任意 XPBD 或 FEM 求解器都能直接获得相同加速。目前该工作是 2026 年 8 月发布的预印本，尚不宜将其性能结论视为经过广泛独立验证的通用规律。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;25-为什么它与-xpbd-和-projective-dynamics-有直接关系&#34;&gt;25. 为什么它与 XPBD 和 Projective Dynamics 有直接关系？
+&lt;/h1&gt;&lt;p&gt;此前多次介绍过 Projective Dynamics，也讨论过 XPBD 的 Gauss–Seidel 约束迭代。&lt;/p&gt;
+&lt;p&gt;这些求解器的共同特点是：&lt;/p&gt;
+\[ \boxed{ \text{复杂全局运动} \rightarrow \text{大量简单局部更新}. } \]&lt;p&gt;例如 XPBD 中，单个约束的典型更新为：&lt;/p&gt;
+\[ \Delta\lambda = \frac{-C(x)-\tilde\alpha\lambda} {\sum_iw_i\|\nabla_iC\|^2+\tilde\alpha}, \]&lt;p&gt;随后：&lt;/p&gt;
+\[ \Delta x_i=w_i\nabla_iC\,\Delta\lambda. \]&lt;p&gt;如果希望计算：&lt;/p&gt;
+\[ \frac{\partial x_{\mathrm{final}}} {\partial\alpha}, \]&lt;p&gt;其中 \(\alpha\) 是材料或约束参数，就需要考虑每次局部约束投影如何影响后续更新。&lt;/p&gt;
+&lt;p&gt;对于只执行有限次约束迭代的 XPBD，直接对理想收敛状态求导，可能无法准确描述实际输出。&lt;/p&gt;
+&lt;p&gt;反向扫描方法提供了一个值得研究的方向：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;在保留原有局部求解器和并行调度结构的基础上，为它设计相应的局部伴随更新。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这与 DiffPD 的研究目标具有明显关联。&lt;/p&gt;
+&lt;p&gt;DiffPD 在 2022 年发表于 &lt;em&gt;ACM Transactions on Graphics&lt;/em&gt;，利用 PD 前向求解中的预分解矩阵加速反向计算，在系统辨识、逆向设计和控制等任务中展示了实际效果。&lt;/p&gt;
+&lt;p&gt;不过，两者的主要创新点不同：DiffPD 着重利用 PD 的线性代数结构，而反向扫描伴随法着重利用&lt;strong&gt;实际执行的局部迭代结构&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;26-一个必须警惕的局限梯度正确不代表物理正确&#34;&gt;26. 一个必须警惕的局限：梯度正确，不代表物理正确
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设某个接触求解器存在系统性穿透误差。&lt;/p&gt;
+&lt;p&gt;反向扫描可以准确计算：&lt;/p&gt;
+\[ \frac{\partial x_K}{\partial\theta}. \]&lt;p&gt;但这只能保证梯度正确反映当前离散算法。&lt;/p&gt;
+&lt;p&gt;如果算法本身没有准确描述真实接触物理，那么这个梯度也可能缺乏真实物理意义。&lt;/p&gt;
+&lt;p&gt;此外，接触激活、摩擦粘滑切换和碰撞事件会产生非光滑性。&lt;/p&gt;
+&lt;p&gt;在这些位置，经典导数可能不存在，或者只能在固定接触分支内定义局部导数。&lt;/p&gt;
+&lt;p&gt;2023 年的研究 &lt;em&gt;Improving Gradient Computation for Differentiable Physics Simulation with Contacts&lt;/em&gt; 已经发现，部分可微接触模型在接触法向发生变化时会产生错误梯度，并利用连续碰撞检测和碰撞时刻信息改善这一问题。&lt;/p&gt;
+&lt;p&gt;因此，可微物理至少需要区分三个层次：&lt;/p&gt;
+\[ \boxed{\text{物理模型是否正确？}} \]\[ \boxed{\text{离散求解是否足够准确？}} \]\[ \boxed{\text{梯度是否对应实际执行的计算？}} \]&lt;p&gt;这三者需要分别验证。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
 &lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
 &lt;/h1&gt;&lt;p&gt;Implicit Differentiation 最重要的不是：&lt;/p&gt;
 \[\frac{dx^*}{d\theta} = -F_x^{-1}F_\theta.\]&lt;p&gt;真正值得记住的是：&lt;/p&gt;

@@ -1809,7 +1809,7 @@ Disney Research / Animation 论文页&lt;/p&gt;
         <pubDate>Tue, 08 Sep 2026 00:00:00 +0000</pubDate>
         
         <guid>https://assranai.github.io/cards/25-nitsche-method/</guid>
-        <description>&lt;p&gt;&lt;strong&gt;主题：Nitsche Method（Nitsche 方法）&lt;/strong&gt;&lt;br&gt;
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;nitsche&#34; tabindex=&#34;0&#34;&gt;Nitsche&lt;/span&gt; Method（Nitsche 方法）&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：有限元 × 计算力学 × 接触力学 × 数值方法&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：&lt;/p&gt;
@@ -2249,6 +2249,141 @@ Disney Research / Animation 论文页&lt;/p&gt;
 \[[0,0.5]\]&lt;p&gt;和：&lt;/p&gt;
 \[[0.5,1],\]&lt;p&gt;用 Nitsche coupling 连接。&lt;/p&gt;
 &lt;p&gt;如果这个实验做通，你基本就理解了 Nitsche 80% 的核心价值。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;22-普通有限元为什么需要直接固定节点&#34;&gt;22. 普通有限元为什么需要直接固定节点？
+&lt;/h1&gt;&lt;p&gt;考虑最简单的 Poisson 方程：&lt;/p&gt;
+\[ -\Delta u=f,\qquad x\in\Omega, \]&lt;p&gt;边界条件：&lt;/p&gt;
+\[ u=g,\qquad x\in\Gamma_D. \]&lt;p&gt;传统 Galerkin FEM 将方程乘以测试函数 \(v\)，积分分部：&lt;/p&gt;
+\[ \int_\Omega\nabla u\cdot\nabla v\,d\Omega - \int_{\Gamma_D}\frac{\partial u}{\partial n}v\,d\Gamma = \int_\Omega fv\,d\Omega. \]&lt;p&gt;如果使用强制 Dirichlet 条件，测试函数在对应边界满足：&lt;/p&gt;
+\[ v|_{\Gamma_D}=0. \]&lt;p&gt;于是边界积分消失。&lt;/p&gt;
+&lt;p&gt;最后得到熟悉的：&lt;/p&gt;
+\[ Ku=f. \]&lt;p&gt;这种处理十分自然，但存在一个隐含要求：&lt;/p&gt;
+\[ \boxed{\text{有限元空间必须事先满足边界约束。}} \]&lt;p&gt;对于规则、边界匹配的网格，这很容易实现。&lt;/p&gt;
+&lt;p&gt;但如果边界穿过单元内部，或者两个网格的节点并不重合，强制约束就可能需要复杂的自由度映射。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;23-最简单的替代方案penalty-method&#34;&gt;23. 最简单的替代方案：Penalty Method
+&lt;/h1&gt;&lt;p&gt;既然希望：&lt;/p&gt;
+\[ u=g, \]&lt;p&gt;可以直接给边界偏差增加惩罚：&lt;/p&gt;
+\[ \boxed{ E_p(u)= \frac{\eta}{2h} \int_{\Gamma_D}(u-g)^2\,d\Gamma. } \]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(h\)：边界附近的网格尺寸；&lt;/li&gt;
+&lt;li&gt;\(\eta\)：惩罚参数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;当：&lt;/p&gt;
+\[ \eta\rightarrow\infty, \]&lt;p&gt;边界偏差趋向零。&lt;/p&gt;
+&lt;p&gt;但这里有两个问题。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第一，有限惩罚参数会引入边界误差。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;第二，惩罚参数过大会恶化刚度矩阵的条件数。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;因此普通 Penalty Method 存在典型的权衡：&lt;/p&gt;
+\[ \boxed{ \text{约束越严格} \quad\Longrightarrow\quad \text{线性系统可能越难求解}. } \]&lt;p&gt;Nitsche 方法的关键突破，是发现&lt;strong&gt;仅增加惩罚能量还不够，必须把边界上的物理通量也纳入构造&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;24-nitsche-方法怎样修改弱形式&#34;&gt;24. Nitsche 方法怎样修改弱形式？
+&lt;/h1&gt;&lt;p&gt;对于上述 Poisson 方程，经典对称 Nitsche 方法定义：&lt;/p&gt;
+\[ \boxed{ \begin{aligned} a_h(u,v) ={}&amp; \int_\Omega\nabla u\cdot\nabla v\,d\Omega\\ &amp;-\int_{\Gamma_D} \frac{\partial u}{\partial n}v\,d\Gamma\\ &amp;-\int_{\Gamma_D} \frac{\partial v}{\partial n}u\,d\Gamma\\ &amp;+\int_{\Gamma_D} \frac{\gamma}{h}uv\,d\Gamma. \end{aligned} } \]&lt;p&gt;右端为：&lt;/p&gt;
+\[ \boxed{ \begin{aligned} l_h(v) ={}&amp;\int_\Omega fv\,d\Omega\\ &amp;-\int_{\Gamma_D} \frac{\partial v}{\partial n}g\,d\Gamma\\ &amp;+\int_{\Gamma_D} \frac{\gamma}{h}gv\,d\Gamma. \end{aligned} } \]&lt;p&gt;其中 \(\gamma\) 是无量纲稳定化参数，实际扩散问题还需考虑扩散系数。&lt;/p&gt;
+&lt;p&gt;这几个边界项具有不同作用。&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;项&lt;/th&gt;
+					&lt;th&gt;作用&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;\(-\int_{\Gamma_D}\partial_nu\,v\)&lt;/td&gt;
+					&lt;td&gt;保留积分分部产生的物理通量&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;\(-\int_{\Gamma_D}\partial_nv\,u\)&lt;/td&gt;
+					&lt;td&gt;保持双线性形式的对称性及&lt;span class=&#34;term-anchor&#34; data-term=&#34;adjoint&#34; tabindex=&#34;0&#34;&gt;伴随&lt;/span&gt;一致性&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;\(\int_{\Gamma_D}(\gamma/h)uv\)&lt;/td&gt;
+					&lt;td&gt;提供稳定化，控制边界偏差&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;最重要的性质是：&lt;/p&gt;
+&lt;p&gt;如果 \(u\) 是满足原 PDE 和 \(u=g\) 的精确解，将它代入 Nitsche 弱形式，方程仍然成立。&lt;/p&gt;
+&lt;p&gt;这称为：&lt;/p&gt;
+\[ \boxed{\text{Consistency（一致性）}.} \]&lt;p&gt;相比之下，单纯增加有限强度的边界惩罚通常无法保持这种一致性。&lt;/p&gt;
+&lt;p&gt;Feel++ 的官方教程正是按照“通量一致性项 → 对称项 → 稳定化项”的顺序介绍 Nitsche 方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;25-一个深刻区别一致性与稳定性可以分别设计&#34;&gt;25. 一个深刻区别：一致性与稳定性可以分别设计
+&lt;/h1&gt;&lt;p&gt;Nitsche 方法的重要性还在于，它把两个经常混淆的要求分开了。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;一致性：&lt;/strong&gt;&lt;/p&gt;
+\[ u_{\mathrm{exact}} \]&lt;p&gt;必须满足离散弱方程。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;稳定性：&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;离散双线性形式必须具有足够的控制能力，使数值解不会出现不稳定模式。&lt;/p&gt;
+&lt;p&gt;对于经典对称 Nitsche 方法，需要选择足够大的 \(\gamma\)，以保证 coercivity（强制性）。&lt;/p&gt;
+&lt;p&gt;但并不是所有 Nitsche 方法都必须依赖正惩罚参数。&lt;/p&gt;
+&lt;p&gt;Burman 在 2012 年证明，一类&lt;strong&gt;非对称 Nitsche 方法可以在没有惩罚项的情况下保持稳定性&lt;/strong&gt;，但其误差性质与经典对称方法有所不同。&lt;/p&gt;
+&lt;p&gt;这揭示了一个值得迁移的数值方法设计思想：&lt;/p&gt;
+\[ \boxed{ \text{物理一致性、代数对称性和数值稳定性， 是可以分别分析和设计的性质。} } \]&lt;hr&gt;
+&lt;h1 id=&#34;26-为什么它特别适合接触有限元&#34;&gt;26. 为什么它特别适合接触有限元？
+&lt;/h1&gt;&lt;p&gt;考虑弹性体与刚性平面的无摩擦接触。&lt;/p&gt;
+&lt;p&gt;接触条件可以写成 Signorini 互补关系：&lt;/p&gt;
+\[ g_n\geq0, \]\[ p_n\geq0, \]\[ \boxed{g_np_n=0.} \]&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;\(g_n\)：法向间隙；&lt;/li&gt;
+&lt;li&gt;\(p_n\)：接触压力，取压缩为正。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些条件意味着：&lt;/p&gt;
+&lt;p&gt;物体可以离开接触面，但不能穿透；只有间隙为零时才可能产生接触压力。&lt;/p&gt;
+&lt;p&gt;传统方法通常使用：&lt;/p&gt;
+\[ \text{Penalty} \]&lt;p&gt;或：&lt;/p&gt;
+\[ \text{Lagrange Multipliers}. \]&lt;p&gt;Nitsche 型接触方法则通过一致的边界项与适当的非线性投影表达接触条件。&lt;/p&gt;
+&lt;p&gt;其优势之一是：&lt;/p&gt;
+\[ \boxed{\text{可以不增加接触压力的独立未知量。}} \]&lt;p&gt;Chouly 与 Hild 在 2013 年的 &lt;em&gt;SIAM Journal on Numerical Analysis&lt;/em&gt; 论文中，针对二维线弹性单侧接触问题证明了 Nitsche 型方法的最优阶收敛性，并且不需要拉格朗日乘子方法中的离散 inf-sup 条件。&lt;/p&gt;
+&lt;p&gt;这对于接触边界复杂、网格不匹配的工程模型尤其有吸引力。&lt;/p&gt;
+&lt;p&gt;不过，Nitsche 接触仍然需要处理接触状态切换带来的非光滑性；不引入乘子，并不意味着接触问题自动变成简单的线性问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h1 id=&#34;27-它与-cutfem-的关系更值得注意&#34;&gt;27. 它与 CutFEM 的关系更值得注意
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设要模拟一个圆形弹性体。&lt;/p&gt;
+&lt;p&gt;传统 FEM 通常需要生成贴合圆形边界的网格。&lt;/p&gt;
+&lt;p&gt;CutFEM 则允许使用规则背景网格，让真实物体边界直接穿过单元。&lt;/p&gt;
+&lt;p&gt;这样可以减少复杂几何的网格生成成本。&lt;/p&gt;
+&lt;p&gt;但随之产生一个问题：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;真实边界没有对应的一整排网格节点，怎样施加位移边界条件？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Nitsche 方法可以直接在真实边界与被切割单元的交线上施加弱边界条件。&lt;/p&gt;
+&lt;p&gt;不过，极小的 cut cells 可能导致矩阵严重病态。&lt;/p&gt;
+&lt;p&gt;因此实际 CutFEM 往往还需要 Ghost Penalty 等稳定化机制。&lt;/p&gt;
+&lt;p&gt;Burman 与 Hansbo 在 2012 年的工作中，将 Nitsche 方法推广到 cut-element fictitious domain，并通过额外的面跳跃稳定化，使矩阵条件数不依赖于边界切割网格的具体位置。&lt;/p&gt;
+&lt;p&gt;这里的技术链条非常清晰：&lt;/p&gt;
+\[ \boxed{ \text{复杂几何} \rightarrow \text{非贴体背景网格} \rightarrow \text{Nitsche 弱边界} \rightarrow \text{Ghost Penalty 稳定化}. } \]&lt;p&gt;这对复杂机构接触、自动网格生成和几何快速变化的物理仿真具有直接启发。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h1 id=&#34;28-对自研-fem--软体求解器的启发&#34;&gt;28. 对自研 FEM / 软体求解器的启发
+&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;假设未来需要模拟大量形状不同的软体对象。&lt;/p&gt;
+&lt;p&gt;如果每个对象都必须重新生成贴体四面体网格，几何预处理可能成为很大的成本。&lt;/p&gt;
+&lt;p&gt;另一条路线是：&lt;/p&gt;
+&lt;p&gt;使用背景网格表达体内场，通过隐式几何描述真实边界，再利用 Nitsche 类方法施加边界条件。&lt;/p&gt;
+&lt;p&gt;这种路线尤其适合研究：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;复杂几何自动离散；&lt;/li&gt;
+&lt;li&gt;非匹配网格耦合；&lt;/li&gt;
+&lt;li&gt;刚柔接触；&lt;/li&gt;
+&lt;li&gt;immersed FEM；&lt;/li&gt;
+&lt;li&gt;大规模几何参数扫描。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但它也有代价。&lt;/p&gt;
+&lt;p&gt;Nitsche 方法依赖物理模型的边界通量表达。对于非线性弹性，需要正确计算边界牵引及其线性化；对于接触，还需要设计适当的非线性接触算子。&lt;/p&gt;
+&lt;p&gt;此外，稳定化参数和网格尺寸之间存在明确的尺度关系，不能简单照搬 PBD 中任意设定的约束刚度。&lt;/p&gt;
+&lt;p&gt;因此，它更适合作为&lt;strong&gt;变分有限元中的约束处理技术&lt;/strong&gt;理解，而不宜直接当成一个通用的位置投影算法。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
