@@ -327,6 +327,14 @@
   </ol>
 
   <ol>
+    <li>
+      <ol>
+        <li><a href="#一个直观例子">一个直观例子</a></li>
+      </ol>
+    </li>
+  </ol>
+
+  <ol>
     <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a>
       <ol>
         <li><a href="#拓展阅读">拓展阅读</a></li>
@@ -388,7 +396,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 6 分钟
+                    阅读时长: 8 分钟
                 </time>
             </div>
         
@@ -549,7 +557,7 @@
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p>经典 MFMC 的 recursive sampling 结构并不是理论极限。</p>
-<p>Gorodetsky、Geraci、Eldred 和 Jakeman 后来提出 generalized <strong>Approximate Control Variate（ACV）</strong> 框架，并证明某些经典递归多模型策略的最大方差降低能力实际上受到限制；通过新的非递归采样结构，可以更充分利用多个低保真模型。</p>
+<p>Gorodetsky、Geraci、Eldred 和 Jakeman 后来提出 generalized <strong>Approximate Control Variate（<span class="term-anchor" data-term="approximate-control-variates" tabindex="0">ACV</span>）</strong> 框架，并证明某些经典递归多模型策略的最大方差降低能力实际上受到限制；通过新的非递归采样结构，可以更充分利用多个低保真模型。</p>
 <p>这使技术演化路线变成：</p>
 \[\boxed{ \text{Control Variates} \rightarrow \text{MFMC} \rightarrow \text{Approximate Control Variates} \rightarrow \text{现代多模型 UQ} }\]<p>到 2025–2026 年，NASA 等机构仍在继续研究如何自动调节 multifidelity 模型参数，使给定预算下的 estimator variance 最小化，说明“模型如何自动分配预算”仍然是活跃的工程研究问题。</p>
 
@@ -896,6 +904,193 @@
 \[\rho\downarrow\]<p>时：</p>
 \[1-\rho^2\uparrow.\]<p>这个实验会非常直观地建立：</p>
 \[\boxed{\text{MFMC 的收益来自 correlation，而不是 bias 小}.}\]
+  </div>
+</details>
+
+<hr>
+<h1 id="23-为什么直接使用代理模型会产生统计偏差">23. 为什么直接使用代理模型会产生统计偏差？
+</h1><p>设高保真模型为：</p>
+\[ Y_H=f_H(X), \]<p>代理模型为：</p>
+\[ Y_L=f_L(X). \]<p>目标是估计：</p>
+\[ \mu_H=\mathbb E[Y_H]. \]<p>如果直接用代理模型计算：</p>
+\[ \hat\mu_L=\frac1N\sum_{i=1}^Nf_L(X_i), \]<p>即使 \(N\rightarrow\infty\)，通常也只能得到：</p>
+\[ \hat\mu_L\rightarrow\mathbb E[Y_L]. \]<p>如果：</p>
+\[ \mathbb E[Y_L]\neq\mathbb E[Y_H], \]<p>那么增加代理模型采样数量无法消除这种偏差。</p>
+<p>因此，传统代理模型 Monte Carlo 存在两类误差：</p>
+\[ \boxed{ \text{总估计误差} = \text{代理模型偏差} + \text{采样误差} } \]<p>这里的等式指估计误差的概念性分解；均方误差则满足偏差平方与方差相加的关系。</p>
+<p>ACV 的核心思想是：<strong>不要让代理模型单独决定最终统计量。</strong></p>
+<hr>
+<h1 id="24-核心构造利用相关误差相互抵消">24. 核心构造：利用相关误差相互抵消
+</h1><p>首先，使用 \(n\) 个相同输入样本，同时运行高、低保真模型：</p>
+\[ \bar Y_H=\frac1n\sum_{i=1}^nY_H(X_i), \]\[ \bar Y_L=\frac1n\sum_{i=1}^nY_L(X_i). \]<p>再独立生成 \(m\) 个输入样本，只运行低保真模型：</p>
+\[ \bar Y_L'=\frac1m\sum_{j=1}^mY_L(Z_j). \]<p>构造估计量：</p>
+\[ \boxed{ \hat\mu_{\mathrm{ACV}} = \bar Y_H - \beta(\bar Y_L-\bar Y_L'). } \]<p>其中 \(\beta\) 是控制变量系数。</p>
+<p>观察括号中的部分：</p>
+\[ \mathbb E[\bar Y_L-\bar Y_L']=0. \]<p>因此，只要 \(\beta\) 是固定的，或者由独立先导样本确定，就有：</p>
+\[ \boxed{ \mathbb E[\hat\mu_{\mathrm{ACV}}] = \mu_H. } \]<p>这个结论并不要求：</p>
+\[ f_L(X)\approx f_H(X) \]<p>在所有输入位置都高度准确。</p>
+<p>甚至不要求：</p>
+\[ \mathbb E[Y_L]=\mathbb E[Y_H]. \]<p>它只要求两组低保真样本来自相同的输入分布，并且具有有限的相关统计量。</p>
+<p><strong>代理模型的均值偏差在控制变量差值中被抵消了。</strong></p>
+<p>需要注意：如果直接用同一批估计样本拟合 \(\beta\)，严格的有限样本无偏性未必仍然成立。独立先导样本或适当的交叉拟合设计可以避免这一问题。</p>
+<hr>
+<h1 id="25-为什么相关性比代理模型的绝对精度更重要">25. 为什么相关性比代理模型的绝对精度更重要？
+</h1><p>对于上述独立样本设计，估计量方差为：</p>
+\[ \operatorname{Var}(\hat\mu_{\mathrm{ACV}}) = \frac{\sigma_H^2}{n} + \beta^2\sigma_L^2 \left(\frac1n+\frac1m\right) - 2\beta\frac{\operatorname{Cov}(Y_H,Y_L)}n. \]<p>选择最优系数：</p>
+\[ \boxed{ \beta^\star = \frac{\operatorname{Cov}(Y_H,Y_L)} {\operatorname{Var}(Y_L)} \frac{m}{n+m}. } \]<p>代入后得到：</p>
+\[ \boxed{ \operatorname{Var}(\hat\mu_{\mathrm{ACV}}) = \frac{\sigma_H^2}{n} \left( 1-\rho^2\frac{m}{n+m} \right). } \]<p>其中：</p>
+\[ \rho=\operatorname{Corr}(Y_H,Y_L). \]<p>这就是本期最值得理解的公式。</p>
+<p>它说明方差降低主要取决于：</p>
+\[ \boxed{\rho^2} \]<p>以及低保真额外采样数量。</p>
+<h3 id="一个直观例子">一个直观例子
+</h3><p>假设：</p>
+\[ \rho=0.95, \]<p>使用：</p>
+\[ n=100 \]<p>次高保真仿真，并额外运行：</p>
+\[ m=2000 \]<p>次低保真仿真。</p>
+<p>则：</p>
+\[ \frac{ \operatorname{Var}(\hat\mu_{\mathrm{ACV}}) }{ \operatorname{Var}(\bar Y_H) } = 1-0.95^2\frac{2000}{2100} \approx0.1405. \]<p>也就是说：</p>
+<p><strong>在高保真样本数量相同的情况下，估计方差降低约 86%。</strong></p>
+<p>如果一次低保真计算成本仅为高保真的千分之一，那么整个计算成本只比 100 次纯高保真计算增加约 2.1%。</p>
+<p>这里的数值是理想化的理论比较，尚未计入代理模型训练和先导采样成本。</p>
+<p>它展示了一个重要事实：</p>
+<blockquote>
+<p>一个代理模型即使不能准确预测每个样本的真实响应，只要能够较好地跟踪高保真响应的变化，就可能成为非常有效的统计计算工具。</p>
+</blockquote>
+<hr>
+<h1 id="26-为什么-acv-比普通-control-variates-更适合工程仿真">26. 为什么 ACV 比普通 Control Variates 更适合工程仿真？
+</h1><p>经典控制变量法通常要求知道低保真变量的真实期望：</p>
+\[ \mathbb E[Y_L]. \]<p>但实际工程中的代理模型、ROM 或简化物理模型，其输出均值往往也不知道。</p>
+<p>ACV 使用额外的低保真样本估计这个均值，从而避免了这一要求。</p>
+<p>进一步地，可以引入多个低保真模型：</p>
+\[ Y_{L_1},Y_{L_2},\ldots,Y_{L_k}. \]<p>例如：</p>
+<ul>
+<li>粗网格 FEM；</li>
+<li><span class="term-anchor" data-term="pod" tabindex="0">POD</span>-ROM；</li>
+<li>Kriging；</li>
+<li>简化刚体动力学。</li>
+</ul>
+<p>构造：</p>
+\[ \boxed{ \hat\mu = \bar Y_H- \sum_{i=1}^k\beta_i\Delta_i, } \]<p>其中每个 \(\Delta_i\) 都是期望为零的低保真估计差。</p>
+<p>最优权重取决于各模型与高保真模型之间，以及低保真模型彼此之间的协方差。</p>
+<p>Gorodetsky 等人在 2020 年发表于 <em>Journal of Computational Physics</em> 的研究中，提出广义 ACV 框架，证明不同的采样共享方式会显著影响方差降低效果。</p>
+<p>一个重要发现是：<strong>简单地增加代理模型数量，并不保证获得更好的方差降低；如何组织模型之间的共享样本同样重要。</strong></p>
+<hr>
+<h1 id="27-对可靠性分析存在一个必须注意的陷阱">27. 对可靠性分析，存在一个必须注意的陷阱
+</h1><p>前面的公式针对一般随机响应的期望。</p>
+<p>但可靠性分析关心的是：</p>
+\[ P_f=P[g_H(X)\leq0]. \]<p>可以定义高保真失效指示变量：</p>
+\[ Y_H=\mathbf1[g_H(X)\leq0]. \]<p>对应的低保真变量为：</p>
+\[ Y_L=\mathbf1[g_L(X)\leq0]. \]<p>于是：</p>
+\[ \mathbb E[Y_H]=P_f. \]<p>ACV 仍然可以应用。</p>
+<p>但这里有一个很容易被忽略的问题：</p>
+<p><strong>代理模型对连续响应的预测精度很高，并不意味着失效指示变量之间具有很高的相关性。</strong></p>
+<p>例如，某个失效事件非常罕见：</p>
+\[ P_f=10^{-3}. \]<p>假设低保真分类器能够识别 90% 的真实失效样本，但对安全样本仍有 1% 的误报率。</p>
+<p>那么在这一简化假设下，两个失效指示变量的相关系数仅约为：</p>
+\[ \rho\approx0.27. \]<p>即使低保真分类器的整体准确率看起来很高，其作为失效概率控制变量的效果仍然有限。</p>
+<p>因为：</p>
+\[ 1-\rho^2\approx0.93. \]<p>即便低保真均值估计得极其精确，理论上也只能降低约 7% 的方差。</p>
+<p>这说明：</p>
+\[ \boxed{ \text{响应拟合精度} \neq \text{失效概率估计效率}. } \]<p>对于极小失效概率，通常需要将 ACV 与重要抽样等稀有事件方法结合。</p>
+<p>Pham 与 Gorodetsky 在 2022 年发表于 <em>SIAM/ASA Journal on Uncertainty Quantification</em> 的研究中，正是将 ACV 与多保真重要抽样结合，并分析了控制变量权重估计误差及先导样本数量的影响。</p>
+<hr>
+<h1 id="28-工程上怎样实现">28. 工程上怎样实现？
+</h1><details class="reveal">
+  <summary>查看代码与实现</summary>
+  <div class="reveal-body">
+    <p>一个最小化的双模型 ACV 程序可以写成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="c1"># paired samples</span>
+</span></span><span class="line"><span class="cl"><span class="n">x</span> <span class="o">=</span> <span class="n">sample_inputs</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">high</span> <span class="o">=</span> <span class="n">high_fidelity</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="n">low</span>  <span class="o">=</span> <span class="n">low_fidelity</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># independent low-fidelity samples</span>
+</span></span><span class="line"><span class="cl"><span class="n">z</span> <span class="o">=</span> <span class="n">sample_inputs</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="n">low_extra</span> <span class="o">=</span> <span class="n">low_fidelity</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># beta is estimated from an independent pilot set</span>
+</span></span><span class="line"><span class="cl"><span class="n">beta</span> <span class="o">=</span> <span class="n">pilot_cov_HL</span> <span class="o">/</span> <span class="n">pilot_var_L</span>
+</span></span><span class="line"><span class="cl"><span class="n">beta</span> <span class="o">*=</span> <span class="n">m</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="n">m</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">estimate</span> <span class="o">=</span> <span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">mean</span><span class="p">(</span><span class="n">high</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="o">-</span> <span class="n">beta</span> <span class="o">*</span> <span class="p">(</span><span class="n">mean</span><span class="p">(</span><span class="n">low</span><span class="p">)</span> <span class="o">-</span> <span class="n">mean</span><span class="p">(</span><span class="n">low_extra</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>实际部署时，还需要估计不同模型的计算成本，并优化：</p>
+\[ \boxed{ \min_{n,m} \operatorname{Var}(\hat\mu_{\mathrm{ACV}}) } \]<p>满足预算约束：</p>
+\[ n(c_H+c_L)+mc_L\leq B. \]<p>对于多个低保真模型，还需要联合优化样本分配和控制变量系数。</p>
+<p>这已经进入成熟工程软件的能力范围。</p>
+<p>Dakota 是 Sandia National Laboratories 开发的不确定性量化与优化软件。</p>
+<p>其官方文档提供 <code>approximate_control_variate</code> 方法，并支持通过有向无环图搜索不同低保真模型之间的采样关系。</p>
+<p>Dakota 6.18 于 2023 年 5 月引入了相关的广义模型关系搜索能力。</p>
+
+  </div>
+</details>
+
+<hr>
+<h1 id="29-它与-krigingrommlmc-的关系">29. 它与 Kriging、ROM、MLMC 的关系
+</h1><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p>这几种技术处于不同层次。</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>方法</th>
+					<th>解决的主要问题</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Kriging</td>
+					<td>如何快速近似昂贵函数？</td>
+			</tr>
+			<tr>
+					<td>POD-ROM</td>
+					<td>如何降低动力学系统的计算维度？</td>
+			</tr>
+			<tr>
+					<td>Multilevel Monte Carlo</td>
+					<td>如何利用不同离散精度层级的差值减少计算成本？</td>
+			</tr>
+			<tr>
+					<td><strong>ACV</strong></td>
+					<td><strong>如何利用相关的廉价模型降低高保真统计估计方差？</strong></td>
+			</tr>
+	</tbody>
+</table></div>
+<p>ACV 的一个突出特点是：</p>
+<p><strong>它不要求低保真模型之间存在明确的精度层级。</strong></p>
+<p>Kriging、ROM 和粗网格 FEM 可以同时参与计算，只要它们与目标高保真输出具有有用的统计相关性。</p>
+<p>这与传统 MLMC 依赖逐层差值的设计有所不同。</p>
+<p>不过，ACV 并不能消除高保真模型自身的数值离散误差。</p>
+<p>如果高保真 FEM 的输出已经存在明显偏差，ACV 无偏估计的仍然是该高保真离散模型的统计量。</p>
+
   </div>
 </details>
 

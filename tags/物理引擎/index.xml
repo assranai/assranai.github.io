@@ -5503,6 +5503,239 @@ ACM 原论文&lt;/p&gt;
 
 </description>
         </item>
+        <item>
+        <title>Discrete Gradient：离散时间下如何严格保持能量守恒</title>
+        <link>https://assranai.github.io/cards/42-discrete-gradient/</link>
+        <pubDate>Sun, 04 Oct 2026 00:00:00 +0000</pubDate>
+        
+        <guid>https://assranai.github.io/cards/42-discrete-gradient/</guid>
+        <description>&lt;p&gt;&lt;strong&gt;主题：&lt;span class=&#34;term-anchor&#34; data-term=&#34;discrete-gradient&#34; tabindex=&#34;0&#34;&gt;Discrete Gradient&lt;/span&gt; Methods（离散梯度法）&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;领域：几何数值积分 × 非线性有限元 × 软体动力学 × 物理求解器&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;阅读时间：约 5 分钟&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;核心问题：数值求解存在截断误差，为什么某些物理守恒定律仍然可以被精确满足？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;考虑一个没有外力、阻尼和碰撞的弹性体。真实物理系统满足：&lt;/p&gt;
+\[ E_{\mathrm{kin}}+E_{\mathrm{elastic}}=\mathrm{constant}. \]&lt;p&gt;然而，使用普通时间积分器模拟时，即使每一步的位置误差很小，总能量仍可能缓慢漂移。&lt;/p&gt;
+&lt;p&gt;对于长时间运行的物理引擎，这种漂移可能表现为物体凭空获得动能，或者振动逐渐衰减。&lt;/p&gt;
+&lt;p&gt;离散梯度法提出了一种很有价值的思路：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;与其要求每一步都高度逼近真实轨迹，不如直接构造一个满足离散能量守恒恒等式的时间积分算法。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这种方法属于结构保持数值积分（Structure-Preserving Integration）。Gonzalez 在 1996 年建立了相关守恒积分框架，Quispel 与 McLaren 在 2008 年进一步提出了具有重要理论意义的 Average Vector Field（AVF）积分方法。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一问题根源连续微积分中的链式法则在离散时间下不再自动成立&#34;&gt;一、问题根源：连续微积分中的链式法则，在离散时间下不再自动成立
+&lt;/h2&gt;&lt;p&gt;考虑一个保守力学系统，其状态为：&lt;/p&gt;
+\[ z= \begin{bmatrix} q\\p \end{bmatrix}, \]&lt;p&gt;其中 \(q\) 是位置，\(p\) 是动量。&lt;/p&gt;
+&lt;p&gt;系统总能量写成：&lt;/p&gt;
+\[ H(q,p)=T(p)+V(q). \]&lt;p&gt;根据 Hamiltonian mechanics，运动方程为：&lt;/p&gt;
+\[ \dot z=J\nabla H(z), \]&lt;p&gt;其中：&lt;/p&gt;
+\[ J= \begin{bmatrix} 0&amp;I\\ -I&amp;0 \end{bmatrix}, \qquad J^T=-J. \]&lt;p&gt;连续时间下：&lt;/p&gt;
+\[ \frac{dH}{dt} = \nabla H^T\dot z = \nabla H^TJ\nabla H=0. \]&lt;p&gt;最后一个等式成立，因为反对称矩阵满足：&lt;/p&gt;
+\[ a^TJa=0. \]&lt;p&gt;因此，能量守恒来自两个数学结构：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;链式法则，以及运动方程中的反对称结构。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;但当时间被离散为：&lt;/p&gt;
+\[ t_0,t_1,\ldots,t_n \]&lt;p&gt;时，我们通常只有：&lt;/p&gt;
+\[ z_n,\qquad z_{n+1}. \]&lt;p&gt;如果直接用某个时刻的梯度近似：&lt;/p&gt;
+\[ H(z_{n+1})-H(z_n) \approx \nabla H(z_n)^T(z_{n+1}-z_n), \]&lt;p&gt;这个等式一般存在截断误差。&lt;/p&gt;
+&lt;p&gt;于是，即使离散运动方程看起来合理，也不再自动满足能量守恒。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;离散梯度法的突破，就是重新构造一个在有限时间步上严格成立的链式法则。&lt;/strong&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;二核心定义用两个状态共同定义梯度&#34;&gt;二、核心定义：用两个状态共同定义梯度
+&lt;/h2&gt;&lt;p&gt;普通梯度只依赖一个位置：&lt;/p&gt;
+\[ \nabla H(z). \]&lt;p&gt;离散梯度则依赖两个位置：&lt;/p&gt;
+\[ \overline{\nabla}H(z_n,z_{n+1}). \]&lt;p&gt;要求满足：&lt;/p&gt;
+\[ \boxed{ H(z_{n+1})-H(z_n) = \overline{\nabla}H^T(z_{n+1}-z_n). } \]&lt;p&gt;同时满足一致性条件：&lt;/p&gt;
+\[ \overline{\nabla}H(z,z)=\nabla H(z). \]&lt;p&gt;这两个条件是离散梯度的核心。&lt;/p&gt;
+&lt;p&gt;现在构造时间积分器：&lt;/p&gt;
+\[ \boxed{ \frac{z_{n+1}-z_n}{h} = J\overline{\nabla}H(z_n,z_{n+1}). } \]&lt;p&gt;将其代入离散链式法则：&lt;/p&gt;
+\[ \begin{aligned} H(z_{n+1})-H(z_n) &amp;=\overline{\nabla}H^T(z_{n+1}-z_n)\\ &amp;=h\overline{\nabla}H^TJ\overline{\nabla}H\\ &amp;=0. \end{aligned} \]&lt;p&gt;因此：&lt;/p&gt;
+\[ \boxed{H(z_{n+1})=H(z_n).} \]&lt;p&gt;注意这里没有要求：&lt;/p&gt;
+\[ h\rightarrow0. \]&lt;p&gt;&lt;strong&gt;只要离散方程被准确求解，且离散梯度满足定义，能量守恒就直接由代数恒等式保证。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;实际计算仍会受到非线性求解容差、数值积分误差和浮点舍入的影响。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;三一个具体算例非线性弹簧振子&#34;&gt;三、一个具体算例：非线性弹簧振子
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑一个具有四次势能的振子：&lt;/p&gt;
+\[ \boxed{ H(q,p)=\frac{p^2}{2m}+\frac{kq^4}{4}. } \]&lt;p&gt;其真实运动方程为：&lt;/p&gt;
+\[ \dot q=\frac pm, \qquad \dot p=-kq^3. \]&lt;p&gt;普通隐式中点法使用：&lt;/p&gt;
+\[ \dot p\approx -k\left(\frac{q_n+q_{n+1}}2\right)^3. \]&lt;p&gt;对于线性弹簧，这类中点离散能够保持相应的二次能量；但对于这里的四次势能，一般无法精确守恒。&lt;/p&gt;
+&lt;p&gt;离散梯度法则从势能差出发：&lt;/p&gt;
+\[ V(q_{n+1})-V(q_n) = \frac{k}{4}(q_{n+1}^4-q_n^4). \]&lt;p&gt;利用因式分解：&lt;/p&gt;
+\[ a^4-b^4=(a-b)(a+b)(a^2+b^2), \]&lt;p&gt;得到：&lt;/p&gt;
+\[ \boxed{ \overline{\nabla}V = \frac{k}{4} (q_{n+1}+q_n) (q_{n+1}^2+q_n^2). } \]&lt;p&gt;因此，可以构造：&lt;/p&gt;
+\[ \boxed{ \begin{aligned} q_{n+1}-q_n &amp;=h\frac{p_{n+1}+p_n}{2m},\\[4pt] p_{n+1}-p_n &amp;=-h\frac{k}{4} (q_{n+1}+q_n) (q_{n+1}^2+q_n^2). \end{aligned} } \]&lt;p&gt;将两个方程代入动能与势能的变化表达式，就能得到：&lt;/p&gt;
+\[ \boxed{\Delta T+\Delta V=0.} \]&lt;p&gt;这意味着，即使位置和速度仍然存在时间离散误差，计算得到的总能量也不会发生系统性漂移。&lt;/p&gt;
+&lt;p&gt;但必须区分：&lt;/p&gt;
+\[ \boxed{\text{能量准确}\neq\text{运动轨迹准确}.} \]&lt;p&gt;一个振子可能始终保持正确的总能量，却逐渐产生相位误差。&lt;/p&gt;
+&lt;p&gt;这也是理解结构保持积分器时最重要的限制之一。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;四它与-symplectic-integrator-有什么区别&#34;&gt;四、它与 Symplectic Integrator 有什么区别？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;此前讨论过数值积分器的长期稳定性。这里需要区分两种不同的结构保持目标。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Symplectic Integrator（辛积分器）&lt;/strong&gt; 保持 Hamilton 系统的辛结构。&lt;/p&gt;
+&lt;p&gt;对于满足适当光滑性和步长条件的系统，辛积分器通常具有很好的长期能量行为：能量误差可能围绕真实值小幅振荡，而不会持续单向漂移。&lt;/p&gt;
+&lt;p&gt;但它一般不严格保持原始 Hamiltonian。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Discrete Gradient Integrator（离散梯度积分器）&lt;/strong&gt; 则直接保持指定的能量函数。&lt;/p&gt;
+&lt;p&gt;但它一般不保持辛结构。&lt;/p&gt;
+&lt;p&gt;两者分别强调：&lt;/p&gt;
+\[ \boxed{ \text{Symplectic：保持相空间的几何结构} } \]\[ \boxed{ \text{Discrete Gradient：保持能量恒等式} } \]&lt;p&gt;对于长时间轨道计算，辛结构可能十分重要；对于要求严格控制能量收支的非线性动力学计算，离散梯度则具有独特价值。&lt;/p&gt;
+&lt;p&gt;Marsden 与 West 的经典综述系统解释了离散变分原理、辛积分以及动量守恒之间的关系，适合作为两类方法的对照材料。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;五如果系统存在阻尼能否严格保持能量耗散&#34;&gt;五、如果系统存在阻尼，能否严格保持能量耗散？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这是离散梯度法更值得研究的扩展。&lt;/p&gt;
+&lt;p&gt;考虑具有耗散结构的系统：&lt;/p&gt;
+\[ \boxed{ \dot z=(J-R)\nabla H(z), } \]&lt;p&gt;其中：&lt;/p&gt;
+\[ J^T=-J, \qquad R^T=R\succeq0. \]&lt;p&gt;连续时间下：&lt;/p&gt;
+\[ \frac{dH}{dt} = -\nabla H^TR\nabla H \leq0. \]&lt;p&gt;采用离散梯度：&lt;/p&gt;
+\[ \frac{z_{n+1}-z_n}{h} = (J-R)\overline{\nabla}H, \]&lt;p&gt;立即得到：&lt;/p&gt;
+\[ \boxed{ H(z_{n+1})-H(z_n) = -h\overline{\nabla}H^TR\overline{\nabla}H \leq0. } \]&lt;p&gt;这说明方法不仅能用于守恒系统，还能构造&lt;strong&gt;严格遵守能量非增规律的耗散积分器&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;这种性质尤其适合需要避免非物理能量注入的软体动力学和阻尼系统。&lt;/p&gt;
+&lt;p&gt;不过，能量非增并不等于求解器在任意步长下都能成功收敛，也不保证运动轨迹误差很小。&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;六2026-年的新进展如何同时获得高阶精度与能量耗散保证&#34;&gt;六、2026 年的新进展：如何同时获得高阶精度与能量耗散保证？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;这里出现了一个值得关注的最新研究。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;2026 年 9 月 21 日&lt;/strong&gt;，Lautwein、Marheineke、Myhr 与 Schäfers 发布预印本：&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Fourth-Order Energy-Consistent Average Vector Field Discrete Gradient Methods for Dissipative Hamiltonian Systems&lt;/em&gt;。&lt;/p&gt;
+&lt;p&gt;传统 AVF 离散梯度方法通常为二阶精度。&lt;/p&gt;
+&lt;p&gt;如果希望提高到四阶，可以修改时间积分的结构矩阵。&lt;/p&gt;
+&lt;p&gt;但一个困难是：&lt;strong&gt;提高精度所需的修正，可能破坏耗散矩阵的半正定性。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;一旦：&lt;/p&gt;
+\[ R\nsucceq0, \]&lt;p&gt;数值系统就可能出现：&lt;/p&gt;
+\[ \Delta H&gt;0. \]&lt;p&gt;也就是物理上应当耗散能量，数值算法却反而增加能量。&lt;/p&gt;
+&lt;p&gt;该研究提出利用 &lt;strong&gt;Congruence-Based Completion（合同变换式补全）&lt;/strong&gt;，构造：&lt;/p&gt;
+\[ \boxed{ \overline R = \sum_j\alpha_j\Psi_j^TR\Psi_j, \qquad \alpha_j\geq0. } \]&lt;p&gt;因为：&lt;/p&gt;
+\[ R\succeq0, \]&lt;p&gt;所以必然有：&lt;/p&gt;
+\[ \boxed{\overline R\succeq0.} \]&lt;p&gt;这样可以在构造高阶修正的同时，保留耗散矩阵的半正定结构。&lt;/p&gt;
+&lt;p&gt;作者在阻尼摆和耗散 Fermi–Pasta–Ulam 系统上验证了四阶收敛与能量耗散性质，并报告了相对于传统二阶方法的计算效率优势。&lt;/p&gt;
+&lt;p&gt;这项工作目前属于预印本，其结果尚需更多独立验证。&lt;/p&gt;
+&lt;p&gt;它展示了一个很深刻的数值算法设计原则：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;提高计算精度时，可以通过特殊的代数参数化，让物理结构在算法修改过程中始终得到保持。&lt;/strong&gt;&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;七对软体动力学和物理引擎的启发&#34;&gt;七、对软体动力学和物理引擎的启发
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;考虑一个四面体 Neo-Hookean 软体模型：&lt;/p&gt;
+\[ H(x,v) = \frac12v^TMv+E_{\mathrm{elastic}}(x). \]&lt;p&gt;如果使用普通时间积分，可能观察到能量随时间漂移。&lt;/p&gt;
+&lt;p&gt;离散梯度方法提供了一条研究路线：&lt;/p&gt;
+&lt;p&gt;首先将弹性势能：&lt;/p&gt;
+\[ E_{\mathrm{elastic}}(x) \]&lt;p&gt;构造成满足离散链式法则的形式。&lt;/p&gt;
+&lt;p&gt;随后通过隐式积分求解：&lt;/p&gt;
+\[ x_{n+1},v_{n+1}. \]&lt;p&gt;在无外力、无阻尼、无碰撞的理想情况下，检查：&lt;/p&gt;
+\[ \boxed{ H_{n+1}-H_n\approx0. } \]&lt;p&gt;对于有阻尼的系统，则检查能量是否满足相应的离散耗散关系。&lt;/p&gt;
+&lt;p&gt;这类实验可以直接用于比较不同时间积分器的数值性质。&lt;/p&gt;
+&lt;p&gt;但它并不意味着应该直接用离散梯度替换 &lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt;。&lt;/p&gt;
+&lt;p&gt;XPBD 主要追求有限计算预算下的约束求解效率。离散梯度方法通常需要求解隐式非线性方程，可能显著增加单步成本。&lt;/p&gt;
+&lt;p&gt;此外，接触、摩擦、外力做功和数值阻尼都需要正确纳入能量收支；单纯保持弹性势能与动能之和，并不能自动处理这些现象。&lt;/p&gt;
+&lt;p&gt;更现实的研究价值是：&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;将离散梯度方法作为高保真参考积分器，检验实时软体求解器的能量误差与长期动力学行为。&lt;/strong&gt;&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;八它在整个知识体系中卡在哪里&#34;&gt;八、它在整个知识体系中卡在哪里？
+&lt;/h2&gt;&lt;p&gt;此前讨论的物理求解器技术，可以按照各自控制的对象区分：&lt;/p&gt;
+&lt;table&gt;
+	&lt;thead&gt;
+			&lt;tr&gt;
+					&lt;th&gt;方法&lt;/th&gt;
+					&lt;th&gt;主要关注&lt;/th&gt;
+			&lt;/tr&gt;
+	&lt;/thead&gt;
+	&lt;tbody&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;jacobian-free-newton-krylov&#34; tabindex=&#34;0&#34;&gt;JFNK&lt;/span&gt;&lt;/td&gt;
+					&lt;td&gt;如何高效求解非线性方程&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;span class=&#34;term-anchor&#34; data-term=&#34;algebraic-multigrid&#34; tabindex=&#34;0&#34;&gt;AMG&lt;/span&gt;&lt;/td&gt;
+					&lt;td&gt;如何加速大型线性系统&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Partial Assembly&lt;/td&gt;
+					&lt;td&gt;如何降低有限元算子的执行成本&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;Reverse-Sweep Adjoint&lt;/td&gt;
+					&lt;td&gt;如何准确计算有限迭代求解器的梯度&lt;/td&gt;
+			&lt;/tr&gt;
+			&lt;tr&gt;
+					&lt;td&gt;&lt;strong&gt;Discrete Gradient&lt;/strong&gt;&lt;/td&gt;
+					&lt;td&gt;&lt;strong&gt;如何使时间离散严格遵守指定的能量规律&lt;/strong&gt;&lt;/td&gt;
+			&lt;/tr&gt;
+	&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;离散梯度位于：&lt;/p&gt;
+\[ \text{连续动力学方程} \]\[ \downarrow \]\[ \boxed{\text{结构保持时间离散}} \]\[ \downarrow \]\[ \text{非线性代数方程} \]\[ \downarrow \]\[ \text{Newton / Krylov / GPU 求解} \]&lt;p&gt;这一层次。&lt;/p&gt;
+&lt;p&gt;它决定的是&lt;strong&gt;离散后的动力学系统应该具有哪些数学性质&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;至于如何高效求解产生的代数方程，则可以继续使用 JFNK、预条件器和 GPU 优化。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;今天最值得记住的一句话：&lt;/strong&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;数值方法可以不精确复制每一步运动，却严格保持某些物理规律。高质量物理求解器的设计，需要明确区分轨迹精度、守恒性质和计算效率。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+  &lt;summary&gt;查看扩展内容&lt;/summary&gt;
+  &lt;div class=&#34;reveal-body&#34;&gt;
+    &lt;p&gt;&lt;strong&gt;1. Gonzalez（1996）— Time Integration and Discrete Hamiltonian Systems&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Journal of Nonlinear Science&lt;/em&gt;, 6, 449–467。DOI：10.1007/BF02440162。&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://doi.org/10.1007/BF02440162&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Springer 原论文&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;经典理论起点，重点理解离散方向导数如何构造守恒时间积分器。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;2. Quispel &amp;amp; McLaren（2008）— A New Class of Energy-Preserving Numerical Integration Methods&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Journal of Physics A: Mathematical and Theoretical&lt;/em&gt;, 41, 045206。&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://doi.org/10.1088/1751-8113/41/4/045206&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;IOP 原论文&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;最推荐首先阅读。文章篇幅较短，直接展示 AVF 方法如何保持 Hamiltonian。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;3. Simo, Tarnow &amp;amp; Wong（1992）— Exact Energy-Momentum Conserving Algorithms and Symplectic Schemes for Nonlinear Dynamics&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Computer Methods in Applied Mechanics and Engineering&lt;/em&gt;, 100(1), 63–116。&lt;/p&gt;
+&lt;p&gt;Elsevier 原论文&lt;/p&gt;
+&lt;p&gt;最贴近非线性有限元与结构动力学，讨论如何同时保持能量、线动量和角动量。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;4. Celledoni et al.（2012）— Preserving Energy resp. Dissipation in Numerical PDEs Using the Average Vector Field Method&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;arXiv 开放论文&lt;/p&gt;
+&lt;p&gt;适合从常微分方程进一步进入 PDE，理解 AVF 如何用于 Hamilton 系统与耗散型方程。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;5. Lautwein et al.（2026）— Fourth-Order Energy-Consistent Average Vector Field Discrete Gradient Methods for Dissipative Hamiltonian Systems&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;2026 年 9 月预印本，arXiv:2609.24692。&lt;/p&gt;
+&lt;p&gt;论文全文与数学推导&lt;/p&gt;
+&lt;p&gt;本期最新研究。建议重点阅读第 2.3 节，理解为什么保持矩阵半正定性能够成为高阶数值方法设计的关键约束。&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;知识卡片注册表｜第 64 张&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;新增主题：&lt;strong&gt;Discrete Gradient Methods（离散梯度与能量一致性时间积分）&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;所属方向：几何数值积分 / 非线性有限元 / 软体动力学 / 物理求解器。&lt;/p&gt;
+&lt;p&gt;核心问题：如何在有限时间步和非线性物理系统中，构造严格满足能量守恒或耗散规律的时间积分算法。&lt;/p&gt;
+&lt;p&gt;知识关联：第 54 张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;discrete-exterior-calculus&#34; tabindex=&#34;0&#34;&gt;DEC&lt;/span&gt;、第 58 张 JFNK、第 60 张 Solver-Level Differentiation、第 61 张 Partial Assembly。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;新增知识分支：结构保持时间积分与离散能量定律。&lt;/strong&gt;&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+</description>
+        </item>
         
     </channel>
 </rss>

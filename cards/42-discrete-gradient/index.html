@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Discrete Gradient Methods（离散梯度法）\n领域：几何数值积分 × 非线性有限元 × 软体动力学 × 物理求解器\n阅读时间：约 5 分钟\n核心问题：数值求解存在截断误差，为什么某些物理守恒定律仍然可以被精确满足？\n考虑一个没有外力、阻尼和碰撞的弹性体。真实物理系统满足：\n\\[ E_{\\mathrm{kin}}+E_{\\mathrm{elastic}}=\\mathrm{constant}. \\]然而，使用普通时间积分器模拟时，即使每一步的位置误差很小，总能量仍可能缓慢漂移。\n对于长时间运行的物理引擎，这种漂移可能表现为物体凭空获得动能，或者振动逐渐衰减。\n离散梯度法提出了一种很有价值的思路：\n与其要求每一步都高度逼近真实轨迹，不如直接构造一个满足离散能量守恒恒等式的时间积分算法。\n这种方法属于结构保持数值积分（Structure-Preserving Integration）。Gonzalez 在 1996 年建立了相关守恒积分框架，Quispel 与 McLaren 在 2008 年进一步提出了具有重要理论意义的 Average Vector Field（AVF）积分方法。\n一、问题根源：连续微积分中的链式法则，在离散时间下不再自动成立 考虑一个保守力学系统，其状态为：\n\\[ z= \\begin{bmatrix} q\\\\p \\end{bmatrix}, \\]其中 \\(q\\) 是位置，\\(p\\) 是动量。\n系统总能量写成：\n\\[ H(q,p)=T(p)+V(q). \\]根据 Hamiltonian mechanics，运动方程为：\n\\[ \\dot z=J\\nabla H(z), \\]其中：\n\\[ J= \\begin{bmatrix} 0&I\\\\ -I&0 \\end{bmatrix}, \\qquad J^T=-J. \\]连续时间下：\n\\[ \\frac{dH}{dt} = \\nabla H^T\\dot z = \\nabla H^TJ\\nabla H=0. \\]最后一个等式成立，因为反对称矩阵满足：\n">
+<title>Discrete Gradient：离散时间下如何严格保持能量守恒</title>
+
+<link rel='canonical' href='https://assranai.github.io/cards/42-discrete-gradient/'>
+
+<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Discrete Gradient：离散时间下如何严格保持能量守恒">
+<meta property='og:description' content="主题：Discrete Gradient Methods（离散梯度法）\n领域：几何数值积分 × 非线性有限元 × 软体动力学 × 物理求解器\n阅读时间：约 5 分钟\n核心问题：数值求解存在截断误差，为什么某些物理守恒定律仍然可以被精确满足？\n考虑一个没有外力、阻尼和碰撞的弹性体。真实物理系统满足：\n\\[ E_{\\mathrm{kin}}+E_{\\mathrm{elastic}}=\\mathrm{constant}. \\]然而，使用普通时间积分器模拟时，即使每一步的位置误差很小，总能量仍可能缓慢漂移。\n对于长时间运行的物理引擎，这种漂移可能表现为物体凭空获得动能，或者振动逐渐衰减。\n离散梯度法提出了一种很有价值的思路：\n与其要求每一步都高度逼近真实轨迹，不如直接构造一个满足离散能量守恒恒等式的时间积分算法。\n这种方法属于结构保持数值积分（Structure-Preserving Integration）。Gonzalez 在 1996 年建立了相关守恒积分框架，Quispel 与 McLaren 在 2008 年进一步提出了具有重要理论意义的 Average Vector Field（AVF）积分方法。\n一、问题根源：连续微积分中的链式法则，在离散时间下不再自动成立 考虑一个保守力学系统，其状态为：\n\\[ z= \\begin{bmatrix} q\\\\p \\end{bmatrix}, \\]其中 \\(q\\) 是位置，\\(p\\) 是动量。\n系统总能量写成：\n\\[ H(q,p)=T(p)+V(q). \\]根据 Hamiltonian mechanics，运动方程为：\n\\[ \\dot z=J\\nabla H(z), \\]其中：\n\\[ J= \\begin{bmatrix} 0&I\\\\ -I&0 \\end{bmatrix}, \\qquad J^T=-J. \\]连续时间下：\n\\[ \\frac{dH}{dt} = \\nabla H^T\\dot z = \\nabla H^TJ\\nabla H=0. \\]最后一个等式成立，因为反对称矩阵满足：\n">
+<meta property='og:url' content='https://assranai.github.io/cards/42-discrete-gradient/'>
+<meta property='og:site_name' content='Assranai&#39;s 手账'>
+<meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='非线性动力学' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='计算力学' /><meta property='article:published_time' content='2026-10-04T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-10-04T00:00:00&#43;00:00'/>
+<meta name="twitter:title" content="Discrete Gradient：离散时间下如何严格保持能量守恒">
+<meta name="twitter:description" content="主题：Discrete Gradient Methods（离散梯度法）\n领域：几何数值积分 × 非线性有限元 × 软体动力学 × 物理求解器\n阅读时间：约 5 分钟\n核心问题：数值求解存在截断误差，为什么某些物理守恒定律仍然可以被精确满足？\n考虑一个没有外力、阻尼和碰撞的弹性体。真实物理系统满足：\n\\[ E_{\\mathrm{kin}}+E_{\\mathrm{elastic}}=\\mathrm{constant}. \\]然而，使用普通时间积分器模拟时，即使每一步的位置误差很小，总能量仍可能缓慢漂移。\n对于长时间运行的物理引擎，这种漂移可能表现为物体凭空获得动能，或者振动逐渐衰减。\n离散梯度法提出了一种很有价值的思路：\n与其要求每一步都高度逼近真实轨迹，不如直接构造一个满足离散能量守恒恒等式的时间积分算法。\n这种方法属于结构保持数值积分（Structure-Preserving Integration）。Gonzalez 在 1996 年建立了相关守恒积分框架，Quispel 与 McLaren 在 2008 年进一步提出了具有重要理论意义的 Average Vector Field（AVF）积分方法。\n一、问题根源：连续微积分中的链式法则，在离散时间下不再自动成立 考虑一个保守力学系统，其状态为：\n\\[ z= \\begin{bmatrix} q\\\\p \\end{bmatrix}, \\]其中 \\(q\\) 是位置，\\(p\\) 是动量。\n系统总能量写成：\n\\[ H(q,p)=T(p)+V(q). \\]根据 Hamiltonian mechanics，运动方程为：\n\\[ \\dot z=J\\nabla H(z), \\]其中：\n\\[ J= \\begin{bmatrix} 0&I\\\\ -I&0 \\end{bmatrix}, \\qquad J^T=-J. \\]连续时间下：\n\\[ \\frac{dH}{dt} = \\nabla H^T\\dot z = \\nabla H^TJ\\nabla H=0. \\]最后一个等式成立，因为反对称矩阵满足：\n">
+    </head>
+    <body class="
+    article-page">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">🍥</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">Assranai&#39;s 手账</a></h1>
+            <h2 class="site-description">但愿会更新。</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://github.com/assranai'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/%E5%85%B3%E4%BA%8E/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+                
+                <span>关于</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/reviews/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-infinity" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M9.828 9.172a4 4 0 1 0 0 5.656 a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828 a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828" />
+</svg>
+
+
+
+                
+                <span>课程复习</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/cards/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cards" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z" />
+  <path d="M15 4h1a1 1 0 0 1 1 1v3.5" />
+  <path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374" />
+</svg>
+
+                
+                <span>知识卡片</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://assranai.github.io/en/" >English</option>
+                                
+                                    <option value="https://assranai.github.io/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一问题根源连续微积分中的链式法则在离散时间下不再自动成立">一、问题根源：连续微积分中的链式法则，在离散时间下不再自动成立</a></li>
+    <li><a href="#二核心定义用两个状态共同定义梯度">二、核心定义：用两个状态共同定义梯度</a></li>
+    <li><a href="#三一个具体算例非线性弹簧振子">三、一个具体算例：非线性弹簧振子</a></li>
+    <li><a href="#四它与-symplectic-integrator-有什么区别">四、它与 Symplectic Integrator 有什么区别？</a></li>
+    <li><a href="#五如果系统存在阻尼能否严格保持能量耗散">五、如果系统存在阻尼，能否严格保持能量耗散？</a></li>
+    <li><a href="#六2026-年的新进展如何同时获得高阶精度与能量耗散保证">六、2026 年的新进展：如何同时获得高阶精度与能量耗散保证？</a></li>
+    <li><a href="#七对软体动力学和物理引擎的启发">七、对软体动力学和物理引擎的启发</a></li>
+    <li><a href="#八它在整个知识体系中卡在哪里">八、它在整个知识体系中卡在哪里？</a>
+      <ol>
+        <li><a href="#拓展阅读">拓展阅读</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/cards/42-discrete-gradient/">Discrete Gradient：离散时间下如何严格保持能量守恒</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published" datetime='2026-10-04T00:00:00Z'>Oct 04, 2026</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    阅读时长: 3 分钟
+                </time>
+            </div>
+        
+    </footer>
+    
+
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <p><strong>主题：<span class="term-anchor" data-term="discrete-gradient" tabindex="0">Discrete Gradient</span> Methods（离散梯度法）</strong><br>
+<strong>领域：几何数值积分 × 非线性有限元 × 软体动力学 × 物理求解器</strong><br>
+<strong>阅读时间：约 5 分钟</strong></p>
+<p><strong>核心问题：数值求解存在截断误差，为什么某些物理守恒定律仍然可以被精确满足？</strong></p>
+<p>考虑一个没有外力、阻尼和碰撞的弹性体。真实物理系统满足：</p>
+\[ E_{\mathrm{kin}}+E_{\mathrm{elastic}}=\mathrm{constant}. \]<p>然而，使用普通时间积分器模拟时，即使每一步的位置误差很小，总能量仍可能缓慢漂移。</p>
+<p>对于长时间运行的物理引擎，这种漂移可能表现为物体凭空获得动能，或者振动逐渐衰减。</p>
+<p>离散梯度法提出了一种很有价值的思路：</p>
+<p><strong>与其要求每一步都高度逼近真实轨迹，不如直接构造一个满足离散能量守恒恒等式的时间积分算法。</strong></p>
+<p>这种方法属于结构保持数值积分（Structure-Preserving Integration）。Gonzalez 在 1996 年建立了相关守恒积分框架，Quispel 与 McLaren 在 2008 年进一步提出了具有重要理论意义的 Average Vector Field（AVF）积分方法。</p>
+<hr>
+<h2 id="一问题根源连续微积分中的链式法则在离散时间下不再自动成立">一、问题根源：连续微积分中的链式法则，在离散时间下不再自动成立
+</h2><p>考虑一个保守力学系统，其状态为：</p>
+\[ z= \begin{bmatrix} q\\p \end{bmatrix}, \]<p>其中 \(q\) 是位置，\(p\) 是动量。</p>
+<p>系统总能量写成：</p>
+\[ H(q,p)=T(p)+V(q). \]<p>根据 Hamiltonian mechanics，运动方程为：</p>
+\[ \dot z=J\nabla H(z), \]<p>其中：</p>
+\[ J= \begin{bmatrix} 0&I\\ -I&0 \end{bmatrix}, \qquad J^T=-J. \]<p>连续时间下：</p>
+\[ \frac{dH}{dt} = \nabla H^T\dot z = \nabla H^TJ\nabla H=0. \]<p>最后一个等式成立，因为反对称矩阵满足：</p>
+\[ a^TJa=0. \]<p>因此，能量守恒来自两个数学结构：</p>
+<p><strong>链式法则，以及运动方程中的反对称结构。</strong></p>
+<p>但当时间被离散为：</p>
+\[ t_0,t_1,\ldots,t_n \]<p>时，我们通常只有：</p>
+\[ z_n,\qquad z_{n+1}. \]<p>如果直接用某个时刻的梯度近似：</p>
+\[ H(z_{n+1})-H(z_n) \approx \nabla H(z_n)^T(z_{n+1}-z_n), \]<p>这个等式一般存在截断误差。</p>
+<p>于是，即使离散运动方程看起来合理，也不再自动满足能量守恒。</p>
+<p><strong>离散梯度法的突破，就是重新构造一个在有限时间步上严格成立的链式法则。</strong></p>
+<hr>
+<h2 id="二核心定义用两个状态共同定义梯度">二、核心定义：用两个状态共同定义梯度
+</h2><p>普通梯度只依赖一个位置：</p>
+\[ \nabla H(z). \]<p>离散梯度则依赖两个位置：</p>
+\[ \overline{\nabla}H(z_n,z_{n+1}). \]<p>要求满足：</p>
+\[ \boxed{ H(z_{n+1})-H(z_n) = \overline{\nabla}H^T(z_{n+1}-z_n). } \]<p>同时满足一致性条件：</p>
+\[ \overline{\nabla}H(z,z)=\nabla H(z). \]<p>这两个条件是离散梯度的核心。</p>
+<p>现在构造时间积分器：</p>
+\[ \boxed{ \frac{z_{n+1}-z_n}{h} = J\overline{\nabla}H(z_n,z_{n+1}). } \]<p>将其代入离散链式法则：</p>
+\[ \begin{aligned} H(z_{n+1})-H(z_n) &=\overline{\nabla}H^T(z_{n+1}-z_n)\\ &=h\overline{\nabla}H^TJ\overline{\nabla}H\\ &=0. \end{aligned} \]<p>因此：</p>
+\[ \boxed{H(z_{n+1})=H(z_n).} \]<p>注意这里没有要求：</p>
+\[ h\rightarrow0. \]<p><strong>只要离散方程被准确求解，且离散梯度满足定义，能量守恒就直接由代数恒等式保证。</strong></p>
+<p>实际计算仍会受到非线性求解容差、数值积分误差和浮点舍入的影响。</p>
+<hr>
+<h2 id="三一个具体算例非线性弹簧振子">三、一个具体算例：非线性弹簧振子
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>考虑一个具有四次势能的振子：</p>
+\[ \boxed{ H(q,p)=\frac{p^2}{2m}+\frac{kq^4}{4}. } \]<p>其真实运动方程为：</p>
+\[ \dot q=\frac pm, \qquad \dot p=-kq^3. \]<p>普通隐式中点法使用：</p>
+\[ \dot p\approx -k\left(\frac{q_n+q_{n+1}}2\right)^3. \]<p>对于线性弹簧，这类中点离散能够保持相应的二次能量；但对于这里的四次势能，一般无法精确守恒。</p>
+<p>离散梯度法则从势能差出发：</p>
+\[ V(q_{n+1})-V(q_n) = \frac{k}{4}(q_{n+1}^4-q_n^4). \]<p>利用因式分解：</p>
+\[ a^4-b^4=(a-b)(a+b)(a^2+b^2), \]<p>得到：</p>
+\[ \boxed{ \overline{\nabla}V = \frac{k}{4} (q_{n+1}+q_n) (q_{n+1}^2+q_n^2). } \]<p>因此，可以构造：</p>
+\[ \boxed{ \begin{aligned} q_{n+1}-q_n &=h\frac{p_{n+1}+p_n}{2m},\\[4pt] p_{n+1}-p_n &=-h\frac{k}{4} (q_{n+1}+q_n) (q_{n+1}^2+q_n^2). \end{aligned} } \]<p>将两个方程代入动能与势能的变化表达式，就能得到：</p>
+\[ \boxed{\Delta T+\Delta V=0.} \]<p>这意味着，即使位置和速度仍然存在时间离散误差，计算得到的总能量也不会发生系统性漂移。</p>
+<p>但必须区分：</p>
+\[ \boxed{\text{能量准确}\neq\text{运动轨迹准确}.} \]<p>一个振子可能始终保持正确的总能量，却逐渐产生相位误差。</p>
+<p>这也是理解结构保持积分器时最重要的限制之一。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="四它与-symplectic-integrator-有什么区别">四、它与 Symplectic Integrator 有什么区别？
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>此前讨论过数值积分器的长期稳定性。这里需要区分两种不同的结构保持目标。</p>
+<p><strong>Symplectic Integrator（辛积分器）</strong> 保持 Hamilton 系统的辛结构。</p>
+<p>对于满足适当光滑性和步长条件的系统，辛积分器通常具有很好的长期能量行为：能量误差可能围绕真实值小幅振荡，而不会持续单向漂移。</p>
+<p>但它一般不严格保持原始 Hamiltonian。</p>
+<p><strong>Discrete Gradient Integrator（离散梯度积分器）</strong> 则直接保持指定的能量函数。</p>
+<p>但它一般不保持辛结构。</p>
+<p>两者分别强调：</p>
+\[ \boxed{ \text{Symplectic：保持相空间的几何结构} } \]\[ \boxed{ \text{Discrete Gradient：保持能量恒等式} } \]<p>对于长时间轨道计算，辛结构可能十分重要；对于要求严格控制能量收支的非线性动力学计算，离散梯度则具有独特价值。</p>
+<p>Marsden 与 West 的经典综述系统解释了离散变分原理、辛积分以及动量守恒之间的关系，适合作为两类方法的对照材料。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="五如果系统存在阻尼能否严格保持能量耗散">五、如果系统存在阻尼，能否严格保持能量耗散？
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这是离散梯度法更值得研究的扩展。</p>
+<p>考虑具有耗散结构的系统：</p>
+\[ \boxed{ \dot z=(J-R)\nabla H(z), } \]<p>其中：</p>
+\[ J^T=-J, \qquad R^T=R\succeq0. \]<p>连续时间下：</p>
+\[ \frac{dH}{dt} = -\nabla H^TR\nabla H \leq0. \]<p>采用离散梯度：</p>
+\[ \frac{z_{n+1}-z_n}{h} = (J-R)\overline{\nabla}H, \]<p>立即得到：</p>
+\[ \boxed{ H(z_{n+1})-H(z_n) = -h\overline{\nabla}H^TR\overline{\nabla}H \leq0. } \]<p>这说明方法不仅能用于守恒系统，还能构造<strong>严格遵守能量非增规律的耗散积分器</strong>。</p>
+<p>这种性质尤其适合需要避免非物理能量注入的软体动力学和阻尼系统。</p>
+<p>不过，能量非增并不等于求解器在任意步长下都能成功收敛，也不保证运动轨迹误差很小。</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="六2026-年的新进展如何同时获得高阶精度与能量耗散保证">六、2026 年的新进展：如何同时获得高阶精度与能量耗散保证？
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>这里出现了一个值得关注的最新研究。</p>
+<p><strong>2026 年 9 月 21 日</strong>，Lautwein、Marheineke、Myhr 与 Schäfers 发布预印本：</p>
+<p><em>Fourth-Order Energy-Consistent Average Vector Field Discrete Gradient Methods for Dissipative Hamiltonian Systems</em>。</p>
+<p>传统 AVF 离散梯度方法通常为二阶精度。</p>
+<p>如果希望提高到四阶，可以修改时间积分的结构矩阵。</p>
+<p>但一个困难是：<strong>提高精度所需的修正，可能破坏耗散矩阵的半正定性。</strong></p>
+<p>一旦：</p>
+\[ R\nsucceq0, \]<p>数值系统就可能出现：</p>
+\[ \Delta H>0. \]<p>也就是物理上应当耗散能量，数值算法却反而增加能量。</p>
+<p>该研究提出利用 <strong>Congruence-Based Completion（合同变换式补全）</strong>，构造：</p>
+\[ \boxed{ \overline R = \sum_j\alpha_j\Psi_j^TR\Psi_j, \qquad \alpha_j\geq0. } \]<p>因为：</p>
+\[ R\succeq0, \]<p>所以必然有：</p>
+\[ \boxed{\overline R\succeq0.} \]<p>这样可以在构造高阶修正的同时，保留耗散矩阵的半正定结构。</p>
+<p>作者在阻尼摆和耗散 Fermi–Pasta–Ulam 系统上验证了四阶收敛与能量耗散性质，并报告了相对于传统二阶方法的计算效率优势。</p>
+<p>这项工作目前属于预印本，其结果尚需更多独立验证。</p>
+<p>它展示了一个很深刻的数值算法设计原则：</p>
+<p><strong>提高计算精度时，可以通过特殊的代数参数化，让物理结构在算法修改过程中始终得到保持。</strong></p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="七对软体动力学和物理引擎的启发">七、对软体动力学和物理引擎的启发
+</h2><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>考虑一个四面体 Neo-Hookean 软体模型：</p>
+\[ H(x,v) = \frac12v^TMv+E_{\mathrm{elastic}}(x). \]<p>如果使用普通时间积分，可能观察到能量随时间漂移。</p>
+<p>离散梯度方法提供了一条研究路线：</p>
+<p>首先将弹性势能：</p>
+\[ E_{\mathrm{elastic}}(x) \]<p>构造成满足离散链式法则的形式。</p>
+<p>随后通过隐式积分求解：</p>
+\[ x_{n+1},v_{n+1}. \]<p>在无外力、无阻尼、无碰撞的理想情况下，检查：</p>
+\[ \boxed{ H_{n+1}-H_n\approx0. } \]<p>对于有阻尼的系统，则检查能量是否满足相应的离散耗散关系。</p>
+<p>这类实验可以直接用于比较不同时间积分器的数值性质。</p>
+<p>但它并不意味着应该直接用离散梯度替换 <span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span>。</p>
+<p>XPBD 主要追求有限计算预算下的约束求解效率。离散梯度方法通常需要求解隐式非线性方程，可能显著增加单步成本。</p>
+<p>此外，接触、摩擦、外力做功和数值阻尼都需要正确纳入能量收支；单纯保持弹性势能与动能之和，并不能自动处理这些现象。</p>
+<p>更现实的研究价值是：</p>
+<p><strong>将离散梯度方法作为高保真参考积分器，检验实时软体求解器的能量误差与长期动力学行为。</strong></p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="八它在整个知识体系中卡在哪里">八、它在整个知识体系中卡在哪里？
+</h2><p>此前讨论的物理求解器技术，可以按照各自控制的对象区分：</p>
+<div class="table-wrapper"><table>
+	<thead>
+			<tr>
+					<th>方法</th>
+					<th>主要关注</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><span class="term-anchor" data-term="jacobian-free-newton-krylov" tabindex="0">JFNK</span></td>
+					<td>如何高效求解非线性方程</td>
+			</tr>
+			<tr>
+					<td><span class="term-anchor" data-term="algebraic-multigrid" tabindex="0">AMG</span></td>
+					<td>如何加速大型线性系统</td>
+			</tr>
+			<tr>
+					<td>Partial Assembly</td>
+					<td>如何降低有限元算子的执行成本</td>
+			</tr>
+			<tr>
+					<td>Reverse-Sweep Adjoint</td>
+					<td>如何准确计算有限迭代求解器的梯度</td>
+			</tr>
+			<tr>
+					<td><strong>Discrete Gradient</strong></td>
+					<td><strong>如何使时间离散严格遵守指定的能量规律</strong></td>
+			</tr>
+	</tbody>
+</table></div>
+<p>离散梯度位于：</p>
+\[ \text{连续动力学方程} \]\[ \downarrow \]\[ \boxed{\text{结构保持时间离散}} \]\[ \downarrow \]\[ \text{非线性代数方程} \]\[ \downarrow \]\[ \text{Newton / Krylov / GPU 求解} \]<p>这一层次。</p>
+<p>它决定的是<strong>离散后的动力学系统应该具有哪些数学性质</strong>。</p>
+<p>至于如何高效求解产生的代数方程，则可以继续使用 JFNK、预条件器和 GPU 优化。</p>
+<p><strong>今天最值得记住的一句话：</strong></p>
+<blockquote>
+<p>数值方法可以不精确复制每一步运动，却严格保持某些物理规律。高质量物理求解器的设计，需要明确区分轨迹精度、守恒性质和计算效率。</p>
+</blockquote>
+<hr>
+<h3 id="拓展阅读">拓展阅读
+</h3><details class="reveal">
+  <summary>查看扩展内容</summary>
+  <div class="reveal-body">
+    <p><strong>1. Gonzalez（1996）— Time Integration and Discrete Hamiltonian Systems</strong></p>
+<p><em>Journal of Nonlinear Science</em>, 6, 449–467。DOI：10.1007/BF02440162。</p>
+<p><a class="link" href="https://doi.org/10.1007/BF02440162"  target="_blank" rel="noopener"
+    >Springer 原论文</a></p>
+<p>经典理论起点，重点理解离散方向导数如何构造守恒时间积分器。</p>
+<p><strong>2. Quispel &amp; McLaren（2008）— A New Class of Energy-Preserving Numerical Integration Methods</strong></p>
+<p><em>Journal of Physics A: Mathematical and Theoretical</em>, 41, 045206。</p>
+<p><a class="link" href="https://doi.org/10.1088/1751-8113/41/4/045206"  target="_blank" rel="noopener"
+    >IOP 原论文</a></p>
+<p>最推荐首先阅读。文章篇幅较短，直接展示 AVF 方法如何保持 Hamiltonian。</p>
+<p><strong>3. Simo, Tarnow &amp; Wong（1992）— Exact Energy-Momentum Conserving Algorithms and Symplectic Schemes for Nonlinear Dynamics</strong></p>
+<p><em>Computer Methods in Applied Mechanics and Engineering</em>, 100(1), 63–116。</p>
+<p>Elsevier 原论文</p>
+<p>最贴近非线性有限元与结构动力学，讨论如何同时保持能量、线动量和角动量。</p>
+<p><strong>4. Celledoni et al.（2012）— Preserving Energy resp. Dissipation in Numerical PDEs Using the Average Vector Field Method</strong></p>
+<p>arXiv 开放论文</p>
+<p>适合从常微分方程进一步进入 PDE，理解 AVF 如何用于 Hamilton 系统与耗散型方程。</p>
+<p><strong>5. Lautwein et al.（2026）— Fourth-Order Energy-Consistent Average Vector Field Discrete Gradient Methods for Dissipative Hamiltonian Systems</strong></p>
+<p>2026 年 9 月预印本，arXiv:2609.24692。</p>
+<p>论文全文与数学推导</p>
+<p>本期最新研究。建议重点阅读第 2.3 节，理解为什么保持矩阵半正定性能够成为高阶数值方法设计的关键约束。</p>
+<hr>
+<p><strong>知识卡片注册表｜第 64 张</strong></p>
+<p>新增主题：<strong>Discrete Gradient Methods（离散梯度与能量一致性时间积分）</strong>。</p>
+<p>所属方向：几何数值积分 / 非线性有限元 / 软体动力学 / 物理求解器。</p>
+<p>核心问题：如何在有限时间步和非线性物理系统中，构造严格满足能量守恒或耗散规律的时间积分算法。</p>
+<p>知识关联：第 54 张 <span class="term-anchor" data-term="discrete-exterior-calculus" tabindex="0">DEC</span>、第 58 张 JFNK、第 60 张 Solver-Level Differentiation、第 61 张 Partial Assembly。</p>
+<p><strong>新增知识分支：结构保持时间积分与离散能量定律。</strong></p>
+
+  </div>
+</details>
+
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E6%95%B0%E5%80%BC%E6%96%B9%E6%B3%95/">数值方法</a>
+        
+            <a href="/tags/%E9%9D%9E%E7%BA%BF%E6%80%A7%E5%8A%A8%E5%8A%9B%E5%AD%A6/">非线性动力学</a>
+        
+            <a href="/tags/%E7%89%A9%E7%90%86%E5%BC%95%E6%93%8E/">物理引擎</a>
+        
+            <a href="/tags/%E8%AE%A1%E7%AE%97%E5%8A%9B%E5%AD%A6/">计算力学</a>
+        
+    </section>
+
+
+    
+    <section class="article-copyright">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <path d="M14.5 9a3.5 4 0 1 0 0 6" />
+</svg>
+
+
+
+        <span>Licensed under CC BY-NC-SA 4.0</span>
+    </section>
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        const elementsToRender = [".main-article", ".widget--toc"];
+
+        elementsToRender.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false },
+                        { left: "\\[", right: "\\]", display: true }
+                    ],
+                    ignoredClasses: ["gist"]
+                });
+            }
+        });
+    });
+</script>
+    
+</article>
+
+    
+
+    <section class="dep-radar">
+    <div class="dep-radar-title">
+        依赖雷达 · card-42<span class="card-badge card-badge--role" title="认知分型">机制剖析</span><span class="card-badge" title="次要分型">权衡对比</span><span class="card-badge card-badge--diff" title="难度 3/3">◆◆◆</span></div>
+    <div class="dep-radar-flow"><div class="dep-radar-col dep-radar-col--pre">
+            <div class="dep-radar-colhead">前置基础</div><a class="dep-radar-node" href="/cards/04-variational-integrators/">变分积分器：从离散 Hamilton 原理到异步 AVI<span class="dep-radar-meta"> · card-04</span></a></div><span class="dep-radar-arrow">→</span><div class="dep-radar-center">
+            <div class="dep-radar-node">card-42<span class="dep-radar-meta"> · 当前卡片</span></div>
+        </div></div>
+</section>
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/cards/38-discrete-exterior-calculus/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Discrete Exterior Calculus：先离散几何关系，再谈微分方程</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/30-backward-error-analysis/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Backward Error Analysis：数值积分器真正求解的，往往不是原方程，而是一个“附近的精确方程”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/06-apic/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">APIC：粒子法里的数值耗散，很多时候来自“信息在表示转换时被丢掉”</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/04-variational-integrators/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">变分积分器：从离散 Hamilton 原理到异步 AVI</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/cards/39-algebraic-multigrid/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Algebraic Multigrid：换一个尺度消除难消的误差</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+
+    
+        
+    <div class="disqus-container">
+    <div id="disqus_thread"></div>
+<script>
+    window.disqus_config = function () {
+    
+    
+    
+    };
+    (function() {
+        if (["localhost", "127.0.0.1"].indexOf(window.location.hostname) != -1) {
+            document.getElementById('disqus_thread').innerHTML = 'Disqus comments not available by default when the website is previewed locally.';
+            return;
+        }
+        var d = document, s = d.createElement('script'); s.async = true;
+        s.src = '//' + "hugo-theme-stack" + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script>
+		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+	
+</div>
+
+<style>
+    .disqus-container {
+        background-color: var(--card-background);
+        border-radius: var(--card-border-radius);
+        box-shadow: var(--shadow-l1);
+        padding: var(--card-padding);
+    }
+</style>
+
+<script>
+    window.addEventListener('onColorSchemeChange', (e) => {
+        if (typeof DISQUS == 'object') {
+            DISQUS.reset({
+                reload: true
+            });
+        }
+    })
+</script>
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2026 Assranai
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.32.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    <script src="/js/term-tooltip.js" defer></script>
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.c922af694cc257bf1ecc41c0dd7b0430f9114ec280ccf67cd2c6ad55f5316c4e.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

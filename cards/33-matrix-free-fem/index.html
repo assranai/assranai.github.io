@@ -325,14 +325,6 @@
   <ol>
     <li><a href="#1-传统-fem-真正在存什么">1. 传统 FEM 真正在存什么？</a></li>
   </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
-  </ol>
 </nav>
         </div>
     </section>
@@ -752,6 +744,24 @@
 \[\boxed{\text{多做计算，少搬数据}.}\]<p>所以 Matrix-Free FEM、FlashAttention、checkpoint recomputation 看起来属于完全不同领域，却共享一个现代计算原则：</p>
 \[\boxed{ \text{在算力相对便宜、内存流量昂贵的机器上， “避免重复计算”已经不再是无条件正确的优化目标。}\]<p>这是 Matrix-Free FEM 最值得迁移出去的一层认识。</p>
 <hr>
+<h1 id="18-为什么-partial-assembly-还没有完全取代传统-fem">18. 为什么 Partial Assembly 还没有完全取代传统 FEM
+</h1><details class="reveal">
+  <summary>查看完整推导与细节</summary>
+  <div class="reveal-body">
+    <p>主要存在三个限制。</p>
+<p><strong>第一，低阶四面体有限元不一定适合。</strong></p>
+<p>Sum Factorization 最容易发挥优势的场景是张量积六面体或四边形单元。</p>
+<p>对于常见的线性四面体单元，每个单元只有少量自由度，本身的矩阵计算已经十分简单。</p>
+<p>因此，在低阶四面体软体动力学中，直接组装矩阵或计算局部单元力，可能更加经济。</p>
+<p><strong>第二，预条件器设计更加困难。</strong></p>
+<p>没有显式全局刚度矩阵，传统依赖矩阵元素的 ILU 或 AMG 方法便无法直接使用。</p>
+<p>因此需要：</p>
+\[ \boxed{ \text{Matrix-Free Operator} + \text{专门设计的 Preconditioner}. } \]<p>一种成熟方案是 Low-Order Refined Preconditioning：将高阶单元对应到细分的低阶离散系统，再利用适合低阶矩阵的 AMG 进行预条件。</p>
+<p>Pazner、Kolev 与 Camier 的研究已经实现了这一思路的端到端 GPU 加速。</p>
+<p><strong>第三，复杂非线性物理可能需要不断更新积分点数据。</strong></p>
+<p>例如 Neo-Hookean 材料：</p>
+\[ P=\frac{\partial\Psi}{\partial F}. \]<p>如果形变梯度 \(F\) 每步都变化，那么积分点上的材料响应也需要更新。</p>
+<p>此时是否预存 \(D\)，以及预存哪些部分，就成为需要针对具体物理模型优化的问题。</p>
 <h1 id="今天值得留下的一句话">今天值得留下的一句话
 </h1><p>Matrix-Free FEM 最值得记住的并不是：</p>
 \[\boxed{\text{“不存刚度矩阵”}.}\]<p>真正重要的是：</p>
@@ -785,6 +795,8 @@
 <p>Arndt et al., <strong>ExaDG: High-Order Discontinuous Galerkin for the Exa-scale</strong>。如果想看这一整套技术怎样组成真正的大规模求解器：matrix-free operator + sum factorization + massively parallel multigrid + optimized smoothers，就是很好的系统案例；相关工作报告实际软件贡献在不同硬件上带来约 3–4× 加速。</p>
 </li>
 </ol>
+  </div>
+</details>
 
   </div>
 </details>
