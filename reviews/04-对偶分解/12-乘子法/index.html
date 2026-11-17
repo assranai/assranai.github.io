@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第12章：乘子法（增广Lagrange法） 核心思想：在Lagrange函数中加入二次惩罚项 $\\frac{\\rho}{2}|Ax - b|^2$，使对偶函数从&quot;有折角&quot;变为处处光滑甚至强凸——从而可以用更快的梯度型方法求解。乘子法的理论精髓在于：它等价于在对偶问题上跑邻近点法（Proximal Point Algorithm）。\n前置知识回顾 概念 定义（简要） 首次出现 Lagrange对偶 原问题 → Lagrange函数 $L(x, \\lambda) = f(x) + \\lambda^T(Ax-b)$ → 对偶函数 $q(\\lambda) = \\inf_x L$ → 对偶问题 $\\max_\\lambda q(\\lambda)$ Ch10 对偶分解法 将可分离问题 $\\min \\sum f_i(x_i)$ s.t. $\\sum A_i x_i = b$ 拆成 $N$ 个并行子问题 + 中心协调，用次梯度法更新 $\\lambda$ Ch11 邻近点法（PPA） $x_{k+1} = \\operatorname{prox}_{\\alpha f}(x_k) = \\arg\\min_x { f(x) + \\frac{1}{2\\alpha}|x - x_k|^2 }$——在原问题加上2范数正则化来稳定迭代 Ch9 邻近算子 $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$ Ch7 对偶函数 $q(\\lambda) = \\inf_x L(x, \\lambda)$，永为凹函数；若原函数强凸则对偶光滑 Ch10 次梯度 非光滑折角处&quot;托底直线&quot;的斜率集合：$\\partial f(x) = {g \\mid f(y) \\geq f(x) + g^T(y-x), \\forall y}$ Ch11 强凸函数 $f(y) \\geq f(x) + \\nabla f(x)^T(y-x) + \\frac{\\mu}{2}|y-x|^2$（碗壁陡峭的碗，极小值唯一） Ch1 Moreau包络 原函数的强凸性 → 对偶函数的光滑性（&ldquo;原函数越凸，对偶越光滑&rdquo;） Ch11 12.1 从罚函数法到增广Lagrange的演进逻辑 12.1.1 纯二次罚函数法 问题：等式约束优化 ">
 <title>第12章：乘子法（增广Lagrange法）</title>
 
 <link rel='canonical' href='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/12-%E4%B9%98%E5%AD%90%E6%B3%95/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="第12章：乘子法（增广Lagrange法）">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="第12章：乘子法（增广Lagrange法）">
 <meta property='og:description' content="第12章：乘子法（增广Lagrange法） 核心思想：在Lagrange函数中加入二次惩罚项 $\\frac{\\rho}{2}|Ax - b|^2$，使对偶函数从&quot;有折角&quot;变为处处光滑甚至强凸——从而可以用更快的梯度型方法求解。乘子法的理论精髓在于：它等价于在对偶问题上跑邻近点法（Proximal Point Algorithm）。\n前置知识回顾 概念 定义（简要） 首次出现 Lagrange对偶 原问题 → Lagrange函数 $L(x, \\lambda) = f(x) + \\lambda^T(Ax-b)$ → 对偶函数 $q(\\lambda) = \\inf_x L$ → 对偶问题 $\\max_\\lambda q(\\lambda)$ Ch10 对偶分解法 将可分离问题 $\\min \\sum f_i(x_i)$ s.t. $\\sum A_i x_i = b$ 拆成 $N$ 个并行子问题 + 中心协调，用次梯度法更新 $\\lambda$ Ch11 邻近点法（PPA） $x_{k+1} = \\operatorname{prox}_{\\alpha f}(x_k) = \\arg\\min_x { f(x) + \\frac{1}{2\\alpha}|x - x_k|^2 }$——在原问题加上2范数正则化来稳定迭代 Ch9 邻近算子 $\\operatorname{prox}_f(v) = \\arg\\min_x { f(x) + \\frac{1}{2}|x - v|^2 }$ Ch7 对偶函数 $q(\\lambda) = \\inf_x L(x, \\lambda)$，永为凹函数；若原函数强凸则对偶光滑 Ch10 次梯度 非光滑折角处&quot;托底直线&quot;的斜率集合：$\\partial f(x) = {g \\mid f(y) \\geq f(x) + g^T(y-x), \\forall y}$ Ch11 强凸函数 $f(y) \\geq f(x) + \\nabla f(x)^T(y-x) + \\frac{\\mu}{2}|y-x|^2$（碗壁陡峭的碗，极小值唯一） Ch1 Moreau包络 原函数的强凸性 → 对偶函数的光滑性（&ldquo;原函数越凸，对偶越光滑&rdquo;） Ch11 12.1 从罚函数法到增广Lagrange的演进逻辑 12.1.1 纯二次罚函数法 问题：等式约束优化 ">
 <meta property='og:url' content='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/12-%E4%B9%98%E5%AD%90%E6%B3%95/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -56,7 +56,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -462,55 +462,55 @@
 <hr>
 <h2 id="前置知识回顾">前置知识回顾
 </h2><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>概念</th>
-					<th>定义（简要）</th>
-					<th>首次出现</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>Lagrange对偶</td>
-					<td>原问题 → Lagrange函数 $L(x, \lambda) = f(x) + \lambda^T(Ax-b)$ → 对偶函数 $q(\lambda) = \inf_x L$ → 对偶问题 $\max_\lambda q(\lambda)$</td>
-					<td>Ch10</td>
-			</tr>
-			<tr>
-					<td>对偶分解法</td>
-					<td>将可分离问题 $\min \sum f_i(x_i)$ s.t. $\sum A_i x_i = b$ 拆成 $N$ 个并行子问题 + 中心协调，用次梯度法更新 $\lambda$</td>
-					<td>Ch11</td>
-			</tr>
-			<tr>
-					<td>邻近点法（PPA）</td>
-					<td>$x_{k+1} = \operatorname{prox}_{\alpha f}(x_k) = \arg\min_x { f(x) + \frac{1}{2\alpha}|x - x_k|^2 }$——在原问题加上2范数正则化来稳定迭代</td>
-					<td>Ch9</td>
-			</tr>
-			<tr>
-					<td>邻近算子</td>
-					<td>$\operatorname{prox}_f(v) = \arg\min_x { f(x) + \frac{1}{2}|x - v|^2 }$</td>
-					<td>Ch7</td>
-			</tr>
-			<tr>
-					<td>对偶函数</td>
-					<td>$q(\lambda) = \inf_x L(x, \lambda)$，永为凹函数；若原函数强凸则对偶光滑</td>
-					<td>Ch10</td>
-			</tr>
-			<tr>
-					<td>次梯度</td>
-					<td>非光滑折角处&quot;托底直线&quot;的斜率集合：$\partial f(x) = {g \mid f(y) \geq f(x) + g^T(y-x), \forall y}$</td>
-					<td>Ch11</td>
-			</tr>
-			<tr>
-					<td>强凸函数</td>
-					<td>$f(y) \geq f(x) + \nabla f(x)^T(y-x) + \frac{\mu}{2}|y-x|^2$（碗壁陡峭的碗，极小值唯一）</td>
-					<td>Ch1</td>
-			</tr>
-			<tr>
-					<td>Moreau包络</td>
-					<td>原函数的强凸性 → 对偶函数的光滑性（&ldquo;原函数越凸，对偶越光滑&rdquo;）</td>
-					<td>Ch11</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>概念</th>
+          <th>定义（简要）</th>
+          <th>首次出现</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Lagrange对偶</td>
+          <td>原问题 → Lagrange函数 $L(x, \lambda) = f(x) + \lambda^T(Ax-b)$ → 对偶函数 $q(\lambda) = \inf_x L$ → 对偶问题 $\max_\lambda q(\lambda)$</td>
+          <td>Ch10</td>
+      </tr>
+      <tr>
+          <td>对偶分解法</td>
+          <td>将可分离问题 $\min \sum f_i(x_i)$ s.t. $\sum A_i x_i = b$ 拆成 $N$ 个并行子问题 + 中心协调，用次梯度法更新 $\lambda$</td>
+          <td>Ch11</td>
+      </tr>
+      <tr>
+          <td>邻近点法（PPA）</td>
+          <td>$x_{k+1} = \operatorname{prox}_{\alpha f}(x_k) = \arg\min_x { f(x) + \frac{1}{2\alpha}|x - x_k|^2 }$——在原问题加上2范数正则化来稳定迭代</td>
+          <td>Ch9</td>
+      </tr>
+      <tr>
+          <td>邻近算子</td>
+          <td>$\operatorname{prox}_f(v) = \arg\min_x { f(x) + \frac{1}{2}|x - v|^2 }$</td>
+          <td>Ch7</td>
+      </tr>
+      <tr>
+          <td>对偶函数</td>
+          <td>$q(\lambda) = \inf_x L(x, \lambda)$，永为凹函数；若原函数强凸则对偶光滑</td>
+          <td>Ch10</td>
+      </tr>
+      <tr>
+          <td>次梯度</td>
+          <td>非光滑折角处&quot;托底直线&quot;的斜率集合：$\partial f(x) = {g \mid f(y) \geq f(x) + g^T(y-x), \forall y}$</td>
+          <td>Ch11</td>
+      </tr>
+      <tr>
+          <td>强凸函数</td>
+          <td>$f(y) \geq f(x) + \nabla f(x)^T(y-x) + \frac{\mu}{2}|y-x|^2$（碗壁陡峭的碗，极小值唯一）</td>
+          <td>Ch1</td>
+      </tr>
+      <tr>
+          <td>Moreau包络</td>
+          <td>原函数的强凸性 → 对偶函数的光滑性（&ldquo;原函数越凸，对偶越光滑&rdquo;）</td>
+          <td>Ch11</td>
+      </tr>
+  </tbody>
 </table></div>
 <hr>
 <h2 id="121-从罚函数法到增广lagrange的演进逻辑">12.1 从罚函数法到增广Lagrange的演进逻辑
@@ -650,65 +650,65 @@ $$\nabla f(x^{k+1}) + A^T \underbrace{(\lambda^k + \rho(Ax^{k+1} - b))}_{\text{�
 <hr>
 <h2 id="123-乘子法-vs-对偶分解法">12.3 乘子法 vs 对偶分解法
 </h2><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>维度</th>
-					<th>对偶分解法（Ch11）</th>
-					<th>乘子法（本章）</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td><strong>数学原理</strong></td>
-					<td>Lagrange对偶 + 次梯度上升</td>
-					<td>增广Lagrange + 梯度上升</td>
-			</tr>
-			<tr>
-					<td><strong>对偶函数性质</strong></td>
-					<td>可能有折角（非光滑）</td>
-					<td>处处光滑/强凹（二次惩罚的光滑化）</td>
-			</tr>
-			<tr>
-					<td><strong>对偶空间算法</strong></td>
-					<td>次梯度法</td>
-					<td><strong>邻近点法</strong></td>
-			</tr>
-			<tr>
-					<td><strong>收敛速度</strong></td>
-					<td>$O(1/\sqrt{k})$（慢）</td>
-					<td>$O(1/k)$（快）</td>
-			</tr>
-			<tr>
-					<td><strong>原问题条件</strong></td>
-					<td>需 $f_i$ 强凸才不振荡</td>
-					<td>无额外要求</td>
-			</tr>
-			<tr>
-					<td><strong>可分离性</strong></td>
-					<td>✅ 完全并行（目标是可分离的）</td>
-					<td>❌ 被二次惩罚项 $|Ax - b|^2$ 破坏</td>
-			</tr>
-			<tr>
-					<td><strong>子问题</strong></td>
-					<td>$N$ 个独立的并行子问题</td>
-					<td>一个联合极小化问题（维数 = 总维数）</td>
-			</tr>
-			<tr>
-					<td><strong>数值稳定性</strong></td>
-					<td>稳定（步长衰减）</td>
-					<td>$\rho$ 太大时原始子问题病态</td>
-			</tr>
-			<tr>
-					<td><strong>适用场景</strong></td>
-					<td>大规模分布式、可分离问题</td>
-					<td>中小规模、对精度要求高的问题</td>
-			</tr>
-			<tr>
-					<td><strong>进阶发展</strong></td>
-					<td>—</td>
-					<td>启发ADMM（Ch14）恢复可分离性</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>维度</th>
+          <th>对偶分解法（Ch11）</th>
+          <th>乘子法（本章）</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><strong>数学原理</strong></td>
+          <td>Lagrange对偶 + 次梯度上升</td>
+          <td>增广Lagrange + 梯度上升</td>
+      </tr>
+      <tr>
+          <td><strong>对偶函数性质</strong></td>
+          <td>可能有折角（非光滑）</td>
+          <td>处处光滑/强凹（二次惩罚的光滑化）</td>
+      </tr>
+      <tr>
+          <td><strong>对偶空间算法</strong></td>
+          <td>次梯度法</td>
+          <td><strong>邻近点法</strong></td>
+      </tr>
+      <tr>
+          <td><strong>收敛速度</strong></td>
+          <td>$O(1/\sqrt{k})$（慢）</td>
+          <td>$O(1/k)$（快）</td>
+      </tr>
+      <tr>
+          <td><strong>原问题条件</strong></td>
+          <td>需 $f_i$ 强凸才不振荡</td>
+          <td>无额外要求</td>
+      </tr>
+      <tr>
+          <td><strong>可分离性</strong></td>
+          <td>✅ 完全并行（目标是可分离的）</td>
+          <td>❌ 被二次惩罚项 $|Ax - b|^2$ 破坏</td>
+      </tr>
+      <tr>
+          <td><strong>子问题</strong></td>
+          <td>$N$ 个独立的并行子问题</td>
+          <td>一个联合极小化问题（维数 = 总维数）</td>
+      </tr>
+      <tr>
+          <td><strong>数值稳定性</strong></td>
+          <td>稳定（步长衰减）</td>
+          <td>$\rho$ 太大时原始子问题病态</td>
+      </tr>
+      <tr>
+          <td><strong>适用场景</strong></td>
+          <td>大规模分布式、可分离问题</td>
+          <td>中小规模、对精度要求高的问题</td>
+      </tr>
+      <tr>
+          <td><strong>进阶发展</strong></td>
+          <td>—</td>
+          <td>启发ADMM（Ch14）恢复可分离性</td>
+      </tr>
+  </tbody>
 </table></div>
 <p><strong>关键权衡</strong>：</p>
 <blockquote>
@@ -898,46 +898,46 @@ $$L_\rho^{\text{Bregman}}(x, \lambda) = f(x) + \lambda^T(Ax - b) + \rho D_\phi(A
 <hr>
 <h2 id="128-算法对比详细表">12.8 算法对比详细表
 </h2><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>方法</th>
-					<th>惩罚方式</th>
-					<th>乘子更新</th>
-					<th>对偶光滑性</th>
-					<th>可分离性</th>
-					<th>收敛速度</th>
-					<th>参数敏感度</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>罚函数法</td>
-					<td>只二次罚，无乘子</td>
-					<td>无</td>
-					<td>—</td>
-					<td>✅（若f可分离）</td>
-					<td>$\rho \to \infty$ 时慢</td>
-					<td>极高（需 $\rho$ 递增序列）</td>
-			</tr>
-			<tr>
-					<td>Lagrange对偶</td>
-					<td>只线性乘子</td>
-					<td>$\lambda^{k+1} = \lambda^k + \alpha_k(Ax^k - b)$</td>
-					<td>可能有折角</td>
-					<td>✅</td>
-					<td>$O(1/\sqrt{k})$</td>
-					<td>中（步长衰减）</td>
-			</tr>
-			<tr>
-					<td><strong>乘子法</strong></td>
-					<td>线性 + 二次</td>
-					<td>$\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)$</td>
-					<td><strong>处处光滑</strong></td>
-					<td>❌（二次项耦合）</td>
-					<td><strong>线性/快</strong></td>
-					<td><strong>低</strong>（$\rho$ 固定即可）</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>方法</th>
+          <th>惩罚方式</th>
+          <th>乘子更新</th>
+          <th>对偶光滑性</th>
+          <th>可分离性</th>
+          <th>收敛速度</th>
+          <th>参数敏感度</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>罚函数法</td>
+          <td>只二次罚，无乘子</td>
+          <td>无</td>
+          <td>—</td>
+          <td>✅（若f可分离）</td>
+          <td>$\rho \to \infty$ 时慢</td>
+          <td>极高（需 $\rho$ 递增序列）</td>
+      </tr>
+      <tr>
+          <td>Lagrange对偶</td>
+          <td>只线性乘子</td>
+          <td>$\lambda^{k+1} = \lambda^k + \alpha_k(Ax^k - b)$</td>
+          <td>可能有折角</td>
+          <td>✅</td>
+          <td>$O(1/\sqrt{k})$</td>
+          <td>中（步长衰减）</td>
+      </tr>
+      <tr>
+          <td><strong>乘子法</strong></td>
+          <td>线性 + 二次</td>
+          <td>$\lambda^{k+1} = \lambda^k + \rho(Ax^{k+1} - b)$</td>
+          <td><strong>处处光滑</strong></td>
+          <td>❌（二次项耦合）</td>
+          <td><strong>线性/快</strong></td>
+          <td><strong>低</strong>（$\rho$ 固定即可）</td>
+      </tr>
+  </tbody>
 </table></div>
 <p><strong>演变路线总结</strong>：</p>
 <div class="highlight"><div class="chroma">
@@ -1114,9 +1114,8 @@ $$x^{k+1} = \arg\min_x \left\{ f(x) + (\lambda^k)^T(Ax - b) + \frac{\rho}{2}\|Ax
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

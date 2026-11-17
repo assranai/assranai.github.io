@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Implicit Differentiation（隐式微分）用于物理求解器与优化层\n领域：有限元 × 科学机器学习 × AI 全栈工程 × 数值优化\n推荐阅读时间：约 8–10 分钟\n今天选隐式微分，因为它处在一个很关键的位置：\n\\[\\boxed{ \\text{数值求解器} \\longrightarrow \\text{可微模块} }\\]传统自动微分通常要求你把程序执行过程全部展开：\n\\[x_0\\to x_1\\to x_2\\to\\cdots\\to x_K.\\]然后从：\n\\[x_K\\]一路反向传播。\n但如果：\n\\[x_K\\]其实是某个方程的收敛解：\n\\[F(x^*,\\theta)=0,\\]那么有一个更聪明的问题：\n为什么要关心求解器“怎么走到答案”，而不能直接对“答案满足的方程”求导？\n这就是 implicit differentiation。\nBlondel 等人的经典工作把这一思想做成模块化框架：用户只要给出最优性条件或 root equation，就可以在不展开整个迭代器的情况下计算解对参数的导数；JAX/JAXopt 今天都直接支持这一工作流。\n1. 最简单的例子：你其实不需要对 Newton 的每一步求导 设：\n\\[x^*(\\theta)\\]由：\n\\[F(x,\\theta)=0\\]隐式定义。\n例如：\n\\[F(x,\\theta) = x^3+\\theta x-1.\\]对不同：\n\\[\\theta\\]你可能用 Newton：\n\\[x_{k+1} = x_k - \\frac{F(x_k,\\theta)} {\\partial F/\\partial x}\\]迭代 20 次求：\n\\[x^*.\\]如果要计算：\n\\[\\frac{dx^*}{d\\theta},\\]最直接的 AD 方法是把 20 次 Newton 全部展开，再反传。\n但其实在收敛点：\n">
 <title>Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/21-implicit-differentiation/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Implicit Differentiation：让“求解器结果”可微，而不是把整个求解过程一层层反传">
 <meta property='og:description' content="主题：Implicit Differentiation（隐式微分）用于物理求解器与优化层\n领域：有限元 × 科学机器学习 × AI 全栈工程 × 数值优化\n推荐阅读时间：约 8–10 分钟\n今天选隐式微分，因为它处在一个很关键的位置：\n\\[\\boxed{ \\text{数值求解器} \\longrightarrow \\text{可微模块} }\\]传统自动微分通常要求你把程序执行过程全部展开：\n\\[x_0\\to x_1\\to x_2\\to\\cdots\\to x_K.\\]然后从：\n\\[x_K\\]一路反向传播。\n但如果：\n\\[x_K\\]其实是某个方程的收敛解：\n\\[F(x^*,\\theta)=0,\\]那么有一个更聪明的问题：\n为什么要关心求解器“怎么走到答案”，而不能直接对“答案满足的方程”求导？\n这就是 implicit differentiation。\nBlondel 等人的经典工作把这一思想做成模块化框架：用户只要给出最优性条件或 root equation，就可以在不展开整个迭代器的情况下计算解对参数的导数；JAX/JAXopt 今天都直接支持这一工作流。\n1. 最简单的例子：你其实不需要对 Newton 的每一步求导 设：\n\\[x^*(\\theta)\\]由：\n\\[F(x,\\theta)=0\\]隐式定义。\n例如：\n\\[F(x,\\theta) = x^3+\\theta x-1.\\]对不同：\n\\[\\theta\\]你可能用 Newton：\n\\[x_{k+1} = x_k - \\frac{F(x_k,\\theta)} {\\partial F/\\partial x}\\]迭代 20 次求：\n\\[x^*.\\]如果要计算：\n\\[\\frac{dx^*}{d\\theta},\\]最直接的 AD 方法是把 20 次 Newton 全部展开，再反传。\n但其实在收敛点：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/21-implicit-differentiation/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,53 +324,56 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-最简单的例子你其实不需要对-newton-的每一步求导">1. 最简单的例子：你其实不需要对 Newton 的每一步求导</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-这件事真正厉害在哪里">2. 这件事真正厉害在哪里？</a></li>
+    <li><a href="#3-放到有限元里它立刻变得非常有用">3. 放到有限元里，它立刻变得非常有用</a></li>
+    <li><a href="#4-推导一次你会发现它其实就是-adjoint">4. 推导一次，你会发现它其实就是 adjoint</a></li>
+    <li><a href="#5-为什么它特别适合参数很多输出少的问题">5. 为什么它特别适合“参数很多、输出少”的问题？</a></li>
+    <li><a href="#6-unrolling-和-implicit-differentiation-的真正区别">6. Unrolling 和 implicit differentiation 的真正区别</a>
       <ol>
         <li><a href="#unrolled-autodiff">Unrolled autodiff</a></li>
         <li><a href="#implicit-differentiation">Implicit differentiation</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#7-这里有一个非常重要的微妙点两者求的梯度其实可能不同">7. 这里有一个非常重要的微妙点：两者求的“梯度”其实可能不同</a></li>
+    <li><a href="#8-backward-pass-为什么又变成了一个线性系统">8. Backward pass 为什么又变成了一个线性系统？</a></li>
+    <li><a href="#9-用多重网格加速伴随线性系统的求解">9. 用多重网格加速伴随线性系统的求解</a></li>
+    <li><a href="#10-如果-forward-是优化问题呢">10. 如果 forward 是优化问题呢？</a></li>
+    <li><a href="#11-这和把求解器当神经网络层有什么本质区别">11. 这和“把求解器当神经网络层”有什么本质区别？</a></li>
+    <li><a href="#12-接触为什么是-implicit-differentiation-的地狱级问题">12. 接触为什么是 implicit differentiation 的地狱级问题？</a></li>
+    <li><a href="#13-nimble-和-dojo-为什么值得看">13. Nimble 和 Dojo 为什么值得看？</a></li>
+    <li><a href="#14-为什么碰撞时正确梯度会如此难">14. 为什么碰撞时“正确梯度”会如此难？</a></li>
+    <li><a href="#15-对软体-fem一个特别实用的应用参数识别">15. 对软体 FEM，一个特别实用的应用：参数识别</a>
       <ol>
         <li><a href="#finite-difference">Finite difference</a></li>
         <li><a href="#implicit-adjoint">Implicit adjoint</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li><a href="#一个最小可实践实验">一个最小可实践实验</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#16-这和代理模型形成了一个很有意思的竞争互补关系">16. 这和代理模型形成了一个很有意思的竞争/互补关系</a></li>
+    <li><a href="#17-它和可靠性分析也有一条很值得关注的连接">17. 它和可靠性分析也有一条很值得关注的连接</a></li>
+    <li><a href="#18-一个非常容易误解的点隐式微分并不等于免费梯度">18. 一个非常容易误解的点：隐式微分并不等于“免费梯度”</a></li>
+    <li><a href="#19-2026-年一个值得注意的发展二阶隐式微分开始进入-fem">19. 2026 年一个值得注意的发展：二阶隐式微分开始进入 FEM</a></li>
+    <li><a href="#20-对自研求解器最值得迁移的工程架构">20. 对自研求解器最值得迁移的工程架构</a>
+      <ol>
+        <li><a href="#一个最小可实践实验">一个最小可实践实验</a></li>
+      </ol>
+    </li>
+    <li><a href="#21-问题根源物理方程的解与求解器的输出并不完全相同">21. 问题根源：物理方程的解，与求解器的输出并不完全相同</a>
       <ol>
         <li><a href="#一个简单到不能再简单的例子">一个简单到不能再简单的例子</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#22-传统两条路线各有什么代价">22. 传统两条路线各有什么代价？</a>
       <ol>
         <li><a href="#路线-aunrolled-automatic-differentiation">路线 A：Unrolled Automatic Differentiation</a></li>
         <li><a href="#路线-bequation-level-implicit-differentiation">路线 B：Equation-Level Implicit Differentiation</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#23-2026-年的新思路让反向传播继承前向求解器的局部结构">23. 2026 年的新思路：让反向传播继承前向求解器的局部结构</a></li>
+    <li><a href="#24-实际效果从全局伴随系统转向局部-gpu-计算">24. 实际效果：从全局伴随系统转向局部 GPU 计算</a></li>
+    <li><a href="#25-为什么它与-xpbd-和-projective-dynamics-有直接关系">25. 为什么它与 XPBD 和 Projective Dynamics 有直接关系？</a></li>
+    <li><a href="#26-一个必须警惕的局限梯度正确不代表物理正确">26. 一个必须警惕的局限：梯度正确，不代表物理正确</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -427,7 +430,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 4 分钟
+                    阅读时长: 8 分钟
                 </time>
             </div>
         
@@ -476,8 +479,8 @@
 <p>你完全不需要知道：</p>
 \[x_1,x_2,\ldots,x_{19}\]<p>发生了什么。</p>
 <hr>
-<h1 id="2-这件事真正厉害在哪里">2. 这件事真正厉害在哪里？
-</h1><p>关键是：</p>
+<h2 id="2-这件事真正厉害在哪里">2. 这件事真正厉害在哪里？
+</h2><p>关键是：</p>
 \[\boxed{ \text{求解轨迹} }\]<p>和：</p>
 \[\boxed{ \text{求解结果的数学定义} }\]<p>被分离开了。</p>
 <p>Forward solve 可以用：</p>
@@ -495,8 +498,8 @@
 \[\boxed{ \text{Differentiation is attached to the problem, not to the algorithm.} }\]<p>这就是它比普通“把 solver 展开反传”更深的一层。</p>
 <p>Blondel 等将这一点称为 modular implicit differentiation：solver 和 optimality mapping 可以彼此解耦，因此可以继续使用已有高性能求解器，而不用为了自动微分重写一遍算法。</p>
 <hr>
-<h1 id="3-放到有限元里它立刻变得非常有用">3. 放到有限元里，它立刻变得非常有用
-</h1><p>设非线性有限元平衡方程：</p>
+<h2 id="3-放到有限元里它立刻变得非常有用">3. 放到有限元里，它立刻变得非常有用
+</h2><p>设非线性有限元平衡方程：</p>
 \[R(u,\theta)=0.\]<p>其中：</p>
 \[u\]<p>是几十万甚至几百万个自由度，</p>
 <p>而：</p>
@@ -536,8 +539,8 @@
 <p>Implicit differentiation 则直接从：</p>
 \[R(u^*,\theta)=0\]<p>出发。</p>
 <hr>
-<h1 id="4-推导一次你会发现它其实就是-adjoint">4. 推导一次，你会发现它其实就是 adjoint
-</h1><p>对：</p>
+<h2 id="4-推导一次你会发现它其实就是-adjoint">4. 推导一次，你会发现它其实就是 adjoint
+</h2><p>对：</p>
 \[R(u,\theta)=0\]<p>求导：</p>
 \[R_u \frac{du}{d\theta} + R_\theta = 0.\]<p>所以：</p>
 \[\frac{du}{d\theta} = - R_u^{-1}R_\theta.\]<p>然后：</p>
@@ -551,8 +554,8 @@
 \[\boxed{ \text{adjoint method} }\]<p>本质上是同一套数学结构。</p>
 <p>不同的是，现代 differentiable programming 把这套结构变成了可组合的软件原语。</p>
 <hr>
-<h1 id="5-为什么它特别适合参数很多输出少的问题">5. 为什么它特别适合“参数很多、输出少”的问题？
-</h1><p>假设：</p>
+<h2 id="5-为什么它特别适合参数很多输出少的问题">5. 为什么它特别适合“参数很多、输出少”的问题？
+</h2><p>假设：</p>
 \[\theta\in\mathbb R^{10000}\]<p>代表：</p>
 <ul>
 <li>材料场；</li>
@@ -577,8 +580,8 @@
 <li>differentiable physics。</li>
 </ul>
 <hr>
-<h1 id="6-unrolling-和-implicit-differentiation-的真正区别">6. Unrolling 和 implicit differentiation 的真正区别
-</h1><p>假设 fixed-point solver：</p>
+<h2 id="6-unrolling-和-implicit-differentiation-的真正区别">6. Unrolling 和 implicit differentiation 的真正区别
+</h2><p>假设 fixed-point solver：</p>
 \[x_{k+1}=G(x_k,\theta)\]<p>迭代：</p>
 \[K=1000\]<p>次。</p>
 <h3 id="unrolled-autodiff">Unrolled autodiff
@@ -606,8 +609,8 @@
 </ul>
 <p>JAXopt 官方文档明确把这两种方式并列：solver 可以选择 implicit differentiation，或者对 unrolled iterations 自动微分。</p>
 <hr>
-<h1 id="7-这里有一个非常重要的微妙点两者求的梯度其实可能不同">7. 这里有一个非常重要的微妙点：两者求的“梯度”其实可能不同
-</h1><p>假设 solver 并没有完全收敛。</p>
+<h2 id="7-这里有一个非常重要的微妙点两者求的梯度其实可能不同">7. 这里有一个非常重要的微妙点：两者求的“梯度”其实可能不同
+</h2><p>假设 solver 并没有完全收敛。</p>
 <p>运行：</p>
 \[K=10\]<p>次得到：</p>
 \[x_{10}.\]<p><span class="term-anchor" data-term="unrolling" tabindex="0">Unrolling</span> 给你的是：</p>
@@ -629,8 +632,8 @@
 \[\boxed{ \text{forward solution 应该足够接近真正的 root/optimum。} }\]<p>这也解释了 JAX <code>custom_root</code> 的接口为什么明确假设 forward solver 返回一个满足：</p>
 \[f(\text{solution})=0\]<p>的解。</p>
 <hr>
-<h1 id="8-backward-pass-为什么又变成了一个线性系统">8. Backward pass 为什么又变成了一个线性系统？
-</h1><p>回忆：</p>
+<h2 id="8-backward-pass-为什么又变成了一个线性系统">8. Backward pass 为什么又变成了一个线性系统？
+</h2><p>回忆：</p>
 \[R_u^T\lambda = J_u^T.\]<p>所以 differentiable solver 的 backward pass 本身就是：</p>
 \[\boxed{ \text{一个 linear solve} }\]<p>。</p>
 <p>这件事非常漂亮。</p>
@@ -648,8 +651,8 @@
 </ul>
 <p>这也是为什么“可微物理引擎”真正做好以后，往往和传统数值求解器技术高度重合。</p>
 <hr>
-<h1 id="9-它和前面讲过的-multigrid-可以直接组合">9. 它和前面讲过的 Multigrid 可以直接组合
-</h1><p>如果：</p>
+<h2 id="9-用多重网格加速伴随线性系统的求解">9. 用多重网格加速伴随线性系统的求解
+</h2><p>如果：</p>
 \[R_u^T\lambda=b\]<p>有：</p>
 \[10^7\]<p>自由度，</p>
 <p>implicit differentiation 并没有让这个系统凭空变小。</p>
@@ -664,8 +667,8 @@
 <p>这就是为什么学习 differentiable physics 不能脱离：</p>
 \[\boxed{\text{传统数值线性代数}}\]<p>。</p>
 <hr>
-<h1 id="10-如果-forward-是优化问题呢">10. 如果 forward 是优化问题呢？
-</h1><p>设：</p>
+<h2 id="10-如果-forward-是优化问题呢">10. 如果 forward 是优化问题呢？
+</h2><p>设：</p>
 \[x^*(\theta) = \arg\min_x f(x,\theta).\]<p>一阶最优条件：</p>
 \[\nabla_x f(x^*,\theta)=0.\]<p>于是把：</p>
 \[F(x,\theta) = \nabla_x f(x,\theta)\]<p>代进 implicit differentiation：</p>
@@ -674,8 +677,8 @@
 \[\boxed{\text{Hessian / KKT system}}\]<p>控制。</p>
 <p>这正是现代 optimization layer、bilevel optimization 和 meta-learning 中 implicit differentiation 的基础。Blondel 等的框架正是以 optimality mapping 为统一接口。</p>
 <hr>
-<h1 id="11-这和把求解器当神经网络层有什么本质区别">11. 这和“把求解器当神经网络层”有什么本质区别？
-</h1><p>普通 NN layer：</p>
+<h2 id="11-这和把求解器当神经网络层有什么本质区别">11. 这和“把求解器当神经网络层”有什么本质区别？
+</h2><p>普通 NN layer：</p>
 \[y=f_\theta(x)\]<p>forward 是显式函数。</p>
 <p>Implicit layer：</p>
 \[\boxed{ y \text{ 被定义为某个方程的解} }\]<p>例如：</p>
@@ -728,8 +731,8 @@
 </div><p>这意味着：</p>
 \[\boxed{ \text{AI 系统可以把成熟数值求解器直接作为一个可微模块使用。} }\]<p>这比“用神经网络近似求解器”是完全不同的一条路线。</p>
 <hr>
-<h1 id="12-接触为什么是-implicit-differentiation-的地狱级问题">12. 接触为什么是 implicit differentiation 的地狱级问题？
-</h1><details class="reveal">
+<h2 id="12-接触为什么是-implicit-differentiation-的地狱级问题">12. 接触为什么是 implicit differentiation 的地狱级问题？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>到目前为止，我们隐含假设：</p>
@@ -752,8 +755,8 @@
 </details>
 
 <hr>
-<h1 id="13-nimble-和-dojo-为什么值得看">13. Nimble 和 Dojo 为什么值得看？
-</h1><details class="reveal">
+<h2 id="13-nimble-和-dojo-为什么值得看">13. Nimble 和 Dojo 为什么值得看？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>它们提供了两种非常好的现实例子。</p>
@@ -774,8 +777,8 @@
 </details>
 
 <hr>
-<h1 id="14-为什么碰撞时正确梯度会如此难">14. 为什么碰撞时“正确梯度”会如此难？
-</h1><details class="reveal">
+<h2 id="14-为什么碰撞时正确梯度会如此难">14. 为什么碰撞时“正确梯度”会如此难？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设小球撞墙。</p>
@@ -786,7 +789,7 @@
 <p>这和普通离散状态更新很不一样：</p>
 \[x_{n+1}=f(x_n)\]<p>里时间步边界是固定的。</p>
 <p>碰撞实际发生在：</p>
-\[t_n<t_{\rm hit}<t_{n+1}.\]<p>所以事件时间本身是状态的一部分。</p>
+\[t_n\lt t_{\rm hit}\lt t_{n+1}.\]<p>所以事件时间本身是状态的一部分。</p>
 <p>2023 年针对 differentiable physics contact gradient 的研究明确指出，当接触法向或碰撞时间随状态变化时，已有 differentiable simulator 可能产生错误梯度；其改进方案直接利用 <span class="term-anchor" data-term="ccd" tabindex="0">CCD</span> 与 time-of-impact 信息修正梯度。</p>
 <p>这再次说明：</p>
 \[\boxed{ \text{几何事件的微分} }\]<p>和：</p>
@@ -796,8 +799,8 @@
 </details>
 
 <hr>
-<h1 id="15-对软体-fem一个特别实用的应用参数识别">15. 对软体 FEM，一个特别实用的应用：参数识别
-</h1><p>假设有实验测得：</p>
+<h2 id="15-对软体-fem一个特别实用的应用参数识别">15. 对软体 FEM，一个特别实用的应用：参数识别
+</h2><p>假设有实验测得：</p>
 \[u_{\rm obs}.\]<p>你希望识别：</p>
 \[\theta= (E,\nu,\mu_{\rm friction}).\]<p>定义：</p>
 \[J(\theta) = \frac12 \|u^*(\theta)-u_{\rm obs}\|^2.\]<p>其中：</p>
@@ -815,8 +818,8 @@
 \[\nabla_\theta J.\]<p>当：</p>
 \[N_\theta\]<p>很大时，差距会极其明显。</p>
 <hr>
-<h1 id="16-这和代理模型形成了一个很有意思的竞争互补关系">16. 这和代理模型形成了一个很有意思的竞争/互补关系
-</h1><details class="reveal">
+<h2 id="16-这和代理模型形成了一个很有意思的竞争互补关系">16. 这和代理模型形成了一个很有意思的竞争/互补关系
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设你的目标是优化：</p>
@@ -846,8 +849,8 @@
 </details>
 
 <hr>
-<h1 id="17-它和可靠性分析也有一条很值得关注的连接">17. 它和可靠性分析也有一条很值得关注的连接
-</h1><p>极限状态：</p>
+<h2 id="17-它和可靠性分析也有一条很值得关注的连接">17. 它和可靠性分析也有一条很值得关注的连接
+</h2><p>极限状态：</p>
 \[g(\theta).\]<p>如果 differentiable FEM 可以提供：</p>
 \[\nabla_\theta g,\]<p>那么很多可靠性工具都会变得更强：</p>
 <ul>
@@ -864,8 +867,8 @@
 <p>这意味着：</p>
 \[\boxed{ \text{可微有限元} + \text{可靠性} }\]<p>其实是一个非常自然、但还没有被工程上充分利用的组合。</p>
 <hr>
-<h1 id="18-一个非常容易误解的点隐式微分并不等于免费梯度">18. 一个非常容易误解的点：隐式微分并不等于“免费梯度”
-</h1><details class="reveal">
+<h2 id="18-一个非常容易误解的点隐式微分并不等于免费梯度">18. 一个非常容易误解的点：隐式微分并不等于“免费梯度”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>Backward 仍需要求：</p>
@@ -893,8 +896,8 @@
 </details>
 
 <hr>
-<h1 id="19-2026-年一个值得注意的发展二阶隐式微分开始进入-fem">19. 2026 年一个值得注意的发展：二阶隐式微分开始进入 FEM
-</h1><details class="reveal">
+<h2 id="19-2026-年一个值得注意的发展二阶隐式微分开始进入-fem">19. 2026 年一个值得注意的发展：二阶隐式微分开始进入 FEM
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>传统 differentiable physics 大量使用：</p>
@@ -908,8 +911,8 @@
 </details>
 
 <hr>
-<h1 id="20-对自研求解器最值得迁移的工程架构">20. 对自研求解器最值得迁移的工程架构
-</h1><details class="reveal">
+<h2 id="20-对自研求解器最值得迁移的工程架构">20. 对自研求解器最值得迁移的工程架构
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>如果以后希望 Rust/物理 solver 具备 differentiability，我反而不建议一开始把整个代码全部 AD 化。</p>
@@ -964,8 +967,8 @@
 </details>
 
 <hr>
-<h2 id="一个最小可实践实验">一个最小可实践实验
-</h2><details class="reveal">
+<h3 id="一个最小可实践实验">一个最小可实践实验
+</h3><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>可以做一个非常简单的非线性弹簧系统：</p>
@@ -986,8 +989,8 @@
 </details>
 
 <hr>
-<h1 id="21-问题根源物理方程的解与求解器的输出并不完全相同">21. 问题根源：物理方程的解，与求解器的输出并不完全相同
-</h1><p>考虑隐式软体动力学中的一个时间步。</p>
+<h2 id="21-问题根源物理方程的解与求解器的输出并不完全相同">21. 问题根源：物理方程的解，与求解器的输出并不完全相同
+</h2><p>考虑隐式软体动力学中的一个时间步。</p>
 <p>设当前位置为 \(x\)，材料参数为 \(\theta\)，需要求解：</p>
 \[ \boxed{ R(x,\theta)=0. } \]<p>例如：</p>
 \[ R(x,\theta) = \frac{M}{h^2}(x-y) + \nabla_x E(x,\theta). \]<p>其中 \(y\) 是惯性预测位置，\(E\) 是弹性势能。</p>
@@ -1010,8 +1013,8 @@
 \[ \underbrace{1}_{\text{收敛方程的梯度}} \qquad \underbrace{0.75}_{\text{实际算法的梯度}}. \]<p>即使收敛方程完全正确，使用它的导数，也不能准确描述只执行两次迭代的程序。</p>
 <p><strong>这就是 Solver-Level Differentiation 要解决的根本问题。</strong></p>
 <hr>
-<h1 id="22-传统两条路线各有什么代价">22. 传统两条路线各有什么代价？
-</h1><h3 id="路线-aunrolled-automatic-differentiation">路线 A：Unrolled Automatic Differentiation
+<h2 id="22-传统两条路线各有什么代价">22. 传统两条路线各有什么代价？
+</h2><h3 id="路线-aunrolled-automatic-differentiation">路线 A：Unrolled Automatic Differentiation
 </h3><p>直接将每次迭代展开：</p>
 \[ x_0 \xrightarrow{S_1} x_1 \xrightarrow{S_2} \cdots \xrightarrow{S_K} x_K. \]<p>然后使用自动微分反向传播。</p>
 <p>其优势是能够对实际执行的计算图求导。</p>
@@ -1030,8 +1033,8 @@
 <p>但它计算的是<strong>方程解的敏感度</strong>。</p>
 <p>如果前向求解器只执行少量迭代，直接使用收敛方程的伴随导数，可能无法正确描述实际程序的输出。</p>
 <hr>
-<h1 id="23-2026-年的新思路让反向传播继承前向求解器的局部结构">23. 2026 年的新思路：让反向传播继承前向求解器的局部结构
-</h1><p>考虑采用 Gauss–Seidel 思想的块迭代求解器。</p>
+<h2 id="23-2026-年的新思路让反向传播继承前向求解器的局部结构">23. 2026 年的新思路：让反向传播继承前向求解器的局部结构
+</h2><p>考虑采用 Gauss–Seidel 思想的块迭代求解器。</p>
 <p>一个完整扫描由多个局部更新组成：</p>
 \[ S=S_n\circ S_{n-1}\circ\cdots\circ S_1. \]<p>每个 \(S_i\) 只修改一小组自由度。</p>
 <p>例如三维四面体网格中，一个顶点的位置：</p>
@@ -1055,44 +1058,44 @@
 <p>它描述局部 Hessian 随状态或参数变化产生的导数贡献。若将其省略，即使局部线性方程求解准确，也可能得到错误梯度。</p>
 <p>2026 年的研究还指出，更新限幅、正则化及其他数值保护操作同样必须纳入反向微分。</p>
 <hr>
-<h1 id="24-实际效果从全局伴随系统转向局部-gpu-计算">24. 实际效果：从全局伴随系统转向局部 GPU 计算
-</h1><p>Shu 等将该方法应用于 Vertex Block Descent（VBD）软体求解器。</p>
+<h2 id="24-实际效果从全局伴随系统转向局部-gpu-计算">24. 实际效果：从全局伴随系统转向局部 GPU 计算
+</h2><p>Shu 等将该方法应用于 Vertex Block Descent（VBD）软体求解器。</p>
 <p>其前向计算具有两个特点：</p>
 <p>第一，每个顶点求解一个小型 \(3\times3\) 系统。</p>
 <p>第二，通过图着色，将不相互干扰的顶点划分为可并行处理的颜色组。</p>
 <p>反向传播则按相反的颜色顺序执行局部伴随更新。</p>
 <p>论文报告，在同一代码库、同一 GPU 的受控比较中：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>指标</th>
-					<th>论文报告结果</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>相比展开式自动微分的反向速度</td>
-					<td>最高约 <strong>33 倍</strong></td>
-			</tr>
-			<tr>
-					<td>相比展开式自动微分的内存节省</td>
-					<td>约 <strong>71 倍</strong></td>
-			</tr>
-			<tr>
-					<td>有限迭代深度下的梯度</td>
-					<td>与对应执行过程的自动微分结果达到机器精度级一致</td>
-			</tr>
-			<tr>
-					<td>可扩展的求解器结构</td>
-					<td>VBD，并给出 <span class="term-anchor" data-term="pd" tabindex="0">PD</span>、<span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 的验证</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>指标</th>
+          <th>论文报告结果</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>相比展开式自动微分的反向速度</td>
+          <td>最高约 <strong>33 倍</strong></td>
+      </tr>
+      <tr>
+          <td>相比展开式自动微分的内存节省</td>
+          <td>约 <strong>71 倍</strong></td>
+      </tr>
+      <tr>
+          <td>有限迭代深度下的梯度</td>
+          <td>与对应执行过程的自动微分结果达到机器精度级一致</td>
+      </tr>
+      <tr>
+          <td>可扩展的求解器结构</td>
+          <td>VBD，并给出 <span class="term-anchor" data-term="pd" tabindex="0">PD</span>、<span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 的验证</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>研究还展示了百万个接触耦合软体对象的 GPU 仿真实验。</p>
 <p>这些是作者在特定实现和测试条件下报告的结果，并不意味着任意 XPBD 或 FEM 求解器都能直接获得相同加速。目前该工作是 2026 年 8 月发布的预印本，尚不宜将其性能结论视为经过广泛独立验证的通用规律。</p>
 <hr>
-<h1 id="25-为什么它与-xpbd-和-projective-dynamics-有直接关系">25. 为什么它与 XPBD 和 Projective Dynamics 有直接关系？
-</h1><p>此前多次介绍过 Projective Dynamics，也讨论过 XPBD 的 Gauss–Seidel 约束迭代。</p>
+<h2 id="25-为什么它与-xpbd-和-projective-dynamics-有直接关系">25. 为什么它与 XPBD 和 Projective Dynamics 有直接关系？
+</h2><p>此前多次介绍过 Projective Dynamics，也讨论过 XPBD 的 Gauss–Seidel 约束迭代。</p>
 <p>这些求解器的共同特点是：</p>
 \[ \boxed{ \text{复杂全局运动} \rightarrow \text{大量简单局部更新}. } \]<p>例如 XPBD 中，单个约束的典型更新为：</p>
 \[ \Delta\lambda = \frac{-C(x)-\tilde\alpha\lambda} {\sum_iw_i\|\nabla_iC\|^2+\tilde\alpha}, \]<p>随后：</p>
@@ -1105,8 +1108,8 @@
 <p>DiffPD 在 2022 年发表于 <em>ACM Transactions on Graphics</em>，利用 PD 前向求解中的预分解矩阵加速反向计算，在系统辨识、逆向设计和控制等任务中展示了实际效果。</p>
 <p>不过，两者的主要创新点不同：DiffPD 着重利用 PD 的线性代数结构，而反向扫描伴随法着重利用<strong>实际执行的局部迭代结构</strong>。</p>
 <hr>
-<h1 id="26-一个必须警惕的局限梯度正确不代表物理正确">26. 一个必须警惕的局限：梯度正确，不代表物理正确
-</h1><details class="reveal">
+<h2 id="26-一个必须警惕的局限梯度正确不代表物理正确">26. 一个必须警惕的局限：梯度正确，不代表物理正确
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设某个接触求解器存在系统性穿透误差。</p>
@@ -1123,14 +1126,14 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Implicit Differentiation 最重要的不是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Implicit Differentiation 最重要的不是：</p>
 \[\frac{dx^*}{d\theta} = -F_x^{-1}F_\theta.\]<p>真正值得记住的是：</p>
 \[\boxed{ \text{如果一个输出是“某个方程的解”， 它的导数应该优先从这个方程本身推导， 而不一定从产生这个解的全部迭代过程推导。} }\]<p>它在整个知识体系中的位置大概是：</p>
 \[\text{Numerical Solver}\]\[\downarrow\]\[\boxed{\text{Implicit / Adjoint Differentiation}}\]\[\downarrow\]\[\text{Differentiable Physics}\]\[\downarrow\]\[\text{Inverse Problems / Optimization / Learning}.\]<p>而对于物理引擎和有限元开发，它最强的启发是：</p>
 \[\boxed{ \text{“可微”不应该只是自动微分框架附着在代码外面， 而可以成为求解器本身的一项数学接口。} }\]<p>一旦这样设计，FEM、优化、可靠性、代理模型和 AI 就真正开始共享同一套计算基础设施。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1342,9 +1345,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

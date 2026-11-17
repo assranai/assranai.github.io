@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Variational Integrators（变分积分器）\n领域：有限元 × 计算力学 × 物理引擎 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[\\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}\\]传统数值积分通常先得到连续运动方程：\n\\[M\\ddot q+\\nabla V(q)=0,\\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[L(q,\\dot q)=T(\\dot q)-V(q).\\]真实运动满足 Hamilton 原理：\n\\[\\delta S=0,\\]其中作用量\n\\[S[q] = \\int_{t_0}^{t_1} L(q,\\dot q)\\,dt.\\]对它做变分，就得到 Euler–Lagrange 方程：\n\\[\\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} - \\frac{\\partial L}{\\partial q} =0.\\]也就是说，连续动力学存在一条逻辑链：\n\\[\\boxed{ \\text{variational principle} \\rightarrow \\text{Euler–Lagrange equation} \\rightarrow \\text{trajectory} }\\]普通时间积分通常在第二层才开始：\n">
 <title>变分积分器：从离散 Hamilton 原理到异步 AVI</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/04-variational-integrators/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="变分积分器：从离散 Hamilton 原理到异步 AVI">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="变分积分器：从离散 Hamilton 原理到异步 AVI">
 <meta property='og:description' content="主题：Variational Integrators（变分积分器）\n领域：有限元 × 计算力学 × 物理引擎 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天这个主题值得学，是因为它触及了一个比“显式还是隐式”“用 Euler 还是 Verlet”更底层的问题：\n\\[\\boxed{\\text{我们应该离散运动方程，还是直接离散产生运动方程的力学原理？}}\\]传统数值积分通常先得到连续运动方程：\n\\[M\\ddot q+\\nabla V(q)=0,\\]然后选择 Euler、Runge–Kutta、Newmark 等方法对这个 ODE 进行离散。\nVariational Integrator（VI）走了一条不同路线：先离散 Hamilton 原理，再从离散作用量的驻值得到离散运动方程。\nMarsden 与 West 在 2001 年的经典综述系统建立了这一理论，并证明由离散变分原理得到的方法天然具有辛结构，并可通过离散 Noether 定理保存由对称性对应的动量。\n它属于更大的 **Geometric Numerical Integration（几何数值积分）**体系：重点不只是降低单步误差，而是让离散系统继承连续动力系统的重要结构。Hairer、Lubich、Wanner 的经典专著正是这一领域的系统入口。\n1. 传统方法容易忽略什么？ 考虑最简单的无阻尼机械系统：\n\\[L(q,\\dot q)=T(\\dot q)-V(q).\\]真实运动满足 Hamilton 原理：\n\\[\\delta S=0,\\]其中作用量\n\\[S[q] = \\int_{t_0}^{t_1} L(q,\\dot q)\\,dt.\\]对它做变分，就得到 Euler–Lagrange 方程：\n\\[\\frac{d}{dt} \\frac{\\partial L}{\\partial \\dot q} - \\frac{\\partial L}{\\partial q} =0.\\]也就是说，连续动力学存在一条逻辑链：\n\\[\\boxed{ \\text{variational principle} \\rightarrow \\text{Euler–Lagrange equation} \\rightarrow \\text{trajectory} }\\]普通时间积分通常在第二层才开始：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/04-variational-integrators/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,18 +324,41 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-传统方法容易忽略什么">1. 传统方法容易忽略什么？</a></li>
-  </ol>
-
-  <ol>
-    <li><a href="#一个工程诊断例子">一个工程诊断例子</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-怎么把-hamilton-原理离散化">2. 怎么把 Hamilton 原理离散化？</a></li>
+    <li><a href="#3-一个惊喜熟悉的-verlet-可以从这里自然出现">3. 一个惊喜：熟悉的 Verlet 可以从这里自然出现</a></li>
+    <li><a href="#4-为什么它比局部误差小更值得关心">4. 为什么它比“局部误差小”更值得关心？</a></li>
+    <li><a href="#5-一个容易误解的地方vi-通常不严格守恒能量">5. 一个容易误解的地方：VI 通常<strong>不严格守恒能量</strong></a></li>
+    <li><a href="#6-noether-定理在离散世界里仍然存在">6. Noether 定理在离散世界里仍然存在</a></li>
+    <li><a href="#7-这和-fem-的关系比看起来更近">7. 这和 FEM 的关系比看起来更近</a></li>
+    <li><a href="#8-为什么游戏物理里没有-everywhere-都使用-vi">8. 为什么游戏物理里没有 everywhere 都使用 VI？</a></li>
+    <li><a href="#9-一个很值得看的近期进展variational-elastodynamic-simulation">9. 一个很值得看的近期进展：Variational Elastodynamic Simulation</a></li>
+    <li><a href="#10-对物理求解器最值得迁移的一点">10. 对物理求解器最值得迁移的一点</a>
       <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
+        <li><a href="#一个工程诊断例子">一个工程诊断例子</a></li>
       </ol>
     </li>
+    <li><a href="#11-传统显式有限元的一个结构性浪费">11. 传统显式有限元的一个结构性浪费</a></li>
+    <li><a href="#12-最直接的想法当然是-local-time-stepping">12. 最直接的想法当然是 Local Time Stepping</a></li>
+    <li><a href="#13-avi-的突破不要先写微分方程再异步积分">13. AVI 的突破：不要先写微分方程再异步积分</a></li>
+    <li><a href="#14-avi-再进一步每个势能项拥有自己的时钟">14. AVI 再进一步：每个势能项拥有自己的“时钟”</a></li>
+    <li><a href="#15-最简单的实现结构其实像优先队列">15. 最简单的实现结构其实像优先队列</a></li>
+    <li><a href="#16-为什么这里会出现impulse">16. 为什么这里会出现“impulse”？</a></li>
+    <li><a href="#17-一个非常直观的例子软体里嵌了一块高刚度材料">17. 一个非常直观的例子：软体里嵌了一块高刚度材料</a></li>
+    <li><a href="#18-为什么这比普通-substepping-更深">18. 为什么这比普通 substepping 更深？</a></li>
+    <li><a href="#19-为什么-variational-这部分非常重要">19. 为什么 Variational 这部分非常重要？</a></li>
+    <li><a href="#20-一个反直觉点avi-不一定严格守恒总能量">20. 一个反直觉点：AVI 不一定严格守恒总能量</a></li>
+    <li><a href="#21-这与-xpbd-有一个很有意思的对照">21. 这与 XPBD 有一个很有意思的对照</a></li>
+    <li><a href="#22-avi-最大的现代工程问题它天然不喜欢-simdgpu">22. AVI 最大的现代工程问题：它天然不喜欢 SIMD/GPU</a></li>
+    <li><a href="#23-这个问题后来在-asynchronous-contact-mechanics-中表现得非常明显">23. 这个问题后来在 Asynchronous Contact Mechanics 中表现得非常明显</a></li>
+    <li><a href="#24-这件事对今天-gpu-物理求解器特别有启发">24. 这件事对今天 GPU 物理求解器特别有启发</a></li>
+    <li><a href="#25-它和-multi-rate-time-integration-的关系">25. 它和 Multi-Rate Time Integration 的关系</a></li>
+    <li><a href="#26-它和有限元自适应还有一个重要对应">26. 它和有限元自适应还有一个重要对应</a></li>
+    <li><a href="#27-对可靠性分析也有一个不太显眼但很实用的迁移">27. 对可靠性分析也有一个不太显眼但很实用的迁移</a></li>
+    <li><a href="#28-一个非常适合自己实现的小实验">28. 一个非常适合自己实现的小实验</a></li>
+    <li><a href="#29-对自研软体求解器最值得迁移的思想">29. 对自研软体求解器最值得迁移的思想</a></li>
+    <li><a href="#30-它还给-ai系统工程一个非常一般的启发">30. 它还给 AI/系统工程一个非常一般的启发</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -427,8 +450,8 @@
 \[\text{Euler–Lagrange equation} \rightarrow \boxed{\text{discretize}}\]<p>而 VI 提前了一层：</p>
 \[\boxed{\text{discretize variational principle}} \rightarrow \text{discrete Euler–Lagrange equation}.\]<p>这两个操作一般<strong>并不等价</strong>。这一点也是离散力学和离散最优控制文献反复强调的核心区别。</p>
 <hr>
-<h1 id="2-怎么把-hamilton-原理离散化">2. 怎么把 Hamilton 原理离散化？
-</h1><p>连续作用量为：</p>
+<h2 id="2-怎么把-hamilton-原理离散化">2. 怎么把 Hamilton 原理离散化？
+</h2><p>连续作用量为：</p>
 \[S=\int L(q,\dot q)\,dt.\]<p>现在把时间切成：</p>
 \[t_0,t_1,\ldots,t_N, \qquad h=t_{k+1}-t_k.\]<p>用一个 <strong>discrete Lagrangian</strong></p>
 \[L_d(q_k,q_{k+1})\]<p>去近似一小段真实作用量：</p>
@@ -444,16 +467,16 @@
 <p><strong>离散运动方程并非人为挑选出来，而是从一个离散力学原理中推导出来。</strong></p>
 </blockquote>
 <hr>
-<h1 id="3-一个惊喜熟悉的-verlet-可以从这里自然出现">3. 一个惊喜：熟悉的 Verlet 可以从这里自然出现
-</h1><p>考虑：</p>
+<h2 id="3-一个惊喜熟悉的-verlet-可以从这里自然出现">3. 一个惊喜：熟悉的 Verlet 可以从这里自然出现
+</h2><p>考虑：</p>
 \[L(q,\dot q) = \frac12m\dot q^2-V(q).\]<p>取一种简单 discrete Lagrangian：</p>
 \[L_d(q_k,q_{k+1}) = h \left[ \frac12m \left( \frac{q_{k+1}-q_k}{h} \right)^2 - V(q_k) \right].\]<p>代入离散 Euler–Lagrange 方程，会得到类似：</p>
 \[m \frac{q_{k+1}-2q_k+q_{k-1}}{h^2} = -\nabla V(q_k).\]<p>即：</p>
 \[\boxed{ q_{k+1} = 2q_k-q_{k-1} - \frac{h^2}{m}\nabla V(q_k) }\]<p>这正与 Störmer–Verlet / central-difference 家族有非常紧密的关系。</p>
 <p>所以 Verlet 的长期动力学性质并非偶然。Marsden–West 的框架把许多熟悉的辛方法统一解释成离散变分积分器。</p>
 <hr>
-<h1 id="4-为什么它比局部误差小更值得关心">4. 为什么它比“局部误差小”更值得关心？
-</h1><p>这是 VI 最核心的部分。</p>
+<h2 id="4-为什么它比局部误差小更值得关心">4. 为什么它比“局部误差小”更值得关心？
+</h2><p>这是 VI 最核心的部分。</p>
 <p>普通数值分析经常比较：</p>
 \[\|q_{\rm num}(t)-q_{\rm exact}(t)\|.\]<p>例如：</p>
 \[O(h),\qquad O(h^2),\qquad O(h^4).\]<p>但对于需要模拟：</p>
@@ -468,8 +491,8 @@
 </blockquote>
 <p>这会直接影响长期行为。</p>
 <hr>
-<h1 id="5-一个容易误解的地方vi-通常不严格守恒能量">5. 一个容易误解的地方：VI 通常<strong>不严格守恒能量</strong>
-</h1><p>这是非常重要的区别。</p>
+<h2 id="5-一个容易误解的地方vi-通常不严格守恒能量">5. 一个容易误解的地方：VI 通常<strong>不严格守恒能量</strong>
+</h2><p>这是非常重要的区别。</p>
 <p>很多人看到：</p>
 \[\text{structure preserving}\]<p>就会理解成：</p>
 \[E_{k+1}=E_k.\]<p>一般并非如此。</p>
@@ -479,8 +502,8 @@
 <p>所以一个很值得记住的区别是：</p>
 \[\boxed{ \text{exact energy conservation} \neq \text{good long-term energy behavior} }\]<p>很多时候后者才是动力学仿真真正需要的东西。</p>
 <hr>
-<h1 id="6-noether-定理在离散世界里仍然存在">6. Noether 定理在离散世界里仍然存在
-</h1><details class="reveal">
+<h2 id="6-noether-定理在离散世界里仍然存在">6. Noether 定理在离散世界里仍然存在
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>连续力学中，Noether 定理把：</p>
@@ -501,8 +524,8 @@
 </details>
 
 <hr>
-<h1 id="7-这和-fem-的关系比看起来更近">7. 这和 FEM 的关系比看起来更近
-</h1><p>空间有限元首先把连续弹性体：</p>
+<h2 id="7-这和-fem-的关系比看起来更近">7. 这和 FEM 的关系比看起来更近
+</h2><p>空间有限元首先把连续弹性体：</p>
 \[x(X,t)\]<p>离散成节点自由度：</p>
 \[q(t).\]<p>于是得到一个半离散系统：</p>
 \[M\ddot q + \nabla E(q) = f.\]<p>其 Lagrangian 就是：</p>
@@ -512,8 +535,8 @@
 <p>也就是说，一个结构保持型 FEM 可以理解为：</p>
 \[\text{continuum mechanics}\]\[\downarrow\quad \text{spatial discretization}\]\[L(q,\dot q)\]\[\downarrow\quad \text{variational time discretization}\]\[q_0,q_1,q_2,\ldots\]<p>近年来也仍有工作继续研究 Hamiltonian / symplectic FEM 的空间—时间组合。</p>
 <hr>
-<h1 id="8-为什么游戏物理里没有-everywhere-都使用-vi">8. 为什么游戏物理里没有 everywhere 都使用 VI？
-</h1><details class="reveal">
+<h2 id="8-为什么游戏物理里没有-everywhere-都使用-vi">8. 为什么游戏物理里没有 everywhere 都使用 VI？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这里必须看到它的局限。</p>
@@ -537,8 +560,8 @@
 </details>
 
 <hr>
-<h1 id="9-一个很值得看的近期进展variational-elastodynamic-simulation">9. 一个很值得看的近期进展：Variational Elastodynamic Simulation
-</h1><details class="reveal">
+<h2 id="9-一个很值得看的近期进展variational-elastodynamic-simulation">9. 一个很值得看的近期进展：Variational Elastodynamic Simulation
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这个方向到现在并没有停留在 2001 年理论。</p>
@@ -553,8 +576,8 @@
 </details>
 
 <hr>
-<h1 id="10-对物理求解器最值得迁移的一点">10. 对物理求解器最值得迁移的一点
-</h1><p>VI 最值得迁移的不是某个具体积分公式，而是：</p>
+<h2 id="10-对物理求解器最值得迁移的一点">10. 对物理求解器最值得迁移的一点
+</h2><p>VI 最值得迁移的不是某个具体积分公式，而是：</p>
 \[\boxed{ \text{structure before accuracy} }\]<p>这里的 structure 可以是：</p>
 <ul>
 <li>momentum conservation；</li>
@@ -574,8 +597,8 @@
 \[\text{discrete symmetry}\]<p>让某些 momentum conservation 成为离散动力学本身的性质。</p>
 <p>它们背后有同一个非常强的求解器思想：</p>
 \[\boxed{ \text{尽量把“正确”编码进 formulation， 而不是依赖迭代结束后的修补。} }\]<hr>
-<h2 id="一个工程诊断例子">一个工程诊断例子
-</h2><p>假设你的软体掉在没有摩擦的地面上，然后弹起。</p>
+<h3 id="一个工程诊断例子">一个工程诊断例子
+</h3><p>假设你的软体掉在没有摩擦的地面上，然后弹起。</p>
 <p>你发现：</p>
 \[P_x(t)\]<p>在没有水平外力的情况下持续漂移。</p>
 <p>典型工程做法可能是找：</p>
@@ -597,8 +620,8 @@
 <p>它把问题从：</p>
 \[\text{哪个参数有错？}\]<p>提升到：</p>
 \[\boxed{ \text{这个离散算法保留了哪些连续系统结构？} }\]<hr>
-<h1 id="11-传统显式有限元的一个结构性浪费">11. 传统显式有限元的一个结构性浪费
-</h1><details class="reveal">
+<h2 id="11-传统显式有限元的一个结构性浪费">11. 传统显式有限元的一个结构性浪费
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>考虑半离散动力学：</p>
@@ -623,8 +646,8 @@
 </details>
 
 <hr>
-<h1 id="12-最直接的想法当然是-local-time-stepping">12. 最直接的想法当然是 Local Time Stepping
-</h1><details class="reveal">
+<h2 id="12-最直接的想法当然是-local-time-stepping">12. 最直接的想法当然是 Local Time Stepping
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>假设：</p>
@@ -632,30 +655,30 @@
 <p>可以自然地想：</p>
 \[\boxed{\text{每个 element 自己走自己的时间。}}\]<p>例如：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>element</th>
-					<th style="text-align: right">timestep</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>\(e_1\)</td>
-					<td style="text-align: right">0.1 ms</td>
-			</tr>
-			<tr>
-					<td>\(e_2\)</td>
-					<td style="text-align: right">0.1 ms</td>
-			</tr>
-			<tr>
-					<td>\(e_3\)</td>
-					<td style="text-align: right">1 ms</td>
-			</tr>
-			<tr>
-					<td>\(e_4\)</td>
-					<td style="text-align: right">5 ms</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>element</th>
+          <th style="text-align: right">timestep</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>\(e_1\)</td>
+          <td style="text-align: right">0.1 ms</td>
+      </tr>
+      <tr>
+          <td>\(e_2\)</td>
+          <td style="text-align: right">0.1 ms</td>
+      </tr>
+      <tr>
+          <td>\(e_3\)</td>
+          <td style="text-align: right">1 ms</td>
+      </tr>
+      <tr>
+          <td>\(e_4\)</td>
+          <td style="text-align: right">5 ms</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>那么 5 ms 内：</p>
 \[e_1,e_2\]<p>更新 50 次，</p>
@@ -681,8 +704,8 @@
 </details>
 
 <hr>
-<h1 id="13-avi-的突破不要先写微分方程再异步积分">13. AVI 的突破：不要先写微分方程再异步积分
-</h1><details class="reveal">
+<h2 id="13-avi-的突破不要先写微分方程再异步积分">13. AVI 的突破：不要先写微分方程再异步积分
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>普通思路是：</p>
@@ -701,8 +724,8 @@
 </details>
 
 <hr>
-<h1 id="14-avi-再进一步每个势能项拥有自己的时钟">14. AVI 再进一步：每个势能项拥有自己的“时钟”
-</h1><details class="reveal">
+<h2 id="14-avi-再进一步每个势能项拥有自己的时钟">14. AVI 再进一步：每个势能项拥有自己的“时钟”
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>因为：</p>
@@ -736,8 +759,8 @@
 </details>
 
 <hr>
-<h1 id="15-最简单的实现结构其实像优先队列">15. 最简单的实现结构其实像优先队列
-</h1><details class="reveal">
+<h2 id="15-最简单的实现结构其实像优先队列">15. 最简单的实现结构其实像优先队列
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>每个 element 保存：</p>
@@ -805,8 +828,8 @@
 </details>
 
 <hr>
-<h1 id="16-为什么这里会出现impulse">16. 为什么这里会出现“impulse”？
-</h1><details class="reveal">
+<h2 id="16-为什么这里会出现impulse">16. 为什么这里会出现“impulse”？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>如果某个 element：</p>
@@ -825,8 +848,8 @@
 </details>
 
 <hr>
-<h1 id="17-一个非常直观的例子软体里嵌了一块高刚度材料">17. 一个非常直观的例子：软体里嵌了一块高刚度材料
-</h1><details class="reveal">
+<h2 id="17-一个非常直观的例子软体里嵌了一块高刚度材料">17. 一个非常直观的例子：软体里嵌了一块高刚度材料
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设一个角色腹部软组织：</p>
@@ -845,8 +868,8 @@
 </details>
 
 <hr>
-<h1 id="18-为什么这比普通-substepping-更深">18. 为什么这比普通 substepping 更深？
-</h1><details class="reveal">
+<h2 id="18-为什么这比普通-substepping-更深">18. 为什么这比普通 substepping 更深？
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>游戏物理中常做：</p>
@@ -886,8 +909,8 @@
 </details>
 
 <hr>
-<h1 id="19-为什么-variational-这部分非常重要">19. 为什么 Variational 这部分非常重要？
-</h1><details class="reveal">
+<h2 id="19-为什么-variational-这部分非常重要">19. 为什么 Variational 这部分非常重要？
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>如果简单地：</p>
@@ -921,8 +944,8 @@
 </details>
 
 <hr>
-<h1 id="20-一个反直觉点avi-不一定严格守恒总能量">20. 一个反直觉点：AVI 不一定严格守恒总能量
-</h1><details class="reveal">
+<h2 id="20-一个反直觉点avi-不一定严格守恒总能量">20. 一个反直觉点：AVI 不一定严格守恒总能量
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这值得特别强调。</p>
@@ -940,8 +963,8 @@
 </details>
 
 <hr>
-<h1 id="21-这与-xpbd-有一个很有意思的对照">21. 这与 XPBD 有一个很有意思的对照
-</h1><details class="reveal">
+<h2 id="21-这与-xpbd-有一个很有意思的对照">21. 这与 XPBD 有一个很有意思的对照
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p><span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 的主要思想是：</p>
@@ -956,8 +979,8 @@
 </details>
 
 <hr>
-<h1 id="22-avi-最大的现代工程问题它天然不喜欢-simdgpu">22. AVI 最大的现代工程问题：它天然不喜欢 SIMD/GPU
-</h1><details class="reveal">
+<h2 id="22-avi-最大的现代工程问题它天然不喜欢-simdgpu">22. AVI 最大的现代工程问题：它天然不喜欢 SIMD/GPU
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>CPU event queue：</p>
@@ -1017,8 +1040,8 @@
 </details>
 
 <hr>
-<h1 id="23-这个问题后来在-asynchronous-contact-mechanics-中表现得非常明显">23. 这个问题后来在 Asynchronous Contact Mechanics 中表现得非常明显
-</h1><details class="reveal">
+<h2 id="23-这个问题后来在-asynchronous-contact-mechanics-中表现得非常明显">23. 这个问题后来在 Asynchronous Contact Mechanics 中表现得非常明显
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>AVI 后来被用于 contact。</p>
@@ -1043,8 +1066,8 @@
 </details>
 
 <hr>
-<h1 id="24-这件事对今天-gpu-物理求解器特别有启发">24. 这件事对今天 GPU 物理求解器特别有启发
-</h1><details class="reveal">
+<h2 id="24-这件事对今天-gpu-物理求解器特别有启发">24. 这件事对今天 GPU 物理求解器特别有启发
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>如果现在重新设计 AVI-like solver，我不会真的给：</p>
@@ -1089,8 +1112,8 @@
 </details>
 
 <hr>
-<h1 id="25-它和-multi-rate-time-integration-的关系">25. 它和 Multi-Rate Time Integration 的关系
-</h1><details class="reveal">
+<h2 id="25-它和-multi-rate-time-integration-的关系">25. 它和 Multi-Rate Time Integration 的关系
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>AVI 属于更大的：</p>
@@ -1107,8 +1130,8 @@
 </details>
 
 <hr>
-<h1 id="26-它和有限元自适应还有一个重要对应">26. 它和有限元自适应还有一个重要对应
-</h1><details class="reveal">
+<h2 id="26-它和有限元自适应还有一个重要对应">26. 它和有限元自适应还有一个重要对应
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>空间自适应 FEM 已经非常成熟：</p>
@@ -1127,8 +1150,8 @@
 </details>
 
 <hr>
-<h1 id="27-对可靠性分析也有一个不太显眼但很实用的迁移">27. 对可靠性分析也有一个不太显眼但很实用的迁移
-</h1><details class="reveal">
+<h2 id="27-对可靠性分析也有一个不太显眼但很实用的迁移">27. 对可靠性分析也有一个不太显眼但很实用的迁移
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设做机构动态可靠性：</p>
@@ -1150,8 +1173,8 @@
 </details>
 
 <hr>
-<h1 id="28-一个非常适合自己实现的小实验">28. 一个非常适合自己实现的小实验
-</h1><details class="reveal">
+<h2 id="28-一个非常适合自己实现的小实验">28. 一个非常适合自己实现的小实验
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>不用做 FEM。</p>
@@ -1205,8 +1228,8 @@
 </details>
 
 <hr>
-<h1 id="29-对自研软体求解器最值得迁移的思想">29. 对自研软体求解器最值得迁移的思想
-</h1><details class="reveal">
+<h2 id="29-对自研软体求解器最值得迁移的思想">29. 对自研软体求解器最值得迁移的思想
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>我认为不应该马上去实现完整 AVI。</p>
@@ -1222,14 +1245,14 @@
 \[h,\]<p>那么 multirate/asynchronous architecture 才真正有潜在价值。</p>
 <p>如果所有 tet 都差不多需要：</p>
 \[h,\]<p>AVI 再漂亮也不会产生明显收益。</p>
-<p>这和 Randomized SVD 那张卡片的原则其实一致：</p>
-\[\boxed{ \text{先证明问题存在可利用的非均匀结构， 再设计利用这种结构的算法。}\]
+<p><a class="link" href="../31-randomized-nla/" >随机化 SVD</a> 利用谱衰减，异步积分利用各局部稳定步长的差异。两者有一个共同前提。</p>
+\[\boxed{ \text{先证明问题存在可利用的非均匀结构， 再设计利用这种结构的算法。}}\]
   </div>
 </details>
 
 <hr>
-<h1 id="30-它还给-ai系统工程一个非常一般的启发">30. 它还给 AI/系统工程一个非常一般的启发
-</h1><details class="reveal">
+<h2 id="30-它还给-ai系统工程一个非常一般的启发">30. 它还给 AI/系统工程一个非常一般的启发
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>很多系统默认：</p>
@@ -1274,15 +1297,15 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1>\[\boxed{ \text{不要只离散方程，也可以离散产生方程的原理。} }\]<p>更进一步：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2>\[\boxed{ \text{不要只离散方程，也可以离散产生方程的原理。} }\]<p>更进一步：</p>
 \[\boxed{ \text{一个积分器的质量，不只取决于单步误差， 还取决于它长期保留了什么。} }\]<p>如果未来你要自己设计软体或刚体求解器，这个问题值得经常拿出来：</p>
 <blockquote>
 <p><strong>哪些性质应该由 tolerance 保证，哪些应该由算法结构保证？</strong></p>
 </blockquote>
 <p>这会自然连接到：</p>
-\[\text{variational integrators} \rightarrow \text{symplectic methods} \rightarrow \text{Lie-group integrators} \rightarrow \text{energy-momentum methods} \rightarrow \text{structure-preserving differentiable simulation}.\]<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+\[\text{variational integrators} \rightarrow \text{symplectic methods} \rightarrow \text{Lie-group integrators} \rightarrow \text{energy-momentum methods} \rightarrow \text{structure-preserving differentiable simulation}.\]<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1489,9 +1512,8 @@ Disney Research / Animation 论文页</p>
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

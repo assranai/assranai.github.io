@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Durable Execution（持久化执行）与幂等性设计\n领域：Agent 工业应用 × 分布式系统 × AI 全栈工程\n阅读时间：约 4–5 分钟\n关键词：Event History、Replay、Idempotency、Exactly-once Effect\n本期转向此前覆盖较少的 Agent 工业应用。\n一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。\n问题在于，Agent 的某一步执行成功，并不意味着系统知道它已经成功。\n假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。\n重启后，它应该重新提交，还是等待原任务？\n这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：如何在无法确定上一次操作是否成功的情况下安全恢复执行。\nTemporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。\n一、为什么简单保存 Agent 状态还不够？ 假设工作流为：\n\\[ A\\rightarrow B\\rightarrow C \\]其中：\n\\(A\\)：生成仿真输入； \\(B\\)：向服务器提交仿真； \\(C\\)：下载结果。 Agent 在完成 \\(B\\) 后，需要保存：\n\\[ \\text{state}=\\text{B completed}. \\]但可能发生以下事件：\n\\[ \\underbrace{\\text{服务器接受任务}}_{t_1} \\rightarrow \\underbrace{\\text{Agent 崩溃}}_{t_2} \\rightarrow \\underbrace{\\text{状态写入数据库}}_{t_3} \\]由于：\n\\[ t_2">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Durable Execution（持久化执行）与幂等性设计\n领域：Agent 工业应用 × 分布式系统 × AI 全栈工程\n阅读时间：约 4–5 分钟\n关键词：Event History、Replay、Idempotency、Exactly-once Effect\n本期转向此前覆盖较少的 Agent 工业应用。\n一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。\n问题在于，Agent 的某一步执行成功，并不意味着系统知道它已经成功。\n假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。\n重启后，它应该重新提交，还是等待原任务？\n这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：如何在无法确定上一次操作是否成功的情况下安全恢复执行。\nTemporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。\n一、为什么简单保存 Agent 状态还不够？ 假设工作流为：\n\\[ A\\rightarrow B\\rightarrow C \\]其中：\n\\(A\\)：生成仿真输入； \\(B\\)：向服务器提交仿真； \\(C\\)：下载结果。 Agent 在完成 \\(B\\) 后，需要保存：\n\\[ \\text{state}=\\text{B completed}. \\]但可能发生以下事件：\n\\[ \\underbrace{\\text{服务器接受任务}}_{t_1} \\rightarrow \\underbrace{\\text{Agent 崩溃}}_{t_2} \\rightarrow \\underbrace{\\text{状态写入数据库}}_{t_3} \\]由于：\n\\[ t_2\\lt t_3, \\]状态数据库仍然认为：\n\\[ B=\\text{未完成}. \\]如果 Agent 直接重试 \\(B\\)，就可能产生两个仿真任务。\n">
 <title>Durable Execution：工业 Agent 如何正确处理“执行了一半”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/40-durable-execution/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Durable Execution：工业 Agent 如何正确处理“执行了一半”">
-<meta property='og:description' content="主题：Durable Execution（持久化执行）与幂等性设计\n领域：Agent 工业应用 × 分布式系统 × AI 全栈工程\n阅读时间：约 4–5 分钟\n关键词：Event History、Replay、Idempotency、Exactly-once Effect\n本期转向此前覆盖较少的 Agent 工业应用。\n一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。\n问题在于，Agent 的某一步执行成功，并不意味着系统知道它已经成功。\n假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。\n重启后，它应该重新提交，还是等待原任务？\n这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：如何在无法确定上一次操作是否成功的情况下安全恢复执行。\nTemporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。\n一、为什么简单保存 Agent 状态还不够？ 假设工作流为：\n\\[ A\\rightarrow B\\rightarrow C \\]其中：\n\\(A\\)：生成仿真输入； \\(B\\)：向服务器提交仿真； \\(C\\)：下载结果。 Agent 在完成 \\(B\\) 后，需要保存：\n\\[ \\text{state}=\\text{B completed}. \\]但可能发生以下事件：\n\\[ \\underbrace{\\text{服务器接受任务}}_{t_1} \\rightarrow \\underbrace{\\text{Agent 崩溃}}_{t_2} \\rightarrow \\underbrace{\\text{状态写入数据库}}_{t_3} \\]由于：\n\\[ t_2">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Durable Execution：工业 Agent 如何正确处理“执行了一半”">
+<meta property='og:description' content="主题：Durable Execution（持久化执行）与幂等性设计\n领域：Agent 工业应用 × 分布式系统 × AI 全栈工程\n阅读时间：约 4–5 分钟\n关键词：Event History、Replay、Idempotency、Exactly-once Effect\n本期转向此前覆盖较少的 Agent 工业应用。\n一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。\n问题在于，Agent 的某一步执行成功，并不意味着系统知道它已经成功。\n假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。\n重启后，它应该重新提交，还是等待原任务？\n这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：如何在无法确定上一次操作是否成功的情况下安全恢复执行。\nTemporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。\n一、为什么简单保存 Agent 状态还不够？ 假设工作流为：\n\\[ A\\rightarrow B\\rightarrow C \\]其中：\n\\(A\\)：生成仿真输入； \\(B\\)：向服务器提交仿真； \\(C\\)：下载结果。 Agent 在完成 \\(B\\) 后，需要保存：\n\\[ \\text{state}=\\text{B completed}. \\]但可能发生以下事件：\n\\[ \\underbrace{\\text{服务器接受任务}}_{t_1} \\rightarrow \\underbrace{\\text{Agent 崩溃}}_{t_2} \\rightarrow \\underbrace{\\text{状态写入数据库}}_{t_3} \\]由于：\n\\[ t_2\\lt t_3, \\]状态数据库仍然认为：\n\\[ B=\\text{未完成}. \\]如果 Agent 直接重试 \\(B\\)，就可能产生两个仿真任务。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/40-durable-execution/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:tag' content='大模型推理' /><meta property='article:tag' content='GPU 系统' /><meta property='article:published_time' content='2026-10-04T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-10-04T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Durable Execution：工业 Agent 如何正确处理“执行了一半”">
-<meta name="twitter:description" content="主题：Durable Execution（持久化执行）与幂等性设计\n领域：Agent 工业应用 × 分布式系统 × AI 全栈工程\n阅读时间：约 4–5 分钟\n关键词：Event History、Replay、Idempotency、Exactly-once Effect\n本期转向此前覆盖较少的 Agent 工业应用。\n一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。\n问题在于，Agent 的某一步执行成功，并不意味着系统知道它已经成功。\n假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。\n重启后，它应该重新提交，还是等待原任务？\n这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：如何在无法确定上一次操作是否成功的情况下安全恢复执行。\nTemporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。\n一、为什么简单保存 Agent 状态还不够？ 假设工作流为：\n\\[ A\\rightarrow B\\rightarrow C \\]其中：\n\\(A\\)：生成仿真输入； \\(B\\)：向服务器提交仿真； \\(C\\)：下载结果。 Agent 在完成 \\(B\\) 后，需要保存：\n\\[ \\text{state}=\\text{B completed}. \\]但可能发生以下事件：\n\\[ \\underbrace{\\text{服务器接受任务}}_{t_1} \\rightarrow \\underbrace{\\text{Agent 崩溃}}_{t_2} \\rightarrow \\underbrace{\\text{状态写入数据库}}_{t_3} \\]由于：\n\\[ t_2">
+<meta name="twitter:description" content="主题：Durable Execution（持久化执行）与幂等性设计\n领域：Agent 工业应用 × 分布式系统 × AI 全栈工程\n阅读时间：约 4–5 分钟\n关键词：Event History、Replay、Idempotency、Exactly-once Effect\n本期转向此前覆盖较少的 Agent 工业应用。\n一个工业 Agent 可能需要连续运行数小时：检索文献、调用仿真软件、处理结果、写入数据库，最后生成报告。\n问题在于，Agent 的某一步执行成功，并不意味着系统知道它已经成功。\n假设 Agent 向仿真服务器提交了一个耗时两小时的任务。服务器已经接受任务，但 Agent 在收到确认前因网络中断而崩溃。\n重启后，它应该重新提交，还是等待原任务？\n这个看似简单的问题，实际上涉及分布式系统中最重要的一类可靠性问题：如何在无法确定上一次操作是否成功的情况下安全恢复执行。\nTemporal 等工作流系统的核心设计，正是围绕持久化事件历史、故障恢复和可靠重试展开的。\n一、为什么简单保存 Agent 状态还不够？ 假设工作流为：\n\\[ A\\rightarrow B\\rightarrow C \\]其中：\n\\(A\\)：生成仿真输入； \\(B\\)：向服务器提交仿真； \\(C\\)：下载结果。 Agent 在完成 \\(B\\) 后，需要保存：\n\\[ \\text{state}=\\text{B completed}. \\]但可能发生以下事件：\n\\[ \\underbrace{\\text{服务器接受任务}}_{t_1} \\rightarrow \\underbrace{\\text{Agent 崩溃}}_{t_2} \\rightarrow \\underbrace{\\text{状态写入数据库}}_{t_3} \\]由于：\n\\[ t_2\\lt t_3, \\]状态数据库仍然认为：\n\\[ B=\\text{未完成}. \\]如果 Agent 直接重试 \\(B\\)，就可能产生两个仿真任务。\n">
     </head>
     <body class="
     article-page">
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -330,11 +330,8 @@
     <li><a href="#五一个科研-agent-的最小可靠架构">五、一个科研 Agent 的最小可靠架构</a></li>
     <li><a href="#六为什么这对-llm-agent-尤其重要">六、为什么这对 LLM Agent 尤其重要？</a></li>
     <li><a href="#七局限与工程代价">七、局限与工程代价</a></li>
-    <li><a href="#它在整个知识体系中卡在哪里">它在整个知识体系中卡在哪里？</a>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#它在整个知识体系中卡在哪里">它在整个知识体系中卡在哪里？</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -391,7 +388,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 1 分钟
+                    阅读时长: 3 分钟
                 </time>
             </div>
         
@@ -429,7 +426,7 @@
 <p>Agent 在完成 \(B\) 后，需要保存：</p>
 \[ \text{state}=\text{B completed}. \]<p>但可能发生以下事件：</p>
 \[ \underbrace{\text{服务器接受任务}}_{t_1} \rightarrow \underbrace{\text{Agent 崩溃}}_{t_2} \rightarrow \underbrace{\text{状态写入数据库}}_{t_3} \]<p>由于：</p>
-\[ t_2<t_3, \]<p>状态数据库仍然认为：</p>
+\[ t_2\lt t_3, \]<p>状态数据库仍然认为：</p>
 \[ B=\text{未完成}. \]<p>如果 Agent 直接重试 \(B\)，就可能产生两个仿真任务。</p>
 <p>这里存在一个重要的分布式系统事实：</p>
 <p><strong>外部操作的执行与本地状态的保存，通常无法天然组成一个原子事务。</strong></p>
@@ -508,30 +505,30 @@
   <div class="reveal-body">
     <p>分布式系统经常使用三种执行语义：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>语义</th>
-					<th>含义</th>
-					<th>主要风险</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>At-most-once</td>
-					<td>最多执行一次</td>
-					<td>失败后可能丢失任务</td>
-			</tr>
-			<tr>
-					<td>At-least-once</td>
-					<td>至少执行一次</td>
-					<td>可能重复执行</td>
-			</tr>
-			<tr>
-					<td>Exactly-once effect</td>
-					<td>业务效果恰好发生一次</td>
-					<td>需要额外去重与一致性机制</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>语义</th>
+          <th>含义</th>
+          <th>主要风险</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>At-most-once</td>
+          <td>最多执行一次</td>
+          <td>失败后可能丢失任务</td>
+      </tr>
+      <tr>
+          <td>At-least-once</td>
+          <td>至少执行一次</td>
+          <td>可能重复执行</td>
+      </tr>
+      <tr>
+          <td>Exactly-once effect</td>
+          <td>业务效果恰好发生一次</td>
+          <td>需要额外去重与一致性机制</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>对于工业 Agent，常见的合理选择是：</p>
 \[ \boxed{ \text{At-least-once execution} + \text{Idempotency} \Rightarrow \text{Exactly-once effect} } \]<p>这里的箭头表示一种<strong>需要满足严格条件才能实现的工程设计目标</strong>，并非无条件的数学保证。</p>
@@ -651,8 +648,8 @@
 <p>工业 Agent 的可靠性，不取决于它永远不失败，而取决于它能否在失败发生后，准确判断哪些事情已经完成、哪些事情可以重试，以及哪些事情绝不能重复。</p>
 </blockquote>
 <hr>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p><strong>1. Temporal — Event History</strong></p>
@@ -671,10 +668,6 @@
 <p><a class="link" href="https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"  target="_blank" rel="noopener"
     >AWS 官方架构指南与实现示例</a></p>
 <p>适合进一步理解数据库事务、事件发布和重复消息处理之间的一致性问题。</p>
-<hr>
-<p><strong>知识卡片注册表更新：第 56 张。</strong></p>
-<p>新增主题：Durable Execution 与幂等性设计。所属方向：Agent 工业应用 / 分布式系统 / AI 全栈工程。核心问题：如何使长期运行的 Agent 在进程崩溃、网络中断和外部任务状态不确定的情况下安全恢复。</p>
-<p>与此前的数值求解器、ROM 和可靠性方法卡片无主题重复；它补充的是<strong>科研自动化系统自身的执行可靠性</strong>。</p>
 
   </div>
 </details>
@@ -835,9 +828,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

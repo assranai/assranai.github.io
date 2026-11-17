@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Matrix-Free / Partial Assembly 与 Sum Factorization\n领域：有限元 × GPU/HPC × 求解器架构\n推荐阅读时间：约 8 分钟\n今天选一个和前几张 PD、AVI、DWR 都不同，但对“以后自己写真正高性能求解器”很关键的概念：Matrix-Free FEM（无矩阵有限元）。\n传统有限元的标准流程几乎已经形成条件反射：\n\\[\\text{单元积分}\\rightarrow K_e \\rightarrow\\text{组装全局 }K \\rightarrow Ku.\\]Matrix-Free 方法却问：\n\\[\\boxed{\\text{如果最终只是想计算 }y=Ku,\\text{ 为什么一定要先把 }K\\text{ 存下来？}}\\]它直接从弱形式重新计算 \\(Ku\\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。\n这背后的原因很值得理解：现代计算机越来越经常不是“算不动”，而是“搬不动数据”。\n1. 传统 FEM 真正在存什么？ 以线性弹性为例：\n\\[Ku=f.\\]传统 assembly：\n\\[K=\\sum_e R_e^TK_eR_e.\\]其中 \\(R_e\\) 从全局自由度抽取单元自由度。\n之后迭代求解器反复计算：\n\\[y=Kx.\\]看起来非常合理。\n但注意 sparse matrix-vector multiplication（SpMV）做了什么：\n1 2 3 4 5 读取 K 的非零值 读取列索引 读取 x 做少量乘加 写回 y 每读取一个矩阵元素，往往只对应：\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Matrix-Free / Partial Assembly 与 Sum Factorization\n领域：有限元 × GPU/HPC × 求解器架构\n推荐阅读时间：约 8 分钟\n要实现高性能有限元求解器，除了理解 PD、AVI、DWR，还需要考虑算子如何在硬件上执行。本卡讨论Matrix-Free FEM（无矩阵有限元）。\n传统有限元的标准流程几乎已经形成条件反射：\n\\[\\text{单元积分}\\rightarrow K_e \\rightarrow\\text{组装全局 }K \\rightarrow Ku.\\]Matrix-Free 方法却问：\n\\[\\boxed{\\text{如果最终只是想计算 }y=Ku,\\text{ 为什么一定要先把 }K\\text{ 存下来？}}\\]它直接从弱形式重新计算 \\(Ku\\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。\n这背后的原因很值得理解：现代计算机越来越经常不是“算不动”，而是“搬不动数据”。\n1. 传统 FEM 真正在存什么？ 以线性弹性为例：\n\\[Ku=f.\\]传统 assembly：\n\\[K=\\sum_e R_e^TK_eR_e.\\]其中 \\(R_e\\) 从全局自由度抽取单元自由度。\n之后迭代求解器反复计算：\n\\[y=Kx.\\]看起来非常合理。\n但注意 sparse matrix-vector multiplication（SpMV）做了什么：\n1 2 3 4 5 读取 K 的非零值 读取列索引 读取 x 做少量乘加 写回 y 每读取一个矩阵元素，往往只对应：\n\\[1\\text{ multiply}+1\\text{ add}.\\]因此计算强度：\n">
 <title>Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/33-matrix-free-fem/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？">
-<meta property='og:description' content="主题：Matrix-Free / Partial Assembly 与 Sum Factorization\n领域：有限元 × GPU/HPC × 求解器架构\n推荐阅读时间：约 8 分钟\n今天选一个和前几张 PD、AVI、DWR 都不同，但对“以后自己写真正高性能求解器”很关键的概念：Matrix-Free FEM（无矩阵有限元）。\n传统有限元的标准流程几乎已经形成条件反射：\n\\[\\text{单元积分}\\rightarrow K_e \\rightarrow\\text{组装全局 }K \\rightarrow Ku.\\]Matrix-Free 方法却问：\n\\[\\boxed{\\text{如果最终只是想计算 }y=Ku,\\text{ 为什么一定要先把 }K\\text{ 存下来？}}\\]它直接从弱形式重新计算 \\(Ku\\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。\n这背后的原因很值得理解：现代计算机越来越经常不是“算不动”，而是“搬不动数据”。\n1. 传统 FEM 真正在存什么？ 以线性弹性为例：\n\\[Ku=f.\\]传统 assembly：\n\\[K=\\sum_e R_e^TK_eR_e.\\]其中 \\(R_e\\) 从全局自由度抽取单元自由度。\n之后迭代求解器反复计算：\n\\[y=Kx.\\]看起来非常合理。\n但注意 sparse matrix-vector multiplication（SpMV）做了什么：\n1 2 3 4 5 读取 K 的非零值 读取列索引 读取 x 做少量乘加 写回 y 每读取一个矩阵元素，往往只对应：\n">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？">
+<meta property='og:description' content="主题：Matrix-Free / Partial Assembly 与 Sum Factorization\n领域：有限元 × GPU/HPC × 求解器架构\n推荐阅读时间：约 8 分钟\n要实现高性能有限元求解器，除了理解 PD、AVI、DWR，还需要考虑算子如何在硬件上执行。本卡讨论Matrix-Free FEM（无矩阵有限元）。\n传统有限元的标准流程几乎已经形成条件反射：\n\\[\\text{单元积分}\\rightarrow K_e \\rightarrow\\text{组装全局 }K \\rightarrow Ku.\\]Matrix-Free 方法却问：\n\\[\\boxed{\\text{如果最终只是想计算 }y=Ku,\\text{ 为什么一定要先把 }K\\text{ 存下来？}}\\]它直接从弱形式重新计算 \\(Ku\\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。\n这背后的原因很值得理解：现代计算机越来越经常不是“算不动”，而是“搬不动数据”。\n1. 传统 FEM 真正在存什么？ 以线性弹性为例：\n\\[Ku=f.\\]传统 assembly：\n\\[K=\\sum_e R_e^TK_eR_e.\\]其中 \\(R_e\\) 从全局自由度抽取单元自由度。\n之后迭代求解器反复计算：\n\\[y=Kx.\\]看起来非常合理。\n但注意 sparse matrix-vector multiplication（SpMV）做了什么：\n1 2 3 4 5 读取 K 的非零值 读取列索引 读取 x 做少量乘加 写回 y 每读取一个矩阵元素，往往只对应：\n\\[1\\text{ multiply}+1\\text{ add}.\\]因此计算强度：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/33-matrix-free-fem/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='高性能计算' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='GPU 系统' /><meta property='article:published_time' content='2026-09-23T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-23T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Matrix-Free FEM：为什么“不组装刚度矩阵”反而可能让有限元更快？">
-<meta name="twitter:description" content="主题：Matrix-Free / Partial Assembly 与 Sum Factorization\n领域：有限元 × GPU/HPC × 求解器架构\n推荐阅读时间：约 8 分钟\n今天选一个和前几张 PD、AVI、DWR 都不同，但对“以后自己写真正高性能求解器”很关键的概念：Matrix-Free FEM（无矩阵有限元）。\n传统有限元的标准流程几乎已经形成条件反射：\n\\[\\text{单元积分}\\rightarrow K_e \\rightarrow\\text{组装全局 }K \\rightarrow Ku.\\]Matrix-Free 方法却问：\n\\[\\boxed{\\text{如果最终只是想计算 }y=Ku,\\text{ 为什么一定要先把 }K\\text{ 存下来？}}\\]它直接从弱形式重新计算 \\(Ku\\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。\n这背后的原因很值得理解：现代计算机越来越经常不是“算不动”，而是“搬不动数据”。\n1. 传统 FEM 真正在存什么？ 以线性弹性为例：\n\\[Ku=f.\\]传统 assembly：\n\\[K=\\sum_e R_e^TK_eR_e.\\]其中 \\(R_e\\) 从全局自由度抽取单元自由度。\n之后迭代求解器反复计算：\n\\[y=Kx.\\]看起来非常合理。\n但注意 sparse matrix-vector multiplication（SpMV）做了什么：\n1 2 3 4 5 读取 K 的非零值 读取列索引 读取 x 做少量乘加 写回 y 每读取一个矩阵元素，往往只对应：\n">
+<meta name="twitter:description" content="主题：Matrix-Free / Partial Assembly 与 Sum Factorization\n领域：有限元 × GPU/HPC × 求解器架构\n推荐阅读时间：约 8 分钟\n要实现高性能有限元求解器，除了理解 PD、AVI、DWR，还需要考虑算子如何在硬件上执行。本卡讨论Matrix-Free FEM（无矩阵有限元）。\n传统有限元的标准流程几乎已经形成条件反射：\n\\[\\text{单元积分}\\rightarrow K_e \\rightarrow\\text{组装全局 }K \\rightarrow Ku.\\]Matrix-Free 方法却问：\n\\[\\boxed{\\text{如果最终只是想计算 }y=Ku,\\text{ 为什么一定要先把 }K\\text{ 存下来？}}\\]它直接从弱形式重新计算 \\(Ku\\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。\n这背后的原因很值得理解：现代计算机越来越经常不是“算不动”，而是“搬不动数据”。\n1. 传统 FEM 真正在存什么？ 以线性弹性为例：\n\\[Ku=f.\\]传统 assembly：\n\\[K=\\sum_e R_e^TK_eR_e.\\]其中 \\(R_e\\) 从全局自由度抽取单元自由度。\n之后迭代求解器反复计算：\n\\[y=Kx.\\]看起来非常合理。\n但注意 sparse matrix-vector multiplication（SpMV）做了什么：\n1 2 3 4 5 读取 K 的非零值 读取列索引 读取 x 做少量乘加 写回 y 每读取一个矩阵元素，往往只对应：\n\\[1\\text{ multiply}+1\\text{ add}.\\]因此计算强度：\n">
     </head>
     <body class="
     article-page">
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,6 +324,25 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-传统-fem-真正在存什么">1. 传统 FEM 真正在存什么？</a></li>
+    <li><a href="#2-matrix-free-做了一件看起来反效率的事">2. Matrix-Free 做了一件看起来“反效率”的事</a></li>
+    <li><a href="#3-更准确地说有限元算子本来就不是一块矩阵">3. 更准确地说，有限元算子本来就不是“一块矩阵”</a></li>
+    <li><a href="#4-partial-assembly-是中间路线">4. Partial Assembly 是中间路线</a></li>
+    <li><a href="#5-但如果每次都老老实实算高阶-fem计算量不会爆炸吗">5. 但如果每次都老老实实算高阶 FEM，计算量不会爆炸吗？</a></li>
+    <li><a href="#6-它改变了高阶-fem-的复杂度">6. 它改变了高阶 FEM 的复杂度</a></li>
+    <li><a href="#7-一个直观类比">7. 一个直观类比</a></li>
+    <li><a href="#8-这会产生一个很重要的-roofline-视角">8. 这会产生一个很重要的 Roofline 视角</a></li>
+    <li><a href="#9-这对-gpu-求解器架构特别重要">9. 这对 GPU 求解器架构特别重要</a></li>
+    <li><a href="#10-那为什么低阶四面体-fem-不一定值得-matrix-free">10. 那为什么低阶四面体 FEM 不一定值得 Matrix-Free？</a></li>
+    <li><a href="#11-matrix-free-最大的问题预条件器怎么办">11. Matrix-Free 最大的问题：预条件器怎么办？</a></li>
+    <li><a href="#12-这和-multigrid-的结合尤其漂亮">12. 这和 Multigrid 的结合尤其漂亮</a></li>
+    <li><a href="#13-对非线性软体-fem-更有意思">13. 对非线性软体 FEM 更有意思</a></li>
+    <li><a href="#14-与投影动力学的对照何时值得预计算">14. 与投影动力学的对照：何时值得预计算？</a></li>
+    <li><a href="#15-对自研软体求解器最值得迁移的思想">15. 对自研软体求解器最值得迁移的思想</a></li>
+    <li><a href="#16-一个值得自己做的小实验">16. 一个值得自己做的小实验</a></li>
+    <li><a href="#17-它还给-ai-工程一个很强的迁移原则">17. 它还给 AI 工程一个很强的迁移原则</a></li>
+    <li><a href="#18-为什么-partial-assembly-还没有完全取代传统-fem">18. 为什么 Partial Assembly 还没有完全取代传统 FEM</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -398,7 +417,7 @@
     <p><strong>主题：Matrix-Free / Partial Assembly 与 Sum Factorization</strong><br>
 <strong>领域：有限元 × GPU/HPC × 求解器架构</strong><br>
 <strong>推荐阅读时间：约 8 分钟</strong></p>
-<p>今天选一个和前几张 <span class="term-anchor" data-term="pd" tabindex="0">PD</span>、AVI、<span class="term-anchor" data-term="dwr" tabindex="0">DWR</span> 都不同，但对“以后自己写真正高性能求解器”很关键的概念：<strong>Matrix-Free FEM（无矩阵有限元）</strong>。</p>
+<p>要实现高性能有限元求解器，除了理解 <span class="term-anchor" data-term="pd" tabindex="0">PD</span>、AVI、<span class="term-anchor" data-term="dwr" tabindex="0">DWR</span>，还需要考虑算子如何在硬件上执行。本卡讨论<strong>Matrix-Free FEM（无矩阵有限元）</strong>。</p>
 <p>传统有限元的标准流程几乎已经形成条件反射：</p>
 \[\text{单元积分}\rightarrow K_e \rightarrow\text{组装全局 }K \rightarrow Ku.\]<p>Matrix-Free 方法却问：</p>
 \[\boxed{\text{如果最终只是想计算 }y=Ku,\text{ 为什么一定要先把 }K\text{ 存下来？}}\]<p>它直接从弱形式重新计算 \(Ku\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。</p>
@@ -433,8 +452,8 @@
 <p>现代 CPU/GPU 的浮点吞吐增长速度远快于内存带宽，于是 SpMV 很容易成为：</p>
 \[\boxed{\text{memory-bandwidth bound}.}\]<p>Kronbichler 与 Kormann 对 matrix-free DG 的性能分析甚至发现，完整 operator evaluation 的性能经常已经接近机器可用 memory bandwidth 的极限。</p>
 <hr>
-<h1 id="2-matrix-free-做了一件看起来反效率的事">2. Matrix-Free 做了一件看起来“反效率”的事
-</h1><p>不存：</p>
+<h2 id="2-matrix-free-做了一件看起来反效率的事">2. Matrix-Free 做了一件看起来“反效率”的事
+</h2><p>不存：</p>
 \[K.\]<p>每次需要：</p>
 \[y=Kx\]<p>时，重新执行有限元积分。</p>
 <p>对于一个典型双线性型：</p>
@@ -446,15 +465,15 @@
 <p>在现代硬件上：</p>
 \[\boxed{\text{多算一点，可能比多读一点更便宜。}}\]<p>这正是 Matrix-Free 最反直觉也最重要的地方。</p>
 <hr>
-<h1 id="3-更准确地说有限元算子本来就不是一块矩阵">3. 更准确地说，有限元算子本来就不是“一块矩阵”
-</h1><p><a class="link" href="https://mfem.org/performance/"  target="_blank" rel="noopener"
+<h2 id="3-更准确地说有限元算子本来就不是一块矩阵">3. 更准确地说，有限元算子本来就不是“一块矩阵”
+</h2><p><a class="link" href="https://mfem.org/performance/"  target="_blank" rel="noopener"
     >MFEM 官方 Partial Assembly 文档</a> 把有限元算子分解得非常漂亮：</p>
 \[\boxed{ A=P^TG^TB^TDBG P. }\]<p>这里可以粗略理解为：</p>
 \[P:\text{全局/并行自由度映射}\]\[G:\text{global DOF}\rightarrow\text{element DOF}\]\[B:\text{element DOF}\rightarrow\text{quadrature point}\]\[D:\text{积分点上的几何与物理作用}.\]<p>所以一个 FEM operator 实际上是：</p>
 \[\boxed{ \text{global} \rightarrow \text{element} \rightarrow \text{quadrature} \rightarrow \text{physics} \rightarrow \text{element} \rightarrow \text{global}. }\]<p>全局 sparse matrix \(A\) 只是把整个计算过程<strong>提前展开并缓存后的结果</strong>。</p>
 <hr>
-<h1 id="4-partial-assembly-是中间路线">4. Partial Assembly 是中间路线
-</h1><p>这里有一个很重要的层次：</p>
+<h2 id="4-partial-assembly-是中间路线">4. Partial Assembly 是中间路线
+</h2><p>这里有一个很重要的层次：</p>
 \[\text{Full Assembly}\]<p>存整个：</p>
 \[A.\]<p>Element Assembly：</p>
 <p>存：</p>
@@ -464,14 +483,14 @@
 <p>连更多中间量也动态计算。</p>
 <p>所以你可以把 assembly 看成一条连续谱：</p>
 \[\boxed{ \text{更多预计算/更多内存} \longleftrightarrow \text{更少存储/更多在线计算}. }\]<p>MFEM 当前明确提供 FULL、ELEMENT、PARTIAL 等不同 assembly level；其 partial assembly 的核心就是只保存 \(D\) 或其一部分，而把 \(P,G,B\) 等操作在线执行。</p>
-<p>这其实与昨天 PD 的思想形成一个很漂亮的反差：</p>
+<p>这里可以和<a class="link" href="../03-projective-dynamics/" >投影动力学（PD）</a>的全局求解步对照。</p>
 <p>PD：</p>
 \[\boxed{\text{尽量预计算固定结构}}\]<p>Matrix-Free：</p>
 \[\boxed{\text{当预计算结果太大时，宁愿重算}}\]<p>两者并不矛盾。</p>
 <p>真正原则是：</p>
 \[\boxed{\text{缓存那些“重算比搬运贵”的东西。}}\]<hr>
-<h1 id="5-但如果每次都老老实实算高阶-fem计算量不会爆炸吗">5. 但如果每次都老老实实算高阶 FEM，计算量不会爆炸吗？
-</h1><p>会。</p>
+<h2 id="5-但如果每次都老老实实算高阶-fem计算量不会爆炸吗">5. 但如果每次都老老实实算高阶 FEM，计算量不会爆炸吗？
+</h2><p>会。</p>
 <p>所以 Matrix-Free 高阶 FEM 的另一个核心技术叫：</p>
 \[\boxed{\text{Sum Factorization}.}\]<p>考虑三维六面体高阶单元。</p>
 <p>每个方向有：</p>
@@ -485,8 +504,8 @@
 \[w_{q_xq_yk} = \sum_jB_{q_yj}v_{q_xjk},\]<p>最后：</p>
 \[u_{q_xq_yq_z} = \sum_kB_{q_zk}w_{q_xq_yk}.\]<p>这就是 sum factorization。</p>
 <hr>
-<h1 id="6-它改变了高阶-fem-的复杂度">6. 它改变了高阶 FEM 的复杂度
-</h1><p>三维情况下，直接 dense element operation 的复杂度大致会随：</p>
+<h2 id="6-它改变了高阶-fem-的复杂度">6. 它改变了高阶 FEM 的复杂度
+</h2><p>三维情况下，直接 dense element operation 的复杂度大致会随：</p>
 \[O(p^6)\]<p>增长。</p>
 <p>利用 tensor-product sum factorization 后，可降到大约：</p>
 \[\boxed{O(p^4)}.\]<p>这两个幂次的差距在：</p>
@@ -495,8 +514,8 @@
 \[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} }\]<p>才真正构成现代 high-order FEM 的高性能组合。</p>
 <p>Kronbichler 与 Kormann 的工作正是系统研究这种 matrix-free + sum-factorization operator evaluation，并展示经过向量化的一维 tensor kernels 可以达到很高的 CPU 算术吞吐。</p>
 <hr>
-<h1 id="7-一个直观类比">7. 一个直观类比
-</h1><details class="reveal">
+<h2 id="7-一个直观类比">7. 一个直观类比
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设你每天需要：</p>
@@ -518,8 +537,8 @@
 </details>
 
 <hr>
-<h1 id="8-这会产生一个很重要的-roofline-视角">8. 这会产生一个很重要的 Roofline 视角
-</h1><details class="reveal">
+<h2 id="8-这会产生一个很重要的-roofline-视角">8. 这会产生一个很重要的 Roofline 视角
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>性能不应该只看 FLOPs。</p>
@@ -538,8 +557,8 @@
 </details>
 
 <hr>
-<h1 id="9-这对-gpu-求解器架构特别重要">9. 这对 GPU 求解器架构特别重要
-</h1><details class="reveal">
+<h2 id="9-这对-gpu-求解器架构特别重要">9. 这对 GPU 求解器架构特别重要
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>Matrix-Free 的典型 kernel 很适合 GPU：</p>
@@ -566,8 +585,8 @@
 </details>
 
 <hr>
-<h1 id="10-那为什么低阶四面体-fem-不一定值得-matrix-free">10. 那为什么低阶四面体 FEM 不一定值得 Matrix-Free？
-</h1><details class="reveal">
+<h2 id="10-那为什么低阶四面体-fem-不一定值得-matrix-free">10. 那为什么低阶四面体 FEM 不一定值得 Matrix-Free？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这是一个重要边界。</p>
@@ -591,8 +610,8 @@
 </details>
 
 <hr>
-<h1 id="11-matrix-free-最大的问题预条件器怎么办">11. Matrix-Free 最大的问题：预条件器怎么办？
-</h1><details class="reveal">
+<h2 id="11-matrix-free-最大的问题预条件器怎么办">11. Matrix-Free 最大的问题：预条件器怎么办？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>如果你有：</p>
@@ -624,8 +643,8 @@
 </details>
 
 <hr>
-<h1 id="12-这和-multigrid-的结合尤其漂亮">12. 这和 Multigrid 的结合尤其漂亮
-</h1><details class="reveal">
+<h2 id="12-这和-multigrid-的结合尤其漂亮">12. 这和 Multigrid 的结合尤其漂亮
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>高阶问题：</p>
@@ -642,8 +661,8 @@
 </details>
 
 <hr>
-<h1 id="13-对非线性软体-fem-更有意思">13. 对非线性软体 FEM 更有意思
-</h1><details class="reveal">
+<h2 id="13-对非线性软体-fem-更有意思">13. 对非线性软体 FEM 更有意思
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>考虑 Neo-Hookean：</p>
@@ -666,8 +685,8 @@
 </details>
 
 <hr>
-<h1 id="14-这里还能和上一张-pd-卡片形成一个很有价值的对照">14. 这里还能和上一张 PD 卡片形成一个很有价值的对照
-</h1><details class="reveal">
+<h2 id="14-与投影动力学的对照何时值得预计算">14. 与投影动力学的对照：何时值得预计算？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>PD 的核心优势：</p>
@@ -684,8 +703,8 @@
 </details>
 
 <hr>
-<h1 id="15-对自研软体求解器最值得迁移的思想">15. 对自研软体求解器最值得迁移的思想
-</h1><details class="reveal">
+<h2 id="15-对自研软体求解器最值得迁移的思想">15. 对自研软体求解器最值得迁移的思想
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>即使当前使用 <span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span>，而不是 FEM，Matrix-Free 的思想仍然非常有价值。</p>
@@ -710,8 +729,8 @@
 </details>
 
 <hr>
-<h1 id="16-一个值得自己做的小实验">16. 一个值得自己做的小实验
-</h1><details class="reveal">
+<h2 id="16-一个值得自己做的小实验">16. 一个值得自己做的小实验
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>做一个规则六面体 Poisson 问题。</p>
@@ -737,15 +756,15 @@
 </details>
 
 <hr>
-<h1 id="17-它还给-ai-工程一个很强的迁移原则">17. 它还给 AI 工程一个很强的迁移原则
-</h1><p>现代 LLM 推理也越来越受：</p>
+<h2 id="17-它还给-ai-工程一个很强的迁移原则">17. 它还给 AI 工程一个很强的迁移原则
+</h2><p>现代 LLM 推理也越来越受：</p>
 \[\boxed{\text{memory bandwidth}}\]<p>限制。</p>
 <p>很多 kernel fusion、FlashAttention、activation recomputation，本质上都在做类似交易：</p>
 \[\boxed{\text{多做计算，少搬数据}.}\]<p>所以 Matrix-Free FEM、FlashAttention、checkpoint recomputation 看起来属于完全不同领域，却共享一个现代计算原则：</p>
-\[\boxed{ \text{在算力相对便宜、内存流量昂贵的机器上， “避免重复计算”已经不再是无条件正确的优化目标。}\]<p>这是 Matrix-Free FEM 最值得迁移出去的一层认识。</p>
+\[\boxed{ \text{在算力相对便宜、内存流量昂贵的机器上， “避免重复计算”已经不再是无条件正确的优化目标。}}\]<p>这是 Matrix-Free FEM 最值得迁移出去的一层认识。</p>
 <hr>
-<h1 id="18-为什么-partial-assembly-还没有完全取代传统-fem">18. 为什么 Partial Assembly 还没有完全取代传统 FEM
-</h1><details class="reveal">
+<h2 id="18-为什么-partial-assembly-还没有完全取代传统-fem">18. 为什么 Partial Assembly 还没有完全取代传统 FEM
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>主要存在三个限制。</p>
@@ -762,16 +781,21 @@
 <p>例如 Neo-Hookean 材料：</p>
 \[ P=\frac{\partial\Psi}{\partial F}. \]<p>如果形变梯度 \(F\) 每步都变化，那么积分点上的材料响应也需要更新。</p>
 <p>此时是否预存 \(D\)，以及预存哪些部分，就成为需要针对具体物理模型优化的问题。</p>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Matrix-Free FEM 最值得记住的并不是：</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Matrix-Free FEM 最值得记住的并不是：</p>
 \[\boxed{\text{“不存刚度矩阵”}.}\]<p>真正重要的是：</p>
 \[\boxed{ \text{矩阵只是一个算子的某种物化形式； 如果物化后的数据比重新执行算子本身更昂贵， 那就没有必要把它物化。} }\]<p>它在知识体系中的位置可以画成：</p>
 \[\text{Weak Form}\]\[\downarrow\]\[\text{Finite Element Operator}\]\[\begin{array}{ccc} \swarrow && \searrow\\ \text{Assembly} && \text{Matrix-Free} \end{array}\]\[\begin{array}{ccc} K\text{ sparse} && P^TG^TB^TDBG P \end{array}\]<p>而高阶 FEM 再加入：</p>
 \[\boxed{\text{tensor product}}\]\[\downarrow\]\[\boxed{\text{sum factorization}}\]<p>最终得到：</p>
 \[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} + \text{Multigrid} }\]<p>这已经成为现代高性能高阶有限元的一条核心技术路线。</p>
 <p>对于以后真正写 GPU 物理求解器，这张卡片最值得留下的工程判断是：</p>
-\[\boxed{ \text{看到一个可以预计算并缓存的大数组时， 先不要问“怎么把它存得更紧凑”， 先问“我真的需要存它吗？”} }\]<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+\[\boxed{ \text{看到一个可以预计算并缓存的大数组时， 先不要问“怎么把它存得更紧凑”， 先问“我真的需要存它吗？”} }\]<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -795,8 +819,6 @@
 <p>Arndt et al., <strong>ExaDG: High-Order Discontinuous Galerkin for the Exa-scale</strong>。如果想看这一整套技术怎样组成真正的大规模求解器：matrix-free operator + sum factorization + massively parallel multigrid + optimized smoothers，就是很好的系统案例；相关工作报告实际软件贡献在不同硬件上带来约 3–4× 加速。</p>
 </li>
 </ol>
-  </div>
-</details>
 
   </div>
 </details>
@@ -980,9 +1002,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

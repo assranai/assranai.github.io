@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Jacobian-Free Newton–Krylov（JFNK）\n领域：非线性有限元 × 数值优化 × 物理求解器\n阅读时间：约 4–5 分钟\n核心问题：求解非线性方程，是否真的需要知道 Jacobian 矩阵的每一个元素？\n在大型非线性有限元中，构造和存储切线刚度矩阵往往是昂贵的。尤其对于超弹性、多物理场耦合或复杂本构模型，推导和实现一致切线矩阵本身就是一项工程负担。\nJFNK 提供了另一条路线：保留 Newton 法的非线性求解能力，却不显式构造 Jacobian，而是通过残差函数直接计算 Jacobian 对向量的作用。\n这一思想已经广泛应用于大型 PDE 求解。Knoll 与 Keyes 在 2004 年发表于 Journal of Computational Physics 的经典综述中，系统讨论了 JFNK 的理论、预条件策略及其在计算物理中的应用。\n一、Newton 法真的需要完整 Jacobian 吗？ 考虑非线性有限元方程：\n\\[ R(u)=0, \\]其中 \\(u\\in\\mathbb R^N\\) 是节点自由度，\\(R(u)\\) 是残差。\nNewton 法每次迭代求解：\n\\[ \\boxed{ J(u_k)\\Delta u=-R(u_k) } \\]其中：\n\\[ J(u)=\\frac{\\partial R}{\\partial u}. \\]传统实现需要组装 \\(J\\)，然后求解线性系统。\n但如果使用 GMRES 等 Krylov 迭代方法，情况就不同了。\nGMRES 构造的 Krylov 子空间为：\n">
 <title>Jacobian-Free Newton–Krylov：不构造 Jacobian 也能解非线性有限元</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/41-jacobian-free-newton-krylov/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Jacobian-Free Newton–Krylov：不构造 Jacobian 也能解非线性有限元">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Jacobian-Free Newton–Krylov：不构造 Jacobian 也能解非线性有限元">
 <meta property='og:description' content="主题：Jacobian-Free Newton–Krylov（JFNK）\n领域：非线性有限元 × 数值优化 × 物理求解器\n阅读时间：约 4–5 分钟\n核心问题：求解非线性方程，是否真的需要知道 Jacobian 矩阵的每一个元素？\n在大型非线性有限元中，构造和存储切线刚度矩阵往往是昂贵的。尤其对于超弹性、多物理场耦合或复杂本构模型，推导和实现一致切线矩阵本身就是一项工程负担。\nJFNK 提供了另一条路线：保留 Newton 法的非线性求解能力，却不显式构造 Jacobian，而是通过残差函数直接计算 Jacobian 对向量的作用。\n这一思想已经广泛应用于大型 PDE 求解。Knoll 与 Keyes 在 2004 年发表于 Journal of Computational Physics 的经典综述中，系统讨论了 JFNK 的理论、预条件策略及其在计算物理中的应用。\n一、Newton 法真的需要完整 Jacobian 吗？ 考虑非线性有限元方程：\n\\[ R(u)=0, \\]其中 \\(u\\in\\mathbb R^N\\) 是节点自由度，\\(R(u)\\) 是残差。\nNewton 法每次迭代求解：\n\\[ \\boxed{ J(u_k)\\Delta u=-R(u_k) } \\]其中：\n\\[ J(u)=\\frac{\\partial R}{\\partial u}. \\]传统实现需要组装 \\(J\\)，然后求解线性系统。\n但如果使用 GMRES 等 Krylov 迭代方法，情况就不同了。\nGMRES 构造的 Krylov 子空间为：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/41-jacobian-free-newton-krylov/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -329,11 +329,8 @@
     <li><a href="#四jfnk-还有一个重要优化不必每次都精确求解-newton-方程">四、JFNK 还有一个重要优化：不必每次都精确求解 Newton 方程</a></li>
     <li><a href="#五jfnk-的局限残差必须足够光滑足够准确">五、JFNK 的局限：残差必须足够光滑、足够准确</a></li>
     <li><a href="#六对自研-fem--软体求解器的直接启发">六、对自研 FEM / 软体求解器的直接启发</a></li>
-    <li><a href="#它在整个知识体系中卡在哪里">它在整个知识体系中卡在哪里？</a>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#它在整个知识体系中卡在哪里">它在整个知识体系中卡在哪里？</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -462,30 +459,30 @@
 \[ \boxed{ P=\frac{M}{h^2}+K_{\mathrm{approx}}. } \]<p>其中 \(K_{\mathrm{approx}}\) 可以来自线性弹性近似、简化本构或较少更新的切线刚度。</p>
 <p>于是形成两套不同精度的计算：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>部分</th>
-					<th>采用的模型</th>
-					<th>目的</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>Newton 残差</td>
-					<td>完整非线性物理</td>
-					<td>保证求解目标正确</td>
-			</tr>
-			<tr>
-					<td>Jacobian-vector product</td>
-					<td>完整残差的方向导数近似</td>
-					<td>提供 Newton 线性化信息</td>
-			</tr>
-			<tr>
-					<td>预条件器</td>
-					<td>简化物理模型</td>
-					<td>加速 Krylov 收敛</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>部分</th>
+          <th>采用的模型</th>
+          <th>目的</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Newton 残差</td>
+          <td>完整非线性物理</td>
+          <td>保证求解目标正确</td>
+      </tr>
+      <tr>
+          <td>Jacobian-vector product</td>
+          <td>完整残差的方向导数近似</td>
+          <td>提供 Newton 线性化信息</td>
+      </tr>
+      <tr>
+          <td>预条件器</td>
+          <td>简化物理模型</td>
+          <td>加速 Krylov 收敛</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>这是 JFNK 很有价值的工程结构：<strong>高保真物理负责正确性，低成本近似负责计算效率。</strong></p>
 <p>MOOSE 的官方文档明确采用这种设计。其 PJFNK 求解器可以使用近似 Jacobian 构造预条件器，并支持针对不同物理变量采用不同的预条件策略。</p>
@@ -564,7 +561,7 @@
 <li>加入简化弹性刚度或质量矩阵预条件器，改善迭代收敛。</li>
 <li>进一步尝试 <span class="term-anchor" data-term="algebraic-multigrid" tabindex="0">AMG</span>、自动微分 JVP 和自适应 Newton 容差。</li>
 </ol>
-<p>其中第二步恰好连接第 55 张知识卡片的 Algebraic <span class="term-anchor" data-term="multigrid" tabindex="0">Multigrid</span>。</p>
+<p>第二步可以使用<a class="link" href="../39-algebraic-multigrid/" >代数多重网格（AMG）</a>作为预条件器。</p>
 <p>需要强调：这种方案适合探索大型隐式 FEM 的实现路线，并不意味着应该直接替换现有 <span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 求解器。两者的时间积分、约束处理和计算预算不同。</p>
 
   </div>
@@ -574,30 +571,30 @@
 <h2 id="它在整个知识体系中卡在哪里">它在整个知识体系中卡在哪里？
 </h2><p>可以将此前学习的几种求解加速方法放在同一框架中：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>方法</th>
-					<th>主要减少什么成本？</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td><span class="term-anchor" data-term="pd" tabindex="0">Projective Dynamics</span></td>
-					<td>非线性全局矩阵反复变化的成本</td>
-			</tr>
-			<tr>
-					<td>Algebraic Multigrid</td>
-					<td>大型线性系统的迭代收敛成本</td>
-			</tr>
-			<tr>
-					<td><span class="term-anchor" data-term="hyper-reduction" tabindex="0">Hyper-reduction</span></td>
-					<td>非线性算子的评估成本</td>
-			</tr>
-			<tr>
-					<td><strong>JFNK</strong></td>
-					<td><strong>构造和存储完整 Jacobian 的成本</strong></td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>方法</th>
+          <th>主要减少什么成本？</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><span class="term-anchor" data-term="pd" tabindex="0">Projective Dynamics</span></td>
+          <td>非线性全局矩阵反复变化的成本</td>
+      </tr>
+      <tr>
+          <td>Algebraic Multigrid</td>
+          <td>大型线性系统的迭代收敛成本</td>
+      </tr>
+      <tr>
+          <td><span class="term-anchor" data-term="hyper-reduction" tabindex="0">Hyper-reduction</span></td>
+          <td>非线性算子的评估成本</td>
+      </tr>
+      <tr>
+          <td><strong>JFNK</strong></td>
+          <td><strong>构造和存储完整 Jacobian 的成本</strong></td>
+      </tr>
+  </tbody>
 </table></div>
 <p>它们并非相互排斥。</p>
 <p>例如：</p>
@@ -608,30 +605,29 @@
 </blockquote>
 <p>JFNK 将这一认识用于非线性求解，因而可以把复杂物理模型的实现重点重新放回残差计算，并将预条件器设计为独立的性能优化问题。</p>
 <hr>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<p>还可以对照<a class="link" href="../14-anderson-acceleration/" >Anderson 加速</a>的固定点迭代、<a class="link" href="../39-algebraic-multigrid/" >代数多重网格</a>的预条件作用，以及<a class="link" href="../25-nitsche-method/" >Nitsche 方法</a>如何把边界条件写进残差。</p>
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p><strong>1. Knoll &amp; Keyes（2004）— Jacobian-free Newton–Krylov Methods: A Survey of Approaches and Applications</strong></p>
 <p><em>Journal of Computational Physics</em>, 193(2), 357–397。DOI：10.1016/j.jcp.2003.08.010。</p>
-<p>经典综述全文 PDF</p>
+<p><a class="link" href="https://doi.org/10.1016/j.jcp.2003.08.010"  target="_blank" rel="noopener"
+    >JFNK 综述</a></p>
 <p>最推荐的理论来源。系统讨论 JFNK、非线性预条件、物理耦合与实际应用。</p>
 <p><strong>2. PETSc — SNES Nonlinear Solvers</strong></p>
-<p>PETSc 官方非线性求解器文档</p>
+<p><a class="link" href="https://petsc.org/release/manual/snes/"  target="_blank" rel="noopener"
+    >PETSc 非线性求解器手册</a></p>
 <p>重点关注 <code>-snes_mf_operator</code>：允许 Jacobian-vector product 使用矩阵自由计算，同时保留单独的预条件矩阵。</p>
 <p><strong>3. MOOSE — NonlinearSystem</strong></p>
-<p>MOOSE 官方技术文档</p>
+<p><a class="link" href="https://mooseframework.inl.gov/source/systems/NonlinearSystem.html"  target="_blank" rel="noopener"
+    >MOOSE 非线性系统文档</a></p>
 <p>从真实多物理场 FEM 框架理解残差、Jacobian、自动微分与 PJFNK 的工程分工。</p>
 <p><strong>4. Eisenstat &amp; Walker（1996）— Choosing the Forcing Terms in an Inexact Newton Method</strong></p>
 <p><em>SIAM Journal on Scientific Computing</em>, 17(1), 16–32。DOI：10.1137/0917003。</p>
-<p>作者公开论文 PDF</p>
+<p><a class="link" href="https://doi.org/10.1137/0917003"  target="_blank" rel="noopener"
+    >Eisenstat 与 Walker 原论文</a></p>
 <p>适合进一步理解如何协调 Newton 与 Krylov 两层迭代的精度和计算成本。</p>
-<hr>
-<p><strong>知识卡片注册表｜第 58 张</strong></p>
-<p>新增主题：<strong>Jacobian-Free Newton–Krylov（JFNK）</strong>。</p>
-<p>所属方向：非线性有限元 / 数值线性代数 / 物理求解器。</p>
-<p>核心问题：如何在不显式组装完整 Jacobian 的条件下求解大型非线性系统。</p>
-<p>知识关联：第 35 张 <span class="term-anchor" data-term="anderson" tabindex="0">Anderson Acceleration</span>、第 55 张 Algebraic Multigrid、第 57 张 <span class="term-anchor" data-term="nitsche" tabindex="0">Nitsche</span> Method。新增的是此前未覆盖的<strong>矩阵自由非线性求解</strong>分支。</p>
 
   </div>
 </details>
@@ -814,9 +810,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

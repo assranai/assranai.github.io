@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Multigrid（多重网格）与误差频谱分解 领域：有限元 × 数值方法 × 物理引擎 × 高性能计算 推荐阅读时间：约 8–10 分钟\n今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：\n$$\\boxed{ \\text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$答案通常不是“迭代器坏了”，而是：\n它擅长消灭高频误差，却不擅长消灭低频误差。\nMultigrid 的核心策略因此非常漂亮：\n$$\\boxed{ \\text{细网格负责消高频误差，粗网格负责消低频误差。} }$$Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。([应用数学学会][1])\n1. 先看一个非常典型的现象 设要求解：\n$$Au=f.$$当前近似：\n$$u^{(k)}$$与真解：\n$$u^*$$之间的误差：\n$$e^{(k)} = u^*-u^{(k)}.$$假设用 Weighted Jacobi：\n$$u^{(k+1)} = u^{(k)} + \\omega D^{-1} (f-Au^{(k)}).$$误差满足：\n$$e^{(k+1)} = \\left(I-\\omega D^{-1}A\\right)e^{(k)}.$$如果把误差写成 Fourier modes：\n$$e_j = \\sin(k\\pi x_j),$$不同波数：\n$$k$$的衰减速度完全不同。\n对于 Poisson 一类问题，Jacobi/Gauss–Seidel 通常能迅速削弱：\n$$\\boxed{\\text{高波数 / 高频误差}}$$却会留下：\n$$\\boxed{\\text{低波数 / 平滑误差}}$$慢慢收敛。\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Multigrid（多重网格）与误差频谱分解 领域：有限元 × 数值方法 × 物理引擎 × 高性能计算 推荐阅读时间：约 8–10 分钟\n今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：\n$$\\boxed{ \\text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$答案通常不是“迭代器坏了”，而是：\n它擅长消灭高频误差，却不擅长消灭低频误差。\nMultigrid 的核心策略因此非常漂亮：\n$$\\boxed{ \\text{细网格负责消高频误差，粗网格负责消低频误差。} }$$Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。(应用数学学会)\n1. 先看一个非常典型的现象 设要求解：\n$$Au=f.$$当前近似：\n$$u^{(k)}$$与真解：\n$$u^*$$之间的误差：\n$$e^{(k)} = u^*-u^{(k)}.$$假设用 Weighted Jacobi：\n$$u^{(k+1)} = u^{(k)} + \\omega D^{-1} (f-Au^{(k)}).$$误差满足：\n$$e^{(k+1)} = \\left(I-\\omega D^{-1}A\\right)e^{(k)}.$$如果把误差写成 Fourier modes：\n$$e_j = \\sin(k\\pi x_j),$$不同波数：\n$$k$$的衰减速度完全不同。\n对于 Poisson 一类问题，Jacobi/Gauss–Seidel 通常能迅速削弱：\n$$\\boxed{\\text{高波数 / 高频误差}}$$却会留下：\n$$\\boxed{\\text{低波数 / 平滑误差}}$$慢慢收敛。\n">
 <title>Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/19-multigrid/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉">
-<meta property='og:description' content="主题：Multigrid（多重网格）与误差频谱分解 领域：有限元 × 数值方法 × 物理引擎 × 高性能计算 推荐阅读时间：约 8–10 分钟\n今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：\n$$\\boxed{ \\text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$答案通常不是“迭代器坏了”，而是：\n它擅长消灭高频误差，却不擅长消灭低频误差。\nMultigrid 的核心策略因此非常漂亮：\n$$\\boxed{ \\text{细网格负责消高频误差，粗网格负责消低频误差。} }$$Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。([应用数学学会][1])\n1. 先看一个非常典型的现象 设要求解：\n$$Au=f.$$当前近似：\n$$u^{(k)}$$与真解：\n$$u^*$$之间的误差：\n$$e^{(k)} = u^*-u^{(k)}.$$假设用 Weighted Jacobi：\n$$u^{(k+1)} = u^{(k)} + \\omega D^{-1} (f-Au^{(k)}).$$误差满足：\n$$e^{(k+1)} = \\left(I-\\omega D^{-1}A\\right)e^{(k)}.$$如果把误差写成 Fourier modes：\n$$e_j = \\sin(k\\pi x_j),$$不同波数：\n$$k$$的衰减速度完全不同。\n对于 Poisson 一类问题，Jacobi/Gauss–Seidel 通常能迅速削弱：\n$$\\boxed{\\text{高波数 / 高频误差}}$$却会留下：\n$$\\boxed{\\text{低波数 / 平滑误差}}$$慢慢收敛。\n">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉">
+<meta property='og:description' content="主题：Multigrid（多重网格）与误差频谱分解 领域：有限元 × 数值方法 × 物理引擎 × 高性能计算 推荐阅读时间：约 8–10 分钟\n今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：\n$$\\boxed{ \\text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$答案通常不是“迭代器坏了”，而是：\n它擅长消灭高频误差，却不擅长消灭低频误差。\nMultigrid 的核心策略因此非常漂亮：\n$$\\boxed{ \\text{细网格负责消高频误差，粗网格负责消低频误差。} }$$Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。(应用数学学会)\n1. 先看一个非常典型的现象 设要求解：\n$$Au=f.$$当前近似：\n$$u^{(k)}$$与真解：\n$$u^*$$之间的误差：\n$$e^{(k)} = u^*-u^{(k)}.$$假设用 Weighted Jacobi：\n$$u^{(k+1)} = u^{(k)} + \\omega D^{-1} (f-Au^{(k)}).$$误差满足：\n$$e^{(k+1)} = \\left(I-\\omega D^{-1}A\\right)e^{(k)}.$$如果把误差写成 Fourier modes：\n$$e_j = \\sin(k\\pi x_j),$$不同波数：\n$$k$$的衰减速度完全不同。\n对于 Poisson 一类问题，Jacobi/Gauss–Seidel 通常能迅速削弱：\n$$\\boxed{\\text{高波数 / 高频误差}}$$却会留下：\n$$\\boxed{\\text{低波数 / 平滑误差}}$$慢慢收敛。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/19-multigrid/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='物理引擎' /><meta property='article:tag' content='高性能计算' /><meta property='article:published_time' content='2026-09-02T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-02T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Multigrid：为什么“低频误差”应该交给粗网格，而不是逼细网格慢慢磨掉">
-<meta name="twitter:description" content="主题：Multigrid（多重网格）与误差频谱分解 领域：有限元 × 数值方法 × 物理引擎 × 高性能计算 推荐阅读时间：约 8–10 分钟\n今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：\n$$\\boxed{ \\text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$答案通常不是“迭代器坏了”，而是：\n它擅长消灭高频误差，却不擅长消灭低频误差。\nMultigrid 的核心策略因此非常漂亮：\n$$\\boxed{ \\text{细网格负责消高频误差，粗网格负责消低频误差。} }$$Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。([应用数学学会][1])\n1. 先看一个非常典型的现象 设要求解：\n$$Au=f.$$当前近似：\n$$u^{(k)}$$与真解：\n$$u^*$$之间的误差：\n$$e^{(k)} = u^*-u^{(k)}.$$假设用 Weighted Jacobi：\n$$u^{(k+1)} = u^{(k)} + \\omega D^{-1} (f-Au^{(k)}).$$误差满足：\n$$e^{(k+1)} = \\left(I-\\omega D^{-1}A\\right)e^{(k)}.$$如果把误差写成 Fourier modes：\n$$e_j = \\sin(k\\pi x_j),$$不同波数：\n$$k$$的衰减速度完全不同。\n对于 Poisson 一类问题，Jacobi/Gauss–Seidel 通常能迅速削弱：\n$$\\boxed{\\text{高波数 / 高频误差}}$$却会留下：\n$$\\boxed{\\text{低波数 / 平滑误差}}$$慢慢收敛。\n">
+<meta name="twitter:description" content="主题：Multigrid（多重网格）与误差频谱分解 领域：有限元 × 数值方法 × 物理引擎 × 高性能计算 推荐阅读时间：约 8–10 分钟\n今天选 Multigrid，因为它解释了一个对大规模有限元和物理求解器极重要的问题：\n$$\\boxed{ \\text{为什么很多迭代器前几步收敛很快，后面却越来越慢？} }$$答案通常不是“迭代器坏了”，而是：\n它擅长消灭高频误差，却不擅长消灭低频误差。\nMultigrid 的核心策略因此非常漂亮：\n$$\\boxed{ \\text{细网格负责消高频误差，粗网格负责消低频误差。} }$$Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。(应用数学学会)\n1. 先看一个非常典型的现象 设要求解：\n$$Au=f.$$当前近似：\n$$u^{(k)}$$与真解：\n$$u^*$$之间的误差：\n$$e^{(k)} = u^*-u^{(k)}.$$假设用 Weighted Jacobi：\n$$u^{(k+1)} = u^{(k)} + \\omega D^{-1} (f-Au^{(k)}).$$误差满足：\n$$e^{(k+1)} = \\left(I-\\omega D^{-1}A\\right)e^{(k)}.$$如果把误差写成 Fourier modes：\n$$e_j = \\sin(k\\pi x_j),$$不同波数：\n$$k$$的衰减速度完全不同。\n对于 Poisson 一类问题，Jacobi/Gauss–Seidel 通常能迅速削弱：\n$$\\boxed{\\text{高波数 / 高频误差}}$$却会留下：\n$$\\boxed{\\text{低波数 / 平滑误差}}$$慢慢收敛。\n">
     </head>
     <body class="
     article-page">
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,32 +324,35 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-先看一个非常典型的现象">1. 先看一个非常典型的现象</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-为什么低频误差这么难消">2. 为什么低频误差这么难消？</a></li>
+    <li><a href="#3-multigrid-最关键的洞察低频是相对于网格而言的">3. Multigrid 最关键的洞察：低频是相对于网格而言的</a></li>
+    <li><a href="#4-两层-multigrid-到底做了什么">4. 两层 Multigrid 到底做了什么？</a></li>
+    <li><a href="#5-为什么要解误差方程而不是重新解原方程">5. 为什么要解“误差方程”，而不是重新解原方程？</a></li>
+    <li><a href="#6-为什么还需要一层又一层粗网格">6. 为什么还需要一层又一层粗网格？</a></li>
+    <li><a href="#7-为什么理论上-multigrid-可以接近-">7. 为什么理论上 Multigrid 可以接近 ？</a></li>
+    <li><a href="#8-multigrid-与-cg-是竞争关系吗">8. Multigrid 与 CG 是竞争关系吗？</a></li>
+    <li><a href="#9-geometric-multigrid-与-algebraic-multigrid-差在哪里">9. Geometric Multigrid 与 Algebraic Multigrid 差在哪里？</a>
       <ol>
         <li><a href="#geometric-multigridgmg">Geometric Multigrid（GMG）</a></li>
         <li><a href="#algebraic-multigridamg">Algebraic Multigrid（AMG）</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#10-为什么-multigrid-与-matrix-free-是一对非常重要的组合">10. 为什么 Multigrid 与 Matrix-Free 是一对非常重要的组合？</a></li>
+    <li><a href="#11-multigrid-真正深刻的地方它在解不同尺度的错误">11. Multigrid 真正深刻的地方：它在解“不同尺度的错误”</a></li>
+    <li><a href="#12-为什么简单-jacobi-在-multigrid-里反而突然变得有价值">12. 为什么简单 Jacobi 在 Multigrid 里反而突然变得有价值？</a></li>
+    <li><a href="#13-对软体求解器这个思想几乎可以直接迁移">13. 对软体求解器，这个思想几乎可以直接迁移</a></li>
+    <li><a href="#14-它和-projective-dynamics-也有直接联系">14. 它和 Projective Dynamics 也有直接联系</a></li>
+    <li><a href="#15-为什么-amg-对真实弹性问题比-poisson-难">15. 为什么 AMG 对真实弹性问题比 Poisson 难？</a></li>
+    <li><a href="#16-这甚至可以用来理解-reduced-basis">16. 这甚至可以用来理解 Reduced Basis</a></li>
+    <li><a href="#17-multigrid-失败时通常不是层数不够">17. Multigrid 失败时通常不是“层数不够”</a></li>
+    <li><a href="#18-一个很值得做的求解器诊断观察误差频谱而不只是-residual-norm">18. 一个很值得做的求解器诊断：观察误差频谱，而不只是 residual norm</a>
       <ol>
         <li><a href="#高频误差">高频误差</a></li>
         <li><a href="#低频误差">低频误差</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -430,7 +433,8 @@ $$\boxed{ \text{为什么很多迭代器前几步收敛很快，后面却越来�
 <p><strong>它擅长消灭高频误差，却不擅长消灭低频误差。</strong></p>
 </blockquote>
 <p>Multigrid 的核心策略因此非常漂亮：</p>
-$$\boxed{ \text{细网格负责消高频误差，粗网格负责消低频误差。} }$$<p>Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。([应用数学学会][1])</p>
+$$\boxed{ \text{细网格负责消高频误差，粗网格负责消低频误差。} }$$<p>Briggs、Henson、McCormick 的经典《A Multigrid Tutorial》把 multigrid 建立在这一“smoothing property”之上：Jacobi、Gauss–Seidel 等 relaxation 并不会均匀削弱所有误差模态，而是优先抹平网格尺度附近的高频误差。(<a class="link" href="https://epubs.siam.org/doi/10.1137/1.9780898719505.ch3"  target="_blank" rel="noopener"
+    >应用数学学会</a>)</p>
 <hr>
 <h2 id="1-先看一个非常典型的现象">1. 先看一个非常典型的现象
 </h2><p>设要求解：</p>
@@ -459,10 +463,11 @@ $$\boxed{\text{低波数 / 平滑误差}}$$<p>慢慢收敛。</p>
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>残差最初下降得很快，随后进入长尾。</p>
-<p>这正是经典 multigrid 理论所谓 relaxation 的 <strong>smoothing property</strong>。([应用数学学会][1])</p>
+<p>这正是经典 multigrid 理论所谓 relaxation 的 <strong>smoothing property</strong>。(<a class="link" href="https://epubs.siam.org/doi/10.1137/1.9780898719505.ch3"  target="_blank" rel="noopener"
+    >应用数学学会</a>)</p>
 <hr>
-<h1 id="2-为什么低频误差这么难消">2. 为什么低频误差这么难消？
-</h1><p>考虑一个非常平滑的误差：</p>
+<h2 id="2-为什么低频误差这么难消">2. 为什么低频误差这么难消？
+</h2><p>考虑一个非常平滑的误差：</p>
 $$e(x)=\sin(\pi x).$$<p>在很细的网格上：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -487,8 +492,8 @@ $$e_{i-1}\approx e_i\approx e_{i+1}.$$<p>所以局部 relaxation 很难判断：
 </blockquote>
 <p>这是一个尺度问题。</p>
 <hr>
-<h1 id="3-multigrid-最关键的洞察低频是相对于网格而言的">3. Multigrid 最关键的洞察：低频是相对于网格而言的
-</h1><p>把细网格：</p>
+<h2 id="3-multigrid-最关键的洞察低频是相对于网格而言的">3. Multigrid 最关键的洞察：低频是相对于网格而言的
+</h2><p>把细网格：</p>
 $$h$$<p>换成粗网格：</p>
 $$2h.$$<p>原来细网格上的长波误差：</p>
 <div class="highlight"><div class="chroma">
@@ -518,8 +523,8 @@ $$\boxed{ \text{细网格上的低频误差， 在粗网格上会变成相对高
 <p>它没有发明一个更强的迭代器。</p>
 <p>它改变了：</p>
 $$\boxed{\text{误差被观察的尺度}}$$<hr>
-<h1 id="4-两层-multigrid-到底做了什么">4. 两层 Multigrid 到底做了什么？
-</h1><p>设 fine-grid equation：</p>
+<h2 id="4-两层-multigrid-到底做了什么">4. 两层 Multigrid 到底做了什么？
+</h2><p>设 fine-grid equation：</p>
 $$A_hu_h=f_h.$$<p>当前近似：</p>
 $$u_h.$$<p>第一步，先在细网格做几次 smoothing：</p>
 $$u_h \leftarrow S_h(u_h).$$<p>高频误差迅速下降。</p>
@@ -563,8 +568,8 @@ $$u_h \leftarrow u_h+Pe_{2h}.$$<p>最后再做几次 post-smoothing。</p>
 </div>
 </div><p>这就是一个基本的 <strong>two-grid correction scheme</strong>。</p>
 <hr>
-<h1 id="5-为什么要解误差方程而不是重新解原方程">5. 为什么要解“误差方程”，而不是重新解原方程？
-</h1><p>这是一个非常漂亮的结构。</p>
+<h2 id="5-为什么要解误差方程而不是重新解原方程">5. 为什么要解“误差方程”，而不是重新解原方程？
+</h2><p>这是一个非常漂亮的结构。</p>
 <p>因为：</p>
 $$Au=f$$<p>而：</p>
 $$A\tilde u$$<p>是当前近似。</p>
@@ -584,8 +589,8 @@ $$J\Delta x=-F$$<p>在思维上非常相似：</p>
 <p>不重新构造答案，而是解“当前错了多少”。</p>
 </blockquote>
 <hr>
-<h1 id="6-为什么还需要一层又一层粗网格">6. 为什么还需要一层又一层粗网格？
-</h1><p>因为在：</p>
+<h2 id="6-为什么还需要一层又一层粗网格">6. 为什么还需要一层又一层粗网格？
+</h2><p>因为在：</p>
 $$2h$$<p>网格上，仍然存在低频误差。</p>
 <p>所以继续：</p>
 $$h \rightarrow 2h \rightarrow 4h \rightarrow 8h \rightarrow\cdots$$<p>直到最粗层只有很少自由度，可以：</p>
@@ -635,8 +640,8 @@ $$\boxed{\text{直接解}}$$<p>于是形成经典 V-cycle：</p>
 </div><p>因此：</p>
 $$\boxed{ \text{不同空间尺度的误差， 由不同网格层负责。} }$$<p>这其实是一种非常明确的“频带分工”。</p>
 <hr>
-<h1 id="7-为什么理论上-multigrid-可以接近-">7. 为什么理论上 Multigrid 可以接近 \(O(N)\)？
-</h1><p>假设 finest grid 有：</p>
+<h2 id="7-为什么理论上-multigrid-可以接近-">7. 为什么理论上 Multigrid 可以接近 \(O(N)\)？
+</h2><p>假设 finest grid 有：</p>
 $$N$$<p>个未知量。</p>
 <p>三维均匀 coarsening 后：</p>
 $$N,\quad \frac{N}{8},\quad \frac{N}{64},\ldots$$<p>所有层加起来：</p>
@@ -657,8 +662,8 @@ $$\kappa(A) \sim h^{-2}.$$<p>网格越细：</p>
 $$\text{迭代越来越难}.$$<p>Multigrid 的目标正是让：</p>
 $$\boxed{\text{收敛速度基本摆脱 }h}$$<p>的控制。</p>
 <hr>
-<h1 id="8-multigrid-与-cg-是竞争关系吗">8. Multigrid 与 CG 是竞争关系吗？
-</h1><p>通常不是。</p>
+<h2 id="8-multigrid-与-cg-是竞争关系吗">8. Multigrid 与 CG 是竞争关系吗？
+</h2><p>通常不是。</p>
 <p>实际系统经常使用：</p>
 $$\boxed{ \text{CG} + \text{Multigrid preconditioner}. }$$<p>也就是说，Multigrid 不直接承担所有求解，而是提供：</p>
 $$M^{-1}\approx A^{-1}.$$<p>然后：</p>
@@ -668,8 +673,8 @@ $$\kappa(M^{-1}A)$$<p>会大幅降低。</p>
 <p>现代 FEM 中常见组合：</p>
 $$\boxed{ \text{Krylov outer solver} + \text{Multigrid inner preconditioner}. }$$<p>这比“选 CG 还是 Multigrid”更准确。</p>
 <hr>
-<h1 id="9-geometric-multigrid-与-algebraic-multigrid-差在哪里">9. Geometric Multigrid 与 Algebraic Multigrid 差在哪里？
-</h1><p>这是工程上最重要的分叉之一。</p>
+<h2 id="9-geometric-multigrid-与-algebraic-multigrid-差在哪里">9. Geometric Multigrid 与 Algebraic Multigrid 差在哪里？
+</h2><p>这是工程上最重要的分叉之一。</p>
 <h3 id="geometric-multigridgmg">Geometric Multigrid（GMG）
 </h3><p>你明确知道：</p>
 $$\text{fine mesh} \rightarrow \text{coarse mesh}.$$<p>例如：</p>
@@ -695,11 +700,13 @@ $$\boxed{ \text{AMG 不需要知道原始几何} }$$<p>这使它非常适合：<
 <li>黑盒线性系统；</li>
 <li>工业 solver。</li>
 </ul>
-<p>deal.II 官方 step-50 就直接比较了 AMG 与几何 Multigrid：AMG 配置容易得多，而 matrix-free GMG 在其测试问题上能获得显著更好的性能。([deal.II][2])</p>
-<p>NVIDIA 也提供 GPU 加速 AMG 库 <strong>AMGX</strong>，面向 implicit unstructured simulations 和单/多 GPU 分布式求解。([GitHub][3])</p>
+<p>deal.II 官方 step-50 就直接比较了 AMG 与几何 Multigrid：AMG 配置容易得多，而 matrix-free GMG 在其测试问题上能获得显著更好的性能。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_50.html"  target="_blank" rel="noopener"
+    >deal.II</a>)</p>
+<p>NVIDIA 也提供 GPU 加速 AMG 库 <strong>AMGX</strong>，面向 implicit unstructured simulations 和单/多 GPU 分布式求解。(<a class="link" href="https://github.com/NVIDIA/AMGX"  target="_blank" rel="noopener"
+    >GitHub</a>)</p>
 <hr>
-<h1 id="10-为什么-multigrid-与-matrix-free-是一对非常重要的组合">10. 为什么 Multigrid 与 Matrix-Free 是一对非常重要的组合？
-</h1><p>现代 CPU/GPU 上，稀疏矩阵乘：</p>
+<h2 id="10-为什么-multigrid-与-matrix-free-是一对非常重要的组合">10. 为什么 Multigrid 与 Matrix-Free 是一对非常重要的组合？
+</h2><p>现代 CPU/GPU 上，稀疏矩阵乘：</p>
 $$y=Ax$$<p>经常不是 FLOPs 不够，而是：</p>
 $$\boxed{\text{内存带宽不够}}$$<p>因为 sparse matrix 需要不断从主存读取：</p>
 <ul>
@@ -707,7 +714,8 @@ $$\boxed{\text{内存带宽不够}}$$<p>因为 sparse matrix 需要不断从主�
 <li>column indices；</li>
 <li>vectors。</li>
 </ul>
-<p>deal.II 官方 matrix-free 教程明确指出，在现代处理器上，主内存访问往往成为 PDE solver 的瓶颈；matrix-free 方法避免显式存储矩阵，从单元算子直接执行 \(Av\)，从而减少 memory transfer。([deal.II][4])</p>
+<p>deal.II 官方 matrix-free 教程明确指出，在现代处理器上，主内存访问往往成为 PDE solver 的瓶颈；matrix-free 方法避免显式存储矩阵，从单元算子直接执行 \(Av\)，从而减少 memory transfer。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_37.html"  target="_blank" rel="noopener"
+    >deal.II</a>)</p>
 <p>于是现代高阶 FEM 一个非常强的组合是：</p>
 $$\boxed{ \text{Matrix-free operator} + \text{Multigrid} + \text{Krylov} }$$<p>可以理解成：</p>
 <ul>
@@ -715,10 +723,11 @@ $$\boxed{ \text{Matrix-free operator} + \text{Multigrid} + \text{Krylov} }$$<p>�
 <li>multigrid：iteration count 少；</li>
 <li>Krylov：提高鲁棒性。</li>
 </ul>
-<p>deal.II 的 step-37 展示的正是这一结构，并报告了大规模并行中高达数百亿甚至数千亿自由度级别的 matrix-free multigrid 计算案例。([deal.II][5])</p>
+<p>deal.II 的 step-37 展示的正是这一结构，并报告了大规模并行中高达数百亿甚至数千亿自由度级别的 matrix-free multigrid 计算案例。(<a class="link" href="https://dealii.org/9.0.0/doxygen/deal.II/step_37.html"  target="_blank" rel="noopener"
+    >deal.II</a>)</p>
 <hr>
-<h1 id="11-multigrid-真正深刻的地方它在解不同尺度的错误">11. Multigrid 真正深刻的地方：它在解“不同尺度的错误”
-</h1><p>很多 iterative solver 的思想是：</p>
+<h2 id="11-multigrid-真正深刻的地方它在解不同尺度的错误">11. Multigrid 真正深刻的地方：它在解“不同尺度的错误”
+</h2><p>很多 iterative solver 的思想是：</p>
 $$\boxed{\text{找到更好的搜索方向}}$$<p>例如：</p>
 <ul>
 <li>CG；</li>
@@ -736,8 +745,8 @@ $$\boxed{ \text{Smoother：处理局部振荡误差} }$$$$\boxed{ \text{Coarse s
 <p>它本质上是一种：</p>
 $$\boxed{\text{error-space decomposition}}$$<p>方法。</p>
 <hr>
-<h1 id="12-为什么简单-jacobi-在-multigrid-里反而突然变得有价值">12. 为什么简单 Jacobi 在 Multigrid 里反而突然变得有价值？
-</h1><p>单独使用 Jacobi：</p>
+<h2 id="12-为什么简单-jacobi-在-multigrid-里反而突然变得有价值">12. 为什么简单 Jacobi 在 Multigrid 里反而突然变得有价值？
+</h2><p>单独使用 Jacobi：</p>
 $$\boxed{\text{慢}}$$<p>所以看起来很落后。</p>
 <p>但 Multigrid 根本不要求 smoother 把问题解完。</p>
 <p>它只要求：</p>
@@ -748,8 +757,8 @@ $$\boxed{ \text{一个“差的完整求解器”， 可能是一个非常好的
 $$\text{什么都擅长}.$$<p>只要：</p>
 $$\boxed{\text{在明确分工里做好一件事}}$$<p>就够了。</p>
 <hr>
-<h1 id="13-对软体求解器这个思想几乎可以直接迁移">13. 对软体求解器，这个思想几乎可以直接迁移
-</h1><p>想象一个大软体。</p>
+<h2 id="13-对软体求解器这个思想几乎可以直接迁移">13. 对软体求解器，这个思想几乎可以直接迁移
+</h2><p>想象一个大软体。</p>
 <p>局部 tet 形状误差：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -787,8 +796,8 @@ $$\boxed{ \text{在粗层直接表示“整根杆一起怎么变”。} }$$<p>�
 </ul>
 <p>都有天然吸引力。</p>
 <hr>
-<h1 id="14-它和-projective-dynamics-也有直接联系">14. 它和 Projective Dynamics 也有直接联系
-</h1><p><span class="term-anchor" data-term="pd" tabindex="0">PD</span> global step 经常要求解：</p>
+<h2 id="14-它和-projective-dynamics-也有直接联系">14. 它和 Projective Dynamics 也有直接联系
+</h2><p><span class="term-anchor" data-term="pd" tabindex="0">PD</span> global step 经常要求解：</p>
 $$Ax=b.$$<p>对于大规模网格：</p>
 $$A$$<p>虽然固定，但线性求解仍可能占主要成本。</p>
 <p>如果网格规模增大：</p>
@@ -803,8 +812,8 @@ $$\boxed{ \text{Multigrid-preconditioned iterative global solve} }$$<p>就是非
 <p>更深一点，PD/local-global 本身也有尺度传播问题。</p>
 <p>因此 multi-resolution deformation solver、hierarchical <span class="term-anchor" data-term="pbd" tabindex="0">PBD</span>、multilevel PD 等方法背后的直觉，都和 Multigrid 有很强亲缘性：</p>
 $$\boxed{ \text{global low-frequency modes 应该在低维 coarse representation 上处理。} }$$<hr>
-<h1 id="15-为什么-amg-对真实弹性问题比-poisson-难">15. 为什么 AMG 对真实弹性问题比 Poisson 难？
-</h1><details class="reveal">
+<h2 id="15-为什么-amg-对真实弹性问题比-poisson-难">15. 为什么 AMG 对真实弹性问题比 Poisson 难？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>Poisson 很友好，因为其平滑误差通常就是：</p>
@@ -825,8 +834,8 @@ $$\boxed{ \text{coarse space 最重要的任务， 不是“节点变少”，�
 </details>
 
 <hr>
-<h1 id="16-这甚至可以用来理解-reduced-basis">16. 这甚至可以用来理解 Reduced Basis
-</h1><p>Multigrid coarse space：</p>
+<h2 id="16-这甚至可以用来理解-reduced-basis">16. 这甚至可以用来理解 Reduced Basis
+</h2><p>Multigrid coarse space：</p>
 $$V_H$$<p>保存的是：</p>
 $$\boxed{\text{低频 / 难收敛误差模式}}$$<p><span class="term-anchor" data-term="reduced-basis" tabindex="0">Reduced Basis</span>：</p>
 $$V_r$$<p>保存的是：</p>
@@ -836,8 +845,8 @@ $$\boxed{\text{数据中最有能量的 modes}}$$<p><span class="term-anchor" da
 $$\boxed{\text{输入空间最敏感方向}}$$<p>你会发现这些方法其实都在做：</p>
 $$\boxed{ \text{找到真正需要昂贵处理的低维结构。} }$$<p>区别只是“重要”的定义不同。</p>
 <hr>
-<h1 id="17-multigrid-失败时通常不是层数不够">17. Multigrid 失败时通常不是“层数不够”
-</h1><details class="reveal">
+<h2 id="17-multigrid-失败时通常不是层数不够">17. Multigrid 失败时通常不是“层数不够”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这是工程上很重要的一点。</p>
@@ -859,8 +868,8 @@ $$\text{more levels}$$<p>并不能自动修复结构错误。</p>
 </details>
 
 <hr>
-<h1 id="18-一个很值得做的求解器诊断观察误差频谱而不只是-residual-norm">18. 一个很值得做的求解器诊断：观察误差频谱，而不只是 residual norm
-</h1><p>如果你有一个 Poisson/FEM benchmark，可以分别初始化：</p>
+<h2 id="18-一个很值得做的求解器诊断观察误差频谱而不只是-residual-norm">18. 一个很值得做的求解器诊断：观察误差频谱，而不只是 residual norm
+</h2><p>如果你有一个 Poisson/FEM benchmark，可以分别初始化：</p>
 <h3 id="高频误差">高频误差
 </h3>$$e_i=(-1)^i$$<h3 id="低频误差">低频误差
 </h3>$$e_i=\sin(\pi x_i).$$<p>然后只跑：</p>
@@ -872,8 +881,8 @@ $$\|e_{\rm low}\|$$<p>下降很慢。</p>
 <p>它在 coarse grid 上就不再那么“低频”。</p>
 <p>这个实验非常简单，却能直接建立 Multigrid 的核心直觉。</p>
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Multigrid 最值得记住的并不是 V-cycle 的代码结构，而是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Multigrid 最值得记住的并不是 V-cycle 的代码结构，而是：</p>
 $$\boxed{ \text{一个误差难不难消除，取决于你在哪个尺度上看它。} }$$<p>在细网格上：</p>
 $$\text{长波误差}$$<p>非常顽固。</p>
 <p>到了粗网格：</p>
@@ -881,37 +890,33 @@ $$\boxed{\text{它就变成了容易处理的误差。}}$$<p>因此 Multigrid �
 $$\text{local relaxation}$$$$\downarrow$$$$\boxed{\text{multiscale error decomposition}}$$$$\downarrow$$$$\text{near-linear-complexity PDE solve}.$$<p>它给物理求解器最值得迁移的启发则是：</p>
 $$\boxed{ \text{不要期待一种迭代过程同时高效处理所有尺度的错误。} }$$<p>更成熟的做法是明确分工：</p>
 $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理全局误差。} }$$<p>这也是从“能解一个有限元系统”走向“大规模高性能求解器”非常关键的一步。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
 <li>
-<p><strong>Briggs, Henson &amp; McCormick, <em>A Multigrid Tutorial</em>, 2nd ed., SIAM</strong>。最推荐的入门资料。尤其值得看 Basic Iterative Methods 与 Elements of Multigrid 两章，把 smoothing、Fourier modes 和 coarse-grid correction 串起来。(<a class="link" href="https://epubs.siam.org/doi/abs/10.1137/1.9780898719505.fm?utm_source=chatgpt.com"  title="A Multigrid Tutorial, Second Edition | Front Matter"
-     target="_blank" rel="noopener"
+<p><strong>Briggs, Henson &amp; McCormick, <em>A Multigrid Tutorial</em>, 2nd ed., SIAM</strong>。最推荐的入门资料。尤其值得看 Basic Iterative Methods 与 Elements of Multigrid 两章，把 smoothing、Fourier modes 和 coarse-grid correction 串起来。(<a class="link" href="https://epubs.siam.org/doi/abs/10.1137/1.9780898719505.fm"  target="_blank" rel="noopener"
     >应用数学学会</a>)
-<a class="link" href="https://epubs.siam.org/doi/book/10.1137/1.9780898719505?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+<a class="link" href="https://epubs.siam.org/doi/book/10.1137/1.9780898719505"  target="_blank" rel="noopener"
     >SIAM 图书页</a></p>
 </li>
 <li>
-<p><strong>deal.II <code>step-37</code>：Matrix-Free Multigrid</strong>。非常好的现代 FEM 工程实现入口，重点看为什么当前处理器上的瓶颈经常是 memory bandwidth，以及 matrix-free 如何与 multigrid 组合。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_37.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-37 tutorial program"
-     target="_blank" rel="noopener"
+<p><strong>deal.II <code>step-37</code>：Matrix-Free Multigrid</strong>。非常好的现代 FEM 工程实现入口，重点看为什么当前处理器上的瓶颈经常是 memory bandwidth，以及 matrix-free 如何与 multigrid 组合。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_37.html"  target="_blank" rel="noopener"
     >deal.II</a>)
-<a class="link" href="https://dealii.org/current/doxygen/deal.II/step_37.html?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+<a class="link" href="https://dealii.org/current/doxygen/deal.II/step_37.html"  target="_blank" rel="noopener"
     >deal.II step-37</a></p>
 </li>
 <li>
-<p><strong>deal.II <code>step-50</code>：GMG vs AMG</strong>。适合理解 geometric multigrid、algebraic multigrid、matrix-free GMG 在大型并行 FEM 中的真实工程差异。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_50.html?utm_source=chatgpt.com"  title="The deal.II Library: The step-50 tutorial program"
-     target="_blank" rel="noopener"
+<p><strong>deal.II <code>step-50</code>：GMG vs AMG</strong>。适合理解 geometric multigrid、algebraic multigrid、matrix-free GMG 在大型并行 FEM 中的真实工程差异。(<a class="link" href="https://dealii.org/9.5.0/doxygen/deal.II/step_50.html"  target="_blank" rel="noopener"
     >deal.II</a>)
-<a class="link" href="https://www.dealii.org/current/doxygen/deal.II/step_50.html?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+<a class="link" href="https://www.dealii.org/current/doxygen/deal.II/step_50.html"  target="_blank" rel="noopener"
     >deal.II step-50</a></p>
 </li>
 <li>
-<p><strong>NVIDIA AMGX</strong>。GPU 上的工业级 algebraic multigrid solver library，支持分布式、多 GPU、block systems 与灵活 smoother/preconditioner 组合，很适合观察 AMG 怎样变成 HPC 基础设施。(<a class="link" href="https://github.com/NVIDIA/AMGX?utm_source=chatgpt.com"  title="GitHub - NVIDIA/AMGX: Distributed multigrid linear solver library on GPU · GitHub"
-     target="_blank" rel="noopener"
+<p><strong>NVIDIA AMGX</strong>。GPU 上的工业级 algebraic multigrid solver library，支持分布式、多 GPU、block systems 与灵活 smoother/preconditioner 组合，很适合观察 AMG 怎样变成 HPC 基础设施。(<a class="link" href="https://github.com/NVIDIA/AMGX"  target="_blank" rel="noopener"
     >GitHub</a>)
-<a class="link" href="https://github.com/NVIDIA/AMGX?utm_source=chatgpt.com"  target="_blank" rel="noopener"
+<a class="link" href="https://github.com/NVIDIA/AMGX"  target="_blank" rel="noopener"
     >AMGX GitHub</a></p>
 </li>
 <li>
@@ -1100,9 +1105,8 @@ $$\boxed{ \text{局部方法处理局部误差， 低维/粗尺度模型处理�
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

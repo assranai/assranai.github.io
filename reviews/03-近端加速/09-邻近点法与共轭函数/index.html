@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第9章：邻近点法与共轭函数 核心思想：(1) 邻近点法 = Moreau 包络上的梯度下降——这是将非光滑函数&quot;光滑化&quot;后求解的元方法；(2) 共轭函数将函数从&quot;点-值&quot;视角翻转为&quot;斜率-截距&quot;视角，是构建凸对偶理论的核心工具；(3) Moreau 分解恒等式 $x = \\text{prox}f(x) + \\text{prox}{f^*}(x)$ 是连接原问题与对偶问题的桥梁，直观且优美。\n前置知识回顾 概念 出自 一句话回顾 邻近算子 $\\text{prox}_g$ Ch7 $\\text{prox}_g(x)=\\arg\\min_z{g(z)+\\frac{1}{2}|z-x|^2}$，刻画不等式 $x-\\text{prox}_g(x) \\in \\partial g(\\text{prox}_g(x))$ ISTA 迭代 Ch7 $x_{k+1}=\\text{prox}_{\\alpha g}(x_k-\\alpha\\nabla f(x_k))$，前向梯度步 + 后向邻近步 梯度下降法 Ch2 $x_{k+1}=x_k-\\alpha\\nabla f(x_k)$，对 $L$-smooth 凸函数收敛率 $O(1/k)$ 次梯度 Ch3 非光滑函数的&quot;广义导数&quot;：$g \\in \\partial f(x)$ 满足 $f(y)\\geq f(x)+g^T(y-x)$ 凸函数的一阶条件 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$，等价于次梯度定义 强凸函数 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)+\\frac{\\mu}{2}|y-x|^2$ $L$-smooth Ch2 $|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$ 指示函数 $\\delta_C$ Ch6/Ch7 $\\delta_C(x)=0$ 若 $x\\in C$，否则 $+\\infty$；其邻近算子 = 投影 FISTA/加速 Ch8 通过外推步 $y_k$ 达到 $O(1/k^2)$ 9.1 邻近点法（Proximal Point Method） 9.1.1 迭代格式 对于极小化 $\\min_x f(x)$，其中 $f$ 为闭凸函数（可以非光滑——这是关键区别！），邻近点法的迭代为：\n">
 <title>第9章：邻近点法与共轭函数</title>
 
 <link rel='canonical' href='https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/09-%E9%82%BB%E8%BF%91%E7%82%B9%E6%B3%95%E4%B8%8E%E5%85%B1%E8%BD%AD%E5%87%BD%E6%95%B0/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="第9章：邻近点法与共轭函数">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="第9章：邻近点法与共轭函数">
 <meta property='og:description' content="第9章：邻近点法与共轭函数 核心思想：(1) 邻近点法 = Moreau 包络上的梯度下降——这是将非光滑函数&quot;光滑化&quot;后求解的元方法；(2) 共轭函数将函数从&quot;点-值&quot;视角翻转为&quot;斜率-截距&quot;视角，是构建凸对偶理论的核心工具；(3) Moreau 分解恒等式 $x = \\text{prox}f(x) + \\text{prox}{f^*}(x)$ 是连接原问题与对偶问题的桥梁，直观且优美。\n前置知识回顾 概念 出自 一句话回顾 邻近算子 $\\text{prox}_g$ Ch7 $\\text{prox}_g(x)=\\arg\\min_z{g(z)+\\frac{1}{2}|z-x|^2}$，刻画不等式 $x-\\text{prox}_g(x) \\in \\partial g(\\text{prox}_g(x))$ ISTA 迭代 Ch7 $x_{k+1}=\\text{prox}_{\\alpha g}(x_k-\\alpha\\nabla f(x_k))$，前向梯度步 + 后向邻近步 梯度下降法 Ch2 $x_{k+1}=x_k-\\alpha\\nabla f(x_k)$，对 $L$-smooth 凸函数收敛率 $O(1/k)$ 次梯度 Ch3 非光滑函数的&quot;广义导数&quot;：$g \\in \\partial f(x)$ 满足 $f(y)\\geq f(x)+g^T(y-x)$ 凸函数的一阶条件 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$，等价于次梯度定义 强凸函数 Ch3 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)+\\frac{\\mu}{2}|y-x|^2$ $L$-smooth Ch2 $|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$ 指示函数 $\\delta_C$ Ch6/Ch7 $\\delta_C(x)=0$ 若 $x\\in C$，否则 $+\\infty$；其邻近算子 = 投影 FISTA/加速 Ch8 通过外推步 $y_k$ 达到 $O(1/k^2)$ 9.1 邻近点法（Proximal Point Method） 9.1.1 迭代格式 对于极小化 $\\min_x f(x)$，其中 $f$ 为闭凸函数（可以非光滑——这是关键区别！），邻近点法的迭代为：\n">
 <meta property='og:url' content='https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/09-%E9%82%BB%E8%BF%91%E7%82%B9%E6%B3%95%E4%B8%8E%E5%85%B1%E8%BD%AD%E5%87%BD%E6%95%B0/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -56,7 +56,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -449,60 +449,60 @@
 <hr>
 <h2 id="前置知识回顾">前置知识回顾
 </h2><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>概念</th>
-					<th>出自</th>
-					<th>一句话回顾</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>邻近算子 $\text{prox}_g$</td>
-					<td>Ch7</td>
-					<td>$\text{prox}_g(x)=\arg\min_z{g(z)+\frac{1}{2}|z-x|^2}$，刻画不等式 $x-\text{prox}_g(x) \in \partial g(\text{prox}_g(x))$</td>
-			</tr>
-			<tr>
-					<td>ISTA 迭代</td>
-					<td>Ch7</td>
-					<td>$x_{k+1}=\text{prox}_{\alpha g}(x_k-\alpha\nabla f(x_k))$，前向梯度步 + 后向邻近步</td>
-			</tr>
-			<tr>
-					<td>梯度下降法</td>
-					<td>Ch2</td>
-					<td>$x_{k+1}=x_k-\alpha\nabla f(x_k)$，对 $L$-smooth 凸函数收敛率 $O(1/k)$</td>
-			</tr>
-			<tr>
-					<td>次梯度</td>
-					<td>Ch3</td>
-					<td>非光滑函数的&quot;广义导数&quot;：$g \in \partial f(x)$ 满足 $f(y)\geq f(x)+g^T(y-x)$</td>
-			</tr>
-			<tr>
-					<td>凸函数的一阶条件</td>
-					<td>Ch3</td>
-					<td>$f(y)\geq f(x)+\nabla f(x)^T(y-x)$，等价于次梯度定义</td>
-			</tr>
-			<tr>
-					<td>强凸函数</td>
-					<td>Ch3</td>
-					<td>$f(y)\geq f(x)+\nabla f(x)^T(y-x)+\frac{\mu}{2}|y-x|^2$</td>
-			</tr>
-			<tr>
-					<td>$L$-smooth</td>
-					<td>Ch2</td>
-					<td>$|\nabla f(x)-\nabla f(y)|\leq L|x-y|$</td>
-			</tr>
-			<tr>
-					<td>指示函数 $\delta_C$</td>
-					<td>Ch6/Ch7</td>
-					<td>$\delta_C(x)=0$ 若 $x\in C$，否则 $+\infty$；其邻近算子 = 投影</td>
-			</tr>
-			<tr>
-					<td>FISTA/加速</td>
-					<td>Ch8</td>
-					<td>通过外推步 $y_k$ 达到 $O(1/k^2)$</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>概念</th>
+          <th>出自</th>
+          <th>一句话回顾</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>邻近算子 $\text{prox}_g$</td>
+          <td>Ch7</td>
+          <td>$\text{prox}_g(x)=\arg\min_z{g(z)+\frac{1}{2}|z-x|^2}$，刻画不等式 $x-\text{prox}_g(x) \in \partial g(\text{prox}_g(x))$</td>
+      </tr>
+      <tr>
+          <td>ISTA 迭代</td>
+          <td>Ch7</td>
+          <td>$x_{k+1}=\text{prox}_{\alpha g}(x_k-\alpha\nabla f(x_k))$，前向梯度步 + 后向邻近步</td>
+      </tr>
+      <tr>
+          <td>梯度下降法</td>
+          <td>Ch2</td>
+          <td>$x_{k+1}=x_k-\alpha\nabla f(x_k)$，对 $L$-smooth 凸函数收敛率 $O(1/k)$</td>
+      </tr>
+      <tr>
+          <td>次梯度</td>
+          <td>Ch3</td>
+          <td>非光滑函数的&quot;广义导数&quot;：$g \in \partial f(x)$ 满足 $f(y)\geq f(x)+g^T(y-x)$</td>
+      </tr>
+      <tr>
+          <td>凸函数的一阶条件</td>
+          <td>Ch3</td>
+          <td>$f(y)\geq f(x)+\nabla f(x)^T(y-x)$，等价于次梯度定义</td>
+      </tr>
+      <tr>
+          <td>强凸函数</td>
+          <td>Ch3</td>
+          <td>$f(y)\geq f(x)+\nabla f(x)^T(y-x)+\frac{\mu}{2}|y-x|^2$</td>
+      </tr>
+      <tr>
+          <td>$L$-smooth</td>
+          <td>Ch2</td>
+          <td>$|\nabla f(x)-\nabla f(y)|\leq L|x-y|$</td>
+      </tr>
+      <tr>
+          <td>指示函数 $\delta_C$</td>
+          <td>Ch6/Ch7</td>
+          <td>$\delta_C(x)=0$ 若 $x\in C$，否则 $+\infty$；其邻近算子 = 投影</td>
+      </tr>
+      <tr>
+          <td>FISTA/加速</td>
+          <td>Ch8</td>
+          <td>通过外推步 $y_k$ 达到 $O(1/k^2)$</td>
+      </tr>
+  </tbody>
 </table></div>
 <hr>
 <h2 id="91-邻近点法proximal-point-method">9.1 邻近点法（Proximal Point Method）
@@ -510,35 +510,35 @@
 </h3><p>对于极小化 $\min_x f(x)$，其中 $f$ 为<strong>闭凸函数</strong>（可以非光滑——这是关键区别！），邻近点法的迭代为：</p>
 $$\boxed{x_{k+1} = \text{prox}_{\alpha_k f}(x_k) = \arg\min_z \left\{f(z) + \frac{1}{2\alpha_k}\|z - x_k\|^2\right\}}$$<p><strong>与邻近梯度法（ISTA, Ch7）的本质区别</strong>：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>比较维度</th>
-					<th>邻近梯度法（Ch7）</th>
-					<th>邻近点法（Ch9）</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td><strong>处理的问题</strong></td>
-					<td>$\min f(x) + g(x)$，$f$ 光滑</td>
-					<td>$\min f(x)$，$f$ 可以<strong>完全不光滑</strong></td>
-			</tr>
-			<tr>
-					<td><strong>迭代公式</strong></td>
-					<td>$x_{k+1} = \text{prox}_{\alpha g}(x_k - \alpha\nabla f(x_k))$</td>
-					<td>$x_{k+1} = \text{prox}_{\alpha f}(x_k)$</td>
-			</tr>
-			<tr>
-					<td><strong>步的构成</strong></td>
-					<td>梯度步（处理 $f$）+ 邻近步（处理 $g$）</td>
-					<td><strong>纯邻近步</strong>——没有梯度步</td>
-			</tr>
-			<tr>
-					<td><strong>前提条件</strong></td>
-					<td>$f$ 可微（有 $\nabla f$），$g$ 的 prox 好算</td>
-					<td><strong>$f$ 本身</strong>的 $\text{prox}_f$ 必须可计算</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>比较维度</th>
+          <th>邻近梯度法（Ch7）</th>
+          <th>邻近点法（Ch9）</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><strong>处理的问题</strong></td>
+          <td>$\min f(x) + g(x)$，$f$ 光滑</td>
+          <td>$\min f(x)$，$f$ 可以<strong>完全不光滑</strong></td>
+      </tr>
+      <tr>
+          <td><strong>迭代公式</strong></td>
+          <td>$x_{k+1} = \text{prox}_{\alpha g}(x_k - \alpha\nabla f(x_k))$</td>
+          <td>$x_{k+1} = \text{prox}_{\alpha f}(x_k)$</td>
+      </tr>
+      <tr>
+          <td><strong>步的构成</strong></td>
+          <td>梯度步（处理 $f$）+ 邻近步（处理 $g$）</td>
+          <td><strong>纯邻近步</strong>——没有梯度步</td>
+      </tr>
+      <tr>
+          <td><strong>前提条件</strong></td>
+          <td>$f$ 可微（有 $\nabla f$），$g$ 的 prox 好算</td>
+          <td><strong>$f$ 本身</strong>的 $\text{prox}_f$ 必须可计算</td>
+      </tr>
+  </tbody>
 </table></div>
 <p><strong>关键困难</strong>：邻近点法要求直接计算目标函数 $f$ 本身的邻近算子！如果这个能轻松算出来，优化问题基本上已经解决了。因此邻近点法更多被用作<strong>理论分析工具</strong>和<strong>元算法</strong>——通过它来解释、统一和推导其他更实用的算法（如增广 Lagrange 法、DR 分裂法、ADMM 等）。</p>
 <h3 id="912-为什么叫邻近点法">9.1.2 为什么叫&quot;邻近点法&quot;？
@@ -559,30 +559,30 @@ $$\boxed{x_{k+1} = \text{prox}_{\alpha_k f}(x_k) = \arg\min_z \left\{f(z) + \fra
 $$f(x_k) - f^* \leq \frac{\|x_0 - x^*\|^2}{2\alpha k}$$<p>这是 $O(1/k)$ 收敛率——与梯度下降法相同。</p>
 <p><strong>与次梯度法的对比</strong>：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>特征</th>
-					<th>次梯度法（Ch4）</th>
-					<th>邻近点法</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>需要的信息</td>
-					<td>只需<strong>一个</strong>次梯度 $g \in \partial f(x_k)$</td>
-					<td>需要完整的 $\text{prox}_f$ 算子（解一个优化子问题）</td>
-			</tr>
-			<tr>
-					<td>收敛率</td>
-					<td>$O(1/\sqrt{k})$</td>
-					<td>$O(1/k)$</td>
-			</tr>
-			<tr>
-					<td>每步代价</td>
-					<td><strong>低</strong>（一个次梯度）</td>
-					<td><strong>高</strong>（需解优化子问题）</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>特征</th>
+          <th>次梯度法（Ch4）</th>
+          <th>邻近点法</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>需要的信息</td>
+          <td>只需<strong>一个</strong>次梯度 $g \in \partial f(x_k)$</td>
+          <td>需要完整的 $\text{prox}_f$ 算子（解一个优化子问题）</td>
+      </tr>
+      <tr>
+          <td>收敛率</td>
+          <td>$O(1/\sqrt{k})$</td>
+          <td>$O(1/k)$</td>
+      </tr>
+      <tr>
+          <td>每步代价</td>
+          <td><strong>低</strong>（一个次梯度）</td>
+          <td><strong>高</strong>（需解优化子问题）</td>
+      </tr>
+  </tbody>
 </table></div>
 <p><strong>结论</strong>：邻近点法用更高的每步代价换取了更快的收敛率。当 $\text{prox}_f$ 容易计算时（如 $f$ 是 $\ell_1$ 范数），它是高效的；否则主要用于理论分析（&ldquo;元算法&quot;的角色）。</p>
 <blockquote>
@@ -674,75 +674,75 @@ $$\boxed{x^T y \leq f(x) + f^*(y), \quad \forall x, y}$$<p><strong>取等号的�
 $$xy \leq \frac{|x|^p}{p} + \frac{|y|^q}{q}$$<p>这是经典分析中的 Young 不等式——它是 Fenchel 不等式的直接推论。</p>
 <h3 id="934-常见函数的共轭表必背">9.3.4 常见函数的共轭表（必背）
 </h3><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>$f(x)$</th>
-					<th>$f^*(y)$</th>
-					<th>条件/说明</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>$\frac{1}{2}|x|^2$</td>
-					<td>$\frac{1}{2}|y|^2$</td>
-					<td>$\ell_2^2$ <strong>自共轭</strong>（形式不变！）</td>
-			</tr>
-			<tr>
-					<td>$\frac{1}{2}x^T Q x$（$Q \succ 0$）</td>
-					<td>$\frac{1}{2}y^T Q^{-1} y$</td>
-					<td>二次→二次，协方差矩阵取逆</td>
-			</tr>
-			<tr>
-					<td>$|x|$（任意范数）</td>
-					<td>$\delta_{|y|_* \leq 1}(y)$</td>
-					<td>范数→对偶范数球的指示函数</td>
-			</tr>
-			<tr>
-					<td>$|x|_1$</td>
-					<td>$\delta_{|y|_\infty \leq 1}(y)$</td>
-					<td>$\ell_1$→$\ell_\infty$ 球</td>
-			</tr>
-			<tr>
-					<td>$|x|_2$</td>
-					<td>$\delta_{|y|_2 \leq 1}(y)$</td>
-					<td>$\ell_2$→$\ell_2$ 球（自对偶）</td>
-			</tr>
-			<tr>
-					<td>$|x|_\infty$</td>
-					<td>$\delta_{|y|_1 \leq 1}(y)$</td>
-					<td>$\ell_\infty$→$\ell_1$ 球</td>
-			</tr>
-			<tr>
-					<td>$\delta_C(x)$（凸集 $C$）</td>
-					<td>$\sigma_C(y) = \sup_{x\in C} y^T x$</td>
-					<td>指示函数↔支撑函数</td>
-			</tr>
-			<tr>
-					<td>$\frac{1}{2}|Ax-b|^2$</td>
-					<td>$\frac{1}{2}|(A^T)^\dagger y|^2 + b^T y$</td>
-					<td>最小二乘的共轭</td>
-			</tr>
-			<tr>
-					<td>$\log(1+e^{-x})$（logistic loss）</td>
-					<td>$-y\log(-y)-(1+y)\log(1+y)$</td>
-					<td>二值熵函数（$-1\leq y\leq 0$）</td>
-			</tr>
-			<tr>
-					<td>$e^x$</td>
-					<td>$y\log y - y$（$y &gt; 0$）</td>
-					<td>指数→&quot;$\times\log$&ldquo;型</td>
-			</tr>
-			<tr>
-					<td>$-\log x$（$x&gt;0$）</td>
-					<td>$-1 - \log(-y)$（$y&lt;0$）</td>
-					<td>负对数→负对数</td>
-			</tr>
-			<tr>
-					<td>$\sum_i x_i\log x_i$（负熵）</td>
-					<td>$\sum_i e^{y_i-1}$</td>
-					<td>负熵↔指数和</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>$f(x)$</th>
+          <th>$f^*(y)$</th>
+          <th>条件/说明</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>$\frac{1}{2}|x|^2$</td>
+          <td>$\frac{1}{2}|y|^2$</td>
+          <td>$\ell_2^2$ <strong>自共轭</strong>（形式不变！）</td>
+      </tr>
+      <tr>
+          <td>$\frac{1}{2}x^T Q x$（$Q \succ 0$）</td>
+          <td>$\frac{1}{2}y^T Q^{-1} y$</td>
+          <td>二次→二次，协方差矩阵取逆</td>
+      </tr>
+      <tr>
+          <td>$|x|$（任意范数）</td>
+          <td>$\delta_{|y|_* \leq 1}(y)$</td>
+          <td>范数→对偶范数球的指示函数</td>
+      </tr>
+      <tr>
+          <td>$|x|_1$</td>
+          <td>$\delta_{|y|_\infty \leq 1}(y)$</td>
+          <td>$\ell_1$→$\ell_\infty$ 球</td>
+      </tr>
+      <tr>
+          <td>$|x|_2$</td>
+          <td>$\delta_{|y|_2 \leq 1}(y)$</td>
+          <td>$\ell_2$→$\ell_2$ 球（自对偶）</td>
+      </tr>
+      <tr>
+          <td>$|x|_\infty$</td>
+          <td>$\delta_{|y|_1 \leq 1}(y)$</td>
+          <td>$\ell_\infty$→$\ell_1$ 球</td>
+      </tr>
+      <tr>
+          <td>$\delta_C(x)$（凸集 $C$）</td>
+          <td>$\sigma_C(y) = \sup_{x\in C} y^T x$</td>
+          <td>指示函数↔支撑函数</td>
+      </tr>
+      <tr>
+          <td>$\frac{1}{2}|Ax-b|^2$</td>
+          <td>$\frac{1}{2}|(A^T)^\dagger y|^2 + b^T y$</td>
+          <td>最小二乘的共轭</td>
+      </tr>
+      <tr>
+          <td>$\log(1+e^{-x})$（logistic loss）</td>
+          <td>$-y\log(-y)-(1+y)\log(1+y)$</td>
+          <td>二值熵函数（$-1\leq y\leq 0$）</td>
+      </tr>
+      <tr>
+          <td>$e^x$</td>
+          <td>$y\log y - y$（$y &gt; 0$）</td>
+          <td>指数→&quot;$\times\log$&ldquo;型</td>
+      </tr>
+      <tr>
+          <td>$-\log x$（$x&gt;0$）</td>
+          <td>$-1 - \log(-y)$（$y&lt;0$）</td>
+          <td>负对数→负对数</td>
+      </tr>
+      <tr>
+          <td>$\sum_i x_i\log x_i$（负熵）</td>
+          <td>$\sum_i e^{y_i-1}$</td>
+          <td>负熵↔指数和</td>
+      </tr>
+  </tbody>
 </table></div>
 <p><strong>这个表的美感</strong>：注意 $\ell_p$ 和 $\ell_q$（$\frac{1}{p}+\frac{1}{q}=1$）之间的<strong>完美对偶</strong>——$\ell_1$→$\ell_\infty$，$\ell_2$→$\ell_2$，$\ell_\infty$→$\ell_1$。这是数学中深邃的结构之美。</p>
 <h3 id="935-共轭函数的推导示例">9.3.5 共轭函数的推导示例
@@ -927,86 +927,86 @@ $$f^*(y) \leq f^*(y_0) + \langle \nabla f^*(y_0), y - y_0 \rangle + \frac{1}{2\m
 <hr>
 <h2 id="核心要点">核心要点
 </h2><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>概念</th>
-					<th>核心公式/结论</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>邻近点法</td>
-					<td>$x_{k+1} = \text{prox}_{\alpha f}(x_k)$，适用于任意闭凸 $f$（可以不光滑）</td>
-			</tr>
-			<tr>
-					<td>与 ISTA 的区别</td>
-					<td>ISTA 分前向梯度步 + 后向邻近步；邻近点法是纯邻近步</td>
-			</tr>
-			<tr>
-					<td>Moreau 包络</td>
-					<td>$M_f(x) = \min_z{f(z) + \frac{1}{2}|z-x|^2}$，是非光滑 $f$ 的光滑化</td>
-			</tr>
-			<tr>
-					<td>光滑化定理</td>
-					<td>$\nabla M_f(x) = x - \text{prox}_f(x)$，$M_f$ 是 1-smooth 的</td>
-			</tr>
-			<tr>
-					<td><strong>核心洞察</strong></td>
-					<td>邻近点法 ≡ Moreau 包络上的梯度下降！</td>
-			</tr>
-			<tr>
-					<td>与原问题等价性</td>
-					<td>$\arg\min f = \arg\min M_f$，$\inf f = \inf M_f$</td>
-			</tr>
-			<tr>
-					<td>共轭函数定义</td>
-					<td>$f^*(y) = \sup_x{y^T x - f(x)}$，斜率与截距的翻转变换</td>
-			</tr>
-			<tr>
-					<td>Fenchel 不等式</td>
-					<td>$x^T y \leq f(x) + f^*(y)$，取等 $\iff$ $y \in \partial f(x)$</td>
-			</tr>
-			<tr>
-					<td>Young 不等式</td>
-					<td>$xy \leq \frac{|x|^p}{p} + \frac{|y|^q}{q}$（Fenchel 的特例）</td>
-			</tr>
-			<tr>
-					<td>$\ell_p$ 共轭对偶</td>
-					<td>$|\cdot|<em>p \leftrightarrow \delta</em>{|\cdot|_q \leq 1}$（$\frac{1}{p}+\frac{1}{q}=1$）</td>
-			</tr>
-			<tr>
-					<td>强凸-光滑对偶</td>
-					<td>$f$ 是 $\mu$-强凸 $\iff$ $f^*$ 是 $1/\mu$-smooth</td>
-			</tr>
-			<tr>
-					<td>光滑-强凸对偶</td>
-					<td>$f$ 是 $L$-smooth $\iff$ $f^*$ 是 $1/L$-强凸</td>
-			</tr>
-			<tr>
-					<td>次梯度互逆</td>
-					<td>$y \in \partial f(x) \iff x \in \partial f^*(y)$</td>
-			</tr>
-			<tr>
-					<td>双重共轭</td>
-					<td>$f^{**} = f$（对 proper 闭凸函数）</td>
-			</tr>
-			<tr>
-					<td><strong>Moreau 分解</strong></td>
-					<td>$x = \text{prox}<em>f(x) + \text{prox}</em>{f^*}(x)$</td>
-			</tr>
-			<tr>
-					<td>经典应用</td>
-					<td>$P_{|\cdot|<em>\infty \leq \lambda}(x) = x - S</em>\lambda(x)$（$\ell_\infty$ 球投影只用软阈值！）</td>
-			</tr>
-			<tr>
-					<td>邻近点法收敛率</td>
-					<td>$O(1/k)$（从 Moreau 包络的 GD 性质直接继承）</td>
-			</tr>
-			<tr>
-					<td>与次梯度法对比</td>
-					<td>邻近点法每步代价更高（解优化子问题），但收敛更快（$O(1/k)$ vs $O(1/\sqrt{k})$）</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>概念</th>
+          <th>核心公式/结论</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>邻近点法</td>
+          <td>$x_{k+1} = \text{prox}_{\alpha f}(x_k)$，适用于任意闭凸 $f$（可以不光滑）</td>
+      </tr>
+      <tr>
+          <td>与 ISTA 的区别</td>
+          <td>ISTA 分前向梯度步 + 后向邻近步；邻近点法是纯邻近步</td>
+      </tr>
+      <tr>
+          <td>Moreau 包络</td>
+          <td>$M_f(x) = \min_z{f(z) + \frac{1}{2}|z-x|^2}$，是非光滑 $f$ 的光滑化</td>
+      </tr>
+      <tr>
+          <td>光滑化定理</td>
+          <td>$\nabla M_f(x) = x - \text{prox}_f(x)$，$M_f$ 是 1-smooth 的</td>
+      </tr>
+      <tr>
+          <td><strong>核心洞察</strong></td>
+          <td>邻近点法 ≡ Moreau 包络上的梯度下降！</td>
+      </tr>
+      <tr>
+          <td>与原问题等价性</td>
+          <td>$\arg\min f = \arg\min M_f$，$\inf f = \inf M_f$</td>
+      </tr>
+      <tr>
+          <td>共轭函数定义</td>
+          <td>$f^*(y) = \sup_x{y^T x - f(x)}$，斜率与截距的翻转变换</td>
+      </tr>
+      <tr>
+          <td>Fenchel 不等式</td>
+          <td>$x^T y \leq f(x) + f^*(y)$，取等 $\iff$ $y \in \partial f(x)$</td>
+      </tr>
+      <tr>
+          <td>Young 不等式</td>
+          <td>$xy \leq \frac{|x|^p}{p} + \frac{|y|^q}{q}$（Fenchel 的特例）</td>
+      </tr>
+      <tr>
+          <td>$\ell_p$ 共轭对偶</td>
+          <td>$|\cdot|<em>p \leftrightarrow \delta</em>{|\cdot|_q \leq 1}$（$\frac{1}{p}+\frac{1}{q}=1$）</td>
+      </tr>
+      <tr>
+          <td>强凸-光滑对偶</td>
+          <td>$f$ 是 $\mu$-强凸 $\iff$ $f^*$ 是 $1/\mu$-smooth</td>
+      </tr>
+      <tr>
+          <td>光滑-强凸对偶</td>
+          <td>$f$ 是 $L$-smooth $\iff$ $f^*$ 是 $1/L$-强凸</td>
+      </tr>
+      <tr>
+          <td>次梯度互逆</td>
+          <td>$y \in \partial f(x) \iff x \in \partial f^*(y)$</td>
+      </tr>
+      <tr>
+          <td>双重共轭</td>
+          <td>$f^{**} = f$（对 proper 闭凸函数）</td>
+      </tr>
+      <tr>
+          <td><strong>Moreau 分解</strong></td>
+          <td>$x = \text{prox}<em>f(x) + \text{prox}</em>{f^*}(x)$</td>
+      </tr>
+      <tr>
+          <td>经典应用</td>
+          <td>$P_{|\cdot|<em>\infty \leq \lambda}(x) = x - S</em>\lambda(x)$（$\ell_\infty$ 球投影只用软阈值！）</td>
+      </tr>
+      <tr>
+          <td>邻近点法收敛率</td>
+          <td>$O(1/k)$（从 Moreau 包络的 GD 性质直接继承）</td>
+      </tr>
+      <tr>
+          <td>与次梯度法对比</td>
+          <td>邻近点法每步代价更高（解优化子问题），但收敛更快（$O(1/k)$ vs $O(1/\sqrt{k})$）</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>(End of file)</p>
 
@@ -1092,9 +1092,8 @@ $$f^*(y) \leq f^*(y_0) + \langle \nabla f^*(y_0), y - y_0 \rangle + \frac{1}{2\m
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

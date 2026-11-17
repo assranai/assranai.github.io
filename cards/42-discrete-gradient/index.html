@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Discrete Gradient Methods（离散梯度法）\n领域：几何数值积分 × 非线性有限元 × 软体动力学 × 物理求解器\n阅读时间：约 5 分钟\n核心问题：数值求解存在截断误差，为什么某些物理守恒定律仍然可以被精确满足？\n考虑一个没有外力、阻尼和碰撞的弹性体。真实物理系统满足：\n\\[ E_{\\mathrm{kin}}+E_{\\mathrm{elastic}}=\\mathrm{constant}. \\]然而，使用普通时间积分器模拟时，即使每一步的位置误差很小，总能量仍可能缓慢漂移。\n对于长时间运行的物理引擎，这种漂移可能表现为物体凭空获得动能，或者振动逐渐衰减。\n离散梯度法提出了一种很有价值的思路：\n与其要求每一步都高度逼近真实轨迹，不如直接构造一个满足离散能量守恒恒等式的时间积分算法。\n这种方法属于结构保持数值积分（Structure-Preserving Integration）。Gonzalez 在 1996 年建立了相关守恒积分框架，Quispel 与 McLaren 在 2008 年进一步提出了具有重要理论意义的 Average Vector Field（AVF）积分方法。\n一、问题根源：连续微积分中的链式法则，在离散时间下不再自动成立 考虑一个保守力学系统，其状态为：\n\\[ z= \\begin{bmatrix} q\\\\p \\end{bmatrix}, \\]其中 \\(q\\) 是位置，\\(p\\) 是动量。\n系统总能量写成：\n\\[ H(q,p)=T(p)+V(q). \\]根据 Hamiltonian mechanics，运动方程为：\n\\[ \\dot z=J\\nabla H(z), \\]其中：\n\\[ J= \\begin{bmatrix} 0&I\\\\ -I&0 \\end{bmatrix}, \\qquad J^T=-J. \\]连续时间下：\n\\[ \\frac{dH}{dt} = \\nabla H^T\\dot z = \\nabla H^TJ\\nabla H=0. \\]最后一个等式成立，因为反对称矩阵满足：\n">
 <title>Discrete Gradient：离散时间下如何严格保持能量守恒</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/42-discrete-gradient/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Discrete Gradient：离散时间下如何严格保持能量守恒">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Discrete Gradient：离散时间下如何严格保持能量守恒">
 <meta property='og:description' content="主题：Discrete Gradient Methods（离散梯度法）\n领域：几何数值积分 × 非线性有限元 × 软体动力学 × 物理求解器\n阅读时间：约 5 分钟\n核心问题：数值求解存在截断误差，为什么某些物理守恒定律仍然可以被精确满足？\n考虑一个没有外力、阻尼和碰撞的弹性体。真实物理系统满足：\n\\[ E_{\\mathrm{kin}}+E_{\\mathrm{elastic}}=\\mathrm{constant}. \\]然而，使用普通时间积分器模拟时，即使每一步的位置误差很小，总能量仍可能缓慢漂移。\n对于长时间运行的物理引擎，这种漂移可能表现为物体凭空获得动能，或者振动逐渐衰减。\n离散梯度法提出了一种很有价值的思路：\n与其要求每一步都高度逼近真实轨迹，不如直接构造一个满足离散能量守恒恒等式的时间积分算法。\n这种方法属于结构保持数值积分（Structure-Preserving Integration）。Gonzalez 在 1996 年建立了相关守恒积分框架，Quispel 与 McLaren 在 2008 年进一步提出了具有重要理论意义的 Average Vector Field（AVF）积分方法。\n一、问题根源：连续微积分中的链式法则，在离散时间下不再自动成立 考虑一个保守力学系统，其状态为：\n\\[ z= \\begin{bmatrix} q\\\\p \\end{bmatrix}, \\]其中 \\(q\\) 是位置，\\(p\\) 是动量。\n系统总能量写成：\n\\[ H(q,p)=T(p)+V(q). \\]根据 Hamiltonian mechanics，运动方程为：\n\\[ \\dot z=J\\nabla H(z), \\]其中：\n\\[ J= \\begin{bmatrix} 0&I\\\\ -I&0 \\end{bmatrix}, \\qquad J^T=-J. \\]连续时间下：\n\\[ \\frac{dH}{dt} = \\nabla H^T\\dot z = \\nabla H^TJ\\nabla H=0. \\]最后一个等式成立，因为反对称矩阵满足：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/42-discrete-gradient/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -330,11 +330,8 @@
     <li><a href="#五如果系统存在阻尼能否严格保持能量耗散">五、如果系统存在阻尼，能否严格保持能量耗散？</a></li>
     <li><a href="#六2026-年的新进展如何同时获得高阶精度与能量耗散保证">六、2026 年的新进展：如何同时获得高阶精度与能量耗散保证？</a></li>
     <li><a href="#七对软体动力学和物理引擎的启发">七、对软体动力学和物理引擎的启发</a></li>
-    <li><a href="#八它在整个知识体系中卡在哪里">八、它在整个知识体系中卡在哪里？</a>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#八它在整个知识体系中卡在哪里">八、它在整个知识体系中卡在哪里？</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -557,34 +554,34 @@
 <h2 id="八它在整个知识体系中卡在哪里">八、它在整个知识体系中卡在哪里？
 </h2><p>此前讨论的物理求解器技术，可以按照各自控制的对象区分：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>方法</th>
-					<th>主要关注</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td><span class="term-anchor" data-term="jacobian-free-newton-krylov" tabindex="0">JFNK</span></td>
-					<td>如何高效求解非线性方程</td>
-			</tr>
-			<tr>
-					<td><span class="term-anchor" data-term="algebraic-multigrid" tabindex="0">AMG</span></td>
-					<td>如何加速大型线性系统</td>
-			</tr>
-			<tr>
-					<td>Partial Assembly</td>
-					<td>如何降低有限元算子的执行成本</td>
-			</tr>
-			<tr>
-					<td>Reverse-Sweep Adjoint</td>
-					<td>如何准确计算有限迭代求解器的梯度</td>
-			</tr>
-			<tr>
-					<td><strong>Discrete Gradient</strong></td>
-					<td><strong>如何使时间离散严格遵守指定的能量规律</strong></td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>方法</th>
+          <th>主要关注</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><span class="term-anchor" data-term="jacobian-free-newton-krylov" tabindex="0">JFNK</span></td>
+          <td>如何高效求解非线性方程</td>
+      </tr>
+      <tr>
+          <td><span class="term-anchor" data-term="algebraic-multigrid" tabindex="0">AMG</span></td>
+          <td>如何加速大型线性系统</td>
+      </tr>
+      <tr>
+          <td>Partial Assembly</td>
+          <td>如何降低有限元算子的执行成本</td>
+      </tr>
+      <tr>
+          <td>Reverse-Sweep Adjoint</td>
+          <td>如何准确计算有限迭代求解器的梯度</td>
+      </tr>
+      <tr>
+          <td><strong>Discrete Gradient</strong></td>
+          <td><strong>如何使时间离散严格遵守指定的能量规律</strong></td>
+      </tr>
+  </tbody>
 </table></div>
 <p>离散梯度位于：</p>
 \[ \text{连续动力学方程} \]\[ \downarrow \]\[ \boxed{\text{结构保持时间离散}} \]\[ \downarrow \]\[ \text{非线性代数方程} \]\[ \downarrow \]\[ \text{Newton / Krylov / GPU 求解} \]<p>这一层次。</p>
@@ -595,8 +592,9 @@
 <p>数值方法可以不精确复制每一步运动，却严格保持某些物理规律。高质量物理求解器的设计，需要明确区分轨迹精度、守恒性质和计算效率。</p>
 </blockquote>
 <hr>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<p>延伸到其他层次，可读<a class="link" href="../38-discrete-exterior-calculus/" >离散外微分</a>的几何恒等式、<a class="link" href="../41-jacobian-free-newton-krylov/" >JFNK</a>的非线性求解、<a class="link" href="../33-matrix-free-fem/" >无矩阵有限元</a>的算子执行，以及<a class="link" href="../21-implicit-differentiation/" >求解器微分</a>的梯度计算。</p>
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p><strong>1. Gonzalez（1996）— Time Integration and Discrete Hamiltonian Systems</strong></p>
@@ -611,22 +609,18 @@
 <p>最推荐首先阅读。文章篇幅较短，直接展示 AVF 方法如何保持 Hamiltonian。</p>
 <p><strong>3. Simo, Tarnow &amp; Wong（1992）— Exact Energy-Momentum Conserving Algorithms and Symplectic Schemes for Nonlinear Dynamics</strong></p>
 <p><em>Computer Methods in Applied Mechanics and Engineering</em>, 100(1), 63–116。</p>
-<p>Elsevier 原论文</p>
+<p><a class="link" href="https://www.sciencedirect.com/science/article/pii/004578259290115Z"  target="_blank" rel="noopener"
+    >Simo 等人的原论文</a></p>
 <p>最贴近非线性有限元与结构动力学，讨论如何同时保持能量、线动量和角动量。</p>
 <p><strong>4. Celledoni et al.（2012）— Preserving Energy resp. Dissipation in Numerical PDEs Using the Average Vector Field Method</strong></p>
-<p>arXiv 开放论文</p>
+<p><a class="link" href="https://arxiv.org/abs/1202.4555"  target="_blank" rel="noopener"
+    >Celledoni 等人的预印本</a></p>
 <p>适合从常微分方程进一步进入 PDE，理解 AVF 如何用于 Hamilton 系统与耗散型方程。</p>
 <p><strong>5. Lautwein et al.（2026）— Fourth-Order Energy-Consistent Average Vector Field Discrete Gradient Methods for Dissipative Hamiltonian Systems</strong></p>
 <p>2026 年 9 月预印本，arXiv:2609.24692。</p>
-<p>论文全文与数学推导</p>
+<p><a class="link" href="https://arxiv.org/abs/2609.24692"  target="_blank" rel="noopener"
+    >Lautwein 等人的预印本</a></p>
 <p>本期最新研究。建议重点阅读第 2.3 节，理解为什么保持矩阵半正定性能够成为高阶数值方法设计的关键约束。</p>
-<hr>
-<p><strong>知识卡片注册表｜第 64 张</strong></p>
-<p>新增主题：<strong>Discrete Gradient Methods（离散梯度与能量一致性时间积分）</strong>。</p>
-<p>所属方向：几何数值积分 / 非线性有限元 / 软体动力学 / 物理求解器。</p>
-<p>核心问题：如何在有限时间步和非线性物理系统中，构造严格满足能量守恒或耗散规律的时间积分算法。</p>
-<p>知识关联：第 54 张 <span class="term-anchor" data-term="discrete-exterior-calculus" tabindex="0">DEC</span>、第 58 张 JFNK、第 60 张 Solver-Level Differentiation、第 61 张 Partial Assembly。</p>
-<p><strong>新增知识分支：结构保持时间积分与离散能量定律。</strong></p>
 
   </div>
 </details>
@@ -809,9 +803,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

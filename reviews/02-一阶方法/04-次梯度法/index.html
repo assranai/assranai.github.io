@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第4章：次梯度法 核心思想：梯度下降要求函数处处可微（每一点都能求唯一梯度），次梯度法将这一思想推广到不可微凸函数——用次梯度集合 $\\partial f(x_k)$ 中的任意一个向量 $g_k$ 代替 $\\nabla f(x_k)$，沿 $-g_k$ 方向迭代。代价是收敛率从光滑 GD 的 $O(1/k)$ 退化为 $O(1/\\sqrt{k})$，复杂度也从 $O(1/\\epsilon)$ 退化为 $O(1/\\epsilon^2)$。\n前置知识回顾 本章的论述建立在第2章（梯度下降法）和第3章（次梯度理论）的基础之上。为了方便自包含地阅读，此处对必备概念做系统回顾。\nA. 从第2章回顾：梯度下降法 (Gradient Descent, GD) GD 是解决无约束光滑凸优化问题的最基本算法。其迭代格式为：\n$$\\boxed{x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)}$$下面逐一定义每个符号的含义，不做任何假定：\n$x_k$ 是什么？ $x_k \\in \\mathbb{R}^n$ 是第 $k$ 步迭代后的解估计。$\\mathbb{R}^n$ 表示 $n$ 维实数向量空间——也就是说 $x_k$ 是一个含有 $n$ 个实数分量的列向量，可以写为 $x_k = (x_{k,1}, x_{k,2}, \\dots, x_{k,n})^T$，其中 $^T$ 表示转置（将行向量变为列向量）。初始点 $x_0$ 由用户任意指定。\n$\\alpha_k$ 是什么？ $\\alpha_k &gt; 0$ 是第 $k$ 步的步长（step size），是一个正实数标量。在机器学习文献中常称为学习率（learning rate）。步长控制着沿梯度方向移动的距离——步长太小则收敛过慢（一步步蠕动），步长太大则可能在最优解附近剧烈跳跃甚至发散。\n">
 <title>第4章：次梯度法</title>
 
 <link rel='canonical' href='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/04-%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="第4章：次梯度法">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="第4章：次梯度法">
 <meta property='og:description' content="第4章：次梯度法 核心思想：梯度下降要求函数处处可微（每一点都能求唯一梯度），次梯度法将这一思想推广到不可微凸函数——用次梯度集合 $\\partial f(x_k)$ 中的任意一个向量 $g_k$ 代替 $\\nabla f(x_k)$，沿 $-g_k$ 方向迭代。代价是收敛率从光滑 GD 的 $O(1/k)$ 退化为 $O(1/\\sqrt{k})$，复杂度也从 $O(1/\\epsilon)$ 退化为 $O(1/\\epsilon^2)$。\n前置知识回顾 本章的论述建立在第2章（梯度下降法）和第3章（次梯度理论）的基础之上。为了方便自包含地阅读，此处对必备概念做系统回顾。\nA. 从第2章回顾：梯度下降法 (Gradient Descent, GD) GD 是解决无约束光滑凸优化问题的最基本算法。其迭代格式为：\n$$\\boxed{x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)}$$下面逐一定义每个符号的含义，不做任何假定：\n$x_k$ 是什么？ $x_k \\in \\mathbb{R}^n$ 是第 $k$ 步迭代后的解估计。$\\mathbb{R}^n$ 表示 $n$ 维实数向量空间——也就是说 $x_k$ 是一个含有 $n$ 个实数分量的列向量，可以写为 $x_k = (x_{k,1}, x_{k,2}, \\dots, x_{k,n})^T$，其中 $^T$ 表示转置（将行向量变为列向量）。初始点 $x_0$ 由用户任意指定。\n$\\alpha_k$ 是什么？ $\\alpha_k &gt; 0$ 是第 $k$ 步的步长（step size），是一个正实数标量。在机器学习文献中常称为学习率（learning rate）。步长控制着沿梯度方向移动的距离——步长太小则收敛过慢（一步步蠕动），步长太大则可能在最优解附近剧烈跳跃甚至发散。\n">
 <meta property='og:url' content='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/04-%E6%AC%A1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -56,7 +56,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -492,40 +492,40 @@ $$\partial f(x) = \left\{ g \in \mathbb{R}^n \;\middle|\; f(y) \ge f(x) + g^T(y 
 </h2><h3 id="411-梯度下降为什么会失败不可微的现实问题">4.1.1 梯度下降为什么会失败：不可微的现实问题
 </h3><p>梯度下降法的每一步都需要计算 $\nabla f(x_k)$。但大量的实际优化问题在关键位置存在<strong>不可微点</strong>——函数在这些点处的偏导数不存在（或者说有多个候选的&quot;方向导数&quot;但没有唯一良定义的梯度）。下表列出了几个标志性例子：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>问题名称</th>
-					<th>目标函数 $f(x)$ 的数学形式</th>
-					<th>不可微点的精确位置</th>
-					<th>为何这些不可微点至关重要</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td><strong>LASSO</strong>（稀疏回归）</td>
-					<td>$f(x)=\frac{1}{2}|Ax-b|_2^2+\lambda|x|_1$</td>
-					<td>各个分量 $x_i=0$</td>
-					<td>$\ell_1$ 范数 $|x|_1=\sum_i</td>
-			</tr>
-			<tr>
-					<td><strong>SVM</strong>（支持向量机）</td>
-					<td>$f(w)=\sum_i\max(0,1-y_i(w^T a_i+b))$</td>
-					<td>Hinge 折点：$y_i(w^T a_i+b)=1$</td>
-					<td>位于分类决策边界上的样本恰是<strong>支持向量</strong>，折点处的非光滑结构是 SVM 模型的核心数学特征</td>
-			</tr>
-			<tr>
-					<td><strong>中位数回归</strong></td>
-					<td>$f(x)=\sum_i</td>
-					<td>y_i-a_i^T x</td>
-					<td>$</td>
-			</tr>
-			<tr>
-					<td><strong>核范数正则化</strong></td>
-					<td>$f(X)=|X|_*$（奇异值之和）</td>
-					<td>奇异值退化处（两个以上奇异值相等）</td>
-					<td>核范数在奇异值交织处不可微，但这些低秩结构正是矩阵补全的目标</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>问题名称</th>
+          <th>目标函数 $f(x)$ 的数学形式</th>
+          <th>不可微点的精确位置</th>
+          <th>为何这些不可微点至关重要</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><strong>LASSO</strong>（稀疏回归）</td>
+          <td>$f(x)=\frac{1}{2}|Ax-b|_2^2+\lambda|x|_1$</td>
+          <td>各个分量 $x_i=0$</td>
+          <td>$\ell_1$ 范数 $|x|_1=\sum_i</td>
+      </tr>
+      <tr>
+          <td><strong>SVM</strong>（支持向量机）</td>
+          <td>$f(w)=\sum_i\max(0,1-y_i(w^T a_i+b))$</td>
+          <td>Hinge 折点：$y_i(w^T a_i+b)=1$</td>
+          <td>位于分类决策边界上的样本恰是<strong>支持向量</strong>，折点处的非光滑结构是 SVM 模型的核心数学特征</td>
+      </tr>
+      <tr>
+          <td><strong>中位数回归</strong></td>
+          <td>$f(x)=\sum_i</td>
+          <td>y_i-a_i^T x</td>
+          <td>$</td>
+      </tr>
+      <tr>
+          <td><strong>核范数正则化</strong></td>
+          <td>$f(X)=|X|_*$（奇异值之和）</td>
+          <td>奇异值退化处（两个以上奇异值相等）</td>
+          <td>核范数在奇异值交织处不可微，但这些低秩结构正是矩阵补全的目标</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>以上任意一种问题在不可微点都无法直接用 GD 求解。<strong>次梯度法</strong>正是为应对这类情况而诞生的——它把&quot;唯一的梯度&quot;推广为&quot;集合中的任选向量&quot;。</p>
 <h3 id="412-次梯度法的迭代格式">4.1.2 次梯度法的迭代格式
@@ -562,7 +562,6 @@ $$f(x_k - \alpha g_k) < f(x_k)$$<p>
 <li>$\partial f(1) = {f&rsquo;(1)} = {1}$，即 $g_k = 1$。</li>
 <li>我们考虑沿负次梯度方向走：即 $x_{k+1} = 1 - \alpha \cdot 1 = 1 - \alpha$。</li>
 <li>函数值的变化：
-
 $$f(x_{k+1}) = |1 - \alpha| = \begin{cases} 1 - \alpha, & \text{当 } 0 \le \alpha \le 1 \text{（尚未跨过原点，在下降）} \\ \alpha - 1, & \text{当 } \alpha > 1 \text{（已跨过原点，开始上升！）} \end{cases}$$</li>
 <li>当 $\alpha = 2$ 时，$f(1-2) = | -1 | = 1 = f(1)$（回到了原来的值）。</li>
 <li>当 $\alpha = 3$ 时，$f(1-3) = 2 &gt; 1 = f(1)$（反而更差了！）</li>
@@ -599,26 +598,26 @@ $$\boxed{\limsup_{K \to \infty} \; f_{\text{best}}^K - f^* \le \frac{\alpha G^2}
 <p><strong>物理直觉</strong>：想象一个弹珠在一个锯齿碗中滚动。固定步长意味着弹珠每次跳动的距离是固定的。当它接近碗底时，固定的跳跃距离让它无法精确落在碗底——它会在碗底周围一个半径约为 $\alpha G^2/2$ 的区域内反复弹跳。</p>
 <p><strong>固定步长的优缺点总结</strong>：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>优点</th>
-					<th>缺点</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>实现最简单：只需指定一个常数</td>
-					<td><strong>不能收敛到 $f^*$ 本身</strong>，只能到 $\alpha G^2/2$ 邻域</td>
-			</tr>
-			<tr>
-					<td>不需要动态计算步长的任何参数</td>
-					<td>$\alpha$ 的选取非常敏感：太小 → 极慢；太大 → 邻域过大失去意义</td>
-			</tr>
-			<tr>
-					<td>对初始猜测相对鲁棒</td>
-					<td>对高精度需求（$\epsilon \le 10^{-6}$）完全无法满足</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>优点</th>
+          <th>缺点</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>实现最简单：只需指定一个常数</td>
+          <td><strong>不能收敛到 $f^*$ 本身</strong>，只能到 $\alpha G^2/2$ 邻域</td>
+      </tr>
+      <tr>
+          <td>不需要动态计算步长的任何参数</td>
+          <td>$\alpha$ 的选取非常敏感：太小 → 极慢；太大 → 邻域过大失去意义</td>
+      </tr>
+      <tr>
+          <td>对初始猜测相对鲁棒</td>
+          <td>对高精度需求（$\epsilon \le 10^{-6}$）完全无法满足</td>
+      </tr>
+  </tbody>
 </table></div>
 <h3 id="422-递减步长保证精确收敛的充要条件">4.2.2 递减步长：保证精确收敛的充要条件
 </h3><p>要使次梯度法<strong>精确收敛到 $f^*$</strong>（而不是收敛到某个邻域），步长必须满足以下三个条件（缺一不可）：</p>
@@ -632,45 +631,45 @@ $$\sum_{k=1}^{\infty} \frac{1}{k^2} = \frac{\pi^2}{6} \approx 1.64 < \infty$$<p>
 <p><strong>(3) $\sum_{k=0}^{\infty} \alpha_k^2 &lt; \infty$（步长平方和必须收敛）</strong>：在 §4.3 的收敛分析中，由步长引发的累积&quot;噪声&quot;表现为 $G^2 \sum \alpha_k^2$。如果平方和发散，那么即使总行程无穷大，步长带来的累积偏差也会同步放大，最终淹没收敛信号，使误差无法趋于零。</p>
 <p><strong>典型递减步长方案及其判定</strong>：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>方案名称</th>
-					<th>步长公式</th>
-					<th>$\sum \alpha_k$ 是否 $\infty$？</th>
-					<th>$\sum \alpha_k^2$ 是否 $&lt;\infty$？</th>
-					<th>综合评价</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>幂律 $1/\sqrt{k}$</td>
-					<td>$\alpha_k = \frac{\alpha_0}{\sqrt{k+1}}$</td>
-					<td>是（$\int dx/\sqrt{x}$ 发散）</td>
-					<td><strong>否！</strong>（$\sum 1/k$ 为调和级数，发散）</td>
-					<td><strong>不满足理论条件！</strong></td>
-			</tr>
-			<tr>
-					<td>调和 $1/k$</td>
-					<td>$\alpha_k = \frac{\alpha_0}{k+1}$</td>
-					<td>是</td>
-					<td>是（$\sum 1/k^2 = \pi^2/6$）</td>
-					<td>经典取法，后期较慢</td>
-			</tr>
-			<tr>
-					<td>$k^{-p}$（$p \in (0.5,1]$）</td>
-					<td>$\alpha_k = \frac{\alpha_0}{(k+1)^p}$</td>
-					<td>是（$p \le 1$）</td>
-					<td>是（$2p &gt; 1$）</td>
-					<td>$p \approx 0.51$ 或 $0.6$ 常用</td>
-			</tr>
-			<tr>
-					<td>分阶段常数</td>
-					<td>$\alpha_k = \frac{\alpha_0}{1+\lfloor k/K_0\rfloor}$</td>
-					<td>是</td>
-					<td>是</td>
-					<td>工程实现简便</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>方案名称</th>
+          <th>步长公式</th>
+          <th>$\sum \alpha_k$ 是否 $\infty$？</th>
+          <th>$\sum \alpha_k^2$ 是否 $&lt;\infty$？</th>
+          <th>综合评价</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>幂律 $1/\sqrt{k}$</td>
+          <td>$\alpha_k = \frac{\alpha_0}{\sqrt{k+1}}$</td>
+          <td>是（$\int dx/\sqrt{x}$ 发散）</td>
+          <td><strong>否！</strong>（$\sum 1/k$ 为调和级数，发散）</td>
+          <td><strong>不满足理论条件！</strong></td>
+      </tr>
+      <tr>
+          <td>调和 $1/k$</td>
+          <td>$\alpha_k = \frac{\alpha_0}{k+1}$</td>
+          <td>是</td>
+          <td>是（$\sum 1/k^2 = \pi^2/6$）</td>
+          <td>经典取法，后期较慢</td>
+      </tr>
+      <tr>
+          <td>$k^{-p}$（$p \in (0.5,1]$）</td>
+          <td>$\alpha_k = \frac{\alpha_0}{(k+1)^p}$</td>
+          <td>是（$p \le 1$）</td>
+          <td>是（$2p &gt; 1$）</td>
+          <td>$p \approx 0.51$ 或 $0.6$ 常用</td>
+      </tr>
+      <tr>
+          <td>分阶段常数</td>
+          <td>$\alpha_k = \frac{\alpha_0}{1+\lfloor k/K_0\rfloor}$</td>
+          <td>是</td>
+          <td>是</td>
+          <td>工程实现简便</td>
+      </tr>
+  </tbody>
 </table></div>
 <p><strong>关于 $\alpha_k = 1/\sqrt{k}$ 的重要讨论</strong>：</p>
 $$\sum_{k=0}^{\infty} \alpha_k^2 = \sum_{k=0}^{\infty} \frac{1}{k+1}$$<p>这是著名的<strong>调和级数</strong>——它是<strong>发散</strong>的（$H_K \approx \ln K + \gamma$，其中 $\gamma \approx 0.577$ 是欧拉常数）。所以表面上看起来温和的 $1/\sqrt{k}$ 衰减实际上<strong>不满足</strong>平方和收敛的条件。</p>
@@ -936,9 +935,8 @@ $$g_k = A^T \cdot \text{sign}(A x_k - b) \in \partial f(x_k)$$<p>
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW\n领域：有限元 × 数值方法 × 代理模型 × 软体动力学\n推荐阅读时间：约 8–10 分钟\n这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：\n\\[\\boxed{ \\text{“自由度少了”与“计算成本少了”不是同一件事。} }\\]假设原始有限元有：\n\\[N=10^6\\]个自由度。\n通过 POD/Reduced Basis 得到：\n\\[u\\approx Vq, \\qquad V\\in\\mathbb R^{N\\times r}, \\quad r=50.\\]看起来问题已经从：\n\\[10^6\\]维降到了：\n\\[50\\]维。\n但如果系统含有非线性内力：\n\\[f_{\\rm int}(u),\\]每一步仍然必须先在完整网格上计算：\n\\[f_{\\rm int}(Vq)\\in\\mathbb R^N,\\]然后才投影：\n\\[V^T f_{\\rm int}(Vq).\\]于是你虽然只求 50 个未知量，却可能依然遍历：\n\\[\\boxed{\\text{全部百万个自由度 / 全部有限元单元。}}\\]这就是 projection-based nonlinear ROM 的经典瓶颈。DEIM 正是为此提出：让非线性项只在少数经过挑选的位置上求值；ECSW 则进一步从有限元虚功/能量结构出发，只计算少量具有权重的代表单元。\n真正值得记住的是：\n\\[\\boxed{ \\text{Model reduction 降的是状态空间； Hyper-reduction 降的是算子求值成本。} }\\] 1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？ 先看线性有限元：\n">
 <title>Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/24-hyper-reduction/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Hyper-reduction：状态维数降到几十，并不意味着非线性有限元真的变快">
 <meta property='og:description' content="主题：Hyper-reduction（超降阶），重点理解 DEIM 与 ECSW\n领域：有限元 × 数值方法 × 代理模型 × 软体动力学\n推荐阅读时间：约 8–10 分钟\n这期选 Hyper-reduction，因为它揭示了降阶模型里一个非常容易被忽略的事实：\n\\[\\boxed{ \\text{“自由度少了”与“计算成本少了”不是同一件事。} }\\]假设原始有限元有：\n\\[N=10^6\\]个自由度。\n通过 POD/Reduced Basis 得到：\n\\[u\\approx Vq, \\qquad V\\in\\mathbb R^{N\\times r}, \\quad r=50.\\]看起来问题已经从：\n\\[10^6\\]维降到了：\n\\[50\\]维。\n但如果系统含有非线性内力：\n\\[f_{\\rm int}(u),\\]每一步仍然必须先在完整网格上计算：\n\\[f_{\\rm int}(Vq)\\in\\mathbb R^N,\\]然后才投影：\n\\[V^T f_{\\rm int}(Vq).\\]于是你虽然只求 50 个未知量，却可能依然遍历：\n\\[\\boxed{\\text{全部百万个自由度 / 全部有限元单元。}}\\]这就是 projection-based nonlinear ROM 的经典瓶颈。DEIM 正是为此提出：让非线性项只在少数经过挑选的位置上求值；ECSW 则进一步从有限元虚功/能量结构出发，只计算少量具有权重的代表单元。\n真正值得记住的是：\n\\[\\boxed{ \\text{Model reduction 降的是状态空间； Hyper-reduction 降的是算子求值成本。} }\\] 1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？ 先看线性有限元：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/24-hyper-reduction/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,14 +324,32 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-为什么线性-rom-很容易真正做到快非线性-rom-却不行">1. 为什么线性 ROM 很容易真正做到快，非线性 ROM 却不行？</a></li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#2-非线性一出现offline-online-decomposition-就断了">2. 非线性一出现，offline-online decomposition 就断了</a></li>
+    <li><a href="#3-hyper-reduction-到底超在哪里">3. Hyper-reduction 到底“超”在哪里？</a></li>
+    <li><a href="#4-deim既然整个非线性向量有低维结构就没必要把它全部算出来">4. DEIM：既然整个非线性向量有低维结构，就没必要把它全部算出来</a></li>
+    <li><a href="#5-deim-的核心公式非常漂亮">5. DEIM 的核心公式非常漂亮</a></li>
+    <li><a href="#6-一个简单例子100-万维-nonlinear-vector只看-50-个坐标">6. 一个简单例子：100 万维 nonlinear vector，只看 50 个坐标</a></li>
+    <li><a href="#7-deim-点不是随机选的">7. DEIM 点不是随机选的</a></li>
+    <li><a href="#8-deim-的误差由两个东西共同控制">8. DEIM 的误差由两个东西共同控制</a></li>
+    <li><a href="#9-但-deim-用在非线性结构动力学上有一个隐患它主要近似向量不一定保持物理结构">9. 但 DEIM 用在非线性结构动力学上有一个隐患：它主要近似“向量”，不一定保持“物理结构”</a></li>
+    <li><a href="#10-ecsw与其重构整条-nonlinear-force不如直接挑少数代表单元">10. ECSW：与其重构整条 nonlinear force，不如直接挑少数“代表单元”</a></li>
+    <li><a href="#11-为什么-ecsw-的权重必须认真学">11. 为什么 ECSW 的权重必须认真学？</a></li>
+    <li><a href="#12-为什么-ecsw-会比直接重构-nonlinear-vector更适合结构力学">12. 为什么 ECSW 会比“直接重构 nonlinear vector”更适合结构力学？</a></li>
+    <li><a href="#13-deim-与-ecsw-最值得记住的区别">13. DEIM 与 ECSW 最值得记住的区别</a></li>
+    <li><a href="#14-hyper-reduction-和普通网格粗化不是一回事">14. Hyper-reduction 和普通“网格粗化”不是一回事</a></li>
+    <li><a href="#15-为什么它与代理模型有本质区别">15. 为什么它与代理模型有本质区别？</a></li>
+    <li><a href="#16-但-hyper-reduction-仍然有一个非常明显的训练域问题">16. 但 Hyper-reduction 仍然有一个非常明显的“训练域”问题</a></li>
+    <li><a href="#17-这和你的软体动力学尤其有一个值得注意的冲突接触高度局部且会移动">17. 这和你的软体动力学尤其有一个值得注意的冲突：接触高度局部且会移动</a></li>
+    <li><a href="#18-一个特别值得迁移到物理引擎的思想不要降整个系统降最贵的算子调用次数">18. 一个特别值得迁移到物理引擎的思想：不要降整个系统，降“最贵的算子调用次数”</a></li>
+    <li><a href="#19-它对代理模型还有一个很强的启发可以代理算子不一定代理最终输出">19. 它对代理模型还有一个很强的启发：可以代理“算子”，不一定代理最终输出</a></li>
+    <li><a href="#20-一个特别适合亲手做的最小实验">20. 一个特别适合亲手做的最小实验</a></li>
+    <li><a href="#21-deim不要计算完整非线性场只看几个最有信息量的位置">21. DEIM：不要计算完整非线性场，只看几个“最有信息量”的位置</a></li>
+    <li><a href="#22-ecsw对非线性-fem更自然的是只计算少量单元">22. ECSW：对非线性 FEM，更自然的是“只计算少量单元”</a></li>
+    <li><a href="#23-为什么这件事对软体动力学尤其重要">23. 为什么这件事对软体动力学尤其重要？</a></li>
+    <li><a href="#24-但-hyper-reduction-会制造一种新的危险破坏物理结构">24. 但 Hyper-reduction 会制造一种新的危险：破坏物理结构</a></li>
+    <li><a href="#25-它在知识体系中卡在哪里">25. 它在知识体系中卡在哪里？</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -433,8 +451,8 @@
 <p>这叫：</p>
 \[\boxed{\text{offline-online decomposition}}\]<p>，也是 Reduced Basis / projection ROM 最理想的状态。经典 projection-based model reduction 综述正是把“online cost 是否与高维系统规模无关”视为参数化降阶模型是否真正有效的重要标准。</p>
 <hr>
-<h1 id="2-非线性一出现offline-online-decomposition-就断了">2. 非线性一出现，offline-online decomposition 就断了
-</h1><p>假设：</p>
+<h2 id="2-非线性一出现offline-online-decomposition-就断了">2. 非线性一出现，offline-online decomposition 就断了
+</h2><p>假设：</p>
 \[M\ddot u+f_{\rm int}(u)=f_{\rm ext}.\]<p>代入：</p>
 \[u=Vq,\]<p>得到：</p>
 \[M_r\ddot q + \boxed{ V^Tf_{\rm int}(Vq) } = f_r.\]<p>问题就在方框里。</p>
@@ -463,8 +481,8 @@
 \[V^TK_t(Vq)V.\]<p>于是：</p>
 \[\boxed{ \text{降阶后的线性系统很小， 但构造这个小系统仍然很贵。} }\]<p>Farhat 等对 ECSW 的分析明确指出：对于 nonlinear ROM，显式计算的主要成本在 projected residual；隐式计算还需要 projected Jacobian，这两个高维算子求值正是 hyper-reduction 要消除的瓶颈。</p>
 <hr>
-<h1 id="3-hyper-reduction-到底超在哪里">3. Hyper-reduction 到底“超”在哪里？
-</h1><p>普通 reduction：</p>
+<h2 id="3-hyper-reduction-到底超在哪里">3. Hyper-reduction 到底“超”在哪里？
+</h2><p>普通 reduction：</p>
 \[u\in\mathbb R^N\]<p>被压缩成：</p>
 \[q\in\mathbb R^r.\]<p>Hyper-reduction 再进一步问：</p>
 \[\boxed{ \text{为了算 reduced equation， 真的有必要看全部 }N\text{ 个空间位置吗？} }\]<p>如果真正重要的 nonlinear information 只需要在：</p>
@@ -474,8 +492,8 @@
 \[O(m).\]<p>因此整个结构是：</p>
 \[\text{Full-order model}\]\[\downarrow\]\[\text{POD / Reduced Basis}\]\[\boxed{\text{降低未知量数目}}\]\[\downarrow\]\[\text{Hyper-reduction}\]\[\boxed{\text{降低 nonlinear operator 求值成本}}.\]<p>这两个层次必须同时存在，nonlinear ROM 才可能真正获得数量级的在线加速。</p>
 <hr>
-<h1 id="4-deim既然整个非线性向量有低维结构就没必要把它全部算出来">4. DEIM：既然整个非线性向量有低维结构，就没必要把它全部算出来
-</h1><p>假设：</p>
+<h2 id="4-deim既然整个非线性向量有低维结构就没必要把它全部算出来">4. DEIM：既然整个非线性向量有低维结构，就没必要把它全部算出来
+</h2><p>假设：</p>
 \[f(u)\in\mathbb R^N\]<p>虽然有：</p>
 \[N\]<p>个分量，但在训练数据中主要落在一个：</p>
 \[m\]<p>维子空间：</p>
@@ -491,8 +509,8 @@
 \[f\in\mathbb R^N.\]<p>所以没有解决问题。</p>
 <p>DEIM 的关键是：</p>
 \[\boxed{ \text{只要求 }f\text{ 的 }m\text{ 个精选分量。} }\]<hr>
-<h1 id="5-deim-的核心公式非常漂亮">5. DEIM 的核心公式非常漂亮
-</h1><p>选取：</p>
+<h2 id="5-deim-的核心公式非常漂亮">5. DEIM 的核心公式非常漂亮
+</h2><p>选取：</p>
 \[m\]<p>个索引：</p>
 \[p_1,\ldots,p_m.\]<p>构造选择矩阵：</p>
 \[P= [e_{p_1},\ldots,e_{p_m}] \in\mathbb R^{N\times m}.\]<p>DEIM 要求近似向量：</p>
@@ -510,8 +528,8 @@
 <p>因此 online 阶段只剩：</p>
 \[\boxed{ \text{算 }m\text{ 个非线性分量。} }\]<p>Chaturantabut 与 Sorensen 2010 年的 DEIM 论文正是通过这个结构，让 POD nonlinear ROM 的复杂度显著摆脱 full system dimension。</p>
 <hr>
-<h1 id="6-一个简单例子100-万维-nonlinear-vector只看-50-个坐标">6. 一个简单例子：100 万维 nonlinear vector，只看 50 个坐标
-</h1><p>假设：</p>
+<h2 id="6-一个简单例子100-万维-nonlinear-vector只看-50-个坐标">6. 一个简单例子：100 万维 nonlinear vector，只看 50 个坐标
+</h2><p>假设：</p>
 \[N=10^6, \qquad r=30, \qquad m=50.\]<p>普通 POD ROM：</p>
 \[q\in\mathbb R^{30}.\]<p>但每次仍计算：</p>
 \[10^6\]<p>维 nonlinear force。</p>
@@ -547,8 +565,8 @@
 \[50\]<p>级。</p>
 <p>这就是为什么它被称作 hyper-reduction。</p>
 <hr>
-<h1 id="7-deim-点不是随机选的">7. DEIM 点不是随机选的
-</h1><p>如果随便选择：</p>
+<h2 id="7-deim-点不是随机选的">7. DEIM 点不是随机选的
+</h2><p>如果随便选择：</p>
 \[m\]<p>个坐标，很可能：</p>
 \[P^TU\]<p>接近奇异。</p>
 <p>那么：</p>
@@ -567,8 +585,8 @@
 \[\boxed{ \text{当前已有采样位置最难解释的 nonlinear mode 在哪里？} }\]<p>这和 greedy reduced basis、active learning 在思想上有明显相似性，但 DEIM 的目标很具体：</p>
 \[\boxed{ \text{让 nonlinear field 能从少数坐标稳定重构。} }\]<p>pyMOR 当前仍直接提供 <code>deim()</code> 和 empirical-interpolation operator 接口，并通过 nonlinear snapshots 生成 collateral basis 与 interpolation DOFs。</p>
 <hr>
-<h1 id="8-deim-的误差由两个东西共同控制">8. DEIM 的误差由两个东西共同控制
-</h1><p>其典型误差结构可以理解成：</p>
+<h2 id="8-deim-的误差由两个东西共同控制">8. DEIM 的误差由两个东西共同控制
+</h2><p>其典型误差结构可以理解成：</p>
 \[\|f-\tilde f\| \lesssim \underbrace{ \|(I-UU^T)f\| }_{\text{nonlinear basis 截断误差}} \times \underbrace{ \|(P^TU)^{-1}\| }_{\text{插值点条件数}} .\]<p>第一项回答：</p>
 <blockquote>
 <p>nonlinear POD basis 本身够不够表达 \(f\)？</p>
@@ -582,8 +600,8 @@
 <p>你同时需要：</p>
 \[\boxed{ \text{good collateral basis} + \text{good sampling points}. }\]<p>后续 POD-DEIM 的理论分析明确给出了 reduced state error 与 neglected POD singular values、DEIM nonlinear approximation error 之间的关系。</p>
 <hr>
-<h1 id="9-但-deim-用在非线性结构动力学上有一个隐患它主要近似向量不一定保持物理结构">9. 但 DEIM 用在非线性结构动力学上有一个隐患：它主要近似“向量”，不一定保持“物理结构”
-</h1><details class="reveal">
+<h2 id="9-但-deim-用在非线性结构动力学上有一个隐患它主要近似向量不一定保持物理结构">9. 但 DEIM 用在非线性结构动力学上有一个隐患：它主要近似“向量”，不一定保持“物理结构”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>考虑有限元内力：</p>
@@ -607,8 +625,8 @@
 </details>
 
 <hr>
-<h1 id="10-ecsw与其重构整条-nonlinear-force不如直接挑少数代表单元">10. ECSW：与其重构整条 nonlinear force，不如直接挑少数“代表单元”
-</h1><details class="reveal">
+<h2 id="10-ecsw与其重构整条-nonlinear-force不如直接挑少数代表单元">10. ECSW：与其重构整条 nonlinear force，不如直接挑少数“代表单元”
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>有限元内力天然可以写成单元求和：</p>
@@ -648,8 +666,8 @@
 </details>
 
 <hr>
-<h1 id="11-为什么-ecsw-的权重必须认真学">11. 为什么 ECSW 的权重必须认真学？
-</h1><details class="reveal">
+<h2 id="11-为什么-ecsw-的权重必须认真学">11. 为什么 ECSW 的权重必须认真学？
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>如果只是随机取：</p>
@@ -683,8 +701,8 @@
 </details>
 
 <hr>
-<h1 id="12-为什么-ecsw-会比直接重构-nonlinear-vector更适合结构力学">12. 为什么 ECSW 会比“直接重构 nonlinear vector”更适合结构力学？
-</h1><details class="reveal">
+<h2 id="12-为什么-ecsw-会比直接重构-nonlinear-vector更适合结构力学">12. 为什么 ECSW 会比“直接重构 nonlinear vector”更适合结构力学？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>因为有限元本身就是按单元积分/装配建立的。</p>
@@ -704,51 +722,51 @@
 </details>
 
 <hr>
-<h1 id="13-deim-与-ecsw-最值得记住的区别">13. DEIM 与 ECSW 最值得记住的区别
-</h1><details class="reveal">
+<h2 id="13-deim-与-ecsw-最值得记住的区别">13. DEIM 与 ECSW 最值得记住的区别
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>可以这样理解：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th></th>
-					<th>DEIM</th>
-					<th>ECSW</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>近似对象</td>
-					<td>nonlinear vector \(f(u)\)</td>
-					<td>projected FE element contributions</td>
-			</tr>
-			<tr>
-					<td>采样对象</td>
-					<td>vector entries / DOFs</td>
-					<td>finite elements</td>
-			</tr>
-			<tr>
-					<td>核心结构</td>
-					<td>interpolation</td>
-					<td>sampled quadrature</td>
-			</tr>
-			<tr>
-					<td>主要优势</td>
-					<td>通用、简单、适合一般 nonlinear operator</td>
-					<td>特别适合 FE mechanics</td>
-			</tr>
-			<tr>
-					<td>物理结构</td>
-					<td>不自动保持</td>
-					<td>可保持能量/Lagrangian结构</td>
-			</tr>
-			<tr>
-					<td>在线成本</td>
-					<td>与选中 DOF 数相关</td>
-					<td>与选中单元数相关</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th></th>
+          <th>DEIM</th>
+          <th>ECSW</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>近似对象</td>
+          <td>nonlinear vector \(f(u)\)</td>
+          <td>projected FE element contributions</td>
+      </tr>
+      <tr>
+          <td>采样对象</td>
+          <td>vector entries / DOFs</td>
+          <td>finite elements</td>
+      </tr>
+      <tr>
+          <td>核心结构</td>
+          <td>interpolation</td>
+          <td>sampled quadrature</td>
+      </tr>
+      <tr>
+          <td>主要优势</td>
+          <td>通用、简单、适合一般 nonlinear operator</td>
+          <td>特别适合 FE mechanics</td>
+      </tr>
+      <tr>
+          <td>物理结构</td>
+          <td>不自动保持</td>
+          <td>可保持能量/Lagrangian结构</td>
+      </tr>
+      <tr>
+          <td>在线成本</td>
+          <td>与选中 DOF 数相关</td>
+          <td>与选中单元数相关</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>所以对一般 nonlinear PDE：</p>
 \[\boxed{\text{DEIM 是非常自然的入口}}\]<p>而对 nonlinear FEM / structural dynamics：</p>
@@ -758,8 +776,8 @@
 </details>
 
 <hr>
-<h1 id="14-hyper-reduction-和普通网格粗化不是一回事">14. Hyper-reduction 和普通“网格粗化”不是一回事
-</h1><details class="reveal">
+<h2 id="14-hyper-reduction-和普通网格粗化不是一回事">14. Hyper-reduction 和普通“网格粗化”不是一回事
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设原模型：</p>
@@ -784,8 +802,8 @@
 </details>
 
 <hr>
-<h1 id="15-为什么它与代理模型有本质区别">15. 为什么它与代理模型有本质区别？
-</h1><details class="reveal">
+<h2 id="15-为什么它与代理模型有本质区别">15. 为什么它与代理模型有本质区别？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p><span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span> / <span class="term-anchor" data-term="neural-operator" tabindex="0">Neural Operator</span> 通常直接学习：</p>
@@ -807,8 +825,8 @@
 </details>
 
 <hr>
-<h1 id="16-但-hyper-reduction-仍然有一个非常明显的训练域问题">16. 但 Hyper-reduction 仍然有一个非常明显的“训练域”问题
-</h1><details class="reveal">
+<h2 id="16-但-hyper-reduction-仍然有一个非常明显的训练域问题">16. 但 Hyper-reduction 仍然有一个非常明显的“训练域”问题
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设 ECSW 只在：</p>
@@ -829,8 +847,8 @@
 </details>
 
 <hr>
-<h1 id="17-这和你的软体动力学尤其有一个值得注意的冲突接触高度局部且会移动">17. 这和你的软体动力学尤其有一个值得注意的冲突：接触高度局部且会移动
-</h1><details class="reveal">
+<h2 id="17-这和你的软体动力学尤其有一个值得注意的冲突接触高度局部且会移动">17. 这和你的软体动力学尤其有一个值得注意的冲突：接触高度局部且会移动
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设软体落地。</p>
@@ -860,8 +878,8 @@
 </details>
 
 <hr>
-<h1 id="18-一个特别值得迁移到物理引擎的思想不要降整个系统降最贵的算子调用次数">18. 一个特别值得迁移到物理引擎的思想：不要降整个系统，降“最贵的算子调用次数”
-</h1><details class="reveal">
+<h2 id="18-一个特别值得迁移到物理引擎的思想不要降整个系统降最贵的算子调用次数">18. 一个特别值得迁移到物理引擎的思想：不要降整个系统，降“最贵的算子调用次数”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>Hyper-reduction 给物理引擎开发最大的启发，甚至不一定要真正做 ROM。</p>
@@ -896,8 +914,8 @@
 </details>
 
 <hr>
-<h1 id="19-它对代理模型还有一个很强的启发可以代理算子不一定代理最终输出">19. 它对代理模型还有一个很强的启发：可以代理“算子”，不一定代理最终输出
-</h1><details class="reveal">
+<h2 id="19-它对代理模型还有一个很强的启发可以代理算子不一定代理最终输出">19. 它对代理模型还有一个很强的启发：可以代理“算子”，不一定代理最终输出
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>通常代理模型研究：</p>
@@ -922,8 +940,8 @@
 </ul>
 <p>都非常有迁移价值。</p>
 <hr>
-<h1 id="20-一个特别适合亲手做的最小实验">20. 一个特别适合亲手做的最小实验
-</h1><details class="reveal">
+<h2 id="20-一个特别适合亲手做的最小实验">20. 一个特别适合亲手做的最小实验
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>可以做一个 nonlinear spring chain：</p>
@@ -951,8 +969,8 @@
 </details>
 
 <hr>
-<h1 id="21-deim不要计算完整非线性场只看几个最有信息量的位置">21. DEIM：不要计算完整非线性场，只看几个“最有信息量”的位置
-</h1><details class="reveal">
+<h2 id="21-deim不要计算完整非线性场只看几个最有信息量的位置">21. DEIM：不要计算完整非线性场，只看几个“最有信息量”的位置
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设 nonlinear-force snapshots 可以低秩表示：</p>
@@ -974,8 +992,8 @@
 </details>
 
 <hr>
-<h1 id="22-ecsw对非线性-fem更自然的是只计算少量单元">22. ECSW：对非线性 FEM，更自然的是“只计算少量单元”
-</h1><details class="reveal">
+<h2 id="22-ecsw对非线性-fem更自然的是只计算少量单元">22. ECSW：对非线性 FEM，更自然的是“只计算少量单元”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>结构 FEM 还有一种更物理的思路。</p>
@@ -993,8 +1011,8 @@
 </details>
 
 <hr>
-<h1 id="23-为什么这件事对软体动力学尤其重要">23. 为什么这件事对软体动力学尤其重要？
-</h1><details class="reveal">
+<h2 id="23-为什么这件事对软体动力学尤其重要">23. 为什么这件事对软体动力学尤其重要？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设未来对四面体 Neo-Hookean 求解器做 POD：</p>
@@ -1002,17 +1020,17 @@
 \[ F_e,\quad J_e,\quad P_e,\quad f_e, \]<p>那么真正昂贵的 constitutive evaluation 根本没有消失。</p>
 <p>Hyper-reduction 的目标就是：</p>
 \[ \boxed{ 10^6\text{ DOF} \rightarrow 30\text{ reduced coordinates} } \]<p>同时再做到</p>
-\[ \boxed{ 10^5\text{ constitutive evaluations} \rightarrow 10^2\sim10^3\text{ sampled evaluations}. } \]<p>这也是为什么上一张 <span class="term-anchor" data-term="pd" tabindex="0">Projective Dynamics</span> 卡片中提到的 <strong>Hyper-Reduced PD</strong> 很重要：仅降低 global state dimension 还不够，local projection 的数量同样必须减少。</p>
+\[ \boxed{ 10^5\text{ constitutive evaluations} \rightarrow 10^2\sim10^3\text{ sampled evaluations}. } \]<p>在 <span class="term-anchor" data-term="pd" tabindex="0">Projective Dynamics</span> 中，这个瓶颈催生了 <a class="link" href="../03-projective-dynamics/" >Hyper-Reduced PD</a>：仅降低 global state dimension 还不够，local projection 的数量同样必须减少。</p>
 <p>这里还揭示了一个更一般的工程原则：</p>
-\[ \boxed{\text{降维 ≠ 降计算量。}} \]<p>判断一个 ROM 是否真正在线加速，应检查它的 online complexity 中是否还残留：</p>
+\[ \boxed{\text{降维}\ne\text{降低计算量}} \]<p>判断一个 ROM 是否真正在线加速，应检查它的 online complexity 中是否还残留：</p>
 \[ N,\qquad n_e,\qquad n_{\rm quad}. \]<p>如果存在，往往说明 ROM 尚未真正摆脱 FOM。</p>
 
   </div>
 </details>
 
 <hr>
-<h1 id="24-但-hyper-reduction-会制造一种新的危险破坏物理结构">24. 但 Hyper-reduction 会制造一种新的危险：破坏物理结构
-</h1><details class="reveal">
+<h2 id="24-但-hyper-reduction-会制造一种新的危险破坏物理结构">24. 但 Hyper-reduction 会制造一种新的危险：破坏物理结构
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>普通 DEIM 的目标主要是：</p>
@@ -1033,16 +1051,16 @@
 </details>
 
 <hr>
-<h1 id="25-它在知识体系中卡在哪里">25. 它在知识体系中卡在哪里？
-</h1><p>可以把非线性 ROM 的完整链条记成：</p>
+<h2 id="25-它在知识体系中卡在哪里">25. 它在知识体系中卡在哪里？
+</h2><p>可以把非线性 ROM 的完整链条记成：</p>
 \[ \text{FOM} \]\[ \downarrow \]\[ \boxed{\text{POD / Reduced Basis}} \]<p>解决：<strong>状态太大</strong></p>
 \[ \downarrow \]\[ \boxed{\text{DEIM / ECSW / GNAT}} \]<p>解决：<strong>非线性算子仍然太贵</strong></p>
 \[ \downarrow \]\[ \boxed{\text{Structure-preserving hyper-reduction}} \]<p>解决：<strong>加速以后物理结构是否还在</strong></p>
 <p>其中 GNAT 又走了一条略不同的路线：它采用 residual-minimizing Petrov–Galerkin ROM，再通过 gappy POD 和 sample mesh 对残差/Jacobian 进行 hyper-reduction。其大型 CFD 案例包含超过 1700 万自由度，并报告了超过两个数量级的计算资源缩减且与高维结果差异低于 1%。</p>
 <p>所以今天最值得留下的一句话是：</p>
 \[ \boxed{ \text{POD 告诉你系统只需要几十个状态变量描述； Hyper-reduction 才让计算机真的只做与这几十维相称的工作。} } \]<p>这一步是很多“论文里的 ROM”能否真正变成<strong>在线实时模型、优化内循环模型或数字孪生模型</strong>的分水岭。</p>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Hyper-reduction 最重要的公式并不是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Hyper-reduction 最重要的公式并不是：</p>
 \[f \approx U(P^TU)^{-1}P^Tf.\]<p>真正值得记住的是：</p>
 \[\boxed{ \text{减少未知量，并不自动减少构造方程的成本。} }\]<p>所以 nonlinear model reduction 真正完整的知识结构是：</p>
 \[\text{Full nonlinear FEM}\]\[\downarrow\]\[\boxed{ u\approx Vq }\]<p><strong>State reduction</strong></p>
@@ -1051,8 +1069,8 @@
 <p>而 DEIM 与 ECSW 的区别又揭示了一个更深的原则：</p>
 \[\boxed{ \text{“近似得准”只是第一层要求； 对于物理求解器，还要问近似以后保留了什么结构。} }\]<p>对非线性有限元、软体动力学乃至代理模型而言，这都是非常重要的分界线：</p>
 \[\boxed{ \text{你究竟是在压缩状态， 压缩输出， 还是压缩物理算子的计算本身？} }\]<p>Hyper-reduction 正好卡在第三层。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1259,9 +1277,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

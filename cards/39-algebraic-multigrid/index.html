@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Algebraic Multigrid（AMG，代数多重网格）\n领域：有限元 × 数值线性代数 × 物理求解器 × HPC\n阅读时间：约 4–5 分钟\n今天补充一个此前尚未系统覆盖、但对大型有限元求解器至关重要的概念：代数多重网格。\n它解决的是一个非常基础的问题：随着网格不断细化，为什么许多迭代求解器越来越慢？AMG 的核心发现是：\n迭代方法难以消除的误差，往往可以通过改变表示尺度，转化成容易处理的误差。\n这使得某些大型稀疏线性系统能够以接近 \\(O(N)\\) 的计算复杂度求解，而不必付出传统直接分解的高昂代价。AMG 尤其适合椭圆型 PDE 离散产生的系统，实际表现仍取决于算子性质和粗化策略。\n一、为什么普通迭代法会越算越慢？ 考虑有限元中的线性系统：\n\\[ Ku=f. \\]先用最简单的一维 Poisson 方程理解：\n\\[ -\\frac{d^2u}{dx^2}=f(x). \\]离散以后：\n\\[ K=\\frac{1}{h^2} \\begin{bmatrix} 2&-1&&\\\\ -1&2&-1&\\\\ &\\ddots&\\ddots&\\ddots\\\\ &&-1&2 \\end{bmatrix}. \\]使用 Jacobi 迭代：\n\\[ u^{k+1}=u^k+\\omega D^{-1}(f-Ku^k). \\]其中 \\(D\\) 是 \\(K\\) 的对角部分。\n设误差为：\n\\[ e^k=u^k-u^\\star. \\]那么：\n\\[ e^{k+1}=(I-\\omega D^{-1}K)e^k. \\]对离散正弦误差模式进行分析，可以得到误差放大因子：\n\\[ \\boxed{ \\mu_j=1-\\omega\\left(1-\\cos\\frac{j\\pi}{n+1}\\right). } \\]取 \\(\\omega=2/3\\)。\n对于高频误差，\\(|\\mu_j|\\) 通常较小，意味着误差快速衰减。\n但对于低频误差：\n\\[ j\\ll n, \\]有：\n">
 <title>Algebraic Multigrid：换一个尺度消除难消的误差</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/39-algebraic-multigrid/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Algebraic Multigrid：换一个尺度消除难消的误差">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Algebraic Multigrid：换一个尺度消除难消的误差">
 <meta property='og:description' content="主题：Algebraic Multigrid（AMG，代数多重网格）\n领域：有限元 × 数值线性代数 × 物理求解器 × HPC\n阅读时间：约 4–5 分钟\n今天补充一个此前尚未系统覆盖、但对大型有限元求解器至关重要的概念：代数多重网格。\n它解决的是一个非常基础的问题：随着网格不断细化，为什么许多迭代求解器越来越慢？AMG 的核心发现是：\n迭代方法难以消除的误差，往往可以通过改变表示尺度，转化成容易处理的误差。\n这使得某些大型稀疏线性系统能够以接近 \\(O(N)\\) 的计算复杂度求解，而不必付出传统直接分解的高昂代价。AMG 尤其适合椭圆型 PDE 离散产生的系统，实际表现仍取决于算子性质和粗化策略。\n一、为什么普通迭代法会越算越慢？ 考虑有限元中的线性系统：\n\\[ Ku=f. \\]先用最简单的一维 Poisson 方程理解：\n\\[ -\\frac{d^2u}{dx^2}=f(x). \\]离散以后：\n\\[ K=\\frac{1}{h^2} \\begin{bmatrix} 2&-1&&\\\\ -1&2&-1&\\\\ &\\ddots&\\ddots&\\ddots\\\\ &&-1&2 \\end{bmatrix}. \\]使用 Jacobi 迭代：\n\\[ u^{k+1}=u^k+\\omega D^{-1}(f-Ku^k). \\]其中 \\(D\\) 是 \\(K\\) 的对角部分。\n设误差为：\n\\[ e^k=u^k-u^\\star. \\]那么：\n\\[ e^{k+1}=(I-\\omega D^{-1}K)e^k. \\]对离散正弦误差模式进行分析，可以得到误差放大因子：\n\\[ \\boxed{ \\mu_j=1-\\omega\\left(1-\\cos\\frac{j\\pi}{n+1}\\right). } \\]取 \\(\\omega=2/3\\)。\n对于高频误差，\\(|\\mu_j|\\) 通常较小，意味着误差快速衰减。\n但对于低频误差：\n\\[ j\\ll n, \\]有：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/39-algebraic-multigrid/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -330,11 +330,8 @@
     <li><a href="#五smoothed-aggregation从粗略分组到低能量插值">五、Smoothed Aggregation：从粗略分组到低能量插值</a></li>
     <li><a href="#六它对软体动力学求解器有什么价值">六、它对软体动力学求解器有什么价值？</a></li>
     <li><a href="#七一个很值得做的数值实验">七、一个很值得做的数值实验</a></li>
-    <li><a href="#它在知识体系中卡在哪里">它在知识体系中卡在哪里？</a>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#它在知识体系中卡在哪里">它在知识体系中卡在哪里？</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -578,27 +575,31 @@
 <p>更深一层，它告诉我们：<strong>预条件器本质上是在为迭代算法重新组织问题的几何结构。</strong></p>
 <p>这也是为什么预条件技术值得与有限元、ROM 和数值优化并列学习。</p>
 <hr>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<p>同样为了加速求解，<a class="link" href="../14-anderson-acceleration/" >Anderson 加速</a>利用迭代历史，<a class="link" href="../03-projective-dynamics/" >投影动力学</a>复用全局系统，<a class="link" href="../24-hyper-reduction/" >超降阶</a>减少局部计算。AMG 利用的是误差在不同尺度上的结构。</p>
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p><strong>1. Briggs, Henson &amp; McCormick — <em>A Multigrid Tutorial</em>, 2nd Edition</strong></p>
 <p>SIAM，2000。经典入门教材，推荐重点阅读误差平滑、两层方法和第八章 Algebraic Multigrid。</p>
-<p>SIAM 官方教材第八章</p>
+<p><a class="link" href="https://doi.org/10.1137/1.9780898719505.ch8"  target="_blank" rel="noopener"
+    >SIAM 教材第八章</a></p>
 <p><strong>2. Vaněk, Mandel &amp; Brezina — <em>Algebraic Multigrid by Smoothed Aggregation for Second and Fourth Order Elliptic Problems</em></strong></p>
 <p><em>Computing</em>, 56, 179–196，1996。DOI：10.1007/BF02238511。Smoothed Aggregation 的经典论文。</p>
-<p>NASA 技术报告资料</p>
+<p><a class="link" href="https://doi.org/10.1007/BF02238511"  target="_blank" rel="noopener"
+    >Smoothed Aggregation 原论文</a></p>
 <p><strong>3. PETSc — PCGAMG 与 Near-nullspace 官方文档</strong></p>
 <p>适合直接进入工业级 FEM 求解器实现。尤其推荐阅读刚体模式如何用于 AMG 粗空间构造。</p>
-<p>PETSc 刚体模式接口文档</p>
+<p><a class="link" href="https://petsc.org/main/manualpages/Mat/MatNullSpaceCreateRigidBody/"  target="_blank" rel="noopener"
+    >PETSc 刚体模式接口文档</a></p>
 <p><strong>4. hypre — BoomerAMG 官方文档</strong></p>
 <p>hypre 的 BoomerAMG 是广泛应用的并行 AMG 实现。文档介绍了粗化、插值、松弛及并行求解参数。</p>
-<p>BoomerAMG 官方文档</p>
+<p><a class="link" href="https://hypre.readthedocs.io/en/stable/solvers-boomeramg.html"  target="_blank" rel="noopener"
+    >BoomerAMG 官方文档</a></p>
 <p><strong>5. PyAMG — 官方文档与实现</strong></p>
 <p>适合用 Python 快速进行数值实验，包含 Classical AMG、Smoothed Aggregation 和 Krylov 预条件示例。</p>
-<p>PyAMG 官方文档</p>
-<hr>
-<p><strong>知识卡片注册表更新：</strong> 第 55 张，新增主题「Algebraic Multigrid」。所属方向：有限元 / 数值线性代数 / 物理求解器。核心问题：如何利用多尺度误差结构，实现大型稀疏系统的高效迭代求解。与第 35 张 <span class="term-anchor" data-term="anderson" tabindex="0">Anderson Acceleration</span>、第 49–50 张 Projective Dynamics、第 52 张 Hyper-reduction 构成相邻但不重复的求解加速知识分支。</p>
+<p><a class="link" href="https://github.com/pyamg/pyamg"  target="_blank" rel="noopener"
+    >PyAMG 项目与示例</a></p>
 
   </div>
 </details>
@@ -782,9 +783,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

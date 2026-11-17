@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Speculative Decoding / Speculative Sampling（推测解码）\n领域：AI 全栈工程 × 大模型推理 × 高性能计算\n推荐阅读时间：约 8–10 分钟\n上一张卡片讲 Continuous Batching，解决的是：\n\\[\\boxed{\\text{多个请求之间怎样更高效地共享 GPU}}\\]今天的 Speculative Decoding 解决的是另一个更底层的问题：\n\\[\\boxed{\\text{单个请求为什么非得一个 token 一个 token 串行生成？}}\\]标准自回归模型：\n\\[p(x_{1:T}) = \\prod_{t=1}^{T} p(x_t\\mid x_{">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Speculative Decoding / Speculative Sampling（推测解码）\n领域：AI 全栈工程 × 大模型推理 × 高性能计算\n推荐阅读时间：约 8–10 分钟\n连续批处理（Continuous Batching）解决的是\n\\[\\boxed{\\text{多个请求之间怎样更高效地共享 GPU}}\\]今天的 Speculative Decoding 解决的是另一个更底层的问题：\n\\[\\boxed{\\text{单个请求为什么非得一个 token 一个 token 串行生成？}}\\]标准自回归模型：\n\\[p(x_{1:T}) = \\prod_{t=1}^{T} p(x_t\\mid x_{\\lt t})\\]导致生成第 \\(t+1\\) 个 token 前，必须先知道第 \\(t\\) 个：\n\\[x_t\\rightarrow x_{t+1}\\rightarrow x_{t+2}.\\]因此生成 100 个 token，原则上需要约 100 次串行 target-model decoding step。\nSpeculative Decoding 的关键突破是：\n\\[\\boxed{ \\text{依赖关系不能消灭， 但可以“猜测未来”，然后并行验证。} }\\]让一个便宜的 draft model 一次猜出：\n\\[x_{t+1},x_{t+2},\\ldots,x_{t+\\gamma},\\]再让昂贵的大模型在一次并行 forward中同时检查这些位置。\nLeviathan、Kalman、Matias 在 ICML 2023 的工作报告 T5-XXL 上约 \\(2\\!-\\!3\\times\\) 加速；几乎同期 DeepMind 的 Chen 等人在 Chinchilla 70B 上报告约 \\(2\\!-\\!2.5\\times\\) decoding speedup。更关键的是，两套工作的经典 speculative sampling 都能保持 target model 的原始采样分布，而非用质量换速度。\n">
 <title>Speculative Decoding：为什么一个“小模型猜答案 &#43; 大模型批量验算”的系统，可以在**不改变目标分布**的前提下加速大模型</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/29-speculative-decoding/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Speculative Decoding：为什么一个“小模型猜答案 + 大模型批量验算”的系统，可以在**不改变目标分布**的前提下加速大模型">
-<meta property='og:description' content="主题：Speculative Decoding / Speculative Sampling（推测解码）\n领域：AI 全栈工程 × 大模型推理 × 高性能计算\n推荐阅读时间：约 8–10 分钟\n上一张卡片讲 Continuous Batching，解决的是：\n\\[\\boxed{\\text{多个请求之间怎样更高效地共享 GPU}}\\]今天的 Speculative Decoding 解决的是另一个更底层的问题：\n\\[\\boxed{\\text{单个请求为什么非得一个 token 一个 token 串行生成？}}\\]标准自回归模型：\n\\[p(x_{1:T}) = \\prod_{t=1}^{T} p(x_t\\mid x_{">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Speculative Decoding：为什么一个“小模型猜答案 + 大模型批量验算”的系统，可以在**不改变目标分布**的前提下加速大模型">
+<meta property='og:description' content="主题：Speculative Decoding / Speculative Sampling（推测解码）\n领域：AI 全栈工程 × 大模型推理 × 高性能计算\n推荐阅读时间：约 8–10 分钟\n连续批处理（Continuous Batching）解决的是\n\\[\\boxed{\\text{多个请求之间怎样更高效地共享 GPU}}\\]今天的 Speculative Decoding 解决的是另一个更底层的问题：\n\\[\\boxed{\\text{单个请求为什么非得一个 token 一个 token 串行生成？}}\\]标准自回归模型：\n\\[p(x_{1:T}) = \\prod_{t=1}^{T} p(x_t\\mid x_{\\lt t})\\]导致生成第 \\(t+1\\) 个 token 前，必须先知道第 \\(t\\) 个：\n\\[x_t\\rightarrow x_{t+1}\\rightarrow x_{t+2}.\\]因此生成 100 个 token，原则上需要约 100 次串行 target-model decoding step。\nSpeculative Decoding 的关键突破是：\n\\[\\boxed{ \\text{依赖关系不能消灭， 但可以“猜测未来”，然后并行验证。} }\\]让一个便宜的 draft model 一次猜出：\n\\[x_{t+1},x_{t+2},\\ldots,x_{t+\\gamma},\\]再让昂贵的大模型在一次并行 forward中同时检查这些位置。\nLeviathan、Kalman、Matias 在 ICML 2023 的工作报告 T5-XXL 上约 \\(2\\!-\\!3\\times\\) 加速；几乎同期 DeepMind 的 Chen 等人在 Chinchilla 70B 上报告约 \\(2\\!-\\!2.5\\times\\) decoding speedup。更关键的是，两套工作的经典 speculative sampling 都能保持 target model 的原始采样分布，而非用质量换速度。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/29-speculative-decoding/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='AI 全栈工程' /><meta property='article:tag' content='大模型推理' /><meta property='article:tag' content='高性能计算' /><meta property='article:published_time' content='2026-09-12T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-12T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Speculative Decoding：为什么一个“小模型猜答案 + 大模型批量验算”的系统，可以在**不改变目标分布**的前提下加速大模型">
-<meta name="twitter:description" content="主题：Speculative Decoding / Speculative Sampling（推测解码）\n领域：AI 全栈工程 × 大模型推理 × 高性能计算\n推荐阅读时间：约 8–10 分钟\n上一张卡片讲 Continuous Batching，解决的是：\n\\[\\boxed{\\text{多个请求之间怎样更高效地共享 GPU}}\\]今天的 Speculative Decoding 解决的是另一个更底层的问题：\n\\[\\boxed{\\text{单个请求为什么非得一个 token 一个 token 串行生成？}}\\]标准自回归模型：\n\\[p(x_{1:T}) = \\prod_{t=1}^{T} p(x_t\\mid x_{">
+<meta name="twitter:description" content="主题：Speculative Decoding / Speculative Sampling（推测解码）\n领域：AI 全栈工程 × 大模型推理 × 高性能计算\n推荐阅读时间：约 8–10 分钟\n连续批处理（Continuous Batching）解决的是\n\\[\\boxed{\\text{多个请求之间怎样更高效地共享 GPU}}\\]今天的 Speculative Decoding 解决的是另一个更底层的问题：\n\\[\\boxed{\\text{单个请求为什么非得一个 token 一个 token 串行生成？}}\\]标准自回归模型：\n\\[p(x_{1:T}) = \\prod_{t=1}^{T} p(x_t\\mid x_{\\lt t})\\]导致生成第 \\(t+1\\) 个 token 前，必须先知道第 \\(t\\) 个：\n\\[x_t\\rightarrow x_{t+1}\\rightarrow x_{t+2}.\\]因此生成 100 个 token，原则上需要约 100 次串行 target-model decoding step。\nSpeculative Decoding 的关键突破是：\n\\[\\boxed{ \\text{依赖关系不能消灭， 但可以“猜测未来”，然后并行验证。} }\\]让一个便宜的 draft model 一次猜出：\n\\[x_{t+1},x_{t+2},\\ldots,x_{t+\\gamma},\\]再让昂贵的大模型在一次并行 forward中同时检查这些位置。\nLeviathan、Kalman、Matias 在 ICML 2023 的工作报告 T5-XXL 上约 \\(2\\!-\\!3\\times\\) 加速；几乎同期 DeepMind 的 Chen 等人在 Chinchilla 70B 上报告约 \\(2\\!-\\!2.5\\times\\) decoding speedup。更关键的是，两套工作的经典 speculative sampling 都能保持 target model 的原始采样分布，而非用质量换速度。\n">
     </head>
     <body class="
     article-page">
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -329,23 +329,32 @@
         <li><a href="#验证一串候选">验证一串候选</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-基本结构draft--verify">2. 基本结构：Draft → Verify</a></li>
+    <li><a href="#3-但这里有一个核心难题draft-猜错怎么办">3. 但这里有一个核心难题：Draft 猜错怎么办？</a></li>
+    <li><a href="#4-最值得理解的公式接受概率">4. 最值得理解的公式：接受概率</a></li>
+    <li><a href="#5-被拒绝以后不能简单重新从--采样">5. 被拒绝以后，不能简单重新从  采样</a></li>
+    <li><a href="#6-一个离散小例子">6. 一个离散小例子</a></li>
+    <li><a href="#7-真正决定性能的是-acceptance-rate">7. 真正决定性能的是 Acceptance Rate</a></li>
+    <li><a href="#8-这产生了一个很典型的双重-trade-off">8. 这产生了一个很典型的双重 trade-off</a></li>
+    <li><a href="#9-为什么-speculative-decoding-本质上也是一种-multi-fidelity-方法">9. 为什么 Speculative Decoding 本质上也是一种 Multi-Fidelity 方法？</a>
       <ol>
         <li><a href="#低保真模型">低保真模型</a></li>
         <li><a href="#高保真模型">高保真模型</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#10-这和-mfmc-又有一个重要区别">10. 这和 MFMC 又有一个重要区别</a></li>
+    <li><a href="#11-为什么draft-正确率-90仍不足以预测-speedup">11. 为什么“Draft 正确率 90%”仍不足以预测 speedup？</a></li>
+    <li><a href="#12-为什么高并发场景反而可能让它不那么划算">12. 为什么高并发场景反而可能让它不那么划算？</a></li>
+    <li><a href="#13-经典双模型方案还有一个现实问题需要多放一个模型">13. 经典双模型方案还有一个现实问题：需要多放一个模型</a></li>
+    <li><a href="#14-medusa让大模型自己一次预测多个未来-token">14. Medusa：让大模型自己一次预测多个未来 token</a></li>
+    <li><a href="#15-eagle甚至不一定要在-token-空间里猜">15. EAGLE：甚至不一定要在 token 空间里猜</a></li>
+    <li><a href="#16-到-2026-年speculative-decoding-已经从一个算法演化成方法族">16. 到 2026 年，Speculative Decoding 已经从“一个算法”演化成“方法族”</a></li>
+    <li><a href="#17-它和-branch-prediction-有什么共同思想">17. 它和 Branch Prediction 有什么共同思想？</a></li>
+    <li><a href="#18-对物理求解器它甚至提供了一个很有野心的类比">18. 对物理求解器，它甚至提供了一个很有野心的类比</a></li>
+    <li><a href="#19-对代理模型还有一个更重要的启发代理不必直接取代高保真模型">19. 对代理模型还有一个更重要的启发：代理不必直接取代高保真模型</a></li>
+    <li><a href="#20-一个最值得自己实现的最小实验">20. 一个最值得自己实现的最小实验</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -402,7 +411,7 @@
 
 
                 <time class="article-time--reading">
-                    阅读时长: 1 分钟
+                    阅读时长: 7 分钟
                 </time>
             </div>
         
@@ -420,10 +429,10 @@
     <p><strong>主题：Speculative Decoding / Speculative Sampling（推测解码）</strong><br>
 <strong>领域：AI 全栈工程 × 大模型推理 × 高性能计算</strong><br>
 <strong>推荐阅读时间：约 8–10 分钟</strong><br>
-上一张卡片讲 Continuous Batching，解决的是：</p>
+<a class="link" href="../28-continuous-batching/" >连续批处理（Continuous Batching）</a>解决的是</p>
 \[\boxed{\text{多个请求之间怎样更高效地共享 GPU}}\]<p>今天的 Speculative Decoding 解决的是另一个更底层的问题：</p>
 \[\boxed{\text{单个请求为什么非得一个 token 一个 token 串行生成？}}\]<p>标准自回归模型：</p>
-\[p(x_{1:T}) = \prod_{t=1}^{T} p(x_t\mid x_{<t})\]<p>导致生成第 \(t+1\) 个 token 前，必须先知道第 \(t\) 个：</p>
+\[p(x_{1:T}) = \prod_{t=1}^{T} p(x_t\mid x_{\lt t})\]<p>导致生成第 \(t+1\) 个 token 前，必须先知道第 \(t\) 个：</p>
 \[x_t\rightarrow x_{t+1}\rightarrow x_{t+2}.\]<p>因此生成 100 个 token，原则上需要约 100 次串行 target-model decoding step。</p>
 <p>Speculative Decoding 的关键突破是：</p>
 \[\boxed{ \text{依赖关系不能消灭， 但可以“猜测未来”，然后并行验证。} }\]<p>让一个便宜的 draft model 一次猜出：</p>
@@ -448,8 +457,8 @@
 <p>所以 speculative decoding 利用的是：</p>
 \[\boxed{\text{模型 decode 阶段存在“闲置算力”。}}\]<p>它拿这些闲置算力来验证未来 token。</p>
 <hr>
-<h1 id="2-基本结构draft--verify">2. 基本结构：Draft → Verify
-</h1><p>设：</p>
+<h2 id="2-基本结构draft--verify">2. 基本结构：Draft → Verify
+</h2><p>设：</p>
 \[q\]<p>是很小的 draft model，</p>
 \[p\]<p>是我们真正想采样的大 target model。</p>
 <p>当前上下文：</p>
@@ -489,8 +498,8 @@
 \[\boxed{ \text{原本 }\gamma\text{ 次昂贵 target decode} }\]<p>有机会被压缩成：</p>
 \[\boxed{\text{1 次昂贵 target verification}}\]<p>。</p>
 <hr>
-<h1 id="3-但这里有一个核心难题draft-猜错怎么办">3. 但这里有一个核心难题：Draft 猜错怎么办？
-</h1><p>假设 draft 给：</p>
+<h2 id="3-但这里有一个核心难题draft-猜错怎么办">3. 但这里有一个核心难题：Draft 猜错怎么办？
+</h2><p>假设 draft 给：</p>
 \[q(\text{Paris})=0.50\]<p>而 target 给：</p>
 \[p(\text{Paris})=0.80.\]<p>很好。</p>
 <p>但另一个 token：</p>
@@ -508,8 +517,8 @@
 \[p.\]<p>这意味着 temperature、top-p 等采样行为都会被悄悄改变。</p>
 <p>经典 speculative sampling 真正漂亮的地方就在这里：</p>
 \[\boxed{ \text{它把这件事做成了严格的 rejection sampling。} }\]<hr>
-<h1 id="4-最值得理解的公式接受概率">4. 最值得理解的公式：接受概率
-</h1><p>Draft 从：</p>
+<h2 id="4-最值得理解的公式接受概率">4. 最值得理解的公式：接受概率
+</h2><p>Draft 从：</p>
 \[q(x)\]<p>采样出候选：</p>
 \[\tilde x.\]<p>Target 对同一个位置给出：</p>
 \[p(x).\]<p>候选的接受概率为：</p>
@@ -527,8 +536,8 @@
 \[\frac{p}{q}\]<p>的概率接受。</p>
 <p>因此 draft 分布中“超出 target 的部分”会被削掉。</p>
 <hr>
-<h1 id="5-被拒绝以后不能简单重新从--采样">5. 被拒绝以后，不能简单重新从 \(p\) 采样
-</h1><details class="reveal">
+<h2 id="5-被拒绝以后不能简单重新从--采样">5. 被拒绝以后，不能简单重新从 \(p\) 采样
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这是整个算法最精妙的一步。</p>
@@ -552,8 +561,8 @@
 </details>
 
 <hr>
-<h1 id="6-一个离散小例子">6. 一个离散小例子
-</h1><details class="reveal">
+<h2 id="6-一个离散小例子">6. 一个离散小例子
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>设词表只有：</p>
@@ -576,8 +585,8 @@
 </details>
 
 <hr>
-<h1 id="7-真正决定性能的是-acceptance-rate">7. 真正决定性能的是 Acceptance Rate
-</h1><p>设每轮 draft：</p>
+<h2 id="7-真正决定性能的是-acceptance-rate">7. 真正决定性能的是 Acceptance Rate
+</h2><p>设每轮 draft：</p>
 \[\gamma=5\]<p>个 token。</p>
 <p>如果 target 经常接受：</p>
 <div class="highlight"><div class="chroma">
@@ -612,8 +621,8 @@
 \[\alpha=0.5,\]<p>只约：</p>
 \[0.97.\]<p>因此：</p>
 \[\boxed{ \text{draft 只需要“便宜”是不够的， 还必须与 target 足够一致。} }\]<hr>
-<h1 id="8-这产生了一个很典型的双重-trade-off">8. 这产生了一个很典型的双重 trade-off
-</h1><p>Draft 越大：</p>
+<h2 id="8-这产生了一个很典型的双重-trade-off">8. 这产生了一个很典型的双重 trade-off
+</h2><p>Draft 越大：</p>
 \[\boxed{\alpha\uparrow}\]<p>通常预测越准。</p>
 <p>但：</p>
 \[\boxed{T_{\rm draft}\uparrow}\]<p>也更贵。</p>
@@ -625,8 +634,8 @@
 <p>这和很多工程问题类似：</p>
 \[\boxed{ \text{代理模型不是越准越好； 它的精度必须和调用成本一起评价。} }\]<p>这也是 speculative decoding 对 surrogate modeling 特别有迁移价值的一点。</p>
 <hr>
-<h1 id="9-为什么-speculative-decoding-本质上也是一种-multi-fidelity-方法">9. 为什么 Speculative Decoding 本质上也是一种 Multi-Fidelity 方法？
-</h1><p>把它换一种语言描述：</p>
+<h2 id="9-为什么-speculative-decoding-本质上也是一种-multi-fidelity-方法">9. 为什么 Speculative Decoding 本质上也是一种 Multi-Fidelity 方法？
+</h2><p>把它换一种语言描述：</p>
 <h3 id="低保真模型">低保真模型
 </h3>\[q(x)\]<p>便宜、近似。</p>
 <h3 id="高保真模型">高保真模型
@@ -639,8 +648,8 @@
 <p>这是一种非常强的：</p>
 \[\boxed{\text{proposal + exact correction}}\]<p>架构。</p>
 <hr>
-<h1 id="10-这和-mfmc-又有一个重要区别">10. 这和 MFMC 又有一个重要区别
-</h1><p>之前 <span class="term-anchor" data-term="mfmc" tabindex="0">MFMC</span> 使用低保真模型的方式是：</p>
+<h2 id="10-这和-mfmc-又有一个重要区别">10. 这和 MFMC 又有一个重要区别
+</h2><p>之前 <span class="term-anchor" data-term="mfmc" tabindex="0">MFMC</span> 使用低保真模型的方式是：</p>
 \[\boxed{ \text{利用相关性降低统计估计方差} }\]<p>。</p>
 <p>Speculative decoding 使用低保真模型：</p>
 \[\boxed{ \text{预测未来高保真计算可能接受的状态} }\]<p>。</p>
@@ -649,8 +658,8 @@
 \[\text{MFMC} \rightarrow \text{variance reduction}\]\[\boxed{ \text{Speculation} \rightarrow \text{latency hiding / parallel verification} }\]<p>。</p>
 <p>这是 multi-fidelity 思想一个非常不同的分支。</p>
 <hr>
-<h1 id="11-为什么draft-正确率-90仍不足以预测-speedup">11. 为什么“Draft 正确率 90%”仍不足以预测 speedup？
-</h1><details class="reveal">
+<h2 id="11-为什么draft-正确率-90仍不足以预测-speedup">11. 为什么“Draft 正确率 90%”仍不足以预测 speedup？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>因为 wall-clock 速度还依赖：</p>
@@ -677,11 +686,11 @@
 </details>
 
 <hr>
-<h1 id="12-为什么高并发场景反而可能让它不那么划算">12. 为什么高并发场景反而可能让它不那么划算？
-</h1><details class="reveal">
+<h2 id="12-为什么高并发场景反而可能让它不那么划算">12. 为什么高并发场景反而可能让它不那么划算？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
-    <p>这是 speculative decoding 和上一期 Continuous Batching 最重要的联系。</p>
+    <p>这是 speculative decoding 和 Continuous Batching 最重要的联系。</p>
 <p>在低并发时，大模型 decode 可能：</p>
 \[\boxed{\text{memory bound + GPU 算力闲置}}\]<p>。</p>
 <p>Speculative verification 可以利用闲置算力。</p>
@@ -698,8 +707,8 @@
 </details>
 
 <hr>
-<h1 id="13-经典双模型方案还有一个现实问题需要多放一个模型">13. 经典双模型方案还有一个现实问题：需要多放一个模型
-</h1><details class="reveal">
+<h2 id="13-经典双模型方案还有一个现实问题需要多放一个模型">13. 经典双模型方案还有一个现实问题：需要多放一个模型
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设 target：</p>
@@ -722,8 +731,8 @@
 </details>
 
 <hr>
-<h1 id="14-medusa让大模型自己一次预测多个未来-token">14. Medusa：让大模型自己一次预测多个未来 token
-</h1><p>Medusa 不单独放一个完整小模型。</p>
+<h2 id="14-medusa让大模型自己一次预测多个未来-token">14. Medusa：让大模型自己一次预测多个未来 token
+</h2><p>Medusa 不单独放一个完整小模型。</p>
 <p>它在模型顶部增加多个轻量 decoding heads。</p>
 <p>普通 LM head 预测：</p>
 \[x_{t+1}.\]<p>Medusa heads 进一步尝试预测：</p>
@@ -748,8 +757,8 @@
 <p>Medusa 在 ICML 2024 发表；论文报告 Medusa-1 可超过约 \(2.2\times\) 加速，进一步联合训练的 Medusa-2 报告约 \(2.3\!-\!3.6\times\) 的实验加速范围。</p>
 <p>它体现了另一个重要方向：</p>
 \[\boxed{ \text{未来 token prediction 本身可以成为模型 architecture 的能力。} }\]<hr>
-<h1 id="15-eagle甚至不一定要在-token-空间里猜">15. EAGLE：甚至不一定要在 token 空间里猜
-</h1><p>EAGLE 提出了一个更有意思的问题：</p>
+<h2 id="15-eagle甚至不一定要在-token-空间里猜">15. EAGLE：甚至不一定要在 token 空间里猜
+</h2><p>EAGLE 提出了一个更有意思的问题：</p>
 <blockquote>
 <p>Token 很离散、很难预测，那么能不能先预测模型内部 feature？</p>
 </blockquote>
@@ -759,8 +768,8 @@
 <p>其 ICML 2024 工作在 LLaMA2-Chat 70B 上报告约 \(2.7\!-\!3.5\times\) latency speedup，并保持最终生成分布。</p>
 <p>这揭示了 speculative decoding 的一个更普遍版本：</p>
 \[\boxed{ \text{“猜未来”不一定发生在输出 token 空间， 也可以发生在内部状态空间。} }\]<hr>
-<h1 id="16-到-2026-年speculative-decoding-已经从一个算法演化成方法族">16. 到 2026 年，Speculative Decoding 已经从“一个算法”演化成“方法族”
-</h1><p>当前 vLLM 文档已经把 speculation 暴露成统一配置，并支持/覆盖多类 proposer 思路，包括：</p>
+<h2 id="16-到-2026-年speculative-decoding-已经从一个算法演化成方法族">16. 到 2026 年，Speculative Decoding 已经从“一个算法”演化成“方法族”
+</h2><p>当前 vLLM 文档已经把 speculation 暴露成统一配置，并支持/覆盖多类 proposer 思路，包括：</p>
 <ul>
 <li>独立 draft model；</li>
 <li>n-gram / prompt lookup；</li>
@@ -776,8 +785,8 @@
 \[\boxed{\text{“一个小 LLM + 一个大 LLM”}}\]<p>而应该理解为：</p>
 \[\boxed{ \text{cheap proposal mechanism} + \text{authoritative parallel verification} }\]<p>。</p>
 <hr>
-<h1 id="17-它和-branch-prediction-有什么共同思想">17. 它和 Branch Prediction 有什么共同思想？
-</h1><p>CPU 遇到：</p>
+<h2 id="17-它和-branch-prediction-有什么共同思想">17. 它和 Branch Prediction 有什么共同思想？
+</h2><p>CPU 遇到：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -800,8 +809,8 @@
 \[\boxed{ \text{predict future computation} \rightarrow \text{execute/verify in parallel} \rightarrow \text{accept or discard}. }\]<p>共同思想是：</p>
 \[\boxed{ \text{当真正的依赖无法消除时， 可以通过预测跨越依赖。} }\]<p>这是一种非常普遍的计算机体系结构思想。</p>
 <hr>
-<h1 id="18-对物理求解器它甚至提供了一个很有野心的类比">18. 对物理求解器，它甚至提供了一个很有野心的类比
-</h1><p>假设 nonlinear time stepping：</p>
+<h2 id="18-对物理求解器它甚至提供了一个很有野心的类比">18. 对物理求解器，它甚至提供了一个很有野心的类比
+</h2><p>假设 nonlinear time stepping：</p>
 \[x_{n+1} = \Phi(x_n).\]<p>传统严格串行：</p>
 \[x_n \rightarrow x_{n+1} \rightarrow x_{n+2}.\]<p>现在有一个非常便宜的 approximate solver：</p>
 \[\tilde\Phi.\]<p>它先猜：</p>
@@ -813,8 +822,8 @@
 \[\boxed{ \text{cheap prediction of serial dependencies} + \text{expensive correction} }\]<p>。</p>
 <p>这对物理求解器开发非常值得保留。</p>
 <hr>
-<h1 id="19-对代理模型还有一个更重要的启发代理不必直接取代高保真模型">19. 对代理模型还有一个更重要的启发：代理不必直接取代高保真模型
-</h1><p>通常 surrogate 的目标是：</p>
+<h2 id="19-对代理模型还有一个更重要的启发代理不必直接取代高保真模型">19. 对代理模型还有一个更重要的启发：代理不必直接取代高保真模型
+</h2><p>通常 surrogate 的目标是：</p>
 \[f_H(x) \approx \hat f(x)\]<p>然后部署时：</p>
 \[\boxed{\hat f\text{ 替代 }f_H}.\]<p>于是代理误差直接进入最终答案。</p>
 <p>Speculative decoding 展示了另一种用法：</p>
@@ -833,8 +842,8 @@
 \[\min E[(f-\hat f)^2]\]<p>变成：</p>
 \[\boxed{ \max \text{proposal usefulness per unit cost}. }\]<p>这往往是更符合实际系统目标的指标。</p>
 <hr>
-<h1 id="20-一个最值得自己实现的最小实验">20. 一个最值得自己实现的最小实验
-</h1><details class="reveal">
+<h2 id="20-一个最值得自己实现的最小实验">20. 一个最值得自己实现的最小实验
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>无需 LLM。</p>
@@ -890,16 +899,16 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Speculative Decoding 最值得记住的不是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Speculative Decoding 最值得记住的不是：</p>
 \[a(x)=\min(1,p(x)/q(x)).\]<p>真正值得记住的是：</p>
 \[\boxed{ \text{串行依赖不能被删除时， 仍然可以通过“便宜地猜未来 + 昂贵地批量验证” 把一部分串行工作转化成并行工作。} }\]<p>它在 LLM serving 知识体系中的位置可以理解成：</p>
 \[\text{Autoregressive decoding}\]\[\downarrow\]\[\boxed{\text{Speculative proposal}}\]\[+\]\[\boxed{\text{Parallel target verification}}\]\[\downarrow\]\[\text{fewer expensive serial target steps}.\]<p>它与前两张 AI 工程卡恰好组成三个完全不同的优化轴：</p>
 \[\boxed{ \text{PagedAttention：优化状态内存} }\]\[\boxed{ \text{Continuous Batching：优化请求调度} }\]\[\boxed{ \text{Speculative Decoding：优化算法关键路径} }\]<p>真正深的一层则是：</p>
 \[\boxed{ \text{低保真模型最大的价值，有时并不是替代高保真模型， 而是预测“高保真模型下一步大概率会做什么”。} }\]<p>一旦低保真预测错误可以被便宜而严格地检测和纠正，你就得到了一种非常强的加速架构：</p>
 \[\boxed{ \text{approximate speculation} + \text{exact authority}. }\]<p>这个思想完全可以迁移到 AI 之外。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1096,9 +1105,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

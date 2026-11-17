@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第11章：对偶分解法 核心思想：将大规模可分离凸优化问题通过对偶化拆成若干独立子问题并行求解，再通过对偶变量（乘子）汇总协调——这便是&quot;分而治之&quot;的对偶分解法（Dual Decomposition）。\n11.1 可分离凸优化问题 11.1.1 问题形式 对偶分解法主要针对具有可分离结构的约束优化问题。所谓“可分离”，是指整个大问题可以被拆解为多个互不干扰的小部分。其标准数学形式如下：\n$$\\boxed{\\min_{x = (x_1, \\ldots, x_N)} \\sum_{i=1}^N f_i(x_i) \\quad \\text{s.t.} \\quad \\sum_{i=1}^N A_i x_i = b}$$数学符号与概念定义：\n$x_i \\in \\mathbb{R}^{n_i}$：表示 $x_i$ 是一个含有 $n_i$ 个实数分量的列向量（可以理解为 $n_i$ 个未知数）。所有子向量 $x_1, x_2, \\ldots, x_N$ 拼在一起构成了总的未知向量 $x$，总维度为 $\\sum_i n_i = n$。 $f_i: \\mathbb{R}^{n_i} \\to \\mathbb{R} \\cup {+\\infty}$ 是闭凸函数（Closed Convex Function）。 凸函数：在图像上看，它就像一个开口向上的“碗”。对于凸函数来说，任何一个局部的极小值点，就是全局的最小值点，这保证了问题容易求解。 闭：表示它的等高线包含边界，避免出现取不到最小值的情况。 $A_i \\in \\mathbb{R}^{m \\times n_i}$：表示一个拥有 $m$ 行和 $n_i$ 列的矩阵。$A_i x_i$ 表示矩阵与向量相乘，其结果是一个 $m$ 维的列向量，代表着将 $x_i$ 转化为对应资源的消耗量。 $b \\in \\mathbb{R}^m$：一个 $m$ 维常数向量，通常代表系统总资源的上限或目标要求。 关键特征：\n">
 <title>第11章：对偶分解法</title>
 
 <link rel='canonical' href='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/11-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3%E6%B3%95/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="第11章：对偶分解法">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="第11章：对偶分解法">
 <meta property='og:description' content="第11章：对偶分解法 核心思想：将大规模可分离凸优化问题通过对偶化拆成若干独立子问题并行求解，再通过对偶变量（乘子）汇总协调——这便是&quot;分而治之&quot;的对偶分解法（Dual Decomposition）。\n11.1 可分离凸优化问题 11.1.1 问题形式 对偶分解法主要针对具有可分离结构的约束优化问题。所谓“可分离”，是指整个大问题可以被拆解为多个互不干扰的小部分。其标准数学形式如下：\n$$\\boxed{\\min_{x = (x_1, \\ldots, x_N)} \\sum_{i=1}^N f_i(x_i) \\quad \\text{s.t.} \\quad \\sum_{i=1}^N A_i x_i = b}$$数学符号与概念定义：\n$x_i \\in \\mathbb{R}^{n_i}$：表示 $x_i$ 是一个含有 $n_i$ 个实数分量的列向量（可以理解为 $n_i$ 个未知数）。所有子向量 $x_1, x_2, \\ldots, x_N$ 拼在一起构成了总的未知向量 $x$，总维度为 $\\sum_i n_i = n$。 $f_i: \\mathbb{R}^{n_i} \\to \\mathbb{R} \\cup {+\\infty}$ 是闭凸函数（Closed Convex Function）。 凸函数：在图像上看，它就像一个开口向上的“碗”。对于凸函数来说，任何一个局部的极小值点，就是全局的最小值点，这保证了问题容易求解。 闭：表示它的等高线包含边界，避免出现取不到最小值的情况。 $A_i \\in \\mathbb{R}^{m \\times n_i}$：表示一个拥有 $m$ 行和 $n_i$ 列的矩阵。$A_i x_i$ 表示矩阵与向量相乘，其结果是一个 $m$ 维的列向量，代表着将 $x_i$ 转化为对应资源的消耗量。 $b \\in \\mathbb{R}^m$：一个 $m$ 维常数向量，通常代表系统总资源的上限或目标要求。 关键特征：\n">
 <meta property='og:url' content='https://assranai.github.io/reviews/04-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3/11-%E5%AF%B9%E5%81%B6%E5%88%86%E8%A7%A3%E6%B3%95/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -56,7 +56,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -492,30 +492,30 @@ $$x_i^*(\lambda) = \arg\min_{x_i} \{ f_i(x_i) + (A_i^T\lambda)^T x_i \}$$<p>
 </h3>$$\boxed{\begin{aligned} &\text{初始化 } \lambda^0 \in \mathbb{R}^m, \; k = 0 \\ &\textbf{repeat:} \\ &\quad \text{第一步（并行子问题）：各节点独立计算自己最优解} \\ &\quad x_i^{k+1} = \arg\min_{x_i} \left\{ f_i(x_i) + (A_i^T\lambda^k)^T x_i \right\}, \; i=1,\ldots,N \\ &\quad \text{第二步（汇总协调）：计算总的资源偏差量} \\ &\quad g^{k+1} = \sum_{i=1}^N A_i x_i^{k+1} - b \quad \text{(此项代表约束违反度)} \\ &\quad \text{第三步（乘子更新）：根据偏差量调整惩罚价格，} \alpha_k \text{为步长} \\ &\quad \lambda^{k+1} = \lambda^k + \alpha_k \cdot g^{k+1} \\ &\textbf{until 收敛（即偏差量 } g^{k+1} \text{ 趋近于0）} \end{aligned}}$$<h3 id="1124-步长选择">11.2.4 步长选择
 </h3><p>这里的步长 $\alpha_k$ 决定了每次调整惩罚价格的幅度。</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>步长规则</th>
-					<th>公式</th>
-					<th>特点</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>固定步长</td>
-					<td>$\alpha_k = \alpha$</td>
-					<td>简单，但只会在最优解附近的一个小区域（$\alpha G^2$ 邻域内）震荡。</td>
-			</tr>
-			<tr>
-					<td>衰减步长</td>
-					<td>$\alpha_k = \alpha_0 / \sqrt{k}$</td>
-					<td>满足总步长之和为无穷大（$\sum \alpha_k = \infty$）且平方和有限（$\sum \alpha_k^2 &lt; \infty$），能保证严格收敛到最优解。</td>
-			</tr>
-			<tr>
-					<td>Polyak步长</td>
-					<td>$\alpha_k = (q^* - q(\lambda^k))/|g^k|^2$</td>
-					<td>需要预先知道最终的最优对偶值 $q^*$，在实际中较少直接使用。</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>步长规则</th>
+          <th>公式</th>
+          <th>特点</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>固定步长</td>
+          <td>$\alpha_k = \alpha$</td>
+          <td>简单，但只会在最优解附近的一个小区域（$\alpha G^2$ 邻域内）震荡。</td>
+      </tr>
+      <tr>
+          <td>衰减步长</td>
+          <td>$\alpha_k = \alpha_0 / \sqrt{k}$</td>
+          <td>满足总步长之和为无穷大（$\sum \alpha_k = \infty$）且平方和有限（$\sum \alpha_k^2 &lt; \infty$），能保证严格收敛到最优解。</td>
+      </tr>
+      <tr>
+          <td>Polyak步长</td>
+          <td>$\alpha_k = (q^* - q(\lambda^k))/|g^k|^2$</td>
+          <td>需要预先知道最终的最优对偶值 $q^*$，在实际中较少直接使用。</td>
+      </tr>
+  </tbody>
 </table></div>
 <p><strong>收敛率</strong>：在数学分析中使用大O符号表示误差缩小的速度。对偶分解法的收敛速度一般为 $O(1/\sqrt{k})$，即迭代100次误差缩小到1/10。当所有 $f_i$ 是强凸函数时，速度可提升到 $O(1/k)$。</p>
 <hr>
@@ -558,38 +558,38 @@ $$-A_i^T\lambda \in \partial f_i(x_i^*(\lambda))$$<p>
 </p>
 $$\bar{x}_i^K = \frac{1}{K}\sum_{k=1}^K x_i^k$$<h3 id="1143-对偶分解-vs-乘子法-vs-admm">11.4.3 对偶分解 vs 乘子法 vs ADMM
 </h3><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>方法</th>
-					<th>收敛速度</th>
-					<th>可分离性</th>
-					<th>子问题</th>
-					<th>前提条件</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>对偶分解</td>
-					<td>慢 ($O(1/\sqrt{k})$)</td>
-					<td>✅ 完全并行，可分发给N台电脑</td>
-					<td>各自独立求解</td>
-					<td>需要 $f_i$ 强凸才不振荡</td>
-			</tr>
-			<tr>
-					<td>乘子法</td>
-					<td>快</td>
-					<td>❌ 引入平方惩罚项后，$x_i$和$x_j$之间产生了乘积，破坏了分离性</td>
-					<td>所有人必须一起联合求解</td>
-					<td>无特殊要求</td>
-			</tr>
-			<tr>
-					<td>ADMM</td>
-					<td>快</td>
-					<td>✅ 通过交替更新（轮流求解）的方式巧妙恢复了分离性</td>
-					<td>逐个顺序求解</td>
-					<td>无特殊要求</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>方法</th>
+          <th>收敛速度</th>
+          <th>可分离性</th>
+          <th>子问题</th>
+          <th>前提条件</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>对偶分解</td>
+          <td>慢 ($O(1/\sqrt{k})$)</td>
+          <td>✅ 完全并行，可分发给N台电脑</td>
+          <td>各自独立求解</td>
+          <td>需要 $f_i$ 强凸才不振荡</td>
+      </tr>
+      <tr>
+          <td>乘子法</td>
+          <td>快</td>
+          <td>❌ 引入平方惩罚项后，$x_i$和$x_j$之间产生了乘积，破坏了分离性</td>
+          <td>所有人必须一起联合求解</td>
+          <td>无特殊要求</td>
+      </tr>
+      <tr>
+          <td>ADMM</td>
+          <td>快</td>
+          <td>✅ 通过交替更新（轮流求解）的方式巧妙恢复了分离性</td>
+          <td>逐个顺序求解</td>
+          <td>无特殊要求</td>
+      </tr>
+  </tbody>
 </table></div>
 <hr>
 <h2 id="115-典型例题">11.5 典型例题
@@ -838,9 +838,8 @@ $$\lambda^{k+1} = \lambda^k + \alpha_k(x_1^{k+1} - x_2^{k+1})$$<p>通过这个�
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

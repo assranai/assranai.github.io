@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Continuous Batching / Iteration-Level Scheduling（连续批处理 / 迭代级调度）\n领域：AI 全栈工程 × 大模型推理 × GPU 系统 × 高性能计算\n推荐阅读时间：约 8–10 分钟\n这期转到 AI 推理基础设施。Continuous Batching 值得学，因为它揭示了 LLM serving 和普通神经网络 inference 的一个根本区别：\n\\[\\boxed{ \\text{LLM 请求不是一次 forward pass，而是一串长度未知的 forward passes。} }\\]如果还沿用传统“收集一批请求 → 整批跑完 → 再接下一批”的 batching 思路，会造成非常严重的 GPU 空转。\n2022 年 OSDI 的 Orca 把调度粒度从 request level 降到 iteration level：每生成一轮 token 后，已经完成的请求立即退出，新请求立即加入。论文在其 GPT-3 175B 实验中报告，相同延迟水平下相比 FasterTransformer 可达到最高约 36.9× 的吞吐提升。今天 Hugging Face Transformers、vLLM、SGLang 等推理体系都采用或建立在类似 continuous batching 思路之上。\n">
 <title>Continuous Batching：大模型推理真正的“批处理单位”，为什么不是请求，而是一次 token 迭代</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/28-continuous-batching/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Continuous Batching：大模型推理真正的“批处理单位”，为什么不是请求，而是一次 token 迭代">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Continuous Batching：大模型推理真正的“批处理单位”，为什么不是请求，而是一次 token 迭代">
 <meta property='og:description' content="主题：Continuous Batching / Iteration-Level Scheduling（连续批处理 / 迭代级调度）\n领域：AI 全栈工程 × 大模型推理 × GPU 系统 × 高性能计算\n推荐阅读时间：约 8–10 分钟\n这期转到 AI 推理基础设施。Continuous Batching 值得学，因为它揭示了 LLM serving 和普通神经网络 inference 的一个根本区别：\n\\[\\boxed{ \\text{LLM 请求不是一次 forward pass，而是一串长度未知的 forward passes。} }\\]如果还沿用传统“收集一批请求 → 整批跑完 → 再接下一批”的 batching 思路，会造成非常严重的 GPU 空转。\n2022 年 OSDI 的 Orca 把调度粒度从 request level 降到 iteration level：每生成一轮 token 后，已经完成的请求立即退出，新请求立即加入。论文在其 GPT-3 175B 实验中报告，相同延迟水平下相比 FasterTransformer 可达到最高约 36.9× 的吞吐提升。今天 Hugging Face Transformers、vLLM、SGLang 等推理体系都采用或建立在类似 continuous batching 思路之上。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/28-continuous-batching/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,14 +324,27 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-为什么普通-static-batching-在-llm-上特别浪费">1. 为什么普通 static batching 在 LLM 上特别浪费？</a></li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#2-continuous-batching-的核心操作其实非常简单">2. Continuous Batching 的核心操作其实非常简单</a></li>
+    <li><a href="#3-为什么一次-token-iteration才是自然的调度单位">3. 为什么“一次 token iteration”才是自然的调度单位？</a></li>
+    <li><a href="#4-但问题随即出现不同-sequence-的长度根本不一样">4. 但问题随即出现：不同 sequence 的长度根本不一样</a></li>
+    <li><a href="#5-这正好解释了-pagedattention-为什么后来如此重要">5. 这正好解释了 PagedAttention 为什么后来如此重要</a></li>
+    <li><a href="#6-continuous-batching-真正困难的地方在-prefill-和-decode-混在了一起">6. Continuous Batching 真正困难的地方，在 Prefill 和 Decode 混在了一起</a></li>
+    <li><a href="#7-一个长-prefill-可以把所有正在聊天的人卡住">7. 一个长 Prefill 可以把所有正在聊天的人“卡住”</a></li>
+    <li><a href="#8-chunked-prefill把一个大任务切碎让-decode-穿插进去">8. Chunked Prefill：把一个大任务切碎，让 decode 穿插进去</a></li>
+    <li><a href="#9-为什么-chunked-prefill-这么巧">9. 为什么 Chunked Prefill 这么巧？</a></li>
+    <li><a href="#10-所以现代-scheduler-更像一个token-budget-分配器">10. 所以现代 scheduler 更像一个“token budget 分配器”</a></li>
+    <li><a href="#11-为什么只看-tokenss-会误判-serving-系统">11. 为什么只看 tokens/s 会误判 serving 系统？</a></li>
+    <li><a href="#12-continuous-batching-其实引入了一个排队论问题">12. Continuous Batching 其实引入了一个排队论问题</a></li>
+    <li><a href="#13-continuous-batching-和-cuda-graph-又存在天然冲突">13. Continuous Batching 和 CUDA Graph 又存在天然冲突</a></li>
+    <li><a href="#14-一个容易忽视的问题公平性">14. 一个容易忽视的问题：公平性</a></li>
+    <li><a href="#15-为什么-reasoning-model-会让这个问题更严重">15. 为什么 reasoning model 会让这个问题更严重？</a></li>
+    <li><a href="#16-一个很值得自己实现的最小模拟器">16. 一个很值得自己实现的最小模拟器</a></li>
+    <li><a href="#17-对-ai-agent-系统它还有一个更深的意义">17. 对 AI Agent 系统，它还有一个更深的意义</a></li>
+    <li><a href="#18-对游戏-ai-部署尤其有现实意义">18. 对游戏 AI 部署尤其有现实意义</a></li>
+    <li><a href="#19-它给其他工程领域一个很强的迁移启发重新寻找最小可调度工作单元">19. 它给其他工程领域一个很强的迁移启发：重新寻找“最小可调度工作单元”</a></li>
+    <li><a href="#20-这和-gpu-物理引擎甚至有一个很直接的类比">20. 这和 GPU 物理引擎甚至有一个很直接的类比</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -475,8 +488,8 @@
 \[\boxed{ \text{batch occupancy 随生成过程不断下降。} }\]<p>而刚结束的槽位却不能立即给排队的新请求使用。</p>
 <p>Orca 论文正是针对这种 generative workload 的 multi-iteration 特性提出 iteration-level scheduling。</p>
 <hr>
-<h1 id="2-continuous-batching-的核心操作其实非常简单">2. Continuous Batching 的核心操作其实非常简单
-</h1><p>假设 GPU 最大允许：</p>
+<h2 id="2-continuous-batching-的核心操作其实非常简单">2. Continuous Batching 的核心操作其实非常简单
+</h2><p>假设 GPU 最大允许：</p>
 \[B_{\max}=4.\]<p>初始：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -539,8 +552,8 @@
 \[\boxed{ B_t= \{\text{第 }t\text{ 次迭代被调度的活跃 sequences}\} }\]<p>并且：</p>
 \[B_t\neq B_{t+1}.\]<p>Hugging Face 当前 ContinuousBatchingManager 的行为就是每轮检查已完成请求，并立即用队列中的请求补充 GPU 容量。</p>
 <hr>
-<h1 id="3-为什么一次-token-iteration才是自然的调度单位">3. 为什么“一次 token iteration”才是自然的调度单位？
-</h1><p>因为 autoregressive decode 的最小同步计算单位就是：</p>
+<h2 id="3-为什么一次-token-iteration才是自然的调度单位">3. 为什么“一次 token iteration”才是自然的调度单位？
+</h2><p>因为 autoregressive decode 的最小同步计算单位就是：</p>
 \[\boxed{\text{每个活跃 sequence 生成一个 token}}\]<p>。</p>
 <p>假设当前有：</p>
 \[B\]<p>个 sequence。</p>
@@ -566,8 +579,8 @@
 <p>调度粒度应该匹配工作负载真正可以被抢占和重组的粒度。</p>
 </blockquote>
 <hr>
-<h1 id="4-但问题随即出现不同-sequence-的长度根本不一样">4. 但问题随即出现：不同 sequence 的长度根本不一样
-</h1><p>假设：</p>
+<h2 id="4-但问题随即出现不同-sequence-的长度根本不一样">4. 但问题随即出现：不同 sequence 的长度根本不一样
+</h2><p>假设：</p>
 \[A\]<p>已经生成到 1000 token，</p>
 <p>而：</p>
 \[B\]<p>才 50 token。</p>
@@ -582,8 +595,8 @@
 </ul>
 <p>这也是为什么 Orca 不只是“写一个队列”——真正困难的是让变长 sequence 在 Transformer execution engine 里能够高效共存。</p>
 <hr>
-<h1 id="5-这正好解释了-pagedattention-为什么后来如此重要">5. 这正好解释了 PagedAttention 为什么后来如此重要
-</h1><p>前面知识卡片讲过 <span class="term-anchor" data-term="paged-attention" tabindex="0">PagedAttention</span>。</p>
+<h2 id="5-这正好解释了-pagedattention-为什么后来如此重要">5. 这正好解释了 PagedAttention 为什么后来如此重要
+</h2><p>前面知识卡片讲过 <span class="term-anchor" data-term="paged-attention" tabindex="0">PagedAttention</span>。</p>
 <p>Continuous Batching 解决：</p>
 \[\boxed{\text{谁什么时候进入 GPU 计算}}\]<p>PagedAttention 解决：</p>
 \[\boxed{\text{这些不断加入/退出的请求，其 KV Cache 放在哪里}}\]<p>。</p>
@@ -606,8 +619,8 @@
 \[\boxed{ \text{Continuous Batching = computation scheduling} }\]\[\boxed{ \text{PagedAttention = state-memory virtualization} }\]<p>。</p>
 <p>二者共同组成现代 LLM serving 的基础。</p>
 <hr>
-<h1 id="6-continuous-batching-真正困难的地方在-prefill-和-decode-混在了一起">6. Continuous Batching 真正困难的地方，在 Prefill 和 Decode 混在了一起
-</h1><details class="reveal">
+<h2 id="6-continuous-batching-真正困难的地方在-prefill-和-decode-混在了一起">6. Continuous Batching 真正困难的地方，在 Prefill 和 Decode 混在了一起
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>一个 LLM 请求有两个性质完全不同的阶段。</p>
@@ -632,8 +645,8 @@
 </details>
 
 <hr>
-<h1 id="7-一个长-prefill-可以把所有正在聊天的人卡住">7. 一个长 Prefill 可以把所有正在聊天的人“卡住”
-</h1><p>假设 GPU 当前正在给 32 个用户 decode：</p>
+<h2 id="7-一个长-prefill-可以把所有正在聊天的人卡住">7. 一个长 Prefill 可以把所有正在聊天的人“卡住”
+</h2><p>假设 GPU 当前正在给 32 个用户 decode：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -676,8 +689,8 @@
 \[\boxed{ \text{prefill 与 decode 如何共享 GPU 时间} }\]<p>。</p>
 <p>这就是现代 LLM scheduler 的真正核心。</p>
 <hr>
-<h1 id="8-chunked-prefill把一个大任务切碎让-decode-穿插进去">8. Chunked Prefill：把一个大任务切碎，让 decode 穿插进去
-</h1><p>Sarathi 提出的关键方法之一是：</p>
+<h2 id="8-chunked-prefill把一个大任务切碎让-decode-穿插进去">8. Chunked Prefill：把一个大任务切碎，让 decode 穿插进去
+</h2><p>Sarathi 提出的关键方法之一是：</p>
 \[\boxed{\text{chunked prefill}}\]<p>。</p>
 <p>例如原 prompt：</p>
 \[8192\text{ tokens}\]<p>不要一次运行：</p>
@@ -716,8 +729,8 @@
 \[\boxed{\text{decode-maximal batching}}\]<p>——尽量保留大量 decode，再用 prefill chunk 填充 GPU 的计算能力。</p>
 <p>其论文实验报告，例如 LLaMA-13B/A6000 条件下 decode throughput 最高提升约 10×，端到端吞吐最高提升约 1.33×；后来的 Sarathi-Serve 进一步针对真实 serving 中 throughput-latency tradeoff 优化调度。</p>
 <hr>
-<h1 id="9-为什么-chunked-prefill-这么巧">9. 为什么 Chunked Prefill 这么巧？
-</h1><details class="reveal">
+<h2 id="9-为什么-chunked-prefill-这么巧">9. 为什么 Chunked Prefill 这么巧？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>因为 prefill 和 decode 正好存在互补性。</p>
@@ -735,8 +748,8 @@
 </details>
 
 <hr>
-<h1 id="10-所以现代-scheduler-更像一个token-budget-分配器">10. 所以现代 scheduler 更像一个“token budget 分配器”
-</h1><p>传统 batch size：</p>
+<h2 id="10-所以现代-scheduler-更像一个token-budget-分配器">10. 所以现代 scheduler 更像一个“token budget 分配器”
+</h2><p>传统 batch size：</p>
 \[B=32.\]<p>但 LLM 中一个 request 在当前 iteration 可能需要：</p>
 <ul>
 <li>decode：1 个新 token；</li>
@@ -753,8 +766,8 @@
 \[\boxed{\text{“这一批有多少请求？”}}\]<p>进化成：</p>
 \[\boxed{\text{“这一轮 GPU 应该处理多少 token，以及属于哪些请求？”}}\]<p>。</p>
 <hr>
-<h1 id="11-为什么只看-tokenss-会误判-serving-系统">11. 为什么只看 tokens/s 会误判 serving 系统？
-</h1><details class="reveal">
+<h2 id="11-为什么只看-tokenss-会误判-serving-系统">11. 为什么只看 tokens/s 会误判 serving 系统？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设系统 A：</p>
@@ -776,8 +789,8 @@
 </details>
 
 <hr>
-<h1 id="12-continuous-batching-其实引入了一个排队论问题">12. Continuous Batching 其实引入了一个排队论问题
-</h1><details class="reveal">
+<h2 id="12-continuous-batching-其实引入了一个排队论问题">12. Continuous Batching 其实引入了一个排队论问题
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>设请求到达率：</p>
@@ -802,8 +815,8 @@
 </details>
 
 <hr>
-<h1 id="13-continuous-batching-和-cuda-graph-又存在天然冲突">13. Continuous Batching 和 CUDA Graph 又存在天然冲突
-</h1><details class="reveal">
+<h2 id="13-continuous-batching-和-cuda-graph-又存在天然冲突">13. Continuous Batching 和 CUDA Graph 又存在天然冲突
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>GPU 喜欢固定形状：</p>
@@ -829,8 +842,8 @@
 </details>
 
 <hr>
-<h1 id="14-一个容易忽视的问题公平性">14. 一个容易忽视的问题：公平性
-</h1><details class="reveal">
+<h2 id="14-一个容易忽视的问题公平性">14. 一个容易忽视的问题：公平性
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设队列中有：</p>
@@ -865,8 +878,8 @@
 </details>
 
 <hr>
-<h1 id="15-为什么-reasoning-model-会让这个问题更严重">15. 为什么 reasoning model 会让这个问题更严重？
-</h1><details class="reveal">
+<h2 id="15-为什么-reasoning-model-会让这个问题更严重">15. 为什么 reasoning model 会让这个问题更严重？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>传统聊天可能输出：</p>
@@ -896,8 +909,8 @@
 </details>
 
 <hr>
-<h1 id="16-一个很值得自己实现的最小模拟器">16. 一个很值得自己实现的最小模拟器
-</h1><details class="reveal">
+<h2 id="16-一个很值得自己实现的最小模拟器">16. 一个很值得自己实现的最小模拟器
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>根本不需要 GPU。</p>
@@ -981,8 +994,8 @@
 </details>
 
 <hr>
-<h1 id="17-对-ai-agent-系统它还有一个更深的意义">17. 对 AI Agent 系统，它还有一个更深的意义
-</h1><p>Agent 请求并不像普通 chat request。</p>
+<h2 id="17-对-ai-agent-系统它还有一个更深的意义">17. 对 AI Agent 系统，它还有一个更深的意义
+</h2><p>Agent 请求并不像普通 chat request。</p>
 <p>它可能：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -1024,8 +1037,8 @@
 <p>所以 Continuous Batching 也是理解：</p>
 \[\boxed{\text{Agent runtime infrastructure}}\]<p>很好的入口。</p>
 <hr>
-<h1 id="18-对游戏-ai-部署尤其有现实意义">18. 对游戏 AI 部署尤其有现实意义
-</h1><p>假设游戏服务器同时运行：</p>
+<h2 id="18-对游戏-ai-部署尤其有现实意义">18. 对游戏 AI 部署尤其有现实意义
+</h2><p>假设游戏服务器同时运行：</p>
 <ul>
 <li>40 个 NPC 对话；</li>
 <li>5 个任务规划 Agent；</li>
@@ -1074,8 +1087,8 @@
 <p>一旦进入本地/私有模型部署：</p>
 \[\boxed{ \text{KV memory + batching + scheduling} }\]<p>都会直接决定成本。</p>
 <hr>
-<h1 id="19-它给其他工程领域一个很强的迁移启发重新寻找最小可调度工作单元">19. 它给其他工程领域一个很强的迁移启发：重新寻找“最小可调度工作单元”
-</h1><p>Continuous Batching 最深的地方其实并不限于 LLM。</p>
+<h2 id="19-它给其他工程领域一个很强的迁移启发重新寻找最小可调度工作单元">19. 它给其他工程领域一个很强的迁移启发：重新寻找“最小可调度工作单元”
+</h2><p>Continuous Batching 最深的地方其实并不限于 LLM。</p>
 <p>原来系统认为一个不可分割任务是：</p>
 \[\boxed{\text{request}}\]<p>Orca 发现真正可以安全重组的是：</p>
 \[\boxed{\text{iteration}}\]<p>。</p>
@@ -1096,8 +1109,8 @@
 <p>有时性能问题不是 kernel 太慢，</p>
 <p>而是：</p>
 \[\boxed{\text{scheduler 根本看不到足够细的可重组工作。}}\]<hr>
-<h1 id="20-这和-gpu-物理引擎甚至有一个很直接的类比">20. 这和 GPU 物理引擎甚至有一个很直接的类比
-</h1><p>假设有 100 个 physics islands。</p>
+<h2 id="20-这和-gpu-物理引擎甚至有一个很直接的类比">20. 这和 GPU 物理引擎甚至有一个很直接的类比
+</h2><p>假设有 100 个 physics islands。</p>
 <p>传统方式：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -1120,8 +1133,8 @@
 <p>虽然具体 GPU 数据布局会复杂很多，但思维与 Orca 几乎一致：</p>
 \[\boxed{ \text{variable-length iterative workloads 需要 iteration-aware scheduling。} }\]<p>这就是这张卡片对物理求解器最值得迁移的一点。</p>
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Continuous Batching 最值得记住的不是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Continuous Batching 最值得记住的不是：</p>
 <blockquote>
 <p>“请求完成以后立即补一个新请求。”</p>
 </blockquote>
@@ -1131,8 +1144,8 @@
 \[\boxed{ \text{吞吐} \leftrightarrow \text{TTFT} \leftrightarrow \text{inter-token latency} \leftrightarrow \text{fairness} }\]<p>之间的多目标权衡。</p>
 <p>所以 Continuous Batching 的地位有点类似操作系统中的进程调度：它自身不改变模型任何一个权重，却可能让同一块 GPU 的有效服务能力相差数倍乃至更多。</p>
 <p>这也是 AI 全栈工程里一个很值得长期保留的视角：</p>
-\[\boxed{ \text{模型性能决定“一个请求能做到什么”； 调度系统决定“同一份硬件同时能为多少人做到”。} }\]<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+\[\boxed{ \text{模型性能决定“一个请求能做到什么”； 调度系统决定“同一份硬件同时能为多少人做到”。} }\]<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1344,9 +1357,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Randomized SVD / Randomized Numerical Linear Algebra（随机化奇异值分解 / 随机数值线性代数）\n领域：代理模型 × 有限元 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n这次选 Randomized SVD，因为它体现了一种很值得迁移的计算思想：\n\\[\\boxed{ \\text{如果你只需要一个巨大系统最重要的低维结构， 就没有必要精确理解整个巨大系统。} }\\]标准 SVD：\n\\[A=U\\Sigma V^T\\]是数值线性代数最重要的工具之一，但当：\n\\[A\\in\\mathbb R^{10^6\\times10^4}\\]时，精确 SVD 本身就可能成为瓶颈。\nRandomized SVD 的做法非常反直觉：\n随机生成少量方向，让大矩阵作用在这些方向上，再根据这些响应反推出矩阵的主导子空间。\n典型结构只有：\n\\[\\boxed{ Y=A\\Omega }\\]其中：\n\\[\\Omega\\in\\mathbb R^{n\\times(k+p)}\\]是一组随机向量。\n然后对：\n\\[Y\\]正交化：\n\\[Y=QR,\\]就能得到：\n\\[Q\\]作为 \\(A\\) 主导列空间的近似。\nHalko、Martinsson、Tropp 2011 年的 SIAM Review 论文把这一框架系统化；Martinsson 与 Tropp 2020 年的 Acta Numerica 综述进一步将其扩展到低秩近似、回归、核矩阵、流式算法和线性系统等多个方向。\n真正值得学的不是“随机算法会更快”，而是：\n\\[\\boxed{ \\text{随机探测为什么足以发现确定性的低维结构？} }\\] 1. 先明确问题：很多时候我们根本不需要完整 SVD 假设有限元跑出：\n">
 <title>Randomized NLA：sketching 与 Randomized SVD</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/31-randomized-nla/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Randomized NLA：sketching 与 Randomized SVD">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Randomized NLA：sketching 与 Randomized SVD">
 <meta property='og:description' content="主题：Randomized SVD / Randomized Numerical Linear Algebra（随机化奇异值分解 / 随机数值线性代数）\n领域：代理模型 × 有限元 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n这次选 Randomized SVD，因为它体现了一种很值得迁移的计算思想：\n\\[\\boxed{ \\text{如果你只需要一个巨大系统最重要的低维结构， 就没有必要精确理解整个巨大系统。} }\\]标准 SVD：\n\\[A=U\\Sigma V^T\\]是数值线性代数最重要的工具之一，但当：\n\\[A\\in\\mathbb R^{10^6\\times10^4}\\]时，精确 SVD 本身就可能成为瓶颈。\nRandomized SVD 的做法非常反直觉：\n随机生成少量方向，让大矩阵作用在这些方向上，再根据这些响应反推出矩阵的主导子空间。\n典型结构只有：\n\\[\\boxed{ Y=A\\Omega }\\]其中：\n\\[\\Omega\\in\\mathbb R^{n\\times(k+p)}\\]是一组随机向量。\n然后对：\n\\[Y\\]正交化：\n\\[Y=QR,\\]就能得到：\n\\[Q\\]作为 \\(A\\) 主导列空间的近似。\nHalko、Martinsson、Tropp 2011 年的 SIAM Review 论文把这一框架系统化；Martinsson 与 Tropp 2020 年的 Acta Numerica 综述进一步将其扩展到低秩近似、回归、核矩阵、流式算法和线性系统等多个方向。\n真正值得学的不是“随机算法会更快”，而是：\n\\[\\boxed{ \\text{随机探测为什么足以发现确定性的低维结构？} }\\] 1. 先明确问题：很多时候我们根本不需要完整 SVD 假设有限元跑出：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/31-randomized-nla/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,14 +324,35 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-先明确问题很多时候我们根本不需要完整-svd">1. 先明确问题：很多时候我们根本不需要完整 SVD</a></li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#2-最核心的思想不要直接分解-先找到它的-range">2. 最核心的思想：不要直接分解 ，先找到它的 range</a></li>
+    <li><a href="#3-为什么随机方向不会刚好错过重要子空间">3. 为什么随机方向不会刚好错过重要子空间？</a></li>
+    <li><a href="#4-标准-randomized-svd-算法只有几步">4. 标准 Randomized SVD 算法只有几步</a></li>
+    <li><a href="#5-这其实是先压缩再精确计算">5. 这其实是“先压缩，再精确计算”</a></li>
+    <li><a href="#6-为什么-oversampling-很重要">6. 为什么 oversampling 很重要？</a></li>
+    <li><a href="#7-真正麻烦的是奇异值衰减慢">7. 真正麻烦的是奇异值衰减慢</a></li>
+    <li><a href="#8-power-iteration-为什么有效">8. Power Iteration 为什么有效？</a></li>
+    <li><a href="#9-但-power-iteration-不是免费的">9. 但 Power Iteration 不是免费的</a></li>
+    <li><a href="#10-randomized-svd-和普通随机采样行列并不是一回事">10. Randomized SVD 和普通随机采样行/列并不是一回事</a></li>
+    <li><a href="#11-它与-johnsonlindenstrauss-思想有同一个根">11. 它与 Johnson–Lindenstrauss 思想有同一个根</a></li>
+    <li><a href="#12-为什么它和-pod-天然结合">12. 为什么它和 POD 天然结合？</a></li>
+    <li><a href="#13-随机化-svd-与超降阶在降阶流程中各做哪一步">13. 随机化 SVD 与超降阶在降阶流程中各做哪一步？</a></li>
+    <li><a href="#14-一个有限元中的具体量级">14. 一个有限元中的具体量级</a></li>
+    <li><a href="#15-这对可靠性分析也有非常直接的价值">15. 这对可靠性分析也有非常直接的价值</a></li>
+    <li><a href="#16-它还可以加速-kriging--gaussian-process-的另一部分瓶颈">16. 它还可以加速 Kriging / Gaussian Process 的另一部分瓶颈</a></li>
+    <li><a href="#17-对-ai-全栈工程它为什么也值得学">17. 对 AI 全栈工程，它为什么也值得学？</a></li>
+    <li><a href="#18-它和-lora-有一个非常漂亮的联系">18. 它和 LoRA 有一个非常漂亮的联系</a></li>
+    <li><a href="#19-但它不是万能的真正低秩才是前提">19. 但它不是万能的：真正低秩才是前提</a></li>
+    <li><a href="#20-第二个局限低能量方向可能恰恰是最重要的方向">20. 第二个局限：低能量方向可能恰恰是最重要的方向</a></li>
+    <li><a href="#21-一个很值得记住的误区随机算法并不意味着结果不可靠">21. 一个很值得记住的误区：随机算法并不意味着结果“不可靠”</a></li>
+    <li><a href="#22-一个非常适合亲手做的最小实验">22. 一个非常适合亲手做的最小实验</a></li>
+    <li><a href="#23-对你后续有限元软体方向一个实际可迁移场景">23. 对你后续有限元/软体方向，一个实际可迁移场景</a></li>
+    <li><a href="#24-这就引出-randnla-的第二种世界观sketch-and-solve-与-sketch-and-precondition">24. 这就引出 RandNLA 的第二种世界观：Sketch-and-Solve 与 Sketch-and-Precondition</a></li>
+    <li><a href="#25-fem-为什么会关心它">25. FEM 为什么会关心它？</a></li>
+    <li><a href="#26-它对-pde-inverse-problem-更有意思">26. 它对 PDE inverse problem 更有意思</a></li>
+    <li><a href="#27-为什么随机算法有时反而更适合-gpu">27. 为什么随机算法有时反而更适合 GPU？</a></li>
+    <li><a href="#28-一个非常值得自己实现的实验randomized-pod">28. 一个非常值得自己实现的实验：Randomized POD</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -442,8 +463,8 @@
 \[\boxed{ \text{为了得到 50 个方向， 传统算法有时仍需要对整个巨大矩阵做大量工作。} }\]<p>Randomized SVD 就专门针对这种：</p>
 \[r\ll\min(m,n)\]<p>的场景。Scikit-learn 当前的官方 <code>randomized_svd</code> 也明确将其定位为：当矩阵很大、而只需要少量 singular components 时，随机化 truncated SVD 往往非常高效。</p>
 <hr>
-<h1 id="2-最核心的思想不要直接分解-先找到它的-range">2. 最核心的思想：不要直接分解 \(A\)，先找到它的 range
-</h1><p>假设：</p>
+<h2 id="2-最核心的思想不要直接分解-先找到它的-range">2. 最核心的思想：不要直接分解 \(A\)，先找到它的 range
+</h2><p>假设：</p>
 \[A\]<p>实际上近似 rank-\(k\)：</p>
 \[A \approx U_k\Sigma_kV_k^T.\]<p>那么任意向量：</p>
 \[\omega\]<p>经过：</p>
@@ -465,8 +486,8 @@
 \[\boxed{\text{randomized range finder}}\]<p>，也是 Randomized SVD 的核心。</p>
 <p>Halko 等把大量随机化矩阵分解统一成“两阶段”框架：先用随机采样找到近似 range，再在这个低维空间里做传统确定性线性代数。</p>
 <hr>
-<h1 id="3-为什么随机方向不会刚好错过重要子空间">3. 为什么随机方向不会刚好错过重要子空间？
-</h1><p>这是最关键的问题。</p>
+<h2 id="3-为什么随机方向不会刚好错过重要子空间">3. 为什么随机方向不会刚好错过重要子空间？
+</h2><p>这是最关键的问题。</p>
 <p>假设真实主导右奇异空间：</p>
 \[V_k = [v_1,\ldots,v_k].\]<p>随机高斯向量：</p>
 \[\omega\sim N(0,I)\]<p>在任何固定方向：</p>
@@ -483,8 +504,8 @@
 \[\boxed{ \text{矩阵本身在替你过滤随机噪声， 把随机输入变成主导结构的混合。} }\]<p>多取几个随机向量，就能把整个 dominant subspace 展开出来。</p>
 <p>这其实和 power iteration 的思想非常接近。</p>
 <hr>
-<h1 id="4-标准-randomized-svd-算法只有几步">4. 标准 Randomized SVD 算法只有几步
-</h1><p>假设想要 rank：</p>
+<h2 id="4-标准-randomized-svd-算法只有几步">4. 标准 Randomized SVD 算法只有几步
+</h2><p>假设想要 rank：</p>
 \[k.\]<p>通常再增加：</p>
 \[p\]<p>个 oversampling directions：</p>
 \[l=k+p.\]<p>常见：</p>
@@ -525,8 +546,8 @@
 \[50\times n.\]<p>真正昂贵的 SVD 已经从巨大矩阵：</p>
 \[A\]<p>转移到了一个小得多的：</p>
 \[B.\]<hr>
-<h1 id="5-这其实是先压缩再精确计算">5. 这其实是“先压缩，再精确计算”
-</h1><p>Randomized SVD 并不是完全随机地给答案。</p>
+<h2 id="5-这其实是先压缩再精确计算">5. 这其实是“先压缩，再精确计算”
+</h2><p>Randomized SVD 并不是完全随机地给答案。</p>
 <p>随机性只用于：</p>
 \[\boxed{\text{发现一个好的低维子空间}}\]<p>。</p>
 <p>找到：</p>
@@ -537,8 +558,8 @@
 <p>所以它的结构是：</p>
 \[\text{Huge deterministic problem}\]\[\downarrow\]\[\boxed{\text{Random sketch}}\]\[\downarrow\]\[\text{Small deterministic problem}.\]<p>这是 Randomized Numerical Linear Algebra 一个非常典型的架构。</p>
 <hr>
-<h1 id="6-为什么-oversampling-很重要">6. 为什么 oversampling 很重要？
-</h1><p>假设真正要：</p>
+<h2 id="6-为什么-oversampling-很重要">6. 为什么 oversampling 很重要？
+</h2><p>假设真正要：</p>
 \[k=20\]<p>个 modes。</p>
 <p>理论上可以只取：</p>
 \[20\]<p>个随机向量。</p>
@@ -553,8 +574,8 @@
 <p>Scikit-learn 当前默认：</p>
 \[n_{\rm oversamples}=10,\]<p>并明确指出：对于高噪声、有效秩较大或 singular spectrum 衰减缓慢的问题，可以增加 oversampling 来改善近似质量。</p>
 <hr>
-<h1 id="7-真正麻烦的是奇异值衰减慢">7. 真正麻烦的是奇异值衰减慢
-</h1><details class="reveal">
+<h2 id="7-真正麻烦的是奇异值衰减慢">7. 真正麻烦的是奇异值衰减慢
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设：</p>
@@ -573,8 +594,8 @@
 </details>
 
 <hr>
-<h1 id="8-power-iteration-为什么有效">8. Power Iteration 为什么有效？
-</h1><details class="reveal">
+<h2 id="8-power-iteration-为什么有效">8. Power Iteration 为什么有效？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>改成计算：</p>
@@ -594,8 +615,8 @@
 </details>
 
 <hr>
-<h1 id="9-但-power-iteration-不是免费的">9. 但 Power Iteration 不是免费的
-</h1><details class="reveal">
+<h2 id="9-但-power-iteration-不是免费的">9. 但 Power Iteration 不是免费的
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>每次：</p>
@@ -621,8 +642,8 @@
 </details>
 
 <hr>
-<h1 id="10-randomized-svd-和普通随机采样行列并不是一回事">10. Randomized SVD 和普通随机采样行/列并不是一回事
-</h1><p>容易产生误解：</p>
+<h2 id="10-randomized-svd-和普通随机采样行列并不是一回事">10. Randomized SVD 和普通随机采样行/列并不是一回事
+</h2><p>容易产生误解：</p>
 <blockquote>
 <p>随机方法是不是从 \(A\) 里随便抽几行、几列？</p>
 </blockquote>
@@ -643,8 +664,8 @@
 </ul>
 <p>但这是另一条方法线。Martinsson–Tropp 的综述正是把这些技术放进同一个 randomized matrix computation 框架中。</p>
 <hr>
-<h1 id="11-它与-johnsonlindenstrauss-思想有同一个根">11. 它与 Johnson–Lindenstrauss 思想有同一个根
-</h1><p>Random projection 中有一个著名事实：</p>
+<h2 id="11-它与-johnsonlindenstrauss-思想有同一个根">11. 它与 Johnson–Lindenstrauss 思想有同一个根
+</h2><p>Random projection 中有一个著名事实：</p>
 <p>高维点：</p>
 \[x_i\in\mathbb R^N\]<p>投影到：</p>
 \[r\ll N\]<p>维随机空间后，</p>
@@ -658,8 +679,8 @@
 \[\boxed{\text{用随机误差换速度}}\]<p>这么简单。</p>
 <p>它更像：</p>
 \[\boxed{ \text{利用高维空间的几何集中性质， 廉价获得对全局结构的观测。} }\]<hr>
-<h1 id="12-为什么它和-pod-天然结合">12. 为什么它和 POD 天然结合？
-</h1><p>POD snapshot matrix：</p>
+<h2 id="12-为什么它和-pod-天然结合">12. 为什么它和 POD 天然结合？
+</h2><p>POD snapshot matrix：</p>
 \[X= [u_1,\ldots,u_m].\]<p>标准 POD：</p>
 \[X=U\Sigma V^T.\]<p>取：</p>
 \[U_r.\]<p>所以 POD 本质就是 truncated SVD。</p>
@@ -669,8 +690,8 @@
 \[\boxed{ X \overset{\text{randomized SVD}} {\longrightarrow} U_r. }\]<p>已有 randomized POD 工作正是针对 PDE 离散后产生的大型 snapshot systems，通过随机投影/随机采样减少生成 dominant modes 所需的成本。</p>
 <p>最近的 ROM 工作也继续使用 randomized SVD、randomized DMD 等方式降低大规模降阶建模中 basis construction 的成本。</p>
 <hr>
-<h1 id="13-这和上一张-hyper-reduction-卡片正好位于不同阶段">13. 这和上一张 Hyper-reduction 卡片正好位于不同阶段
-</h1><p>Hyper-reduction 主要解决：</p>
+<h2 id="13-随机化-svd-与超降阶在降阶流程中各做哪一步">13. 随机化 SVD 与超降阶在降阶流程中各做哪一步？
+</h2><p>Hyper-reduction 主要解决：</p>
 \[\boxed{\text{ROM online evaluation 太贵}}\]<p>例如：</p>
 \[f(Vq)\]<p>仍然需要全部有限元单元。</p>
 <p>Randomized SVD 解决：</p>
@@ -678,8 +699,8 @@
 <p>完整流程可以写成：</p>
 \[\text{Full simulations}\]\[\downarrow\]\[\text{huge snapshot matrix}\]\[\downarrow\]\[\boxed{\text{Randomized SVD}}\]\[\downarrow\]\[\text{Reduced basis}\]\[\downarrow\]\[\boxed{\text{DEIM/ECSW Hyper-reduction}}\]\[\downarrow\]\[\text{fast online ROM}.\]<p>两者解决的是 completely different bottleneck。</p>
 <hr>
-<h1 id="14-一个有限元中的具体量级">14. 一个有限元中的具体量级
-</h1><details class="reveal">
+<h2 id="14-一个有限元中的具体量级">14. 一个有限元中的具体量级
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设软体模型：</p>
@@ -698,7 +719,6 @@
 <ol>
 <li>分块读取 snapshots；</li>
 <li>计算：
-
 \[X\Omega;\]</li>
 <li>累积一个小得多的 sketch；</li>
 <li>不再长期保存完整矩阵。</li>
@@ -710,8 +730,8 @@
 </details>
 
 <hr>
-<h1 id="15-这对可靠性分析也有非常直接的价值">15. 这对可靠性分析也有非常直接的价值
-</h1><details class="reveal">
+<h2 id="15-这对可靠性分析也有非常直接的价值">15. 这对可靠性分析也有非常直接的价值
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设你有：</p>
@@ -744,8 +764,8 @@
 </details>
 
 <hr>
-<h1 id="16-它还可以加速-kriging--gaussian-process-的另一部分瓶颈">16. 它还可以加速 Kriging / Gaussian Process 的另一部分瓶颈
-</h1><details class="reveal">
+<h2 id="16-它还可以加速-kriging--gaussian-process-的另一部分瓶颈">16. 它还可以加速 Kriging / Gaussian Process 的另一部分瓶颈
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>Gaussian Process 通常需要处理：</p>
@@ -770,8 +790,8 @@
 </details>
 
 <hr>
-<h1 id="17-对-ai-全栈工程它为什么也值得学">17. 对 AI 全栈工程，它为什么也值得学？
-</h1><details class="reveal">
+<h2 id="17-对-ai-全栈工程它为什么也值得学">17. 对 AI 全栈工程，它为什么也值得学？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>大型 AI 系统里到处存在：</p>
@@ -800,8 +820,8 @@
 </details>
 
 <hr>
-<h1 id="18-它和-lora-有一个非常漂亮的联系">18. 它和 LoRA 有一个非常漂亮的联系
-</h1><p>之前 LoRA 的核心假设：</p>
+<h2 id="18-它和-lora-有一个非常漂亮的联系">18. 它和 LoRA 有一个非常漂亮的联系
+</h2><p>之前 LoRA 的核心假设：</p>
 \[\Delta W\]<p>具有低秩结构。</p>
 <p>Randomized SVD 则回答另一个问题：</p>
 \[\boxed{ \text{如果一个巨大矩阵确实近似低秩， 怎样便宜地找到那个低秩子空间？} }\]<p>因此在分析 LoRA training dynamics 时，如果想研究：</p>
@@ -813,8 +833,8 @@
 \[\boxed{ \text{Low-rank modeling} }\]<p>和：</p>
 \[\boxed{ \text{Randomized low-rank discovery} }\]<p>天然是一对。</p>
 <hr>
-<h1 id="19-但它不是万能的真正低秩才是前提">19. 但它不是万能的：真正低秩才是前提
-</h1><details class="reveal">
+<h2 id="19-但它不是万能的真正低秩才是前提">19. 但它不是万能的：真正低秩才是前提
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>考虑：</p>
@@ -834,8 +854,8 @@
 </details>
 
 <hr>
-<h1 id="20-第二个局限低能量方向可能恰恰是最重要的方向">20. 第二个局限：低能量方向可能恰恰是最重要的方向
-</h1><details class="reveal">
+<h2 id="20-第二个局限低能量方向可能恰恰是最重要的方向">20. 第二个局限：低能量方向可能恰恰是最重要的方向
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这对可靠性尤其重要。</p>
@@ -857,8 +877,8 @@
 </details>
 
 <hr>
-<h1 id="21-一个很值得记住的误区随机算法并不意味着结果不可靠">21. 一个很值得记住的误区：随机算法并不意味着结果“不可靠”
-</h1><p>Randomized SVD 经常给人一种感觉：</p>
+<h2 id="21-一个很值得记住的误区随机算法并不意味着结果不可靠">21. 一个很值得记住的误区：随机算法并不意味着结果“不可靠”
+</h2><p>Randomized SVD 经常给人一种感觉：</p>
 <blockquote>
 <p>每次结果随机，会不会不靠谱？</p>
 </blockquote>
@@ -873,8 +893,8 @@
 \[\boxed{\text{矩阵本身的 singular spectrum}}\]<p>强相关。</p>
 <p>矩阵越接近低秩，它越容易成功。Halko–Martinsson–Tropp 的经典工作正是系统建立了这类概率误差分析。</p>
 <hr>
-<h1 id="22-一个非常适合亲手做的最小实验">22. 一个非常适合亲手做的最小实验
-</h1><details class="reveal">
+<h2 id="22-一个非常适合亲手做的最小实验">22. 一个非常适合亲手做的最小实验
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>构造：</p>
@@ -944,8 +964,8 @@
 </details>
 
 <hr>
-<h1 id="23-对你后续有限元软体方向一个实际可迁移场景">23. 对你后续有限元/软体方向，一个实际可迁移场景
-</h1><p>假设未来做大规模软体 simulation dataset：</p>
+<h2 id="23-对你后续有限元软体方向一个实际可迁移场景">23. 对你后续有限元/软体方向，一个实际可迁移场景
+</h2><p>假设未来做大规模软体 simulation dataset：</p>
 \[u(\theta,t)\]<p>参数包括：</p>
 <ul>
 <li>Young&rsquo;s modulus；</li>
@@ -974,8 +994,8 @@
 <li>learned physics manifold。</li>
 </ul>
 <hr>
-<h1 id="24-这就引出-randnla-的第二种世界观sketch-and-solve-与-sketch-and-precondition">24. 这就引出 RandNLA 的第二种世界观：Sketch-and-Solve 与 Sketch-and-Precondition
-</h1><p>第一种：</p>
+<h2 id="24-这就引出-randnla-的第二种世界观sketch-and-solve-与-sketch-and-precondition">24. 这就引出 RandNLA 的第二种世界观：Sketch-and-Solve 与 Sketch-and-Precondition
+</h2><p>第一种：</p>
 \[A \rightarrow SA \rightarrow \boxed{\text{直接解决压缩问题}}.\]<p>叫：</p>
 \[\boxed{\text{sketch-and-solve}.}\]<p>优点：</p>
 \[\text{快}.\]<p>但最终得到的是近似解。</p>
@@ -987,8 +1007,8 @@
 \[\boxed{\text{随机方法的速度}}\]<p>和：</p>
 \[\boxed{\text{经典迭代法的高精度}.}\]<p>这对 FEM 特别有意义。</p>
 <hr>
-<h1 id="25-fem-为什么会关心它">25. FEM 为什么会关心它？
-</h1><p>大型 FEM 最终经常变成：</p>
+<h2 id="25-fem-为什么会关心它">25. FEM 为什么会关心它？
+</h2><p>大型 FEM 最终经常变成：</p>
 \[Ku=f.\]<p>或者 nonlinear Newton step：</p>
 \[K_t\Delta u=-r.\]<p>真正昂贵的核心经常已经不是：</p>
 \[\text{element formulation}\]<p>而是：</p>
@@ -1003,8 +1023,8 @@
 </ul>
 <p>Nakatsukasa 与 Tropp 最近的一类方法甚至直接把 random sketching 加进 GMRES 和 Rayleigh–Ritz 等经典投影方法，用 sketch 后的小问题减少正交化与投影成本；论文的模型实验报告过相对优化 MATLAB <code>gmres</code> 达到最高约 \(70\times\)、相对 <code>eigs</code> 约 \(10\times\) 的加速。这里当然不是所有 PDE 都会得到这种数量级，但它说明 randomized sketching 已经不只属于数据科学，也正在进入传统 Krylov scientific computing。</p>
 <hr>
-<h1 id="26-它对-pde-inverse-problem-更有意思">26. 它对 PDE inverse problem 更有意思
-</h1><p>考虑参数识别：</p>
+<h2 id="26-它对-pde-inverse-problem-更有意思">26. 它对 PDE inverse problem 更有意思
+</h2><p>考虑参数识别：</p>
 \[\min_\theta \sum_{i=1}^{m} \| F_i(\theta)-d_i \|^2.\]<p>如果：</p>
 \[m\]<p>代表成千上万个 source / receiver / experiment，</p>
 <p>每一步优化都可能要求大量 PDE solves。</p>
@@ -1014,8 +1034,8 @@
 <p>这里随机化真正节省的是：</p>
 \[\boxed{\text{昂贵 PDE 调用次数}.}\]<p>这与代理模型主动学习其实存在同一个底层目标：</p>
 \[\boxed{\text{用尽可能少的昂贵物理计算获取足够的信息。}}\]<hr>
-<h1 id="27-为什么随机算法有时反而更适合-gpu">27. 为什么随机算法有时反而更适合 GPU？
-</h1><p>传统高精度线性代数里有很多：</p>
+<h2 id="27-为什么随机算法有时反而更适合-gpu">27. 为什么随机算法有时反而更适合 GPU？
+</h2><p>传统高精度线性代数里有很多：</p>
 <ul>
 <li>sequential pivoting；</li>
 <li>repeated orthogonalization；</li>
@@ -1029,8 +1049,8 @@
 <p>所以一个很重要的现代算法原则是：</p>
 \[\boxed{\text{少做一点“数学上完美”的工作， 换成更多硬件喜欢的批量运算。}}\]<p>这也是 RandNLA 在今天比二十年前更重要的原因之一。</p>
 <hr>
-<h1 id="28-一个非常值得自己实现的实验randomized-pod">28. 一个非常值得自己实现的实验：Randomized POD
-</h1><details class="reveal">
+<h2 id="28-一个非常值得自己实现的实验randomized-pod">28. 一个非常值得自己实现的实验：Randomized POD
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>生成：</p>
@@ -1058,8 +1078,8 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Randomized SVD 最值得记住的不是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Randomized SVD 最值得记住的不是：</p>
 \[Y=A\Omega.\]<p>真正重要的是：</p>
 \[\boxed{ \text{如果一个巨大系统只有少数真正重要的方向， 你无需完整检查系统的每一个方向， 只要用少量随机探针让这些重要方向自己显现出来。} }\]<p>它在知识体系中的位置可以这样理解：</p>
 \[\text{Large matrix / dataset}\]\[\downarrow\]\[\boxed{\text{Random sketch}}\]\[\downarrow\]\[\boxed{\text{Approximate dominant subspace}}\]\[\downarrow\]\[\text{small deterministic linear algebra}.\]<p>与最近几张卡片相比，它代表的是一个新的优化轴：</p>
@@ -1068,8 +1088,8 @@
 \[\boxed{ \text{面对百万维问题时， 第一反应不一定应该是“怎样更快地把所有东西算完”， 而应该先问：“我真正需要知道的结构有多少维？”} }\]<p>如果答案是：</p>
 \[50\]<p>那么精确分析：</p>
 \[10^6\]<p>个方向，本身可能就是错误的计算目标。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1281,9 +1301,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

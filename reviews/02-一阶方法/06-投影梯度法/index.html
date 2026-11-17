@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第6章：投影梯度法 核心思想：将无约束优化的负梯度方向迈步与向可行凸集&quot;投影&quot;修正相结合——先迈出梯度步，若走出可行域则用投影弹回最近的可行点。当投影本身计算昂贵时，Frank-Wolfe（条件梯度法）以廉价的线性极小化取代投影，在同等 $O(1/k)$ 收敛率下大幅降低每步开销。\n前置知识回顾 从第2章（梯度下降 GD）回顾 GD 迭代：$x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)$。$\\nabla f(x_k)$ 是 $f$ 在 $x_k$ 处的梯度（$n$ 维偏导数向量），指向上升最快的方向。\n$L$-光滑（$L$-smooth）：存在 $L &gt; 0$（光滑常数），使得对任意 $x, y \\in \\mathbb{R}^n$： $$\\|\\nabla f(x) - \\nabla f(y)\\| \\le L\\|x - y\\|$$ 其中 $|z| = \\sqrt{\\sum_{i=1}^n z_i^2}$ 为欧几里得范数。光滑性意味着梯度不会&quot;突变&quot;——梯度的变化速度被 $L$ 约束。\n二次上界（Descent Lemma）：对 $L$-光滑的 $f$，以下不等式对一切 $x, y$ 成立： $$\\boxed{f(y) \\le f(x) + \\nabla f(x)^T(y - x) + \\frac{L}{2}\\|y - x\\|^2}$$ 含义是函数值在任意点不超过以 $x$ 处一阶展开为中心的二次函数。\n">
 <title>第6章：投影梯度法</title>
 
 <link rel='canonical' href='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/06-%E6%8A%95%E5%BD%B1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="第6章：投影梯度法">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="第6章：投影梯度法">
 <meta property='og:description' content="第6章：投影梯度法 核心思想：将无约束优化的负梯度方向迈步与向可行凸集&quot;投影&quot;修正相结合——先迈出梯度步，若走出可行域则用投影弹回最近的可行点。当投影本身计算昂贵时，Frank-Wolfe（条件梯度法）以廉价的线性极小化取代投影，在同等 $O(1/k)$ 收敛率下大幅降低每步开销。\n前置知识回顾 从第2章（梯度下降 GD）回顾 GD 迭代：$x_{k+1} = x_k - \\alpha_k \\nabla f(x_k)$。$\\nabla f(x_k)$ 是 $f$ 在 $x_k$ 处的梯度（$n$ 维偏导数向量），指向上升最快的方向。\n$L$-光滑（$L$-smooth）：存在 $L &gt; 0$（光滑常数），使得对任意 $x, y \\in \\mathbb{R}^n$： $$\\|\\nabla f(x) - \\nabla f(y)\\| \\le L\\|x - y\\|$$ 其中 $|z| = \\sqrt{\\sum_{i=1}^n z_i^2}$ 为欧几里得范数。光滑性意味着梯度不会&quot;突变&quot;——梯度的变化速度被 $L$ 约束。\n二次上界（Descent Lemma）：对 $L$-光滑的 $f$，以下不等式对一切 $x, y$ 成立： $$\\boxed{f(y) \\le f(x) + \\nabla f(x)^T(y - x) + \\frac{L}{2}\\|y - x\\|^2}$$ 含义是函数值在任意点不超过以 $x$ 处一阶展开为中心的二次函数。\n">
 <meta property='og:url' content='https://assranai.github.io/reviews/02-%E4%B8%80%E9%98%B6%E6%96%B9%E6%B3%95/06-%E6%8A%95%E5%BD%B1%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -56,7 +56,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -543,64 +543,64 @@ $$\|u - v\|^2 \le \langle x - y, u - v \rangle \le \|x - y\| \cdot \|u - v\|$$<p
 <h3 id="615-常见凸集投影的闭式解公式">6.1.5 常见凸集投影的闭式解公式
 </h3><p>闭式解（closed-form）指仅需有限次基本运算（加、减、乘、除、取最大/最小）即可直接算出，无需迭代求解子问题。</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>集合</th>
-					<th>数学描述</th>
-					<th>投影 $P_C(y)$ 的闭式公式</th>
-					<th>计算复杂度</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>非负象限</td>
-					<td>${x \mid x_i \ge 0}$</td>
-					<td>$\max(y_i, 0)$（逐分量截断负数）</td>
-					<td>$O(n)$</td>
-			</tr>
-			<tr>
-					<td>箱子约束</td>
-					<td>$[l, u] = {x \mid l_i \le x_i \le u_i}$</td>
-					<td>$\max(l_i, \min(y_i, u_i))$</td>
-					<td>$O(n)$</td>
-			</tr>
-			<tr>
-					<td>$\ell_2$ 球</td>
-					<td>${x \mid |x|_2 \le r}$</td>
-					<td>$\frac{r}{\max(r, |y|_2)} \cdot y$</td>
-					<td>$O(n)$</td>
-			</tr>
-			<tr>
-					<td>仿射空间</td>
-					<td>${x \mid Ax = b}$，$A$ 行满秩</td>
-					<td>$y - A^T(AA^T)^{-1}(Ay - b)$</td>
-					<td>$O(n^2 m)$</td>
-			</tr>
-			<tr>
-					<td>$\ell_1$ 球</td>
-					<td>${x \mid |x|_1 \le 1}$</td>
-					<td>需排序 + 二分搜索</td>
-					<td>$O(n \log n)$</td>
-			</tr>
-			<tr>
-					<td>核范数球</td>
-					<td>${X \mid |X|_* \le \tau}$（奇异值和 ≤ τ）</td>
-					<td>需全量 SVD</td>
-					<td>$O(n^3)$ — 贵</td>
-			</tr>
-			<tr>
-					<td>概率单纯形</td>
-					<td>${x \mid x \ge 0, \sum_i x_i = 1}$</td>
-					<td>需排序 + 累加搜索</td>
-					<td>$O(n \log n)$</td>
-			</tr>
-			<tr>
-					<td>半空间</td>
-					<td>${x \mid a^T x \le b}$ ($a \neq 0$)</td>
-					<td>$y - \frac{\max(0, a^T y - b)}{|a|^2}a$</td>
-					<td>$O(n)$</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>集合</th>
+          <th>数学描述</th>
+          <th>投影 $P_C(y)$ 的闭式公式</th>
+          <th>计算复杂度</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>非负象限</td>
+          <td>${x \mid x_i \ge 0}$</td>
+          <td>$\max(y_i, 0)$（逐分量截断负数）</td>
+          <td>$O(n)$</td>
+      </tr>
+      <tr>
+          <td>箱子约束</td>
+          <td>$[l, u] = {x \mid l_i \le x_i \le u_i}$</td>
+          <td>$\max(l_i, \min(y_i, u_i))$</td>
+          <td>$O(n)$</td>
+      </tr>
+      <tr>
+          <td>$\ell_2$ 球</td>
+          <td>${x \mid |x|_2 \le r}$</td>
+          <td>$\frac{r}{\max(r, |y|_2)} \cdot y$</td>
+          <td>$O(n)$</td>
+      </tr>
+      <tr>
+          <td>仿射空间</td>
+          <td>${x \mid Ax = b}$，$A$ 行满秩</td>
+          <td>$y - A^T(AA^T)^{-1}(Ay - b)$</td>
+          <td>$O(n^2 m)$</td>
+      </tr>
+      <tr>
+          <td>$\ell_1$ 球</td>
+          <td>${x \mid |x|_1 \le 1}$</td>
+          <td>需排序 + 二分搜索</td>
+          <td>$O(n \log n)$</td>
+      </tr>
+      <tr>
+          <td>核范数球</td>
+          <td>${X \mid |X|_* \le \tau}$（奇异值和 ≤ τ）</td>
+          <td>需全量 SVD</td>
+          <td>$O(n^3)$ — 贵</td>
+      </tr>
+      <tr>
+          <td>概率单纯形</td>
+          <td>${x \mid x \ge 0, \sum_i x_i = 1}$</td>
+          <td>需排序 + 累加搜索</td>
+          <td>$O(n \log n)$</td>
+      </tr>
+      <tr>
+          <td>半空间</td>
+          <td>${x \mid a^T x \le b}$ ($a \neq 0$)</td>
+          <td>$y - \frac{\max(0, a^T y - b)}{|a|^2}a$</td>
+          <td>$O(n)$</td>
+      </tr>
+  </tbody>
 </table></div>
 <h4 id="ell_2-球投影的详细推导">$\ell_2$ 球投影的详细推导
 </h4><p>问题：$\min_{|x|_2 \le r} \frac{1}{2}|x - y|_2^2$（乘 $1/2$ 方便求导，不影响最优解位置）。</p>
@@ -718,60 +718,60 @@ $$k^2 + 4k + 3 \le k^2 + 4k + 4 \iff 3 \le 4$$<p>恒成立！归纳完成。</p>
 $$\boxed{f(x_k) - f(x^*) \le \frac{2LD^2}{k+2} = O(1/k)}$$<p>此处取 $\gamma_k = 2/(k+2)$ 的原因：$\gamma_0 = 2/2 = 1$，意味着第一步完全跳到第一个 LMO 给出的顶点。</p>
 <h3 id="634-fw-与-pgd-的系统对比">6.3.4 FW 与 PGD 的系统对比
 </h3><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>维度</th>
-					<th>投影梯度法 (PGD)</th>
-					<th>Frank-Wolfe (FW)</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td><strong>每步子问题</strong></td>
-					<td>投影 $P_C(\cdot)$</td>
-					<td>线性极小化 $\min_{s \in C} g^T s$</td>
-			</tr>
-			<tr>
-					<td>$\ell_1$ 球开销</td>
-					<td>$O(n \log n)$（排序）</td>
-					<td>$O(n)$（扫描）</td>
-			</tr>
-			<tr>
-					<td>核范数球开销</td>
-					<td>$O(n^3)$（满SVD）</td>
-					<td>$O(n^2)$（秩1幂迭代）</td>
-			</tr>
-			<tr>
-					<td><strong>可行性</strong></td>
-					<td>事后投影修正</td>
-					<td>自动（凸组合天然可行）</td>
-			</tr>
-			<tr>
-					<td><strong>收敛率</strong></td>
-					<td>$O(1/k)$</td>
-					<td>$O(1/k)$</td>
-			</tr>
-			<tr>
-					<td><strong>收敛常数</strong></td>
-					<td>$\frac{L}{2}|x_0 - x^*|^2$</td>
-					<td>$2LD^2$（$D \ge R$，常数偏大）</td>
-			</tr>
-			<tr>
-					<td><strong>迭代点结构</strong></td>
-					<td>密集向量</td>
-					<td><strong>稀疏/低秩</strong>（顶点凸组合）</td>
-			</tr>
-			<tr>
-					<td><strong>强凸下表现</strong></td>
-					<td>线性收敛</td>
-					<td>仅 $O(1/k)$（无加速）</td>
-			</tr>
-			<tr>
-					<td><strong>适用场景</strong></td>
-					<td>投影便宜时</td>
-					<td>投影贵但 LMO 便宜时</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>维度</th>
+          <th>投影梯度法 (PGD)</th>
+          <th>Frank-Wolfe (FW)</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><strong>每步子问题</strong></td>
+          <td>投影 $P_C(\cdot)$</td>
+          <td>线性极小化 $\min_{s \in C} g^T s$</td>
+      </tr>
+      <tr>
+          <td>$\ell_1$ 球开销</td>
+          <td>$O(n \log n)$（排序）</td>
+          <td>$O(n)$（扫描）</td>
+      </tr>
+      <tr>
+          <td>核范数球开销</td>
+          <td>$O(n^3)$（满SVD）</td>
+          <td>$O(n^2)$（秩1幂迭代）</td>
+      </tr>
+      <tr>
+          <td><strong>可行性</strong></td>
+          <td>事后投影修正</td>
+          <td>自动（凸组合天然可行）</td>
+      </tr>
+      <tr>
+          <td><strong>收敛率</strong></td>
+          <td>$O(1/k)$</td>
+          <td>$O(1/k)$</td>
+      </tr>
+      <tr>
+          <td><strong>收敛常数</strong></td>
+          <td>$\frac{L}{2}|x_0 - x^*|^2$</td>
+          <td>$2LD^2$（$D \ge R$，常数偏大）</td>
+      </tr>
+      <tr>
+          <td><strong>迭代点结构</strong></td>
+          <td>密集向量</td>
+          <td><strong>稀疏/低秩</strong>（顶点凸组合）</td>
+      </tr>
+      <tr>
+          <td><strong>强凸下表现</strong></td>
+          <td>线性收敛</td>
+          <td>仅 $O(1/k)$（无加速）</td>
+      </tr>
+      <tr>
+          <td><strong>适用场景</strong></td>
+          <td>投影便宜时</td>
+          <td>投影贵但 LMO 便宜时</td>
+      </tr>
+  </tbody>
 </table></div>
 <p><strong>选型原则</strong>：</p>
 <ul>
@@ -796,30 +796,30 @@ $$\boxed{f(x_k) - f(x^*) \le \frac{2LD^2}{k+2} = O(1/k)}$$<p>此处取 $\gamma_k
 </h3><p><strong>题目</strong>：$C = {x: |x|_1 \le 1}$。对比 FW 和 PGD 每步的完整计算流程及复杂度。</p>
 <p><strong>解答</strong>：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>步骤</th>
-					<th>FW</th>
-					<th>PGD</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>子问题</td>
-					<td>找 $-|\nabla f(x_k)|_\infty$：$O(n)$</td>
-					<td>$\ell_1$ 球投影：$O(n \log n)$</td>
-			</tr>
-			<tr>
-					<td>更新</td>
-					<td>凸组合：$O(n)$</td>
-					<td>直接赋值：$O(n)$</td>
-			</tr>
-			<tr>
-					<td><strong>总步耗</strong></td>
-					<td>$\approx 2n$</td>
-					<td>$\approx n \log n + n$</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>步骤</th>
+          <th>FW</th>
+          <th>PGD</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>子问题</td>
+          <td>找 $-|\nabla f(x_k)|_\infty$：$O(n)$</td>
+          <td>$\ell_1$ 球投影：$O(n \log n)$</td>
+      </tr>
+      <tr>
+          <td>更新</td>
+          <td>凸组合：$O(n)$</td>
+          <td>直接赋值：$O(n)$</td>
+      </tr>
+      <tr>
+          <td><strong>总步耗</strong></td>
+          <td>$\approx 2n$</td>
+          <td>$\approx n \log n + n$</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>$n = 10^6$ 时：FW ≈ 2ms，PGD ≈ 20ms → FW 约快 10 倍。</p>
 <h3 id="例题5核范数约束-fw">例题5：核范数约束 FW
@@ -927,9 +927,8 @@ $$\boxed{P_C(y) = y - \frac{\max(0, a^T y - b)}{\|a\|^2} a}$$<hr>
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

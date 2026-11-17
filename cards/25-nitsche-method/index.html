@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Nitsche Method（Nitsche 方法）\n领域：有限元 × 计算力学 × 接触力学 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：\n\\[\\boxed{\\text{边界条件一定要“强制写死”在自由度上吗？}}\\]传统 FEM 里，Dirichlet 边界条件：\n\\[u=g \\quad \\text{on }\\Gamma_D\\]通常通过直接修改自由度来施加：\n\\[u_i=g_i.\\]这当然简单有效。\n但一旦遇到：\n非匹配网格； 两个独立网格的界面耦合； immersed / unfitted FEM； 接触； 多物理场界面； 几何在运动、界面不断变化； “节点一一对应”这件事可能根本不存在。\nNitsche 方法的核心思想是：\n\\[\\boxed{ \\text{不要直接消灭边界自由度，而是把边界约束以一致、稳定的方式嵌入弱式。} }\\]这使它成为一种非常通用的“弱施加约束”技术。Hansbo 的综述把 Nitsche 方法应用于真实/人工界面、unfitted meshes、Chimera meshes、cut meshes、fictitious-domain methods 和模型耦合，正说明了它已经远超“施加 Dirichlet 条件”这一最初用途。\n1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件” 考虑 Poisson：\n\\[-\\Delta u=f\\]并规定：\n\\[u=g \\quad\\text{on }\\Gamma_D.\\]标准弱式：\n\\[\\int_\\Omega \\nabla u\\cdot\\nabla v\\,d\\Omega = \\int_\\Omega fv\\,d\\Omega + \\int_{\\Gamma_N}tv\\,d\\Gamma.\\]如果：\n">
 <title>Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/25-nitsche-method/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Nitsche Method：为什么“施加边界条件”本身也可以变成一个变分问题">
 <meta property='og:description' content="主题：Nitsche Method（Nitsche 方法）\n领域：有限元 × 计算力学 × 接触力学 × 数值方法\n推荐阅读时间：约 8–10 分钟\n今天选 Nitsche 方法，因为它解决的是有限元里一个很基础、但很深的问题：\n\\[\\boxed{\\text{边界条件一定要“强制写死”在自由度上吗？}}\\]传统 FEM 里，Dirichlet 边界条件：\n\\[u=g \\quad \\text{on }\\Gamma_D\\]通常通过直接修改自由度来施加：\n\\[u_i=g_i.\\]这当然简单有效。\n但一旦遇到：\n非匹配网格； 两个独立网格的界面耦合； immersed / unfitted FEM； 接触； 多物理场界面； 几何在运动、界面不断变化； “节点一一对应”这件事可能根本不存在。\nNitsche 方法的核心思想是：\n\\[\\boxed{ \\text{不要直接消灭边界自由度，而是把边界约束以一致、稳定的方式嵌入弱式。} }\\]这使它成为一种非常通用的“弱施加约束”技术。Hansbo 的综述把 Nitsche 方法应用于真实/人工界面、unfitted meshes、Chimera meshes、cut meshes、fictitious-domain methods 和模型耦合，正说明了它已经远超“施加 Dirichlet 条件”这一最初用途。\n1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件” 考虑 Poisson：\n\\[-\\Delta u=f\\]并规定：\n\\[u=g \\quad\\text{on }\\Gamma_D.\\]标准弱式：\n\\[\\int_\\Omega \\nabla u\\cdot\\nabla v\\,d\\Omega = \\int_\\Omega fv\\,d\\Omega + \\int_{\\Gamma_N}tv\\,d\\Gamma.\\]如果：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/25-nitsche-method/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,23 +324,40 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-先看普通-fem-为什么天然喜欢强制-dirichlet-条件">1. 先看普通 FEM 为什么天然喜欢“强制 Dirichlet 条件”</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-一旦网格不匹配强制约束立刻变麻烦">2. 一旦网格不匹配，强制约束立刻变麻烦</a></li>
+    <li><a href="#3-先理解-penalty简单但有一个根本-trade-off">3. 先理解 penalty：简单，但有一个根本 trade-off</a></li>
+    <li><a href="#4-nitsche-方法从分部积分重新把边界物理拿回来">4. Nitsche 方法从分部积分重新把“边界物理”拿回来</a></li>
+    <li><a href="#5-为什么说-nitsche-是consistent-penalty">5. 为什么说 Nitsche 是“consistent penalty”？</a></li>
+    <li><a href="#6-一个直观理解nitsche-不把约束写成命令而是写成界面交换定律">6. 一个直观理解：Nitsche 不把约束写成“命令”，而是写成“界面交换定律”</a></li>
+    <li><a href="#7-非匹配网格耦合时nitsche-的价值最容易看清">7. 非匹配网格耦合时，Nitsche 的价值最容易看清</a></li>
+    <li><a href="#8-这为什么对-cad--fem-很重要">8. 这为什么对 CAD → FEM 很重要？</a></li>
+    <li><a href="#9-nitsche-和-lagrange-multiplier-的区别在哪里">9. Nitsche 和 Lagrange multiplier 的区别在哪里？</a></li>
+    <li><a href="#10-那-nitsche-和-mortar-方法又是什么关系">10. 那 Nitsche 和 Mortar 方法又是什么关系？</a></li>
+    <li><a href="#11-为什么-nitsche-可以处理接触">11. 为什么 Nitsche 可以处理接触？</a></li>
+    <li><a href="#12-penalty-free-nitsche-为什么听起来有点反直觉">12. Penalty-free Nitsche 为什么听起来有点反直觉？</a></li>
+    <li><a href="#13-但工程实现里-penaltystabilization-parameter-仍然很关键">13. 但工程实现里 penalty/stabilization parameter 仍然很关键</a></li>
+    <li><a href="#14-为什么系数通常是-">14. 为什么系数通常是 ？</a></li>
+    <li><a href="#15-nitsche-和-cutfem-为什么天然是一对">15. Nitsche 和 CutFEM 为什么天然是一对？</a></li>
+    <li><a href="#16-这对参数化几何和优化非常有价值">16. 这对参数化几何和优化非常有价值</a></li>
+    <li><a href="#17-这和你熟悉的接触-penalty-有什么最实用的区别">17. 这和你熟悉的接触 penalty 有什么最实用的区别？</a>
       <ol>
         <li><a href="#penalty-contact">Penalty contact</a></li>
         <li><a href="#nitsche-contact">Nitsche contact</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#18-nitsche-的真正难点积分几何">18. Nitsche 的真正难点：积分几何</a></li>
+    <li><a href="#19-对物理引擎开发一个很值得迁移的思想约束不一定非得变成投影">19. 对物理引擎开发，一个很值得迁移的思想：约束不一定非得变成“投影”</a></li>
+    <li><a href="#20-对代理模型数字孪生还有一个不那么显眼的价值模块化高保真模型">20. 对代理模型/数字孪生还有一个不那么显眼的价值：模块化高保真模型</a></li>
+    <li><a href="#21-一个很值得自己实现的最小实验">21. 一个很值得自己实现的最小实验</a></li>
+    <li><a href="#22-普通有限元为什么需要直接固定节点">22. 普通有限元为什么需要直接固定节点？</a></li>
+    <li><a href="#23-最简单的替代方案penalty-method">23. 最简单的替代方案：Penalty Method</a></li>
+    <li><a href="#24-nitsche-方法怎样修改弱形式">24. Nitsche 方法怎样修改弱形式？</a></li>
+    <li><a href="#25-一个深刻区别一致性与稳定性可以分别设计">25. 一个深刻区别：一致性与稳定性可以分别设计</a></li>
+    <li><a href="#26-为什么它特别适合接触有限元">26. 为什么它特别适合接触有限元？</a></li>
+    <li><a href="#27-它与-cutfem-的关系更值得注意">27. 它与 CutFEM 的关系更值得注意</a></li>
+    <li><a href="#28-对自研-fem--软体求解器的启发">28. 对自研 FEM / 软体求解器的启发</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -445,8 +462,8 @@
 \[\boxed{ \text{trial/test space 必须预先服从边界约束。} }\]<p>也就是说有限元空间本身就依赖：</p>
 \[\Gamma_D.\]<p>这在 fitted mesh 上完全没问题。</p>
 <hr>
-<h1 id="2-一旦网格不匹配强制约束立刻变麻烦">2. 一旦网格不匹配，强制约束立刻变麻烦
-</h1><p>假设两个子域：</p>
+<h2 id="2-一旦网格不匹配强制约束立刻变麻烦">2. 一旦网格不匹配，强制约束立刻变麻烦
+</h2><p>假设两个子域：</p>
 \[\Omega_1,\qquad\Omega_2\]<p>在界面：</p>
 \[\Gamma\]<p>相接。</p>
 <p>物理要求：</p>
@@ -491,8 +508,8 @@
 </ol>
 <p>而 Nitsche 的吸引力就在于：</p>
 \[\boxed{ \text{它能弱施加约束，却通常不需要额外 multiplier DOFs。} }\]<hr>
-<h1 id="3-先理解-penalty简单但有一个根本-trade-off">3. 先理解 penalty：简单，但有一个根本 trade-off
-</h1><p>如果要强制：</p>
+<h2 id="3-先理解-penalty简单但有一个根本-trade-off">3. 先理解 penalty：简单，但有一个根本 trade-off
+</h2><p>如果要强制：</p>
 \[u=g,\]<p>可以在能量里加入：</p>
 \[\frac{\gamma}{2} \int_{\Gamma_D} (u-g)^2\,d\Gamma.\]<p>对应弱式增加：</p>
 \[\gamma \int_{\Gamma_D} (u-g)v\,d\Gamma.\]<p>当：</p>
@@ -504,8 +521,8 @@
 \[\boxed{ \text{constraint accuracy} \quad\leftrightarrow\quad \text{conditioning} }\]<p>。</p>
 <p>Nitsche 方法的价值之一，就是引入<strong>一致性项</strong>，让稳定化参数不再承担“单独逼近真实边界条件”的全部责任。</p>
 <hr>
-<h1 id="4-nitsche-方法从分部积分重新把边界物理拿回来">4. Nitsche 方法从分部积分重新把“边界物理”拿回来
-</h1><p>考虑齐次 Dirichlet：</p>
+<h2 id="4-nitsche-方法从分部积分重新把边界物理拿回来">4. Nitsche 方法从分部积分重新把“边界物理”拿回来
+</h2><p>考虑齐次 Dirichlet：</p>
 \[u=0 \quad\text{on }\Gamma_D.\]<p>如果我们暂时不要求测试函数：</p>
 \[v=0\]<p>那么分部积分得到：</p>
 \[\int_\Omega \nabla u\cdot\nabla v - \int_{\Gamma_D} \partial_n u\,v = \int_\Omega fv.\]<p>这里出现了自然边界通量：</p>
@@ -517,8 +534,8 @@
 \[\boxed{\text{consistency}}\]\[\boxed{\text{symmetry / adjoint consistency}}\]\[\boxed{\text{stability}}\]<p>。</p>
 <p>这就是 Nitsche 与单纯 penalty 最核心的区别。</p>
 <hr>
-<h1 id="5-为什么说-nitsche-是consistent-penalty">5. 为什么说 Nitsche 是“consistent penalty”？
-</h1><p>看最后一项：</p>
+<h2 id="5-为什么说-nitsche-是consistent-penalty">5. 为什么说 Nitsche 是“consistent penalty”？
+</h2><p>看最后一项：</p>
 \[\frac{\gamma}{h}uv.\]<p>它确实长得像 penalty。</p>
 <p>但如果只保留这一项，那就是 penalty method。</p>
 <p>Nitsche 还额外保留：</p>
@@ -530,8 +547,8 @@
 \[u-g\]<p>压到零。</p>
 <p>这就是为什么 Nitsche 可以做到：</p>
 \[\boxed{ \text{弱施加边界条件，同时保持有限元的一致收敛阶。} }\]<hr>
-<h1 id="6-一个直观理解nitsche-不把约束写成命令而是写成界面交换定律">6. 一个直观理解：Nitsche 不把约束写成“命令”，而是写成“界面交换定律”
-</h1><p>强制 Dirichlet：</p>
+<h2 id="6-一个直观理解nitsche-不把约束写成命令而是写成界面交换定律">6. 一个直观理解：Nitsche 不把约束写成“命令”，而是写成“界面交换定律”
+</h2><p>强制 Dirichlet：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -566,8 +583,8 @@
 </ul>
 <p>这些问题中的约束本来就更适合写成“界面交换条件”。</p>
 <hr>
-<h1 id="7-非匹配网格耦合时nitsche-的价值最容易看清">7. 非匹配网格耦合时，Nitsche 的价值最容易看清
-</h1><p>假设：</p>
+<h2 id="7-非匹配网格耦合时nitsche-的价值最容易看清">7. 非匹配网格耦合时，Nitsche 的价值最容易看清
+</h2><p>假设：</p>
 \[\Omega_1\]<p>和：</p>
 \[\Omega_2\]<p>之间要求：</p>
 \[u_1=u_2\]<p>以及通量平衡：</p>
@@ -581,8 +598,8 @@
 <p>这允许两边完全独立划分网格。</p>
 <p>Ruess 等在 isogeometric analysis 中正是利用 Nitsche weak coupling，把 non-matching B-spline/NURBS patches 与普通有限元网格连接起来，而无需昂贵的几何重新参数化。</p>
 <hr>
-<h1 id="8-这为什么对-cad--fem-很重要">8. 这为什么对 CAD → FEM 很重要？
-</h1><p>CAD 几何经常天然由多个 patch 组成。</p>
+<h2 id="8-这为什么对-cad--fem-很重要">8. 这为什么对 CAD → FEM 很重要？
+</h2><p>CAD 几何经常天然由多个 patch 组成。</p>
 <p>例如：</p>
 \[\text{NURBS patch A} + \text{patch B} + \text{patch C}.\]<p>如果要求：</p>
 \[\boxed{\text{所有 patch 接口节点严格匹配}}\]<p>网格生成会非常痛苦。</p>
@@ -591,8 +608,8 @@
 \[\text{mesh conformity}\]<p>转移到：</p>
 \[\text{variational coupling}.\]<p>这是一个非常重要的工程思想：</p>
 \[\boxed{ \text{与其为了数值方法强迫几何/网格适配， 不如让数值方法适应真实几何结构。} }\]<hr>
-<h1 id="9-nitsche-和-lagrange-multiplier-的区别在哪里">9. Nitsche 和 Lagrange multiplier 的区别在哪里？
-</h1><p>Lagrange multiplier 方法：</p>
+<h2 id="9-nitsche-和-lagrange-multiplier-的区别在哪里">9. Nitsche 和 Lagrange multiplier 的区别在哪里？
+</h2><p>Lagrange multiplier 方法：</p>
 \[u_1-u_2=0\]<p>通过额外变量：</p>
 \[\lambda\]<p>施加。</p>
 <p>系统变成：</p>
@@ -606,8 +623,8 @@
 \[\boxed{ \text{一种 stabilized multiplier elimination} }\]<p>。</p>
 <p>这也是为什么很多 Nitsche 推导和 stabilized Lagrange multiplier formulation 之间存在紧密联系；对于弹性接触，已有分析就把 Nitsche 解释为稳定化有限元方法。</p>
 <hr>
-<h1 id="10-那-nitsche-和-mortar-方法又是什么关系">10. 那 Nitsche 和 Mortar 方法又是什么关系？
-</h1><p>Mortar 方法也主要用于：</p>
+<h2 id="10-那-nitsche-和-mortar-方法又是什么关系">10. 那 Nitsche 和 Mortar 方法又是什么关系？
+</h2><p>Mortar 方法也主要用于：</p>
 \[\boxed{\text{nonmatching interfaces}}\]<p>。</p>
 <p>经典 mortar 通常在接口引入 multiplier space：</p>
 \[\lambda_h.\]<p>所以更自然地表示 traction，并对 nonmatching discretization 做积分投影。</p>
@@ -617,8 +634,8 @@
 \[\boxed{ \text{Mortar：显式 interface multiplier} }\]\[\boxed{ \text{Nitsche：隐式 interface stabilization} }\]<p>。</p>
 <p>两者在高级接触算法里并非完全对立；甚至存在 Nitsche mortaring 的组合。Gustafsson、Stenberg、Videman 的弹性接触工作就研究了三种 Nitsche mortaring 技术，并给出 quasi-optimality 和 a posteriori error estimates。</p>
 <hr>
-<h1 id="11-为什么-nitsche-可以处理接触">11. 为什么 Nitsche 可以处理接触？
-</h1><p>接触条件本质上不是简单：</p>
+<h2 id="11-为什么-nitsche-可以处理接触">11. 为什么 Nitsche 可以处理接触？
+</h2><p>接触条件本质上不是简单：</p>
 \[u=0.\]<p>以无摩擦 Signorini contact 为例：</p>
 \[g_n(u)\ge0,\]\[\lambda_n\le0,\]\[\lambda_ng_n=0.\]<p>也就是说：</p>
 \[\boxed{ \text{要么分离，要么接触} }\]<p>。</p>
@@ -628,8 +645,8 @@
 <p>Chouly–Hild 以及后续 Burman–Hansbo–Larson 的工作证明，Nitsche 方法可以用于 unilateral contact；后者甚至构造了 nonsymmetric penalty-free Nitsche formulation，并证明 energy norm 下的 optimal error estimates。</p>
 <p>所以：</p>
 \[\boxed{ \text{Nitsche 不只适用于 equality constraints， 也能扩展到 inequality/contact constraints。} }\]<hr>
-<h1 id="12-penalty-free-nitsche-为什么听起来有点反直觉">12. Penalty-free Nitsche 为什么听起来有点反直觉？
-</h1><p>前面 symmetric Nitsche 有：</p>
+<h2 id="12-penalty-free-nitsche-为什么听起来有点反直觉">12. Penalty-free Nitsche 为什么听起来有点反直觉？
+</h2><p>前面 symmetric Nitsche 有：</p>
 \[\frac{\gamma}{h} \int_\Gamma uv.\]<p>看起来 penalty 不可缺少。</p>
 <p>但 Nitsche 还有 nonsymmetric variants。</p>
 <p>某些 formulations 可以通过改变 consistency terms 的符号结构，在理论上不依赖 penalty term 获得稳定性。</p>
@@ -637,8 +654,8 @@
 <p>这说明：</p>
 \[\boxed{ \text{“Nitsche = penalty 方法”是不准确的。} }\]<p>Penalty-like term 只是常见构造的一部分，不是方法的本质定义。</p>
 <hr>
-<h1 id="13-但工程实现里-penaltystabilization-parameter-仍然很关键">13. 但工程实现里 penalty/stabilization parameter 仍然很关键
-</h1><details class="reveal">
+<h2 id="13-但工程实现里-penaltystabilization-parameter-仍然很关键">13. 但工程实现里 penalty/stabilization parameter 仍然很关键
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>在很多 symmetric Nitsche formulation 中，需要：</p>
@@ -665,8 +682,8 @@
 </details>
 
 <hr>
-<h1 id="14-为什么系数通常是-">14. 为什么系数通常是 \(\gamma/h\)？
-</h1><details class="reveal">
+<h2 id="14-为什么系数通常是-">14. 为什么系数通常是 \(\gamma/h\)？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>因为边界项和体积分项具有不同尺度。</p>
@@ -685,8 +702,8 @@
 </details>
 
 <hr>
-<h1 id="15-nitsche-和-cutfem-为什么天然是一对">15. Nitsche 和 CutFEM 为什么天然是一对？
-</h1><details class="reveal">
+<h2 id="15-nitsche-和-cutfem-为什么天然是一对">15. Nitsche 和 CutFEM 为什么天然是一对？
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>CutFEM / unfitted FEM 的思想是：</p>
@@ -738,8 +755,8 @@
 </details>
 
 <hr>
-<h1 id="16-这对参数化几何和优化非常有价值">16. 这对参数化几何和优化非常有价值
-</h1><p>假设做 shape optimization。</p>
+<h2 id="16-这对参数化几何和优化非常有价值">16. 这对参数化几何和优化非常有价值
+</h2><p>假设做 shape optimization。</p>
 <p>传统 fitted mesh：</p>
 \[\text{geometry changes} \Rightarrow \text{mesh deformation/remeshing}.\]<p>如果每次设计迭代都：</p>
 \[\boxed{\text{重新网格化}}\]<p>成本高，而且容易产生质量问题。</p>
@@ -747,8 +764,8 @@
 <p>Dokken 等的工作正是利用多个独立 nonmatching meshes 做 shape optimization，使部分几何变化可以通过网格刚体移动/缩放实现，从而避免每一步整体 remeshing。</p>
 <p>这对参数化机构尤其有启发：</p>
 \[\boxed{ \text{几何参数变化不一定要等价于全局重新划网格。} }\]<hr>
-<h1 id="17-这和你熟悉的接触-penalty-有什么最实用的区别">17. 这和你熟悉的接触 penalty 有什么最实用的区别？
-</h1><p>销轴—孔接触里常用 penalty：</p>
+<h2 id="17-这和你熟悉的接触-penalty-有什么最实用的区别">17. 这和你熟悉的接触 penalty 有什么最实用的区别？
+</h2><p>销轴—孔接触里常用 penalty：</p>
 \[F_n=k\delta^n.\]<p>其思想是：</p>
 \[\boxed{ \text{允许少量穿透，用很大恢复力惩罚。} }\]<p>Nitsche contact 则从变分一致性的角度构造：</p>
 \[\boxed{ \text{接触 traction} + \text{gap constraint} + \text{stabilization} }\]<p>之间的弱耦合。</p>
@@ -761,8 +778,8 @@
 \[\boxed{\text{一种有限元约束离散方法}}\]<p>而 penalty contact 更接近：</p>
 \[\boxed{\text{一种约束正则化方法}}\]<p>。</p>
 <hr>
-<h1 id="18-nitsche-的真正难点积分几何">18. Nitsche 的真正难点：积分几何
-</h1><details class="reveal">
+<h2 id="18-nitsche-的真正难点积分几何">18. Nitsche 的真正难点：积分几何
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>公式看起来不复杂。</p>
@@ -785,8 +802,8 @@
 </details>
 
 <hr>
-<h1 id="19-对物理引擎开发一个很值得迁移的思想约束不一定非得变成投影">19. 对物理引擎开发，一个很值得迁移的思想：约束不一定非得变成“投影”
-</h1><p>游戏物理里通常想到约束：</p>
+<h2 id="19-对物理引擎开发一个很值得迁移的思想约束不一定非得变成投影">19. 对物理引擎开发，一个很值得迁移的思想：约束不一定非得变成“投影”
+</h2><p>游戏物理里通常想到约束：</p>
 \[C(x)=0\]<p>就会自然进入：</p>
 <ul>
 <li><span class="term-anchor" data-term="pbd" tabindex="0">PBD</span> projection；</li>
@@ -808,8 +825,8 @@
 <p>那么用：</p>
 \[\boxed{\text{weak interface coupling}}\]<p>往往比“找到节点然后绑死”更自然。</p>
 <hr>
-<h1 id="20-对代理模型数字孪生还有一个不那么显眼的价值模块化高保真模型">20. 对代理模型/数字孪生还有一个不那么显眼的价值：模块化高保真模型
-</h1><p>假设复杂系统由：</p>
+<h2 id="20-对代理模型数字孪生还有一个不那么显眼的价值模块化高保真模型">20. 对代理模型/数字孪生还有一个不那么显眼的价值：模块化高保真模型
+</h2><p>假设复杂系统由：</p>
 \[\Omega_1,\Omega_2,\Omega_3\]<p>几个子结构组成。</p>
 <p>每个子结构：</p>
 <ul>
@@ -828,8 +845,8 @@
 <p>它实际上是一种：</p>
 \[\boxed{\text{physics module coupling abstraction}}\]<p>。</p>
 <hr>
-<h1 id="21-一个很值得自己实现的最小实验">21. 一个很值得自己实现的最小实验
-</h1><details class="reveal">
+<h2 id="21-一个很值得自己实现的最小实验">21. 一个很值得自己实现的最小实验
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>最简单可以做 1D Poisson：</p>
@@ -857,8 +874,8 @@
 </details>
 
 <hr>
-<h1 id="22-普通有限元为什么需要直接固定节点">22. 普通有限元为什么需要直接固定节点？
-</h1><p>考虑最简单的 Poisson 方程：</p>
+<h2 id="22-普通有限元为什么需要直接固定节点">22. 普通有限元为什么需要直接固定节点？
+</h2><p>考虑最简单的 Poisson 方程：</p>
 \[ -\Delta u=f,\qquad x\in\Omega, \]<p>边界条件：</p>
 \[ u=g,\qquad x\in\Gamma_D. \]<p>传统 Galerkin FEM 将方程乘以测试函数 \(v\)，积分分部：</p>
 \[ \int_\Omega\nabla u\cdot\nabla v\,d\Omega - \int_{\Gamma_D}\frac{\partial u}{\partial n}v\,d\Gamma = \int_\Omega fv\,d\Omega. \]<p>如果使用强制 Dirichlet 条件，测试函数在对应边界满足：</p>
@@ -868,8 +885,8 @@
 \[ \boxed{\text{有限元空间必须事先满足边界约束。}} \]<p>对于规则、边界匹配的网格，这很容易实现。</p>
 <p>但如果边界穿过单元内部，或者两个网格的节点并不重合，强制约束就可能需要复杂的自由度映射。</p>
 <hr>
-<h1 id="23-最简单的替代方案penalty-method">23. 最简单的替代方案：Penalty Method
-</h1><p>既然希望：</p>
+<h2 id="23-最简单的替代方案penalty-method">23. 最简单的替代方案：Penalty Method
+</h2><p>既然希望：</p>
 \[ u=g, \]<p>可以直接给边界偏差增加惩罚：</p>
 \[ \boxed{ E_p(u)= \frac{\eta}{2h} \int_{\Gamma_D}(u-g)^2\,d\Gamma. } \]<p>其中：</p>
 <ul>
@@ -884,32 +901,32 @@
 <p>因此普通 Penalty Method 存在典型的权衡：</p>
 \[ \boxed{ \text{约束越严格} \quad\Longrightarrow\quad \text{线性系统可能越难求解}. } \]<p>Nitsche 方法的关键突破，是发现<strong>仅增加惩罚能量还不够，必须把边界上的物理通量也纳入构造</strong>。</p>
 <hr>
-<h1 id="24-nitsche-方法怎样修改弱形式">24. Nitsche 方法怎样修改弱形式？
-</h1><p>对于上述 Poisson 方程，经典对称 Nitsche 方法定义：</p>
+<h2 id="24-nitsche-方法怎样修改弱形式">24. Nitsche 方法怎样修改弱形式？
+</h2><p>对于上述 Poisson 方程，经典对称 Nitsche 方法定义：</p>
 \[ \boxed{ \begin{aligned} a_h(u,v) ={}& \int_\Omega\nabla u\cdot\nabla v\,d\Omega\\ &-\int_{\Gamma_D} \frac{\partial u}{\partial n}v\,d\Gamma\\ &-\int_{\Gamma_D} \frac{\partial v}{\partial n}u\,d\Gamma\\ &+\int_{\Gamma_D} \frac{\gamma}{h}uv\,d\Gamma. \end{aligned} } \]<p>右端为：</p>
 \[ \boxed{ \begin{aligned} l_h(v) ={}&\int_\Omega fv\,d\Omega\\ &-\int_{\Gamma_D} \frac{\partial v}{\partial n}g\,d\Gamma\\ &+\int_{\Gamma_D} \frac{\gamma}{h}gv\,d\Gamma. \end{aligned} } \]<p>其中 \(\gamma\) 是无量纲稳定化参数，实际扩散问题还需考虑扩散系数。</p>
 <p>这几个边界项具有不同作用。</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>项</th>
-					<th>作用</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>\(-\int_{\Gamma_D}\partial_nu\,v\)</td>
-					<td>保留积分分部产生的物理通量</td>
-			</tr>
-			<tr>
-					<td>\(-\int_{\Gamma_D}\partial_nv\,u\)</td>
-					<td>保持双线性形式的对称性及<span class="term-anchor" data-term="adjoint" tabindex="0">伴随</span>一致性</td>
-			</tr>
-			<tr>
-					<td>\(\int_{\Gamma_D}(\gamma/h)uv\)</td>
-					<td>提供稳定化，控制边界偏差</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>项</th>
+          <th>作用</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>\(-\int_{\Gamma_D}\partial_nu\,v\)</td>
+          <td>保留积分分部产生的物理通量</td>
+      </tr>
+      <tr>
+          <td>\(-\int_{\Gamma_D}\partial_nv\,u\)</td>
+          <td>保持双线性形式的对称性及<span class="term-anchor" data-term="adjoint" tabindex="0">伴随</span>一致性</td>
+      </tr>
+      <tr>
+          <td>\(\int_{\Gamma_D}(\gamma/h)uv\)</td>
+          <td>提供稳定化，控制边界偏差</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>最重要的性质是：</p>
 <p>如果 \(u\) 是满足原 PDE 和 \(u=g\) 的精确解，将它代入 Nitsche 弱形式，方程仍然成立。</p>
@@ -917,8 +934,8 @@
 \[ \boxed{\text{Consistency（一致性）}.} \]<p>相比之下，单纯增加有限强度的边界惩罚通常无法保持这种一致性。</p>
 <p>Feel++ 的官方教程正是按照“通量一致性项 → 对称项 → 稳定化项”的顺序介绍 Nitsche 方法。</p>
 <hr>
-<h1 id="25-一个深刻区别一致性与稳定性可以分别设计">25. 一个深刻区别：一致性与稳定性可以分别设计
-</h1><p>Nitsche 方法的重要性还在于，它把两个经常混淆的要求分开了。</p>
+<h2 id="25-一个深刻区别一致性与稳定性可以分别设计">25. 一个深刻区别：一致性与稳定性可以分别设计
+</h2><p>Nitsche 方法的重要性还在于，它把两个经常混淆的要求分开了。</p>
 <p><strong>一致性：</strong></p>
 \[ u_{\mathrm{exact}} \]<p>必须满足离散弱方程。</p>
 <p><strong>稳定性：</strong></p>
@@ -928,8 +945,8 @@
 <p>Burman 在 2012 年证明，一类<strong>非对称 Nitsche 方法可以在没有惩罚项的情况下保持稳定性</strong>，但其误差性质与经典对称方法有所不同。</p>
 <p>这揭示了一个值得迁移的数值方法设计思想：</p>
 \[ \boxed{ \text{物理一致性、代数对称性和数值稳定性， 是可以分别分析和设计的性质。} } \]<hr>
-<h1 id="26-为什么它特别适合接触有限元">26. 为什么它特别适合接触有限元？
-</h1><p>考虑弹性体与刚性平面的无摩擦接触。</p>
+<h2 id="26-为什么它特别适合接触有限元">26. 为什么它特别适合接触有限元？
+</h2><p>考虑弹性体与刚性平面的无摩擦接触。</p>
 <p>接触条件可以写成 Signorini 互补关系：</p>
 \[ g_n\geq0, \]\[ p_n\geq0, \]\[ \boxed{g_np_n=0.} \]<p>其中：</p>
 <ul>
@@ -946,8 +963,8 @@
 <p>这对于接触边界复杂、网格不匹配的工程模型尤其有吸引力。</p>
 <p>不过，Nitsche 接触仍然需要处理接触状态切换带来的非光滑性；不引入乘子，并不意味着接触问题自动变成简单的线性问题。</p>
 <hr>
-<h1 id="27-它与-cutfem-的关系更值得注意">27. 它与 CutFEM 的关系更值得注意
-</h1><details class="reveal">
+<h2 id="27-它与-cutfem-的关系更值得注意">27. 它与 CutFEM 的关系更值得注意
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p>假设要模拟一个圆形弹性体。</p>
@@ -967,8 +984,8 @@
 </details>
 
 <hr>
-<h1 id="28-对自研-fem--软体求解器的启发">28. 对自研 FEM / 软体求解器的启发
-</h1><details class="reveal">
+<h2 id="28-对自研-fem--软体求解器的启发">28. 对自研 FEM / 软体求解器的启发
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p>假设未来需要模拟大量形状不同的软体对象。</p>
@@ -992,8 +1009,8 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Nitsche 方法最值得记住的不是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Nitsche 方法最值得记住的不是：</p>
 \[-\langle\partial_nu,v\rangle -\langle\partial_nv,u\rangle + \frac{\gamma}{h}\langle u,v\rangle.\]<p>真正值得记住的是：</p>
 \[\boxed{ \text{有限元中的约束，不一定要通过修改自由度来强制满足； 它也可以成为弱平衡方程的一部分。} }\]<p>于是知识体系可以这样定位：</p>
 \[\text{Strong constraints}\]\[\downarrow\]\[\text{Penalty / Lagrange multiplier}\]\[\downarrow\]\[\boxed{\text{Nitsche weak enforcement}}\]\[\downarrow\]\[\text{nonmatching meshes / contact / CutFEM / multiphysics coupling}.\]<p>它最深的工程价值在于：</p>
@@ -1006,8 +1023,8 @@
 <li>多物理场可以通过弱接口组合。</li>
 </ul>
 <p>从这个角度看，Nitsche 方法真正解决的不是“边界条件怎么施加”，而是一个更普遍的问题：</p>
-\[\boxed{ \text{如何让不同离散世界在同一个物理界面上保持一致。} }\]<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+\[\boxed{ \text{如何让不同离散世界在同一个物理界面上保持一致。} }\]<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1206,9 +1223,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

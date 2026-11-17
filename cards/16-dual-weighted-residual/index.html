@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Dual-Weighted Residual（DWR，双重加权残差）与 Goal-Oriented Adaptivity\n领域：有限元 × 数值方法 × 可靠性 × 代理模型\n推荐阅读时间：约 8–10 分钟\n今天选一个和前几张卡片形成很好衔接、但关注点明显不同的方法。\n有限元自适应通常问：\n\\[\\boxed{\\text{哪里的解误差最大？}}\\]DWR 改问：\n\\[\\boxed{\\text{哪里的误差最影响我最终关心的工程量？}}\\]这两个问题差别非常大。\n假设模拟飞机结构，你真正关心的是某个铰链处的最大应力：\n\\[J(u)=\\sigma_{\\mathrm{hinge}}(u).\\]模型另一端存在一个尖角奇异性，局部位移梯度巨大。\n普通 residual-based adaptive FEM 很可能不断在那里加密网格，因为那里：\n\\[\\|R\\|\\gg 0.\\]但如果那个奇异性对铰链应力几乎没有影响，计算资源其实花错了地方。\nDWR 的核心思想可以压缩成：\n\\[\\boxed{ \\text{输出误差} \\approx \\text{局部方程残差} \\times \\text{该位置对目标输出的影响程度}. }\\]后一个量由一个 dual / adjoint problem（对偶/伴随问题） 给出。\n这使 DWR 成为连接有限元误差估计、伴随灵敏度、可靠性和现代 surrogate/ROM 的一个非常漂亮的节点。Becker 与 Rannacher 的经典框架正是为“任意目标泛函”的误差控制而发展，而不局限于传统 energy norm。\n1. 传统 FEM 误差指标其实回答了一个未必重要的问题 考虑：\n\\[-\\nabla\\cdot(k\\nabla u)=f.\\]有限元得到：\n\\[u_h.\\]典型 a posteriori estimator 会看：\n\\[R_K = f+\\nabla\\cdot(k\\nabla u_h)\\]以及单元边界上的 flux jump。\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Dual-Weighted Residual（DWR，双重加权残差）与 Goal-Oriented Adaptivity\n领域：有限元 × 数值方法 × 可靠性 × 代理模型\n推荐阅读时间：约 8–10 分钟\n有限元自适应通常问：\n\\[\\boxed{\\text{哪里的解误差最大？}}\\]DWR 改问：\n\\[\\boxed{\\text{哪里的误差最影响我最终关心的工程量？}}\\]这两个问题差别非常大。\n假设模拟飞机结构，你真正关心的是某个铰链处的最大应力：\n\\[J(u)=\\sigma_{\\mathrm{hinge}}(u).\\]模型另一端存在一个尖角奇异性，局部位移梯度巨大。\n普通 residual-based adaptive FEM 很可能不断在那里加密网格，因为那里：\n\\[\\|R\\|\\gg 0.\\]但如果那个奇异性对铰链应力几乎没有影响，计算资源其实花错了地方。\nDWR 的核心思想可以压缩成：\n\\[\\boxed{ \\text{输出误差} \\approx \\text{局部方程残差} \\times \\text{该位置对目标输出的影响程度}. }\\]后一个量由一个 dual / adjoint problem（对偶/伴随问题） 给出。\n这使 DWR 成为连接有限元误差估计、伴随灵敏度、可靠性和现代 surrogate/ROM 的一个非常漂亮的节点。Becker 与 Rannacher 的经典框架正是为“任意目标泛函”的误差控制而发展，而不局限于传统 energy norm。\n1. 传统 FEM 误差指标其实回答了一个未必重要的问题 考虑：\n\\[-\\nabla\\cdot(k\\nabla u)=f.\\]有限元得到：\n\\[u_h.\\]典型 a posteriori estimator 会看：\n\\[R_K = f+\\nabla\\cdot(k\\nabla u_h)\\]以及单元边界上的 flux jump。\n">
 <title>Dual-Weighted Residual：为“你真正要算的量”细化网格</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/16-dual-weighted-residual/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Dual-Weighted Residual：为“你真正要算的量”细化网格">
-<meta property='og:description' content="主题：Dual-Weighted Residual（DWR，双重加权残差）与 Goal-Oriented Adaptivity\n领域：有限元 × 数值方法 × 可靠性 × 代理模型\n推荐阅读时间：约 8–10 分钟\n今天选一个和前几张卡片形成很好衔接、但关注点明显不同的方法。\n有限元自适应通常问：\n\\[\\boxed{\\text{哪里的解误差最大？}}\\]DWR 改问：\n\\[\\boxed{\\text{哪里的误差最影响我最终关心的工程量？}}\\]这两个问题差别非常大。\n假设模拟飞机结构，你真正关心的是某个铰链处的最大应力：\n\\[J(u)=\\sigma_{\\mathrm{hinge}}(u).\\]模型另一端存在一个尖角奇异性，局部位移梯度巨大。\n普通 residual-based adaptive FEM 很可能不断在那里加密网格，因为那里：\n\\[\\|R\\|\\gg 0.\\]但如果那个奇异性对铰链应力几乎没有影响，计算资源其实花错了地方。\nDWR 的核心思想可以压缩成：\n\\[\\boxed{ \\text{输出误差} \\approx \\text{局部方程残差} \\times \\text{该位置对目标输出的影响程度}. }\\]后一个量由一个 dual / adjoint problem（对偶/伴随问题） 给出。\n这使 DWR 成为连接有限元误差估计、伴随灵敏度、可靠性和现代 surrogate/ROM 的一个非常漂亮的节点。Becker 与 Rannacher 的经典框架正是为“任意目标泛函”的误差控制而发展，而不局限于传统 energy norm。\n1. 传统 FEM 误差指标其实回答了一个未必重要的问题 考虑：\n\\[-\\nabla\\cdot(k\\nabla u)=f.\\]有限元得到：\n\\[u_h.\\]典型 a posteriori estimator 会看：\n\\[R_K = f+\\nabla\\cdot(k\\nabla u_h)\\]以及单元边界上的 flux jump。\n">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Dual-Weighted Residual：为“你真正要算的量”细化网格">
+<meta property='og:description' content="主题：Dual-Weighted Residual（DWR，双重加权残差）与 Goal-Oriented Adaptivity\n领域：有限元 × 数值方法 × 可靠性 × 代理模型\n推荐阅读时间：约 8–10 分钟\n有限元自适应通常问：\n\\[\\boxed{\\text{哪里的解误差最大？}}\\]DWR 改问：\n\\[\\boxed{\\text{哪里的误差最影响我最终关心的工程量？}}\\]这两个问题差别非常大。\n假设模拟飞机结构，你真正关心的是某个铰链处的最大应力：\n\\[J(u)=\\sigma_{\\mathrm{hinge}}(u).\\]模型另一端存在一个尖角奇异性，局部位移梯度巨大。\n普通 residual-based adaptive FEM 很可能不断在那里加密网格，因为那里：\n\\[\\|R\\|\\gg 0.\\]但如果那个奇异性对铰链应力几乎没有影响，计算资源其实花错了地方。\nDWR 的核心思想可以压缩成：\n\\[\\boxed{ \\text{输出误差} \\approx \\text{局部方程残差} \\times \\text{该位置对目标输出的影响程度}. }\\]后一个量由一个 dual / adjoint problem（对偶/伴随问题） 给出。\n这使 DWR 成为连接有限元误差估计、伴随灵敏度、可靠性和现代 surrogate/ROM 的一个非常漂亮的节点。Becker 与 Rannacher 的经典框架正是为“任意目标泛函”的误差控制而发展，而不局限于传统 energy norm。\n1. 传统 FEM 误差指标其实回答了一个未必重要的问题 考虑：\n\\[-\\nabla\\cdot(k\\nabla u)=f.\\]有限元得到：\n\\[u_h.\\]典型 a posteriori estimator 会看：\n\\[R_K = f+\\nabla\\cdot(k\\nabla u_h)\\]以及单元边界上的 flux jump。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/16-dual-weighted-residual/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='数值方法' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='代理模型' /><meta property='article:published_time' content='2026-09-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-20T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Dual-Weighted Residual：为“你真正要算的量”细化网格">
-<meta name="twitter:description" content="主题：Dual-Weighted Residual（DWR，双重加权残差）与 Goal-Oriented Adaptivity\n领域：有限元 × 数值方法 × 可靠性 × 代理模型\n推荐阅读时间：约 8–10 分钟\n今天选一个和前几张卡片形成很好衔接、但关注点明显不同的方法。\n有限元自适应通常问：\n\\[\\boxed{\\text{哪里的解误差最大？}}\\]DWR 改问：\n\\[\\boxed{\\text{哪里的误差最影响我最终关心的工程量？}}\\]这两个问题差别非常大。\n假设模拟飞机结构，你真正关心的是某个铰链处的最大应力：\n\\[J(u)=\\sigma_{\\mathrm{hinge}}(u).\\]模型另一端存在一个尖角奇异性，局部位移梯度巨大。\n普通 residual-based adaptive FEM 很可能不断在那里加密网格，因为那里：\n\\[\\|R\\|\\gg 0.\\]但如果那个奇异性对铰链应力几乎没有影响，计算资源其实花错了地方。\nDWR 的核心思想可以压缩成：\n\\[\\boxed{ \\text{输出误差} \\approx \\text{局部方程残差} \\times \\text{该位置对目标输出的影响程度}. }\\]后一个量由一个 dual / adjoint problem（对偶/伴随问题） 给出。\n这使 DWR 成为连接有限元误差估计、伴随灵敏度、可靠性和现代 surrogate/ROM 的一个非常漂亮的节点。Becker 与 Rannacher 的经典框架正是为“任意目标泛函”的误差控制而发展，而不局限于传统 energy norm。\n1. 传统 FEM 误差指标其实回答了一个未必重要的问题 考虑：\n\\[-\\nabla\\cdot(k\\nabla u)=f.\\]有限元得到：\n\\[u_h.\\]典型 a posteriori estimator 会看：\n\\[R_K = f+\\nabla\\cdot(k\\nabla u_h)\\]以及单元边界上的 flux jump。\n">
+<meta name="twitter:description" content="主题：Dual-Weighted Residual（DWR，双重加权残差）与 Goal-Oriented Adaptivity\n领域：有限元 × 数值方法 × 可靠性 × 代理模型\n推荐阅读时间：约 8–10 分钟\n有限元自适应通常问：\n\\[\\boxed{\\text{哪里的解误差最大？}}\\]DWR 改问：\n\\[\\boxed{\\text{哪里的误差最影响我最终关心的工程量？}}\\]这两个问题差别非常大。\n假设模拟飞机结构，你真正关心的是某个铰链处的最大应力：\n\\[J(u)=\\sigma_{\\mathrm{hinge}}(u).\\]模型另一端存在一个尖角奇异性，局部位移梯度巨大。\n普通 residual-based adaptive FEM 很可能不断在那里加密网格，因为那里：\n\\[\\|R\\|\\gg 0.\\]但如果那个奇异性对铰链应力几乎没有影响，计算资源其实花错了地方。\nDWR 的核心思想可以压缩成：\n\\[\\boxed{ \\text{输出误差} \\approx \\text{局部方程残差} \\times \\text{该位置对目标输出的影响程度}. }\\]后一个量由一个 dual / adjoint problem（对偶/伴随问题） 给出。\n这使 DWR 成为连接有限元误差估计、伴随灵敏度、可靠性和现代 surrogate/ROM 的一个非常漂亮的节点。Becker 与 Rannacher 的经典框架正是为“任意目标泛函”的误差控制而发展，而不局限于传统 energy norm。\n1. 传统 FEM 误差指标其实回答了一个未必重要的问题 考虑：\n\\[-\\nabla\\cdot(k\\nabla u)=f.\\]有限元得到：\n\\[u_h.\\]典型 a posteriori estimator 会看：\n\\[R_K = f+\\nabla\\cdot(k\\nabla u_h)\\]以及单元边界上的 flux jump。\n">
     </head>
     <body class="
     article-page">
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,15 +324,41 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-传统-fem-误差指标其实回答了一个未必重要的问题">1. 传统 FEM 误差指标其实回答了一个未必重要的问题</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-一个极端例子">2. 一个极端例子</a>
       <ol>
         <li><a href="#情况-a">情况 A</a></li>
         <li><a href="#情况-b">情况 B</a></li>
       </ol>
     </li>
+    <li><a href="#3-从最简单的线性代数看dwr-几乎一眼就能理解">3. 从最简单的线性代数看，DWR 几乎一眼就能理解</a></li>
+    <li><a href="#4-这个公式值得认真看一分钟">4. 这个公式值得认真看一分钟</a></li>
+    <li><a href="#5-一个只有三个自由度的例子">5. 一个只有三个自由度的例子</a></li>
+    <li><a href="#6-pde-中也是完全相同的逻辑">6. PDE 中也是完全相同的逻辑</a></li>
+    <li><a href="#7-为什么-adjoint-会知道误差怎么传播">7. 为什么 adjoint 会知道“误差怎么传播”？</a></li>
+    <li><a href="#8-dwr-最漂亮的地方网格会出现反直觉的加密">8. DWR 最漂亮的地方：网格会出现“反直觉”的加密</a></li>
+    <li><a href="#9-这其实改变了高质量有限元模型的定义">9. 这其实改变了“高质量有限元模型”的定义</a></li>
+    <li><a href="#10-dwr-误差估计与认证降阶模型的误差界">10. DWR 误差估计与认证降阶模型的误差界</a></li>
+    <li><a href="#11-对可靠性分析这个思想非常强">11. 对可靠性分析，这个思想非常强</a></li>
+    <li><a href="#12-这还能解决一个经常被忽略的问题solver-什么时候该停止">12. 这还能解决一个经常被忽略的问题：solver 什么时候该停止？</a></li>
+    <li><a href="#13-一个实际-dwr-流程">13. 一个实际 DWR 流程</a></li>
+    <li><a href="#14-为什么-dual-不能简单和-primal-用完全相同的空间">14. 为什么 dual 不能简单和 primal 用完全相同的空间？</a></li>
+    <li><a href="#15-那为什么值得多解一次-pde">15. 那为什么值得多解一次 PDE？</a></li>
+    <li><a href="#16-它和代理模型有一个非常重要的联系">16. 它和代理模型有一个非常重要的联系</a></li>
+    <li><a href="#17-对软体动力学也有一个很强的迁移">17. 对软体动力学也有一个很强的迁移</a></li>
+    <li><a href="#18-与-ai-的联系其实比表面上更深">18. 与 AI 的联系其实比表面上更深</a></li>
+    <li><a href="#19-最近这个方向仍然在继续发展">19. 最近这个方向仍然在继续发展</a></li>
+    <li><a href="#20-一个非常值得自己做的小实验">20. 一个非常值得自己做的小实验</a></li>
+    <li><a href="#21-dwr-为什么和伴随法天然是一回事">21. DWR 为什么和伴随法天然是一回事？</a></li>
+    <li><a href="#22-一个很深的结论误差没有绝对重要性">22. 一个很深的结论：误差没有“绝对重要性”</a></li>
+    <li><a href="#23-为什么-dwr-中-dual-解通常要比-primal-解更丰富">23. 为什么 DWR 中 dual 解通常要比 primal 解“更丰富”？</a></li>
+    <li><a href="#24-一个很重要的限制qoi-选错了整个自适应过程也会跟着错">24. 一个很重要的限制：QoI 选错了，整个自适应过程也会跟着错</a></li>
+    <li><a href="#25-dwr-也不是严格保证误差上界的万能方法">25. DWR 也不是严格保证误差上界的万能方法</a></li>
+    <li><a href="#26-dwr-不只是告诉你哪里细化还可以告诉你什么时候别再迭代">26. DWR 不只是告诉你“哪里细化”，还可以告诉你“什么时候别再迭代”</a></li>
+    <li><a href="#27-对瞬态问题它甚至可以回答什么时候需要小时间步">27. 对瞬态问题，它甚至可以回答“什么时候需要小时间步”</a></li>
+    <li><a href="#28-它还自然通向多保真建模">28. 它还自然通向多保真建模</a></li>
+    <li><a href="#29-实际收敛速率全局加密-vs-dwr-自适应">29. 实际收敛速率：全局加密 vs DWR 自适应</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -406,8 +432,7 @@
     
     <p><strong>主题：<span class="term-anchor" data-term="dwr" tabindex="0">Dual-Weighted Residual</span>（DWR，双重加权残差）与 Goal-Oriented Adaptivity</strong><br>
 <strong>领域：有限元 × 数值方法 × 可靠性 × 代理模型</strong><br>
-<strong>推荐阅读时间：约 8–10 分钟</strong><br>
-今天选一个和前几张卡片形成很好衔接、但关注点明显不同的方法。</p>
+<strong>推荐阅读时间：约 8–10 分钟</strong></p>
 <p>有限元自适应通常问：</p>
 \[\boxed{\text{哪里的解误差最大？}}\]<p>DWR 改问：</p>
 \[\boxed{\text{哪里的误差最影响我最终关心的工程量？}}\]<p>这两个问题差别非常大。</p>
@@ -435,8 +460,8 @@
 \[J(u)= \begin{cases} \text{某点位移}\\ \text{最大载荷}\\ \text{阻力}\\ \text{热流}\\ \text{某接口反力}\\ \text{某失效指标} \end{cases}\]<p>。</p>
 <p>于是真正的问题应该是：</p>
 \[\boxed{|J(u)-J(u_h)|\text{ 有多大？}}\]<hr>
-<h1 id="2-一个极端例子">2. 一个极端例子
-</h1><p>假设一块二维结构：</p>
+<h2 id="2-一个极端例子">2. 一个极端例子
+</h2><p>假设一块二维结构：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -465,8 +490,8 @@
 <p>所以还需要一个量回答：</p>
 \[\boxed{ \text{如果这里产生一点误差， 最终 }J\text{ 会变化多少？} }\]<p>这就是 adjoint。</p>
 <hr>
-<h1 id="3-从最简单的线性代数看dwr-几乎一眼就能理解">3. 从最简单的线性代数看，DWR 几乎一眼就能理解
-</h1><p>考虑：</p>
+<h2 id="3-从最简单的线性代数看dwr-几乎一眼就能理解">3. 从最简单的线性代数看，DWR 几乎一眼就能理解
+</h2><p>考虑：</p>
 \[Au=b.\]<p>有限元/迭代近似：</p>
 \[u_h.\]<p>残差：</p>
 \[r=b-Au_h.\]<p>假设我们关心：</p>
@@ -480,8 +505,8 @@
 \[z=A^{-T}c.\]<p>代回：</p>
 \[\boxed{ J(u)-J(u_h) = z^Tr. }\]<p>这就是整个 DWR 思想最干净的原型。</p>
 <hr>
-<h1 id="4-这个公式值得认真看一分钟">4. 这个公式值得认真看一分钟
-</h1>\[\boxed{ J(u)-J(u_h)=z^Tr. }\]<p>其中：</p>
+<h2 id="4-这个公式值得认真看一分钟">4. 这个公式值得认真看一分钟
+</h2>\[\boxed{ J(u)-J(u_h)=z^Tr. }\]<p>其中：</p>
 \[r\]<p>表示：</p>
 \[\boxed{\text{哪里算得不准。}}\]<p>而：</p>
 \[z\]<p>表示：</p>
@@ -492,8 +517,8 @@
 <p>不是：</p>
 \[\text{Residual}\]<p>而是：</p>
 \[\boxed{\text{Residual × Goal Sensitivity}.}\]<hr>
-<h1 id="5-一个只有三个自由度的例子">5. 一个只有三个自由度的例子
-</h1><details class="reveal">
+<h2 id="5-一个只有三个自由度的例子">5. 一个只有三个自由度的例子
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设：</p>
@@ -510,8 +535,8 @@
 </details>
 
 <hr>
-<h1 id="6-pde-中也是完全相同的逻辑">6. PDE 中也是完全相同的逻辑
-</h1><p>把 PDE 写成抽象形式：</p>
+<h2 id="6-pde-中也是完全相同的逻辑">6. PDE 中也是完全相同的逻辑
+</h2><p>把 PDE 写成抽象形式：</p>
 \[A(u)(v)=0 \qquad \forall v.\]<p>有限元解：</p>
 \[u_h.\]<p>定义 residual：</p>
 \[\rho(u_h)(v) = -A(u_h)(v).\]<p>目标：</p>
@@ -521,8 +546,8 @@
 \[\boxed{ \eta_K \approx R_K \cdot (z-I_hz) }\]<p>。</p>
 <p>deal.II 的官方 step-14 教程正是这样解释 DWR：cell/edge residual 描述局部 PDE violation，而 \(z-I_hz\) 充当权重，告诉算法该残差对于指定 functional 到底有多重要。</p>
 <hr>
-<h1 id="7-为什么-adjoint-会知道误差怎么传播">7. 为什么 adjoint 会知道“误差怎么传播”？
-</h1><p>再次看：</p>
+<h2 id="7-为什么-adjoint-会知道误差怎么传播">7. 为什么 adjoint 会知道“误差怎么传播”？
+</h2><p>再次看：</p>
 \[A^Tz=c.\]<p>如果：</p>
 \[c\]<p>只在目标位置非零，</p>
 <p>adjoint 相当于：</p>
@@ -540,8 +565,8 @@
 </ul>
 <p>它们其实都在使用同一个数学对象：</p>
 \[\boxed{\text{目标对系统内部状态的反向敏感度。}}\]<hr>
-<h1 id="8-dwr-最漂亮的地方网格会出现反直觉的加密">8. DWR 最漂亮的地方：网格会出现“反直觉”的加密
-</h1><p>deal.II 的经典 step-14 示例就非常直观。</p>
+<h2 id="8-dwr-最漂亮的地方网格会出现反直觉的加密">8. DWR 最漂亮的地方：网格会出现“反直觉”的加密
+</h2><p>deal.II 的经典 step-14 示例就非常直观。</p>
 <p>它计算一个区域中某个指定点的：</p>
 \[J(u)=u(x_0).\]<p>解本身在多个角点存在奇异结构。</p>
 <p>但 DWR 自适应后，有些奇异区域几乎完全没有被加密。</p>
@@ -551,8 +576,8 @@
 <p>这就是 goal-oriented 方法最违反“直觉”的地方：</p>
 \[\boxed{ \text{局部解很差，可以完全没关系。} }\]<p>只要：</p>
 \[\boxed{ \text{它不污染我们真正需要的答案。} }\]<hr>
-<h1 id="9-这其实改变了高质量有限元模型的定义">9. 这其实改变了“高质量有限元模型”的定义
-</h1><p>传统想法：</p>
+<h2 id="9-这其实改变了高质量有限元模型的定义">9. 这其实改变了“高质量有限元模型”的定义
+</h2><p>传统想法：</p>
 \[\boxed{\text{整个场都尽量准确。}}\]<p>DWR：</p>
 \[\boxed{\text{为指定 Quantity of Interest 分配计算精度。}}\]<p>假设你只需要：</p>
 \[F_{\rm hinge}.\]<p>那么远离铰链区域的位移误差：</p>
@@ -560,16 +585,16 @@
 <p>只要：</p>
 \[|F_{\rm hinge}-F_{\rm hinge,h}|<0.1\%.\]<p>这是一种非常成熟的：</p>
 \[\boxed{\text{task-oriented computation}.}\]<hr>
-<h1 id="10-它和上一张-certified-rom-卡片的关系很值得区分">10. 它和上一张 Certified ROM 卡片的关系很值得区分
-</h1><p>Certified RB 中我们看到：</p>
+<h2 id="10-dwr-误差估计与认证降阶模型的误差界">10. DWR 误差估计与认证降阶模型的误差界
+</h2><p>Certified RB 中我们看到：</p>
 \[\text{error} \lesssim \frac{\text{residual}} {\text{stability}}.\]<p>它回答：</p>
 \[\boxed{\text{整个 reduced solution 离 full solution 多远？}}\]<p>DWR 更进一步问：</p>
 \[\boxed{\text{这些误差到底有多少会传播到 }J？}\]<p>所以可以粗略理解：</p>
 \[\text{Residual estimator} \rightarrow \text{solution accuracy}\]<p>而：</p>
 \[\boxed{ \text{DWR} \rightarrow \text{decision/output accuracy}. }\]<p>这也是为什么 goal-oriented error estimation 对工程设计特别有价值。</p>
 <hr>
-<h1 id="11-对可靠性分析这个思想非常强">11. 对可靠性分析，这个思想非常强
-</h1><p>可靠性真正关心的不是：</p>
+<h2 id="11-对可靠性分析这个思想非常强">11. 对可靠性分析，这个思想非常强
+</h2><p>可靠性真正关心的不是：</p>
 \[\|u-u_h\|.\]<p>而是极限状态：</p>
 \[g(\theta).\]<p>例如：</p>
 \[g(\theta) = F_{\rm lim} - F_{\max}(u(\theta)).\]<p>真正重要的是：</p>
@@ -588,8 +613,8 @@
 </ul>
 <p>因此：</p>
 \[\boxed{ \text{可靠性 FEM 的最佳网格， 未必是全局误差最小的网格； 它应该优先让极限状态函数足够准确。} }\]<hr>
-<h1 id="12-这还能解决一个经常被忽略的问题solver-什么时候该停止">12. 这还能解决一个经常被忽略的问题：solver 什么时候该停止？
-</h1><p>假设线性系统迭代：</p>
+<h2 id="12-这还能解决一个经常被忽略的问题solver-什么时候该停止">12. 这还能解决一个经常被忽略的问题：solver 什么时候该停止？
+</h2><p>假设线性系统迭代：</p>
 \[A u_k=b.\]<p>通常停止条件：</p>
 \[\|r_k\|<10^{-8}.\]<p>但真正关心：</p>
 \[J(u).\]<p>如果 adjoint：</p>
@@ -603,10 +628,10 @@
 \[z\]<p>非常敏感的方向，</p>
 <p>导致目标仍然不够准确。</p>
 <p>Meidner、Rannacher 与 Vihharev 就将 DWR 用于联合控制 FEM discretization error 和 algebraic iteration error，使线性求解精度能够与网格离散精度匹配。</p>
-<p>这与前几张卡片反复出现的思想高度一致：</p>
+<p>从这个例子可以看出：</p>
 \[\boxed{\text{不要把 solver tolerance 当成物理精度。}}\]<hr>
-<h1 id="13-一个实际-dwr-流程">13. 一个实际 DWR 流程
-</h1><details class="reveal">
+<h2 id="13-一个实际-dwr-流程">13. 一个实际 DWR 流程
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>假设目标：</p>
@@ -663,8 +688,8 @@
 </details>
 
 <hr>
-<h1 id="14-为什么-dual-不能简单和-primal-用完全相同的空间">14. 为什么 dual 不能简单和 primal 用完全相同的空间？
-</h1><details class="reveal">
+<h2 id="14-为什么-dual-不能简单和-primal-用完全相同的空间">14. 为什么 dual 不能简单和 primal 用完全相同的空间？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这里有一个很漂亮的 Galerkin 陷阱。</p>
@@ -689,8 +714,8 @@
 </details>
 
 <hr>
-<h1 id="15-那为什么值得多解一次-pde">15. 那为什么值得多解一次 PDE？
-</h1><details class="reveal">
+<h2 id="15-那为什么值得多解一次-pde">15. 那为什么值得多解一次 PDE？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>因为：</p>
@@ -707,8 +732,8 @@
 </details>
 
 <hr>
-<h1 id="16-它和代理模型有一个非常重要的联系">16. 它和代理模型有一个非常重要的联系
-</h1><details class="reveal">
+<h2 id="16-它和代理模型有一个非常重要的联系">16. 它和代理模型有一个非常重要的联系
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设训练 <span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span>：</p>
@@ -726,15 +751,15 @@
 <li>建 heteroscedastic GP；</li>
 <li>区分 surrogate error 与 FEM discretization error。</li>
 </ul>
-<p>这正好与前几天 Probabilistic Numerics 的思想衔接：</p>
+<p>这与<a class="link" href="../32-probabilistic-numerics/" >概率数值方法</a>中的误差建模有关。</p>
 \[\boxed{ \text{仿真标签本身不是绝对真值。} }\]<p>DWR 提供了一条非常经典的 deterministic 路线去估计：</p>
 \[\boxed{\text{这个标签对指定工程输出到底有多准。}}\]
   </div>
 </details>
 
 <hr>
-<h1 id="17-对软体动力学也有一个很强的迁移">17. 对软体动力学也有一个很强的迁移
-</h1><details class="reveal">
+<h2 id="17-对软体动力学也有一个很强的迁移">17. 对软体动力学也有一个很强的迁移
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设模拟软体角色。</p>
@@ -760,8 +785,8 @@
 </details>
 
 <hr>
-<h1 id="18-与-ai-的联系其实比表面上更深">18. 与 AI 的联系其实比表面上更深
-</h1><details class="reveal">
+<h2 id="18-与-ai-的联系其实比表面上更深">18. 与 AI 的联系其实比表面上更深
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>现代 AI 很熟悉：</p>
@@ -783,8 +808,8 @@
 </details>
 
 <hr>
-<h1 id="19-最近这个方向仍然在继续发展">19. 最近这个方向仍然在继续发展
-</h1><details class="reveal">
+<h2 id="19-最近这个方向仍然在继续发展">19. 最近这个方向仍然在继续发展
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p>DWR 已经不是“老 FEM 技术”。</p>
@@ -804,8 +829,8 @@
 </details>
 
 <hr>
-<h1 id="20-一个非常值得自己做的小实验">20. 一个非常值得自己做的小实验
-</h1><details class="reveal">
+<h2 id="20-一个非常值得自己做的小实验">20. 一个非常值得自己做的小实验
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>不用复杂结构。</p>
@@ -833,8 +858,8 @@
 </details>
 
 <hr>
-<h1 id="21-dwr-为什么和伴随法天然是一回事">21. DWR 为什么和伴随法天然是一回事？
-</h1><details class="reveal">
+<h2 id="21-dwr-为什么和伴随法天然是一回事">21. DWR 为什么和伴随法天然是一回事？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>如果你做过优化：</p>
@@ -849,14 +874,15 @@ $$\boxed{ \text{参数变化会怎样改变 }J？ }$$<h3 id="dwr-中的-adjoint"
 </h3><p>回答：</p>
 $$\boxed{ \text{局部离散误差会怎样改变 }J？ }$$<p>所以：</p>
 $$\boxed{ \text{adjoint optimization} \quad\text{和}\quad \text{goal-oriented error estimation} }$$<p>其实是同一套 duality machinery 的两个应用。</p>
-<p>这也是为什么 Becker–Rannacher 的经典框架直接从最优控制中的 duality 思想发展出来。([剑桥大学出版社][1])</p>
+<p>Becker 与 Rannacher 从最优控制中的对偶关系推导出这一误差表示。<a class="link" href="https://www.cambridge.org/core/journals/acta-numerica/article/abs/an-optimal-control-approach-to-a-posteriori-error-estimation-in-finite-element-methods/5C67A03F528C6FA69F37A97DF5C3BE19"  target="_blank" rel="noopener"
+    >Acta Numerica 原文</a></p>
 
   </div>
 </details>
 
 <hr>
-<h1 id="22-一个很深的结论误差没有绝对重要性">22. 一个很深的结论：误差没有“绝对重要性”
-</h1><details class="reveal">
+<h2 id="22-一个很深的结论误差没有绝对重要性">22. 一个很深的结论：误差没有“绝对重要性”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设一个 FEM 解：</p>
@@ -880,8 +906,8 @@ $$\boxed{ \text{同一个有限元模型，对于不同工程目标，最优网�
 </details>
 
 <hr>
-<h1 id="23-为什么-dwr-中-dual-解通常要比-primal-解更丰富">23. 为什么 DWR 中 dual 解通常要比 primal 解“更丰富”？
-</h1><details class="reveal">
+<h2 id="23-为什么-dwr-中-dual-解通常要比-primal-解更丰富">23. 为什么 DWR 中 dual 解通常要比 primal 解“更丰富”？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这里有一个实现陷阱。</p>
@@ -894,14 +920,15 @@ $$\boxed{ z_h \text{ 在更高阶或更细网格空间中计算} }$$<p>例如：
 $$P_1\text{ primal}$$<p>配：</p>
 $$P_2\text{ dual}.$$<p>或者对 dual 做局部 reconstruction。</p>
 <p>这也是 DWR 比普通 residual estimator 更贵的原因之一：</p>
-$$\boxed{ \text{除了 primal solve， 还要额外解一个 adjoint problem。} }$$<p>近期和经典实践都反复强调，高质量 dual approximation 是 DWR 是否有效的关键。([arXiv][3])</p>
+$$\boxed{ \text{除了 primal solve， 还要额外解一个 adjoint problem。} }$$<p>deal.II 的示例用比原问题高一阶的有限元空间近似对偶解，以保留粗空间无法分辨的误差信息。<a class="link" href="https://dealii.org/9.7.0/doxygen/deal.II/step_14.html"  target="_blank" rel="noopener"
+    >deal.II step-14</a></p>
 
   </div>
 </details>
 
 <hr>
-<h1 id="24-一个很重要的限制qoi-选错了整个自适应过程也会跟着错">24. 一个很重要的限制：QoI 选错了，整个自适应过程也会跟着错
-</h1><details class="reveal">
+<h2 id="24-一个很重要的限制qoi-选错了整个自适应过程也会跟着错">24. 一个很重要的限制：QoI 选错了，整个自适应过程也会跟着错
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>DWR 是高度 goal-dependent 的。</p>
@@ -919,14 +946,15 @@ $$J_1,J_2,\ldots,J_m.$$<p>例如：</p>
 <li>反力。</li>
 </ul>
 <p>这就产生 <strong>multi-goal error estimation</strong>。</p>
-<p>2024 年仍有工作研究如何将多个 goal functionals 放进同一 DWR/adaptive framework，而不是为每个输出单独做一次完全独立的 refinement。([Wiley Online Library][6])</p>
+<p>Endtmayer 在 2024 年的算例中将多个目标量纳入同一自适应过程，使同一张网格兼顾不同输出的误差。<a class="link" href="https://doi.org/10.1002/pamm.202400157"  target="_blank" rel="noopener"
+    >多目标网格自适应算例</a></p>
 
   </div>
 </details>
 
 <hr>
-<h1 id="25-dwr-也不是严格保证误差上界的万能方法">25. DWR 也不是严格保证误差上界的万能方法
-</h1><details class="reveal">
+<h2 id="25-dwr-也不是严格保证误差上界的万能方法">25. DWR 也不是严格保证误差上界的万能方法
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这点必须讲清楚。</p>
@@ -940,7 +968,8 @@ $$\boxed{ \text{非常 sharp、goal-specific} }$$<p>但实际 estimator 往往�
 </ul>
 <p>所以经典 DWR estimator 不应自动理解为：</p>
 $$\boxed{\text{严格数学上界}}$$<p>与前面讲过的某些 certified reduced-basis bound 不完全一样。</p>
-<p>后续工作一直在研究 DWR 的两侧估计、可靠性/效率以及 saturation assumption；例如 SIAM JSC 的两侧 a posteriori 分析明确讨论了这些条件以及 saturation assumption 可能失效的反例。([工业与应用数学学会][7])</p>
+<p>要把估计量变成双侧误差界，还需要饱和假设等条件。Endtmayer 等人给出了双侧估计，也展示了饱和假设失效的反例。<a class="link" href="https://doi.org/10.1137/18M1227275"  target="_blank" rel="noopener"
+    >SIAM 原论文</a></p>
 <p>因此要区分：</p>
 $$\boxed{ \text{sharp estimator} }$$<p>和：</p>
 $$\boxed{ \text{guaranteed upper bound} }$$<p>这两者不是同义词。</p>
@@ -949,8 +978,8 @@ $$\boxed{ \text{guaranteed upper bound} }$$<p>这两者不是同义词。</p>
 </details>
 
 <hr>
-<h1 id="26-dwr-不只是告诉你哪里细化还可以告诉你什么时候别再迭代">26. DWR 不只是告诉你“哪里细化”，还可以告诉你“什么时候别再迭代”
-</h1><details class="reveal">
+<h2 id="26-dwr-不只是告诉你哪里细化还可以告诉你什么时候别再迭代">26. DWR 不只是告诉你“哪里细化”，还可以告诉你“什么时候别再迭代”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设线性系统：</p>
@@ -969,8 +998,8 @@ $$\boxed{ \text{guaranteed upper bound} }$$<p>这两者不是同义词。</p>
 </details>
 
 <hr>
-<h1 id="27-对瞬态问题它甚至可以回答什么时候需要小时间步">27. 对瞬态问题，它甚至可以回答“什么时候需要小时间步”
-</h1><details class="reveal">
+<h2 id="27-对瞬态问题它甚至可以回答什么时候需要小时间步">27. 对瞬态问题，它甚至可以回答“什么时候需要小时间步”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>考虑：</p>
@@ -988,8 +1017,8 @@ $$\boxed{ \text{guaranteed upper bound} }$$<p>这两者不是同义词。</p>
 </details>
 
 <hr>
-<h1 id="28-它还自然通向多保真建模">28. 它还自然通向多保真建模
-</h1><details class="reveal">
+<h2 id="28-它还自然通向多保真建模">28. 它还自然通向多保真建模
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设粗网格：</p>
@@ -1012,8 +1041,8 @@ $$\boxed{ \text{guaranteed upper bound} }$$<p>这两者不是同义词。</p>
 </details>
 
 <hr>
-<h1 id="29-实际收敛速率全局加密-vs-dwr-自适应">29. 实际收敛速率：全局加密 vs DWR 自适应
-</h1><details class="reveal">
+<h2 id="29-实际收敛速率全局加密-vs-dwr-自适应">29. 实际收敛速率：全局加密 vs DWR 自适应
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>DWR 的优势主要体现在：<strong>当只关心少数输出指标时，可以避免为不相关区域投入过多自由度。</strong></p>
@@ -1025,14 +1054,19 @@ $$\boxed{ \text{guaranteed upper bound} }$$<p>这两者不是同义词。</p>
 <p><strong>其次，估计质量依赖伴随解的准确性。</strong> 尤其对于接触、塑性、冲击等非光滑问题，线性化与伴随计算会更加困难。</p>
 <p><strong>最后，DWR 估计通常不是自动成立的严格误差上界。</strong> 伴随近似、数值积分和非线性线性化都会引入额外误差。</p>
 <p>因此，在需要数学保证的可靠性认证中，不能直接把未经验证的 DWR 估计当作严格误差界。</p>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>DWR 最值得记住的不是：</p>
+
+  </div>
+</details>
+
+<hr>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>DWR 最值得记住的不是：</p>
 \[\eta_K=R_Kz_K.\]<p>真正重要的是：</p>
 \[\boxed{ \text{误差本身没有绝对的重要性； 只有“它会不会污染你最终需要的答案”才决定计算资源是否值得投入。} }\]<p>它在知识体系中的位置非常清晰：</p>
 \[\text{FEM}\]\[\downarrow\]\[\text{Residual-based error estimation}\]\[+\]\[\boxed{\text{Adjoint sensitivity}}\]\[\downarrow\]\[\boxed{\text{Dual-Weighted Residual}}\]\[\downarrow\]\[\text{Goal-Oriented Adaptivity}\]\[\downarrow\]\[\text{reliability / optimization / ROM / task-aware simulation}.\]<p>对于可靠性、代理模型和物理求解器，这个原则尤其值得长期保留：</p>
 \[\boxed{ \text{不要追求“整个数值解都很准”， 先定义最终决策真正依赖什么，再让计算精度沿着这条依赖链分配。} }\]<p>这其实是从传统“高精度仿真”走向<strong>计算资源最优分配</strong>非常关键的一步。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1052,8 +1086,6 @@ $$\boxed{ \text{guaranteed upper bound} }$$<p>这两者不是同义词。</p>
 <p>Maier &amp; Rannacher, <strong><em>Duality-based Adaptivity in Finite Element Discretization of Heterogeneous Multiscale Problems</em></strong>。进一步展示 DWR 可以同时区分和权衡 modeling error、macro discretization error 与 micro discretization error，很适合沿着“多保真/多层误差预算”继续深入。</p>
 </li>
 </ol>
-  </div>
-</details>
 
   </div>
 </details>
@@ -1237,9 +1269,8 @@ $$\boxed{ \text{guaranteed upper bound} }$$<p>这两者不是同义词。</p>
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

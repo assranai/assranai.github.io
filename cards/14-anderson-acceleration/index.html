@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Anderson Acceleration（AA，安德森加速）\n领域：有限元 × 数值方法 × 数值优化 × 物理引擎\n推荐阅读时间：约 7–9 分钟\n今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：\n\\[\\boxed{\\text{你已经有一个能工作的迭代器，但它收敛太慢。}}\\]这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、PBD/XPBD 外层迭代，都可能被写成\n\\[x_{k+1}=G(x_k).\\]最朴素的方法就是反复调用 \\(G\\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。\n它最值得学的地方在于：\n\\[\\boxed{ \\text{历史迭代数据，本身可以近似局部逆 Jacobian。} }\\]这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 Acta Numerica 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。\n1. 它首先解决什么问题？ 考虑非线性方程\n\\[F(x)=0.\\]很多时候我们不会直接 Newton：\n\\[x_{k+1} = x_k- J_F(x_k)^{-1}F(x_k),\\]而是构造一个更便宜、更稳定的固定点映射：\n\\[x_{k+1}=G(x_k).\\]定义固定点残差\n\\[f_k=G(x_k)-x_k.\\]目标就是\n\\[f_k\\rightarrow0.\\]如果 \\(G\\) 是 contraction，\n">
 <title>Anderson Acceleration：把固定点迭代外挂成准牛顿求解器</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/14-anderson-acceleration/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Anderson Acceleration：把固定点迭代外挂成准牛顿求解器">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Anderson Acceleration：把固定点迭代外挂成准牛顿求解器">
 <meta property='og:description' content="主题：Anderson Acceleration（AA，安德森加速）\n领域：有限元 × 数值方法 × 数值优化 × 物理引擎\n推荐阅读时间：约 7–9 分钟\n今天选 Anderson Acceleration，是因为它位于一个很有迁移价值的位置：\n\\[\\boxed{\\text{你已经有一个能工作的迭代器，但它收敛太慢。}}\\]这在工程里极其常见。比如接触、材料非线性、流固耦合、分裂算法、PBD/XPBD 外层迭代，都可能被写成\n\\[x_{k+1}=G(x_k).\\]最朴素的方法就是反复调用 \\(G\\)。Anderson Acceleration 不要求你推导 Hessian，通常也不要求显式 Jacobian。它只保存最近几步“你走了哪里、残差怎么变”，然后用一个很小的最小二乘问题预测更好的下一步。\n它最值得学的地方在于：\n\\[\\boxed{ \\text{历史迭代数据，本身可以近似局部逆 Jacobian。} }\\]这使 AA 同时连接了 fixed-point iteration、quasi-Newton、Krylov/GMRES 和现代非线性求解器。Walker 与 Ni 的经典分析证明：在线性问题上，无截断 Anderson acceleration 在一定意义下与 GMRES 本质等价；2025 年 Yousef Saad 在 Acta Numerica 的综述又把 AA 放回整个 fixed-point acceleration 方法谱系中。\n1. 它首先解决什么问题？ 考虑非线性方程\n\\[F(x)=0.\\]很多时候我们不会直接 Newton：\n\\[x_{k+1} = x_k- J_F(x_k)^{-1}F(x_k),\\]而是构造一个更便宜、更稳定的固定点映射：\n\\[x_{k+1}=G(x_k).\\]定义固定点残差\n\\[f_k=G(x_k)-x_k.\\]目标就是\n\\[f_k\\rightarrow0.\\]如果 \\(G\\) 是 contraction，\n">
 <meta property='og:url' content='https://assranai.github.io/cards/14-anderson-acceleration/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,14 +324,32 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-它首先解决什么问题">1. 它首先解决什么问题？</a></li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#2-普通固定点迭代其实浪费了大量信息">2. 普通固定点迭代其实浪费了大量信息</a></li>
+    <li><a href="#3-anderson-最直观的形式寻找残差最小的历史组合">3. Anderson 最直观的形式：寻找“残差最小的历史组合”</a></li>
+    <li><a href="#4-一个一维例子马上能看出它在干什么">4. 一个一维例子马上能看出它在干什么</a></li>
+    <li><a href="#5-更深一层它为什么和-quasi-newton-有关系">5. 更深一层：它为什么和 quasi-Newton 有关系？</a></li>
+    <li><a href="#6-更漂亮的联系在线性问题上它和-gmres-几乎是同一件事">6. 更漂亮的联系：在线性问题上，它和 GMRES 几乎是同一件事</a></li>
+    <li><a href="#7-为什么它对现有工程代码特别友好">7. 为什么它对现有工程代码特别友好？</a></li>
+    <li><a href="#8-为什么只保存很短的历史">8. 为什么只保存很短的历史？</a></li>
+    <li><a href="#9-所以工程实现通常还需要-damping">9. 所以工程实现通常还需要 damping</a></li>
+    <li><a href="#10-为什么-aa-对-contact--pbd-类问题很有诱惑力">10. 为什么 AA 对 contact / PBD 类问题很有诱惑力？</a></li>
+    <li><a href="#11-但这里有一个关键边界aa-不会修复错误的物理模型">11. 但这里有一个关键边界：AA 不会修复错误的物理模型</a></li>
+    <li><a href="#12-对接触问题还有一个更具体的危险active-set-改变">12. 对接触问题还有一个更具体的危险：active set 改变</a></li>
+    <li><a href="#13-一个非常实用的实现框架">13. 一个非常实用的实现框架</a></li>
+    <li><a href="#14-一个很值得监控的指标历史矩阵的条件数">14. 一个很值得监控的指标：历史矩阵的条件数</a></li>
+    <li><a href="#15-为什么它对黑箱多物理耦合特别有价值">15. 为什么它对“黑箱多物理耦合”特别有价值？</a></li>
+    <li><a href="#16-这里其实隐藏着一个很普遍的-ai工程思想">16. 这里其实隐藏着一个很普遍的 AI/工程思想</a></li>
+    <li><a href="#17-它和-kriging-的区别反而很有启发">17. 它和 Kriging 的区别反而很有启发</a></li>
+    <li><a href="#18-对可靠性计算也有直接迁移价值">18. 对可靠性计算也有直接迁移价值</a></li>
+    <li><a href="#19-一个特别适合你自己做的实验">19. 一个特别适合你自己做的实验</a></li>
+    <li><a href="#20-对软体求解器我认为最值得尝试的位置">20. 对软体求解器，我认为最值得尝试的位置</a></li>
+    <li><a href="#21-它为什么特别适合-projective-dynamics--local-global-solver">21. 它为什么特别适合 Projective Dynamics / local-global solver？</a></li>
+    <li><a href="#22-为什么-anderson-有时反而会把-solver-搞炸">22. 为什么 Anderson 有时反而会把 solver 搞炸？</a></li>
+    <li><a href="#23-history-length--为什么不能无限加">23. History length  为什么不能无限加？</a></li>
+    <li><a href="#24-一个很有价值的类比aa-是solver-的短期记忆">24. 一个很有价值的类比：AA 是“solver 的短期记忆”</a></li>
+    <li><a href="#25-对-xpbdpd-求解器最值得做的实验">25. 对 XPBD/PD 求解器最值得做的实验</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -425,8 +443,8 @@
 <p>于是你拥有一个：</p>
 \[\boxed{\text{稳定、便宜、但慢得令人难受的 solver。}}\]<p>这正是 AA 最典型的目标。</p>
 <hr>
-<h1 id="2-普通固定点迭代其实浪费了大量信息">2. 普通固定点迭代其实浪费了大量信息
-</h1><p>假设已经计算过</p>
+<h2 id="2-普通固定点迭代其实浪费了大量信息">2. 普通固定点迭代其实浪费了大量信息
+</h2><p>假设已经计算过</p>
 \[x_{k-3},x_{k-2},x_{k-1},x_k\]<p>以及对应残差</p>
 \[f_{k-3},f_{k-2},f_{k-1},f_k.\]<p>普通固定点迭代下一步仍然只是：</p>
 \[x_{k+1}=G(x_k).\]<p>之前三个状态基本被扔掉了。</p>
@@ -437,8 +455,8 @@
 \[\Delta f \approx J_f\Delta x,\]<p>那么历史数据实际上已经给了若干条关于 Jacobian \(J_f\) 的 secant information。</p>
 <p>AA 的核心就是：</p>
 \[\boxed{\text{不要把这些信息扔掉。}}\]<hr>
-<h1 id="3-anderson-最直观的形式寻找残差最小的历史组合">3. Anderson 最直观的形式：寻找“残差最小的历史组合”
-</h1><p>保留最近 \(m+1\) 个 fixed-point evaluations：</p>
+<h2 id="3-anderson-最直观的形式寻找残差最小的历史组合">3. Anderson 最直观的形式：寻找“残差最小的历史组合”
+</h2><p>保留最近 \(m+1\) 个 fixed-point evaluations：</p>
 \[G(x_{k-m}),\ldots,G(x_k).\]<p>同时有残差：</p>
 \[f_i=G(x_i)-x_i.\]<p>寻找系数</p>
 \[\alpha_0,\ldots,\alpha_m\]<p>使组合残差尽可能小：</p>
@@ -453,8 +471,8 @@
 <p>因此 AA 本质上是一种：</p>
 \[\boxed{\text{history-based extrapolation}.}\]<p>Walker–Ni 对标准 AA 的描述正是保存先前固定点映射与残差，用小型最小二乘问题形成新的组合；AA(0) 则退化为普通 fixed-point iteration。</p>
 <hr>
-<h1 id="4-一个一维例子马上能看出它在干什么">4. 一个一维例子马上能看出它在干什么
-</h1><details class="reveal">
+<h2 id="4-一个一维例子马上能看出它在干什么">4. 一个一维例子马上能看出它在干什么
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设固定点迭代：</p>
@@ -473,8 +491,8 @@
 </details>
 
 <hr>
-<h1 id="5-更深一层它为什么和-quasi-newton-有关系">5. 更深一层：它为什么和 quasi-Newton 有关系？
-</h1><details class="reveal">
+<h2 id="5-更深一层它为什么和-quasi-newton-有关系">5. 更深一层：它为什么和 quasi-Newton 有关系？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>我们的目标：</p>
@@ -499,8 +517,8 @@
 </details>
 
 <hr>
-<h1 id="6-更漂亮的联系在线性问题上它和-gmres-几乎是同一件事">6. 更漂亮的联系：在线性问题上，它和 GMRES 几乎是同一件事
-</h1><details class="reveal">
+<h2 id="6-更漂亮的联系在线性问题上它和-gmres-几乎是同一件事">6. 更漂亮的联系：在线性问题上，它和 GMRES 几乎是同一件事
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>考虑线性系统：</p>
@@ -517,8 +535,8 @@
 </details>
 
 <hr>
-<h1 id="7-为什么它对现有工程代码特别友好">7. 为什么它对现有工程代码特别友好？
-</h1><p>假设你已经有：</p>
+<h2 id="7-为什么它对现有工程代码特别友好">7. 为什么它对现有工程代码特别友好？
+</h2><p>假设你已经有：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -563,8 +581,8 @@
 \[\boxed{\text{它可以作为 solver wrapper。}}\]<p>这也是它特别值得求解器开发者掌握的原因。</p>
 <p>Amanzi-ATS 这样的多物理场模拟软件已经直接提供 Anderson acceleration nonlinear solver，并将其描述为 nonlinear GMRES 风格的方法。</p>
 <hr>
-<h1 id="8-为什么只保存很短的历史">8. 为什么只保存很短的历史？
-</h1><details class="reveal">
+<h2 id="8-为什么只保存很短的历史">8. 为什么只保存很短的历史？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>理论上：</p>
@@ -578,15 +596,15 @@
 \[20,\,-35,\,18,\ldots\]<p>虽然它们满足：</p>
 \[\sum\alpha_i=1,\]<p>却意味着非常激进的 extrapolation。</p>
 <p>于是：</p>
-\[\boxed{\text{更多历史 ≠ 更稳定。}}\]<p>这和 GMRES restart、limited-memory BFGS 的思想很相似：</p>
+\[\boxed{\text{更多历史}\ne\text{更稳定}}\]<p>这和 GMRES restart、limited-memory BFGS 的思想很相似：</p>
 \[\boxed{\text{有限历史有时反而是一种正则化。}}\]<p>Walker–Ni 也专门讨论了 truncation、conditioning 和实现细节。</p>
 
   </div>
 </details>
 
 <hr>
-<h1 id="9-所以工程实现通常还需要-damping">9. 所以工程实现通常还需要 damping
-</h1><details class="reveal">
+<h2 id="9-所以工程实现通常还需要-damping">9. 所以工程实现通常还需要 damping
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>一种常见形式：</p>
@@ -600,8 +618,8 @@
 </details>
 
 <hr>
-<h1 id="10-为什么-aa-对-contact--pbd-类问题很有诱惑力">10. 为什么 AA 对 contact / PBD 类问题很有诱惑力？
-</h1><details class="reveal">
+<h2 id="10-为什么-aa-对-contact--pbd-类问题很有诱惑力">10. 为什么 AA 对 contact / PBD 类问题很有诱惑力？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设每次 constraint sweep 定义：</p>
@@ -626,8 +644,8 @@
 </details>
 
 <hr>
-<h1 id="11-但这里有一个关键边界aa-不会修复错误的物理模型">11. 但这里有一个关键边界：AA 不会修复错误的物理模型
-</h1><details class="reveal">
+<h2 id="11-但这里有一个关键边界aa-不会修复错误的物理模型">11. 但这里有一个关键边界：AA 不会修复错误的物理模型
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设 XPBD 本身存在：</p>
@@ -648,8 +666,8 @@
 </details>
 
 <hr>
-<h1 id="12-对接触问题还有一个更具体的危险active-set-改变">12. 对接触问题还有一个更具体的危险：active set 改变
-</h1><details class="reveal">
+<h2 id="12-对接触问题还有一个更具体的危险active-set-改变">12. 对接触问题还有一个更具体的危险：active set 改变
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设第 \(k\) 步接触集合：</p>
@@ -674,8 +692,8 @@
 </details>
 
 <hr>
-<h1 id="13-一个非常实用的实现框架">13. 一个非常实用的实现框架
-</h1><details class="reveal">
+<h2 id="13-一个非常实用的实现框架">13. 一个非常实用的实现框架
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>对于已有 fixed-point solver，可以从这种结构开始：</p>
@@ -748,8 +766,8 @@
 </details>
 
 <hr>
-<h1 id="14-一个很值得监控的指标历史矩阵的条件数">14. 一个很值得监控的指标：历史矩阵的条件数
-</h1><details class="reveal">
+<h2 id="14-一个很值得监控的指标历史矩阵的条件数">14. 一个很值得监控的指标：历史矩阵的条件数
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>构造：</p>
@@ -764,14 +782,14 @@
 <li>truncated SVD；</li>
 <li>QR filtering。</li>
 </ul>
-<p>所以 AA 本身又和前几张 Randomized SVD / conditioning 卡片发生联系：</p>
+<p><a class="link" href="../31-randomized-nla/" >随机化 SVD</a> 通过奇异值观察有效秩。这里也可以检查历史残差矩阵的奇异值，识别近乎冗余的方向。</p>
 \[\boxed{ \text{加速器的质量取决于历史信息是否真正提供独立方向。} }\]
   </div>
 </details>
 
 <hr>
-<h1 id="15-为什么它对黑箱多物理耦合特别有价值">15. 为什么它对“黑箱多物理耦合”特别有价值？
-</h1><details class="reveal">
+<h2 id="15-为什么它对黑箱多物理耦合特别有价值">15. 为什么它对“黑箱多物理耦合”特别有价值？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>考虑 partitioned fluid-structure interaction：</p>
@@ -786,8 +804,8 @@
 </details>
 
 <hr>
-<h1 id="16-这里其实隐藏着一个很普遍的-ai工程思想">16. 这里其实隐藏着一个很普遍的 AI/工程思想
-</h1><details class="reveal">
+<h2 id="16-这里其实隐藏着一个很普遍的-ai工程思想">16. 这里其实隐藏着一个很普遍的 AI/工程思想
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>设一个昂贵组件：</p>
@@ -812,8 +830,8 @@
 </details>
 
 <hr>
-<h1 id="17-它和-kriging-的区别反而很有启发">17. 它和 Kriging 的区别反而很有启发
-</h1><details class="reveal">
+<h2 id="17-它和-kriging-的区别反而很有启发">17. 它和 Kriging 的区别反而很有启发
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p><span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span> 通常学习：</p>
@@ -832,8 +850,8 @@
 </details>
 
 <hr>
-<h1 id="18-对可靠性计算也有直接迁移价值">18. 对可靠性计算也有直接迁移价值
-</h1><details class="reveal">
+<h2 id="18-对可靠性计算也有直接迁移价值">18. 对可靠性计算也有直接迁移价值
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>可靠性往往需要重复求：</p>
@@ -855,8 +873,8 @@
 </details>
 
 <hr>
-<h1 id="19-一个特别适合你自己做的实验">19. 一个特别适合你自己做的实验
-</h1><details class="reveal">
+<h2 id="19-一个特别适合你自己做的实验">19. 一个特别适合你自己做的实验
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>不用复杂 FEM。</p>
@@ -877,8 +895,8 @@
 </details>
 
 <hr>
-<h1 id="20-对软体求解器我认为最值得尝试的位置">20. 对软体求解器，我认为最值得尝试的位置
-</h1><details class="reveal">
+<h2 id="20-对软体求解器我认为最值得尝试的位置">20. 对软体求解器，我认为最值得尝试的位置
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>如果未来在 XPBD/非线性 FEM 中测试 AA，我不会首先把它塞进每一个 constraint 内部。</p>
@@ -900,8 +918,8 @@
 </details>
 
 <hr>
-<h1 id="21-它为什么特别适合-projective-dynamics--local-global-solver">21. 它为什么特别适合 Projective Dynamics / local-global solver？
-</h1><details class="reveal">
+<h2 id="21-它为什么特别适合-projective-dynamics--local-global-solver">21. 它为什么特别适合 Projective Dynamics / local-global solver？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>回忆 PD：</p>
@@ -921,8 +939,8 @@
 </details>
 
 <hr>
-<h1 id="22-为什么-anderson-有时反而会把-solver-搞炸">22. 为什么 Anderson 有时反而会把 solver 搞炸？
-</h1><details class="reveal">
+<h2 id="22-为什么-anderson-有时反而会把-solver-搞炸">22. 为什么 Anderson 有时反而会把 solver 搞炸？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这是它最需要警惕的地方。</p>
@@ -949,8 +967,8 @@
 </details>
 
 <hr>
-<h1 id="23-history-length--为什么不能无限加">23. History length \(m\) 为什么不能无限加？
-</h1><details class="reveal">
+<h2 id="23-history-length--为什么不能无限加">23. History length \(m\) 为什么不能无限加？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>乍看：</p>
@@ -981,8 +999,8 @@
 </details>
 
 <hr>
-<h1 id="24-一个很有价值的类比aa-是solver-的短期记忆">24. 一个很有价值的类比：AA 是“solver 的短期记忆”
-</h1><details class="reveal">
+<h2 id="24-一个很有价值的类比aa-是solver-的短期记忆">24. 一个很有价值的类比：AA 是“solver 的短期记忆”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>普通迭代是：</p>
@@ -1008,8 +1026,8 @@
 </details>
 
 <hr>
-<h1 id="25-对-xpbdpd-求解器最值得做的实验">25. 对 XPBD/PD 求解器最值得做的实验
-</h1><details class="reveal">
+<h2 id="25-对-xpbdpd-求解器最值得做的实验">25. 对 XPBD/PD 求解器最值得做的实验
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>如果要判断 AA 是否值得加入，不要一开始看 FPS。</p>
@@ -1032,15 +1050,15 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Anderson Acceleration 最值得记住的不是它那个 constrained least-squares 公式，而是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Anderson Acceleration 最值得记住的不是它那个 constrained least-squares 公式，而是：</p>
 \[\boxed{ \text{一个迭代器过去走过的轨迹， 本身就在透露这个非线性系统局部 Jacobian 的信息。} }\]<p>普通 fixed-point iteration：</p>
 \[x_k \rightarrow G(x_k)\]<p>每一步都近乎失忆。</p>
 <p>AA：</p>
 \[\{x_{k-m},\ldots,x_k\}\]\[\downarrow\]\[\boxed{\text{extract local secant information}}\]\[\downarrow\]\[\boxed{\text{residual-minimizing extrapolation}}\]\[\downarrow\]\[x_{k+1}.\]<p>它在知识体系中的位置尤其漂亮：</p>
 \[\text{Fixed Point}\]\[\downarrow\]\[\boxed{\text{Anderson Acceleration}}\]\[\begin{array}{ccc} \text{GMRES/Krylov} & \leftrightarrow & \text{Quasi-Newton} \end{array}\]\[\downarrow\]\[\text{nonlinear FEM / multiphysics / physics solvers}.\]<p>对于求解器开发，最有迁移价值的原则可以压缩成一句：</p>
-\[\boxed{ \text{在重写整个 solver 之前，先检查它是不是一个“稳定但缓慢”的固定点迭代； 如果是，历史迭代信息可能就是现成的加速器。} }\]<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+\[\boxed{ \text{在重写整个 solver 之前，先检查它是不是一个“稳定但缓慢”的固定点迭代； 如果是，历史迭代信息可能就是现成的加速器。} }\]<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1239,9 +1257,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

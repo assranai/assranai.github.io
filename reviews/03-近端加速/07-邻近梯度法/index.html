@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="第7章：邻近梯度法 核心思想：复合优化问题 $\\min f(x)+g(x)$ 中，$f$ 光滑（有梯度）用梯度下降处理，$g$ 非光滑（无梯度）用邻近算子处理，两步交替迭代——这就是邻近梯度法（Proximal Gradient Method）。\n前置知识回顾 在开始本章之前，请确保你已经理解以下概念：\n概念 出自 一句话回顾 梯度下降法 (GD) Ch2 沿负梯度方向走：$x_{k+1}=x_k-\\alpha\\nabla f(x_k)$，对光滑凸函数收敛率 $O(1/k)$ $L$-smooth 函数 Ch2 梯度变化有上界：$|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$，等价于 $f(y)\\leq f(x)+\\nabla f(x)^T(y-x)+\\frac{L}{2}|y-x|^2$ 凸函数 (convex) Ch3 函数图像在弦之下：$f(tx+(1-t)y)\\leq tf(x)+(1-t)f(y)$；等价于 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$ 次梯度 (subgradient) Ch3 非光滑函数的&quot;广义梯度&quot;：$g\\in\\partial f(x)$ 满足 $f(y)\\geq f(x)+g^T(y-x),\\forall y$ 投影梯度法 (PGM) Ch6 $\\min_{x\\in C}f(x)$ 时，梯度下降后投影回约束集：$x_{k+1}=P_C(x_k-\\alpha\\nabla f(x_k))$ 闭凸函数 Ch3 既&quot;凸&quot;（碗形）又&quot;闭&quot;（下水平集包含边界），保证极小点存在且邻近算子良定义 最优性条件 Ch3 $x^$ 是 $\\min f(x)$ 的最优点 $\\iff$ $0\\in\\partial f(x^)$（非光滑情形）或 $\\nabla f(x^*)=0$（光滑情形） 7.1 问题形式 7.1.1 复合优化问题的标准形式 本章考虑如下极小化问题：\n">
 <title>第7章：邻近梯度法</title>
 
 <link rel='canonical' href='https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/07-%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="第7章：邻近梯度法">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="第7章：邻近梯度法">
 <meta property='og:description' content="第7章：邻近梯度法 核心思想：复合优化问题 $\\min f(x)+g(x)$ 中，$f$ 光滑（有梯度）用梯度下降处理，$g$ 非光滑（无梯度）用邻近算子处理，两步交替迭代——这就是邻近梯度法（Proximal Gradient Method）。\n前置知识回顾 在开始本章之前，请确保你已经理解以下概念：\n概念 出自 一句话回顾 梯度下降法 (GD) Ch2 沿负梯度方向走：$x_{k+1}=x_k-\\alpha\\nabla f(x_k)$，对光滑凸函数收敛率 $O(1/k)$ $L$-smooth 函数 Ch2 梯度变化有上界：$|\\nabla f(x)-\\nabla f(y)|\\leq L|x-y|$，等价于 $f(y)\\leq f(x)+\\nabla f(x)^T(y-x)+\\frac{L}{2}|y-x|^2$ 凸函数 (convex) Ch3 函数图像在弦之下：$f(tx+(1-t)y)\\leq tf(x)+(1-t)f(y)$；等价于 $f(y)\\geq f(x)+\\nabla f(x)^T(y-x)$ 次梯度 (subgradient) Ch3 非光滑函数的&quot;广义梯度&quot;：$g\\in\\partial f(x)$ 满足 $f(y)\\geq f(x)+g^T(y-x),\\forall y$ 投影梯度法 (PGM) Ch6 $\\min_{x\\in C}f(x)$ 时，梯度下降后投影回约束集：$x_{k+1}=P_C(x_k-\\alpha\\nabla f(x_k))$ 闭凸函数 Ch3 既&quot;凸&quot;（碗形）又&quot;闭&quot;（下水平集包含边界），保证极小点存在且邻近算子良定义 最优性条件 Ch3 $x^$ 是 $\\min f(x)$ 的最优点 $\\iff$ $0\\in\\partial f(x^)$（非光滑情形）或 $\\nabla f(x^*)=0$（光滑情形） 7.1 问题形式 7.1.1 复合优化问题的标准形式 本章考虑如下极小化问题：\n">
 <meta property='og:url' content='https://assranai.github.io/reviews/03-%E8%BF%91%E7%AB%AF%E5%8A%A0%E9%80%9F/07-%E9%82%BB%E8%BF%91%E6%A2%AF%E5%BA%A6%E6%B3%95/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -56,7 +56,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -457,50 +457,50 @@
 <h2 id="前置知识回顾">前置知识回顾
 </h2><p>在开始本章之前，请确保你已经理解以下概念：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>概念</th>
-					<th>出自</th>
-					<th>一句话回顾</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>梯度下降法 (GD)</td>
-					<td>Ch2</td>
-					<td>沿负梯度方向走：$x_{k+1}=x_k-\alpha\nabla f(x_k)$，对光滑凸函数收敛率 $O(1/k)$</td>
-			</tr>
-			<tr>
-					<td>$L$-smooth 函数</td>
-					<td>Ch2</td>
-					<td>梯度变化有上界：$|\nabla f(x)-\nabla f(y)|\leq L|x-y|$，等价于 $f(y)\leq f(x)+\nabla f(x)^T(y-x)+\frac{L}{2}|y-x|^2$</td>
-			</tr>
-			<tr>
-					<td>凸函数 (convex)</td>
-					<td>Ch3</td>
-					<td>函数图像在弦之下：$f(tx+(1-t)y)\leq tf(x)+(1-t)f(y)$；等价于 $f(y)\geq f(x)+\nabla f(x)^T(y-x)$</td>
-			</tr>
-			<tr>
-					<td>次梯度 (subgradient)</td>
-					<td>Ch3</td>
-					<td>非光滑函数的&quot;广义梯度&quot;：$g\in\partial f(x)$ 满足 $f(y)\geq f(x)+g^T(y-x),\forall y$</td>
-			</tr>
-			<tr>
-					<td>投影梯度法 (PGM)</td>
-					<td>Ch6</td>
-					<td>$\min_{x\in C}f(x)$ 时，梯度下降后投影回约束集：$x_{k+1}=P_C(x_k-\alpha\nabla f(x_k))$</td>
-			</tr>
-			<tr>
-					<td>闭凸函数</td>
-					<td>Ch3</td>
-					<td>既&quot;凸&quot;（碗形）又&quot;闭&quot;（下水平集包含边界），保证极小点存在且邻近算子良定义</td>
-			</tr>
-			<tr>
-					<td>最优性条件</td>
-					<td>Ch3</td>
-					<td>$x^<em>$ 是 $\min f(x)$ 的最优点 $\iff$ $0\in\partial f(x^</em>)$（非光滑情形）或 $\nabla f(x^*)=0$（光滑情形）</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>概念</th>
+          <th>出自</th>
+          <th>一句话回顾</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>梯度下降法 (GD)</td>
+          <td>Ch2</td>
+          <td>沿负梯度方向走：$x_{k+1}=x_k-\alpha\nabla f(x_k)$，对光滑凸函数收敛率 $O(1/k)$</td>
+      </tr>
+      <tr>
+          <td>$L$-smooth 函数</td>
+          <td>Ch2</td>
+          <td>梯度变化有上界：$|\nabla f(x)-\nabla f(y)|\leq L|x-y|$，等价于 $f(y)\leq f(x)+\nabla f(x)^T(y-x)+\frac{L}{2}|y-x|^2$</td>
+      </tr>
+      <tr>
+          <td>凸函数 (convex)</td>
+          <td>Ch3</td>
+          <td>函数图像在弦之下：$f(tx+(1-t)y)\leq tf(x)+(1-t)f(y)$；等价于 $f(y)\geq f(x)+\nabla f(x)^T(y-x)$</td>
+      </tr>
+      <tr>
+          <td>次梯度 (subgradient)</td>
+          <td>Ch3</td>
+          <td>非光滑函数的&quot;广义梯度&quot;：$g\in\partial f(x)$ 满足 $f(y)\geq f(x)+g^T(y-x),\forall y$</td>
+      </tr>
+      <tr>
+          <td>投影梯度法 (PGM)</td>
+          <td>Ch6</td>
+          <td>$\min_{x\in C}f(x)$ 时，梯度下降后投影回约束集：$x_{k+1}=P_C(x_k-\alpha\nabla f(x_k))$</td>
+      </tr>
+      <tr>
+          <td>闭凸函数</td>
+          <td>Ch3</td>
+          <td>既&quot;凸&quot;（碗形）又&quot;闭&quot;（下水平集包含边界），保证极小点存在且邻近算子良定义</td>
+      </tr>
+      <tr>
+          <td>最优性条件</td>
+          <td>Ch3</td>
+          <td>$x^<em>$ 是 $\min f(x)$ 的最优点 $\iff$ $0\in\partial f(x^</em>)$（非光滑情形）或 $\nabla f(x^*)=0$（光滑情形）</td>
+      </tr>
+  </tbody>
 </table></div>
 <hr>
 <h2 id="71-问题形式">7.1 问题形式
@@ -527,52 +527,52 @@ $$\|\nabla f(x) - \nabla f(y)\| \leq L\|x - y\|$$<p>这里的 $|\cdot|$ 是 $\el
 <h3 id="713-典型例子必背">7.1.3 典型例子（必背）
 </h3><p>复合优化问题 $f(x)+g(x)$ 的经典实例：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>问题名称</th>
-					<th>光滑部分 $f(x)$</th>
-					<th>非光滑部分 $g(x)$</th>
-					<th>应用场景</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td><strong>LASSO</strong></td>
-					<td>$\frac{1}{2}|Ax-b|^2$（最小二乘损失）</td>
-					<td>$\lambda|x|_1$（$\ell_1$ 范数）</td>
-					<td>稀疏线性回归，变量选择</td>
-			</tr>
-			<tr>
-					<td><strong>岭回归 (Ridge)</strong></td>
-					<td>$\frac{1}{2}|Ax-b|^2$</td>
-					<td>$\frac{\lambda}{2}|x|^2$（$\ell_2^2$，光滑的！）</td>
-					<td>共线性处理，参数收缩</td>
-			</tr>
-			<tr>
-					<td><strong>弹性网 (Elastic Net)</strong></td>
-					<td>$\frac{1}{2}|Ax-b|^2$</td>
-					<td>$\lambda_1|x|_1 + \frac{\lambda_2}{2}|x|^2$</td>
-					<td>兼具稀疏和组效应的回归</td>
-			</tr>
-			<tr>
-					<td><strong>约束优化</strong></td>
-					<td>$f(x)$（任意光滑凸函数）</td>
-					<td>$\delta_C(x)$（集合 $C$ 的指示函数）</td>
-					<td>带约束的各类优化</td>
-			</tr>
-			<tr>
-					<td><strong>矩阵补全</strong></td>
-					<td>$\frac{1}{2}|P_\Omega(X-M)|_F^2$</td>
-					<td>$\lambda|X|_*$（核范数）</td>
-					<td>推荐系统、图像修复</td>
-			</tr>
-			<tr>
-					<td><strong>组 LASSO</strong></td>
-					<td>$\frac{1}{2}|Ax-b|^2$</td>
-					<td>$\lambda\sum_g |x_g|_2$（组 $\ell_2$ 和）</td>
-					<td>结构化特征选择</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>问题名称</th>
+          <th>光滑部分 $f(x)$</th>
+          <th>非光滑部分 $g(x)$</th>
+          <th>应用场景</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td><strong>LASSO</strong></td>
+          <td>$\frac{1}{2}|Ax-b|^2$（最小二乘损失）</td>
+          <td>$\lambda|x|_1$（$\ell_1$ 范数）</td>
+          <td>稀疏线性回归，变量选择</td>
+      </tr>
+      <tr>
+          <td><strong>岭回归 (Ridge)</strong></td>
+          <td>$\frac{1}{2}|Ax-b|^2$</td>
+          <td>$\frac{\lambda}{2}|x|^2$（$\ell_2^2$，光滑的！）</td>
+          <td>共线性处理，参数收缩</td>
+      </tr>
+      <tr>
+          <td><strong>弹性网 (Elastic Net)</strong></td>
+          <td>$\frac{1}{2}|Ax-b|^2$</td>
+          <td>$\lambda_1|x|_1 + \frac{\lambda_2}{2}|x|^2$</td>
+          <td>兼具稀疏和组效应的回归</td>
+      </tr>
+      <tr>
+          <td><strong>约束优化</strong></td>
+          <td>$f(x)$（任意光滑凸函数）</td>
+          <td>$\delta_C(x)$（集合 $C$ 的指示函数）</td>
+          <td>带约束的各类优化</td>
+      </tr>
+      <tr>
+          <td><strong>矩阵补全</strong></td>
+          <td>$\frac{1}{2}|P_\Omega(X-M)|_F^2$</td>
+          <td>$\lambda|X|_*$（核范数）</td>
+          <td>推荐系统、图像修复</td>
+      </tr>
+      <tr>
+          <td><strong>组 LASSO</strong></td>
+          <td>$\frac{1}{2}|Ax-b|^2$</td>
+          <td>$\lambda\sum_g |x_g|_2$（组 $\ell_2$ 和）</td>
+          <td>结构化特征选择</td>
+      </tr>
+  </tbody>
 </table></div>
 <blockquote>
 <p><strong>指示函数 $\delta_C(x)$ 的定义</strong>（回顾）：$\delta_C(x)=0$ 当 $x\in C$，否则 $\delta_C(x)=+\infty$。它是&quot;禁止出界&quot;的数学表达——任何使 $x$ 落在 $C$ 外的点都会被目标函数 $+\infty$ 无情拒绝。</p>
@@ -717,40 +717,40 @@ $$\boxed{x_{k+1} = \text{prox}_{\alpha g}\big(x_k - \alpha \nabla f(x_k)\big)}$$
 <p>因此也称为<strong>前向后向分裂法（Forward-Backward Splitting）</strong>。</p>
 <h3 id="732-特例的统一一个框架包含一切">7.3.2 特例的统一——一个框架包含一切
 </h3><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>$g(x)$</th>
-					<th>$\text{prox}_{\alpha g}$</th>
-					<th>退化成的算法</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>$0$</td>
-					<td>恒等映射 $z \mapsto z$</td>
-					<td><strong>梯度下降法</strong>（GD, Ch2）</td>
-			</tr>
-			<tr>
-					<td>$\delta_C(x)$</td>
-					<td>投影 $P_C$</td>
-					<td><strong>投影梯度法</strong>（PGM, Ch6）</td>
-			</tr>
-			<tr>
-					<td>$\lambda|x|_1$</td>
-					<td>软阈值 $S_{\alpha\lambda}$</td>
-					<td><strong>ISTA</strong></td>
-			</tr>
-			<tr>
-					<td>$\lambda|X|_*$</td>
-					<td>SVD 软阈值</td>
-					<td><strong>Soft-Impute</strong></td>
-			</tr>
-			<tr>
-					<td>$\frac{\lambda}{2}|x|^2$</td>
-					<td>$\frac{x}{1+\alpha\lambda}$</td>
-					<td>收缩梯度法</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>$g(x)$</th>
+          <th>$\text{prox}_{\alpha g}$</th>
+          <th>退化成的算法</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>$0$</td>
+          <td>恒等映射 $z \mapsto z$</td>
+          <td><strong>梯度下降法</strong>（GD, Ch2）</td>
+      </tr>
+      <tr>
+          <td>$\delta_C(x)$</td>
+          <td>投影 $P_C$</td>
+          <td><strong>投影梯度法</strong>（PGM, Ch6）</td>
+      </tr>
+      <tr>
+          <td>$\lambda|x|_1$</td>
+          <td>软阈值 $S_{\alpha\lambda}$</td>
+          <td><strong>ISTA</strong></td>
+      </tr>
+      <tr>
+          <td>$\lambda|X|_*$</td>
+          <td>SVD 软阈值</td>
+          <td><strong>Soft-Impute</strong></td>
+      </tr>
+      <tr>
+          <td>$\frac{\lambda}{2}|x|^2$</td>
+          <td>$\frac{x}{1+\alpha\lambda}$</td>
+          <td>收缩梯度法</td>
+      </tr>
+  </tbody>
 </table></div>
 <p><strong>邻近梯度法是最一般的框架</strong>——通过选择不同的 $g$ 和对应的邻近算子，它<strong>统一了所有一阶方法</strong>。</p>
 <h3 id="733-梯度映射gradient-mapping">7.3.3 梯度映射（Gradient Mapping）
@@ -923,70 +923,70 @@ $$x^* = \text{prox}_{\alpha g}(x^* - \alpha \nabla f(x^*))$$<p><strong>这个不
 <hr>
 <h2 id="核心要点">核心要点
 </h2><div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>概念</th>
-					<th>核心公式/结论</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>问题形式</td>
-					<td>$\min_x f(x) + g(x)$，$f$ 光滑（$L$-smooth），$g$ 非光滑但 prox 好算</td>
-			</tr>
-			<tr>
-					<td>邻近算子定义</td>
-					<td>$\text{prox}_g(x) = \arg\min_z{g(z) + \frac{1}{2}|z-x|^2}$</td>
-			</tr>
-			<tr>
-					<td>刻画不等式</td>
-					<td>$x - \text{prox}_g(x) \in \partial g(\text{prox}_g(x))$</td>
-			</tr>
-			<tr>
-					<td>$\ell_1$ → 软阈值</td>
-					<td>$[S_\lambda(x)]_i = \text{sign}(x_i) \cdot \max{</td>
-			</tr>
-			<tr>
-					<td>$\ell_2$ → 缩水</td>
-					<td>$\max{1 - \lambda/|x|_2, 0} \cdot x$</td>
-			</tr>
-			<tr>
-					<td>$\delta_C$ → 投影</td>
-					<td>$P_C(x) = \arg\min_{z\in C}|z-x|^2$</td>
-			</tr>
-			<tr>
-					<td>核范数 → SVD 软阈值</td>
-					<td>$U \cdot \text{diag}(S_\lambda(\sigma)) \cdot V^T$</td>
-			</tr>
-			<tr>
-					<td>ISTA 迭代</td>
-					<td>$x_{k+1} = \text{prox}_{\alpha g}(x_k - \alpha \nabla f(x_k))$</td>
-			</tr>
-			<tr>
-					<td>梯度映射</td>
-					<td>$G_\alpha(x) = \frac{1}{\alpha}(x - \text{prox}_{\alpha g}(x - \alpha\nabla f(x)))$</td>
-			</tr>
-			<tr>
-					<td>收敛率（光滑凸）</td>
-					<td>$O(1/k)$，比次梯度法（$O(1/\sqrt{k})$）快得多</td>
-			</tr>
-			<tr>
-					<td>非扩张性</td>
-					<td>$|\text{prox}_g(x) - \text{prox}_g(y)| \leq |x - y|$</td>
-			</tr>
-			<tr>
-					<td>不动点最优化条件</td>
-					<td>$x^<em>$ 最优 $\iff$ $x^</em> = \text{prox}_{\alpha g}(x^* - \alpha\nabla f(x^*))$</td>
-			</tr>
-			<tr>
-					<td>LASSO 的 ISTA</td>
-					<td>$x_{k+1} = S_{\lambda/L}(x_k - \frac{1}{L}A^T(Ax_k - b))$</td>
-			</tr>
-			<tr>
-					<td>Soft-Impute</td>
-					<td>$X_{k+1} = \text{SVT}<em>\lambda(X_k - P</em>\Omega(X_k - M))$</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>概念</th>
+          <th>核心公式/结论</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>问题形式</td>
+          <td>$\min_x f(x) + g(x)$，$f$ 光滑（$L$-smooth），$g$ 非光滑但 prox 好算</td>
+      </tr>
+      <tr>
+          <td>邻近算子定义</td>
+          <td>$\text{prox}_g(x) = \arg\min_z{g(z) + \frac{1}{2}|z-x|^2}$</td>
+      </tr>
+      <tr>
+          <td>刻画不等式</td>
+          <td>$x - \text{prox}_g(x) \in \partial g(\text{prox}_g(x))$</td>
+      </tr>
+      <tr>
+          <td>$\ell_1$ → 软阈值</td>
+          <td>$[S_\lambda(x)]_i = \text{sign}(x_i) \cdot \max{</td>
+      </tr>
+      <tr>
+          <td>$\ell_2$ → 缩水</td>
+          <td>$\max{1 - \lambda/|x|_2, 0} \cdot x$</td>
+      </tr>
+      <tr>
+          <td>$\delta_C$ → 投影</td>
+          <td>$P_C(x) = \arg\min_{z\in C}|z-x|^2$</td>
+      </tr>
+      <tr>
+          <td>核范数 → SVD 软阈值</td>
+          <td>$U \cdot \text{diag}(S_\lambda(\sigma)) \cdot V^T$</td>
+      </tr>
+      <tr>
+          <td>ISTA 迭代</td>
+          <td>$x_{k+1} = \text{prox}_{\alpha g}(x_k - \alpha \nabla f(x_k))$</td>
+      </tr>
+      <tr>
+          <td>梯度映射</td>
+          <td>$G_\alpha(x) = \frac{1}{\alpha}(x - \text{prox}_{\alpha g}(x - \alpha\nabla f(x)))$</td>
+      </tr>
+      <tr>
+          <td>收敛率（光滑凸）</td>
+          <td>$O(1/k)$，比次梯度法（$O(1/\sqrt{k})$）快得多</td>
+      </tr>
+      <tr>
+          <td>非扩张性</td>
+          <td>$|\text{prox}_g(x) - \text{prox}_g(y)| \leq |x - y|$</td>
+      </tr>
+      <tr>
+          <td>不动点最优化条件</td>
+          <td>$x^<em>$ 最优 $\iff$ $x^</em> = \text{prox}_{\alpha g}(x^* - \alpha\nabla f(x^*))$</td>
+      </tr>
+      <tr>
+          <td>LASSO 的 ISTA</td>
+          <td>$x_{k+1} = S_{\lambda/L}(x_k - \frac{1}{L}A^T(Ax_k - b))$</td>
+      </tr>
+      <tr>
+          <td>Soft-Impute</td>
+          <td>$X_{k+1} = \text{SVT}<em>\lambda(X_k - P</em>\Omega(X_k - M))$</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>(End of file)</p>
 
@@ -1072,9 +1072,8 @@ $$x^* = \text{prox}_{\alpha g}(x^* - \alpha \nabla f(x^*))$$<p><strong>这个不
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

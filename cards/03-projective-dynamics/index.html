@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Projective Dynamics（PD，投影动力学）与 Local–Global Solver\n领域：物理引擎 × 软体动力学 × 有限元 × 优化算法\n推荐阅读时间：约 8–10 分钟\n今天选 Projective Dynamics，因为它正好位于一个很有价值的交叉点：\n\\[\\boxed{\\text{FEM 的能量建模}} \\quad+\\quad \\boxed{\\text{PBD 的约束投影}} \\quad+\\quad \\boxed{\\text{数值优化的 alternating minimization}}.\\]它不是简单的“另一种 PBD”。2014 年 Bouaziz、Martin、Liu、Kavan 与 Pauly 提出的原始工作，就是试图在 nodal FEM 与 Position-Based Dynamics 之间建立桥梁：仍然从能量和隐式时间积分出发，却把某类非线性问题改写成极其便宜的局部投影和一个可预分解的全局线性系统。\n对自己写软体求解器尤其值得学，因为 PD 揭示了一个比算法本身更通用的设计原则：\n\\[\\boxed{\\text{不要总想着怎样更快地求非线性方程； 有时应该重新设计问题，使大部分非线性只存在于局部。}}\\] 1. 从隐式 Euler 真正在求什么开始 设节点位置为\n\\[x,\\]上一时刻位置、速度为\n\\[x_n,\\quad v_n,\\]时间步为 \\(h\\)。\n忽略一些细节，隐式 Euler 可以写成一个最小化问题：\n\\[\\boxed{ x_{n+1} = \\arg\\min_x \\left[ \\frac{1}{2h^2} \\|x-y\\|_M^2 + E(x) \\right] }\\]其中\n\\[y=x_n+h v_n+h^2M^{-1}f_{\\rm ext},\\]而\n">
 <title>Projective Dynamics：local–global 分解如何同时得到速度、稳定性与并行性</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/03-projective-dynamics/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Projective Dynamics：local–global 分解如何同时得到速度、稳定性与并行性">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Projective Dynamics：local–global 分解如何同时得到速度、稳定性与并行性">
 <meta property='og:description' content="主题：Projective Dynamics（PD，投影动力学）与 Local–Global Solver\n领域：物理引擎 × 软体动力学 × 有限元 × 优化算法\n推荐阅读时间：约 8–10 分钟\n今天选 Projective Dynamics，因为它正好位于一个很有价值的交叉点：\n\\[\\boxed{\\text{FEM 的能量建模}} \\quad+\\quad \\boxed{\\text{PBD 的约束投影}} \\quad+\\quad \\boxed{\\text{数值优化的 alternating minimization}}.\\]它不是简单的“另一种 PBD”。2014 年 Bouaziz、Martin、Liu、Kavan 与 Pauly 提出的原始工作，就是试图在 nodal FEM 与 Position-Based Dynamics 之间建立桥梁：仍然从能量和隐式时间积分出发，却把某类非线性问题改写成极其便宜的局部投影和一个可预分解的全局线性系统。\n对自己写软体求解器尤其值得学，因为 PD 揭示了一个比算法本身更通用的设计原则：\n\\[\\boxed{\\text{不要总想着怎样更快地求非线性方程； 有时应该重新设计问题，使大部分非线性只存在于局部。}}\\] 1. 从隐式 Euler 真正在求什么开始 设节点位置为\n\\[x,\\]上一时刻位置、速度为\n\\[x_n,\\quad v_n,\\]时间步为 \\(h\\)。\n忽略一些细节，隐式 Euler 可以写成一个最小化问题：\n\\[\\boxed{ x_{n+1} = \\arg\\min_x \\left[ \\frac{1}{2h^2} \\|x-y\\|_M^2 + E(x) \\right] }\\]其中\n\\[y=x_n+h v_n+h^2M^{-1}f_{\\rm ext},\\]而\n">
 <meta property='og:url' content='https://assranai.github.io/cards/03-projective-dynamics/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,14 +324,30 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-从隐式-euler-真正在求什么开始">1. 从隐式 Euler 真正在求什么开始</a></li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#2-普通非线性-fem-为什么贵">2. 普通非线性 FEM 为什么贵？</a></li>
+    <li><a href="#3-pd-对势能施加了一个特殊结构">3. PD 对势能施加了一个特殊结构</a></li>
+    <li><a href="#4-一个最简单的弹簧例子">4. 一个最简单的弹簧例子</a></li>
+    <li><a href="#5-真正漂亮的地方在-global-step">5. 真正漂亮的地方在 Global Step</a></li>
+    <li><a href="#6-整个算法因此简单得惊人">6. 整个算法因此简单得惊人</a></li>
+    <li><a href="#7-为什么-local-step-特别适合-gpu">7. 为什么 Local Step 特别适合 GPU？</a></li>
+    <li><a href="#8-它和-pbd-到底差在哪里">8. 它和 PBD 到底差在哪里？</a></li>
+    <li><a href="#9-这也解释了它和-xpbd-的一个深层区别">9. 这也解释了它和 XPBD 的一个深层区别</a></li>
+    <li><a href="#10-pd-的真正代价它支持的材料模型受到限制">10. PD 的真正代价：它支持的材料模型受到限制</a></li>
+    <li><a href="#11-从这个角度重新看-newton">11. 从这个角度重新看 Newton</a></li>
+    <li><a href="#12-更深一层pd-其实是-admm-家族的特殊结构">12. 更深一层：PD 其实是 ADMM 家族的特殊结构</a></li>
+    <li><a href="#13-这对接触问题尤其有意义">13. 这对接触问题尤其有意义</a></li>
+    <li><a href="#14-它甚至自然连接-rom">14. 它甚至自然连接 ROM</a></li>
+    <li><a href="#15-pd-甚至很适合-differentiable-physics">15. PD 甚至很适合 differentiable physics</a></li>
+    <li><a href="#16-对你自己的-xpbd-求解器最值得迁移什么">16. 对你自己的 XPBD 求解器，最值得迁移什么？</a></li>
+    <li><a href="#17-一个非常值得自己实现的最小实验">17. 一个非常值得自己实现的最小实验</a></li>
+    <li><a href="#18-它在整个知识体系中卡在哪里">18. 它在整个知识体系中卡在哪里？</a></li>
+    <li><a href="#19-一个更深的视角pd-其实可以解释成-quasi-newton">19. 一个更深的视角：PD 其实可以解释成 quasi-Newton</a></li>
+    <li><a href="#20-一个很漂亮的后续chebyshev-acceleration">20. 一个很漂亮的后续：Chebyshev acceleration</a></li>
+    <li><a href="#21-这其实是一种非常普遍的算法设计哲学">21. 这其实是一种非常普遍的算法设计哲学</a></li>
+    <li><a href="#22-更进一步为什么固定矩阵如此值钱">22. 更进一步：为什么“固定矩阵”如此值钱？</a></li>
+    <li><a href="#23-接触会破坏这个漂亮结构吗">23. 接触会破坏这个漂亮结构吗？</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -423,8 +439,8 @@
 \[\boxed{\text{材料希望 }x\text{ 满足弹性规律}.}\]<p>所以一次时间步本质上是在求：</p>
 \[\boxed{\text{惯性与弹性能量之间的最优折中}.}\]<p>这就是所谓 <strong>optimization integrator</strong> 的视角，也是理解 PD、ADMM-PD、后来的 differentiable PD 等方法的共同入口。</p>
 <hr>
-<h1 id="2-普通非线性-fem-为什么贵">2. 普通非线性 FEM 为什么贵？
-</h1><p>如果</p>
+<h2 id="2-普通非线性-fem-为什么贵">2. 普通非线性 FEM 为什么贵？
+</h2><p>如果</p>
 \[E(x)\]<p>是一般 Neo-Hookean 能量，那么需要解：</p>
 \[\nabla E_{\rm total}(x)=0.\]<p>Newton 法每轮大致需要：</p>
 \[H(x_k)\Delta x=-g(x_k),\]<p>其中 Hessian</p>
@@ -433,8 +449,8 @@
 \[\text{组装 Hessian} \rightarrow \text{factorization / linear solve} \rightarrow \text{更新} \rightarrow \text{再组装}.\]<p>真正昂贵的往往不是计算一个 tetrahedron 的能量，而是：</p>
 \[\boxed{\text{全局非线性导致全局线性系统不断变化。}}\]<p>PD 的突破口就是这里。</p>
 <hr>
-<h1 id="3-pd-对势能施加了一个特殊结构">3. PD 对势能施加了一个特殊结构
-</h1><p>考虑一个约束能量：</p>
+<h2 id="3-pd-对势能施加了一个特殊结构">3. PD 对势能施加了一个特殊结构
+</h2><p>考虑一个约束能量：</p>
 \[\boxed{ E_i(x) = \frac{w_i}{2} \min_{p_i\in C_i} \|A_i x-p_i\|^2. }\]<p>这里：</p>
 <ul>
 <li>\(A_ix\)：从全局位置抽取某个局部形变量；</li>
@@ -449,8 +465,8 @@
 \[E_i(x) = \frac{w_i}{2} d^2(A_ix,C_i).\]<p>这就是 <strong>projective potential</strong>。</p>
 <p>原始 PD 工作正是通过这种特殊势能，使 continuum-based constraints 也能进入统一 local–global 求解结构。</p>
 <hr>
-<h1 id="4-一个最简单的弹簧例子">4. 一个最简单的弹簧例子
-</h1><p>两节点：</p>
+<h2 id="4-一个最简单的弹簧例子">4. 一个最简单的弹簧例子
+</h2><p>两节点：</p>
 \[x_1,x_2\]<p>静止长度：</p>
 \[l_0.\]<p>令：</p>
 \[A_ix=x_1-x_2.\]<p>合法集合：</p>
@@ -464,8 +480,8 @@
 \[p_1,p_2,\ldots,p_m\]<p>都可以：</p>
 \[\boxed{\text{并行计算。}}\]<p>这就是 <strong>local step</strong>。</p>
 <hr>
-<h1 id="5-真正漂亮的地方在-global-step">5. 真正漂亮的地方在 Global Step
-</h1><p>如果暂时把：</p>
+<h2 id="5-真正漂亮的地方在-global-step">5. 真正漂亮的地方在 Global Step
+</h2><p>如果暂时把：</p>
 \[p_i\]<p>固定，那么总目标变成：</p>
 \[\frac{1}{2h^2}(x-y)^TM(x-y) + \sum_i \frac{w_i}{2} \|A_ix-p_i\|^2.\]<p>这时对 \(x\) 来说已经是一个<strong>纯二次函数</strong>。</p>
 <p>求导：</p>
@@ -484,8 +500,8 @@
 <p>之后每次 global step 只是：</p>
 \[LL^Tx=b(p).\]<p>这正是 PD 获得高性能的关键。原始方法强调的也正是这种 alternating optimization 与可重复使用的全局系统结构。</p>
 <hr>
-<h1 id="6-整个算法因此简单得惊人">6. 整个算法因此简单得惊人
-</h1><p>一次时间步：</p>
+<h2 id="6-整个算法因此简单得惊人">6. 整个算法因此简单得惊人
+</h2><p>一次时间步：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -518,8 +534,8 @@
 \[\boxed{\text{很多极小的非线性问题}}\]<p>加上：</p>
 \[\boxed{\text{一个固定的大线性问题}.}\]<p>这是一种非常有迁移价值的计算架构：</p>
 \[\boxed{\text{nonlinearity local，coupling global}.}\]<hr>
-<h1 id="7-为什么-local-step-特别适合-gpu">7. 为什么 Local Step 特别适合 GPU？
-</h1><p>例如一个 tetrahedron 的局部投影可能需要：</p>
+<h2 id="7-为什么-local-step-特别适合-gpu">7. 为什么 Local Step 特别适合 GPU？
+</h2><p>例如一个 tetrahedron 的局部投影可能需要：</p>
 \[F=DsDm^{-1},\]<p>然后对：</p>
 \[F\]<p>做极分解或 SVD：</p>
 \[F=U\Sigma V^T\]<p>并把它投影到某个 admissible set。</p>
@@ -533,8 +549,8 @@
 \[\boxed{\text{local embarrassingly parallel kernels}}\]<p>和</p>
 \[\boxed{\text{global sparse solve}.}\]<p>这比把整个非线性 Newton 系统扔给 GPU 要规整得多。</p>
 <hr>
-<h1 id="8-它和-pbd-到底差在哪里">8. 它和 PBD 到底差在哪里？
-</h1><p>这点非常容易混淆。</p>
+<h2 id="8-它和-pbd-到底差在哪里">8. 它和 PBD 到底差在哪里？
+</h2><p>这点非常容易混淆。</p>
 <p>PBD 大致是：</p>
 \[x \rightarrow \text{constraint 1 correction} \rightarrow \text{constraint 2 correction} \rightarrow\cdots\]<p>很多实现本质上进行 Gauss–Seidel 式位置修正。</p>
 <p>PD 则存在一个明确的全局目标：</p>
@@ -543,8 +559,8 @@
 \[x\leftarrow\arg\min_x E(x,p).\]<p>因此它实际上属于：</p>
 \[\boxed{\text{block coordinate descent / alternating minimization}.}\]<p>这就是为什么原论文称它是在 FEM 与 PBD 之间搭桥，而不是简单地提出一种新的 constraint projection heuristic。</p>
 <hr>
-<h1 id="9-这也解释了它和-xpbd-的一个深层区别">9. 这也解释了它和 XPBD 的一个深层区别
-</h1><details class="reveal">
+<h2 id="9-这也解释了它和-xpbd-的一个深层区别">9. 这也解释了它和 XPBD 的一个深层区别
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p><span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 的核心变量之一是：</p>
@@ -562,8 +578,8 @@
 </details>
 
 <hr>
-<h1 id="10-pd-的真正代价它支持的材料模型受到限制">10. PD 的真正代价：它支持的材料模型受到限制
-</h1><details class="reveal">
+<h2 id="10-pd-的真正代价它支持的材料模型受到限制">10. PD 的真正代价：它支持的材料模型受到限制
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这里必须看到它的交换条件。</p>
@@ -580,8 +596,8 @@
 </details>
 
 <hr>
-<h1 id="11-从这个角度重新看-newton">11. 从这个角度重新看 Newton
-</h1><details class="reveal">
+<h2 id="11-从这个角度重新看-newton">11. 从这个角度重新看 Newton
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>Newton：</p>
@@ -596,8 +612,8 @@
 </details>
 
 <hr>
-<h1 id="12-更深一层pd-其实是-admm-家族的特殊结构">12. 更深一层：PD 其实是 ADMM 家族的特殊结构
-</h1><details class="reveal">
+<h2 id="12-更深一层pd-其实是-admm-家族的特殊结构">12. 更深一层：PD 其实是 ADMM 家族的特殊结构
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>2017 年 Overby、Brown、Li 与 Rahul Narain 证明，Alternating Direction Method of Multipliers 可以用来构造一个包含 PD 的更一般框架：</p>
@@ -623,8 +639,8 @@
 </details>
 
 <hr>
-<h1 id="13-这对接触问题尤其有意义">13. 这对接触问题尤其有意义
-</h1><details class="reveal">
+<h2 id="13-这对接触问题尤其有意义">13. 这对接触问题尤其有意义
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>接触是 PD 固定矩阵结构最容易遭到挑战的地方。</p>
@@ -641,8 +657,8 @@
 </details>
 
 <hr>
-<h1 id="14-它甚至自然连接-rom">14. 它甚至自然连接 ROM
-</h1><details class="reveal">
+<h2 id="14-它甚至自然连接-rom">14. 它甚至自然连接 ROM
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设：</p>
@@ -656,7 +672,7 @@
 <p>这就是：</p>
 \[\boxed{\text{hyper-reduction}}\]<p>出现的原因。</p>
 <p>Brandt 等 2018 年的 Hyper-Reduced Projective Dynamics 同时近似 local constraint projections 并构造 sparse reduced bases，使时间积分成本不再直接随原始 mesh resolution 增长；论文展示了大型网格实时模拟，并且不要求训练数据或 modal analysis。</p>
-<p>这和前一张 Randomized <span class="term-anchor" data-term="pod" tabindex="0">POD</span> 卡片正好接上：</p>
+<p>从<a class="link" href="../31-randomized-nla/" >随机化 SVD</a> 构造低维基的角度看，Randomized <span class="term-anchor" data-term="pod" tabindex="0">POD</span> 和超降阶解决了两个不同的瓶颈。</p>
 \[\text{state reduction}\]<p>解决：</p>
 \[\boxed{\text{全局自由度太多}}\]<p>而 hyper-reduction 解决：</p>
 \[\boxed{\text{非线性局部计算仍然太多}.}\]<p>这是 ROM 里一个非常重要的区别。</p>
@@ -665,8 +681,8 @@
 </details>
 
 <hr>
-<h1 id="15-pd-甚至很适合-differentiable-physics">15. PD 甚至很适合 differentiable physics
-</h1><details class="reveal">
+<h2 id="15-pd-甚至很适合-differentiable-physics">15. PD 甚至很适合 differentiable physics
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>如果希望计算：</p>
@@ -682,8 +698,8 @@
 </details>
 
 <hr>
-<h1 id="16-对你自己的-xpbd-求解器最值得迁移什么">16. 对你自己的 XPBD 求解器，最值得迁移什么？
-</h1><details class="reveal">
+<h2 id="16-对你自己的-xpbd-求解器最值得迁移什么">16. 对你自己的 XPBD 求解器，最值得迁移什么？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>不一定是“把 XPBD 全换成 PD”。</p>
@@ -700,8 +716,8 @@
 </details>
 
 <hr>
-<h1 id="17-一个非常值得自己实现的最小实验">17. 一个非常值得自己实现的最小实验
-</h1><details class="reveal">
+<h2 id="17-一个非常值得自己实现的最小实验">17. 一个非常值得自己实现的最小实验
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>不要一开始做 tetrahedron。</p>
@@ -732,8 +748,8 @@
 </details>
 
 <hr>
-<h1 id="18-它在整个知识体系中卡在哪里">18. 它在整个知识体系中卡在哪里？
-</h1><details class="reveal">
+<h2 id="18-它在整个知识体系中卡在哪里">18. 它在整个知识体系中卡在哪里？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>可以把你现在接触的求解方法大致放成：</p>
@@ -752,8 +768,8 @@
 </details>
 
 <hr>
-<h1 id="19-一个更深的视角pd-其实可以解释成-quasi-newton">19. 一个更深的视角：PD 其实可以解释成 quasi-Newton
-</h1><details class="reveal">
+<h2 id="19-一个更深的视角pd-其实可以解释成-quasi-newton">19. 一个更深的视角：PD 其实可以解释成 quasi-Newton
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这一步尤其值得记住。</p>
@@ -768,8 +784,8 @@
 </details>
 
 <hr>
-<h1 id="20-一个很漂亮的后续chebyshev-acceleration">20. 一个很漂亮的后续：Chebyshev acceleration
-</h1><details class="reveal">
+<h2 id="20-一个很漂亮的后续chebyshev-acceleration">20. 一个很漂亮的后续：Chebyshev acceleration
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>2015 年 Huamin Wang 注意到一个现象：</p>
@@ -791,8 +807,8 @@
 </details>
 
 <hr>
-<h1 id="21-这其实是一种非常普遍的算法设计哲学">21. 这其实是一种非常普遍的算法设计哲学
-</h1><details class="reveal">
+<h2 id="21-这其实是一种非常普遍的算法设计哲学">21. 这其实是一种非常普遍的算法设计哲学
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设原问题：</p>
@@ -820,8 +836,8 @@
 </details>
 
 <hr>
-<h1 id="22-更进一步为什么固定矩阵如此值钱">22. 更进一步：为什么“固定矩阵”如此值钱？
-</h1><details class="reveal">
+<h2 id="22-更进一步为什么固定矩阵如此值钱">22. 更进一步：为什么“固定矩阵”如此值钱？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>设一个软体有：</p>
@@ -843,8 +859,8 @@
 </details>
 
 <hr>
-<h1 id="23-接触会破坏这个漂亮结构吗">23. 接触会破坏这个漂亮结构吗？
-</h1><details class="reveal">
+<h2 id="23-接触会破坏这个漂亮结构吗">23. 接触会破坏这个漂亮结构吗？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这正是实际 PD 的难点之一。</p>
@@ -867,8 +883,8 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Projective Dynamics 最值得学的并不是那条固定矩阵公式，而是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Projective Dynamics 最值得学的并不是那条固定矩阵公式，而是：</p>
 \[\boxed{ \text{一个复杂非线性问题的高成本， 往往不是因为“非线性很多”， 而是因为这些非线性被迫全局耦合在一起。} }\]<p>PD 做的事情是：</p>
 \[\boxed{ \text{把非线性留在局部， 把全局耦合变成线性。} }\]<p>于是：</p>
 \[\text{local} = \text{非线性、便宜、并行}\]<p>而：</p>
@@ -884,8 +900,8 @@
 </ul>
 <p>共享着同一种算法设计思想：</p>
 \[\boxed{\text{通过引入辅助变量和问题分裂，主动创造可利用的计算结构。}}\]<p>这就是 PD 真正值得深入理解的位置。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1081,9 +1097,8 @@ DiffPD 官方项目页</p>
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

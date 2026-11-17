@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：LoRA（Low-Rank Adaptation）与低秩参数更新\n领域：AI 全栈工程 × 大模型推理 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\nLoRA 值得深入理解，因为它表面上是一个“大模型省显存微调技巧”，但更深层的问题其实是：\n\\[\\boxed{ \\text{一个拥有数十亿参数的模型，在适配新任务时，真的需要在整个参数空间里自由移动吗？} }\\]LoRA 的回答是：\n\\[\\boxed{ \\text{很多任务适配所需的权重变化，本身可能近似低秩。} }\\]于是它不直接优化完整权重更新：\n\\[\\Delta W\\in\\mathbb R^{d_{\\text{out}}\\times d_{\\text{in}}},\\]而把更新限制成：\n\\[\\boxed{ \\Delta W=BA }\\]其中：\n\\[A\\in\\mathbb R^{r\\times d_{\\text{in}}}, \\qquad B\\in\\mathbb R^{d_{\\text{out}}\\times r},\\]且：\n\\[r\\ll \\min(d_{\\text{in}},d_{\\text{out}}).\\]原始 LoRA 论文正是基于这种 rank decomposition：冻结预训练权重，只训练低秩更新矩阵。作者在 GPT-3 175B 的实验设置中报告，相比完整 Adam 微调，可将可训练参数数量降低约 \\(10^4\\) 倍、GPU 内存需求降低约 3 倍，同时保持相当或更好的任务性能。\n1. 先看完整微调到底浪费在哪里 假设一个 Transformer 线性层：\n\\[W\\in\\mathbb R^{4096\\times4096}.\\]它拥有：\n\\[4096^2 \\approx 16.8\\text{ million}\\]个参数。\n完整微调意味着：\n\\[W \\rightarrow W+\\Delta W,\\]其中：\n\\[\\Delta W\\]也是一个完整的：\n\\[4096\\times4096\\]矩阵。\n">
 <title>LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/23-lora/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="LoRA：真正高效的“模型适配”，往往不是少改几个参数，而是只允许参数更新发生在低秩子空间里">
 <meta property='og:description' content="主题：LoRA（Low-Rank Adaptation）与低秩参数更新\n领域：AI 全栈工程 × 大模型推理 × 科学机器学习\n推荐阅读时间：约 8–10 分钟\nLoRA 值得深入理解，因为它表面上是一个“大模型省显存微调技巧”，但更深层的问题其实是：\n\\[\\boxed{ \\text{一个拥有数十亿参数的模型，在适配新任务时，真的需要在整个参数空间里自由移动吗？} }\\]LoRA 的回答是：\n\\[\\boxed{ \\text{很多任务适配所需的权重变化，本身可能近似低秩。} }\\]于是它不直接优化完整权重更新：\n\\[\\Delta W\\in\\mathbb R^{d_{\\text{out}}\\times d_{\\text{in}}},\\]而把更新限制成：\n\\[\\boxed{ \\Delta W=BA }\\]其中：\n\\[A\\in\\mathbb R^{r\\times d_{\\text{in}}}, \\qquad B\\in\\mathbb R^{d_{\\text{out}}\\times r},\\]且：\n\\[r\\ll \\min(d_{\\text{in}},d_{\\text{out}}).\\]原始 LoRA 论文正是基于这种 rank decomposition：冻结预训练权重，只训练低秩更新矩阵。作者在 GPT-3 175B 的实验设置中报告，相比完整 Adam 微调，可将可训练参数数量降低约 \\(10^4\\) 倍、GPU 内存需求降低约 3 倍，同时保持相当或更好的任务性能。\n1. 先看完整微调到底浪费在哪里 假设一个 Transformer 线性层：\n\\[W\\in\\mathbb R^{4096\\times4096}.\\]它拥有：\n\\[4096^2 \\approx 16.8\\text{ million}\\]个参数。\n完整微调意味着：\n\\[W \\rightarrow W+\\Delta W,\\]其中：\n\\[\\Delta W\\]也是一个完整的：\n\\[4096\\times4096\\]矩阵。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/23-lora/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,14 +324,27 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-先看完整微调到底浪费在哪里">1. 先看完整微调到底浪费在哪里</a></li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#2-lora-真正施加的是一个-rank-constraint">2. LoRA 真正施加的是一个 rank constraint</a></li>
+    <li><a href="#3-为什么低秩会有效">3. 为什么“低秩”会有效？</a></li>
+    <li><a href="#4-一个二维类比">4. 一个二维类比</a></li>
+    <li><a href="#5-为什么-lora-比冻结大部分层更加精细">5. 为什么 LoRA 比“冻结大部分层”更加精细？</a></li>
+    <li><a href="#6-为什么它能显著省显存">6. 为什么它能显著省显存？</a></li>
+    <li><a href="#7-lora-的-inference-为什么可以几乎没有额外结构成本">7. LoRA 的 inference 为什么可以几乎没有额外结构成本？</a></li>
+    <li><a href="#8-这和版本控制有一个很好的类比">8. 这和版本控制有一个很好的类比</a></li>
+    <li><a href="#9-rank--到底控制什么">9. Rank  到底控制什么？</a></li>
+    <li><a href="#10-lora-并不是简单地做-svd">10. LoRA 并不是简单地“做 SVD”</a></li>
+    <li><a href="#11-为什么--的训练动力学也很重要">11. 为什么  的训练动力学也很重要？</a></li>
+    <li><a href="#12-lora-fa-又揭示了另一个系统问题参数少不等于-activation-少">12. LoRA-FA 又揭示了另一个系统问题：参数少，不等于 activation 少</a></li>
+    <li><a href="#13-lora-真正有迁移价值的部分低秩更新不是低秩模型">13. LoRA 真正有迁移价值的部分：低秩“更新”，不是低秩“模型”</a></li>
+    <li><a href="#14-这和有限元中的低秩更新高度相似">14. 这和有限元中的低秩更新高度相似</a></li>
+    <li><a href="#15-这对代理模型也有一个非常好的启发">15. 这对代理模型也有一个非常好的启发</a></li>
+    <li><a href="#16-对可靠性模型同样成立">16. 对可靠性模型同样成立</a></li>
+    <li><a href="#17-对游戏引擎--agent-部署一个特别现实的价值共享-base动态挂-adapter">17. 对游戏引擎 / Agent 部署，一个特别现实的价值：共享 base，动态挂 adapter</a></li>
+    <li><a href="#18-lora-的局限低秩假设不是永远成立">18. LoRA 的局限：低秩假设不是永远成立</a></li>
+    <li><a href="#19-另一个局限低秩不等于低函数复杂度">19. 另一个局限：低秩不等于低函数复杂度</a></li>
+    <li><a href="#20-一个很值得自己做的最小实验">20. 一个很值得自己做的最小实验</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -437,8 +450,8 @@
 \[0.39\%.\]<p>这不是简单“少训练一些原参数”。</p>
 <p>它实际上重新定义了：</p>
 \[\boxed{ \text{允许模型如何变化。} }\]<hr>
-<h1 id="2-lora-真正施加的是一个-rank-constraint">2. LoRA 真正施加的是一个 rank constraint
-</h1><p>完整更新：</p>
+<h2 id="2-lora-真正施加的是一个-rank-constraint">2. LoRA 真正施加的是一个 rank constraint
+</h2><p>完整更新：</p>
 \[\Delta W\]<p>可以是任意矩阵，理论最大秩：</p>
 \[\operatorname{rank}(\Delta W) = \min(d_{\rm in},d_{\rm out}).\]<p>LoRA 写成：</p>
 \[\Delta W=BA.\]<p>于是：</p>
@@ -451,8 +464,8 @@
 \[\boxed{ \text{先把高维输入压缩到一个小的 adaptation space， 再从这个空间生成任务相关修正。} }\]<p>这里的：</p>
 \[r\]<p>就是 adaptation bottleneck dimension。</p>
 <hr>
-<h1 id="3-为什么低秩会有效">3. 为什么“低秩”会有效？
-</h1><p>这是 LoRA 最值得学的地方。</p>
+<h2 id="3-为什么低秩会有效">3. 为什么“低秩”会有效？
+</h2><p>这是 LoRA 最值得学的地方。</p>
 <p>它不是因为：</p>
 <blockquote>
 <p>参数越少一定越好。</p>
@@ -465,8 +478,8 @@
 \[\text{重新学习这些能力},\]<p>而更像：</p>
 \[\boxed{ \text{重新组合、偏置或激活已有能力。} }\]<p>因此更新空间可能天然比原始参数空间低维得多。</p>
 <hr>
-<h1 id="4-一个二维类比">4. 一个二维类比
-</h1><p>假设系统参数有：</p>
+<h2 id="4-一个二维类比">4. 一个二维类比
+</h2><p>假设系统参数有：</p>
 \[1000\]<p>维：</p>
 \[\theta\in\mathbb R^{1000}.\]<p>但任务变化真正只需要沿两个方向：</p>
 \[v_1,\quad v_2.\]<p>那么：</p>
@@ -482,8 +495,8 @@
 </ul>
 <p>二者都建立在同一个更一般的思想上：</p>
 \[\boxed{ \text{名义维度很高，不代表有效自由度真的很高。} }\]<hr>
-<h1 id="5-为什么-lora-比冻结大部分层更加精细">5. 为什么 LoRA 比“冻结大部分层”更加精细？
-</h1><p>另一种参数高效方法是：</p>
+<h2 id="5-为什么-lora-比冻结大部分层更加精细">5. 为什么 LoRA 比“冻结大部分层”更加精细？
+</h2><p>另一种参数高效方法是：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -506,8 +519,8 @@
 \[\boxed{ \text{distributed but low-dimensional} }\]<p>，而不是：</p>
 \[\text{localized but full-dimensional}.\]<p>这是两种完全不同的 inductive bias。</p>
 <hr>
-<h1 id="6-为什么它能显著省显存">6. 为什么它能显著省显存？
-</h1><p>训练模型时，显存不只是存：</p>
+<h2 id="6-为什么它能显著省显存">6. 为什么它能显著省显存？
+</h2><p>训练模型时，显存不只是存：</p>
 \[W.\]<p>还要存：</p>
 <ul>
 <li>gradient；</li>
@@ -524,8 +537,8 @@
 \[A,B.\]<p>于是：</p>
 \[\boxed{ \text{optimizer state 和 gradient memory 只跟 LoRA 参数数量增长。} }\]<p>这也是为什么 PEFT 在消费级 GPU 上非常有价值。Hugging Face 当前 PEFT 官方文档仍把 LoRA 作为最主要的参数高效微调方法之一，并强调只更新少量 adapter 参数可显著降低训练和存储成本。</p>
 <hr>
-<h1 id="7-lora-的-inference-为什么可以几乎没有额外结构成本">7. LoRA 的 inference 为什么可以几乎没有额外结构成本？
-</h1><p>因为：</p>
+<h2 id="7-lora-的-inference-为什么可以几乎没有额外结构成本">7. LoRA 的 inference 为什么可以几乎没有额外结构成本？
+</h2><p>因为：</p>
 \[W_{\rm adapted} = W_0+BA.\]<p>训练结束以后，可以直接做：</p>
 \[\boxed{ W' = W_0+BA }\]<p>把 LoRA merge 回原权重。</p>
 <p>于是 inference 仍然只是：</p>
@@ -556,8 +569,8 @@
 \[\boxed{ \text{一个大模型权重} + \text{很多轻量任务增量} }\]<p>就能支持多租户、多角色、多领域部署。</p>
 <p>这是 LoRA 的系统价值，不只是训练价值。</p>
 <hr>
-<h1 id="8-这和版本控制有一个很好的类比">8. 这和版本控制有一个很好的类比
-</h1><p>假设 base model：</p>
+<h2 id="8-这和版本控制有一个很好的类比">8. 这和版本控制有一个很好的类比
+</h2><p>假设 base model：</p>
 \[W_0\]<p>有：</p>
 \[20\text{ GB}.\]<p>有 100 个不同客户。</p>
 <p>Full fine-tuning 要保存：</p>
@@ -577,8 +590,8 @@
 <p>的系统思想很相似。</p>
 <p>所以 LoRA 在部署层面的本质，也可以理解为：</p>
 \[\boxed{ \text{不要复制整个系统状态，只保存任务相关差分。} }\]<hr>
-<h1 id="9-rank--到底控制什么">9. Rank \(r\) 到底控制什么？
-</h1><p>LoRA 最重要的超参数之一：</p>
+<h2 id="9-rank--到底控制什么">9. Rank \(r\) 到底控制什么？
+</h2><p>LoRA 最重要的超参数之一：</p>
 \[r.\]<p>如果：</p>
 \[r=1,\]<p>那么：</p>
 \[\Delta W=ba^T\]<p>只能产生一个 rank-1 更新。</p>
@@ -599,8 +612,8 @@
 <p>有些层可能需要：</p>
 \[r=32.\]<p>这也自然引出了 AdaLoRA、rank allocation 等后续方法。</p>
 <hr>
-<h1 id="10-lora-并不是简单地做-svd">10. LoRA 并不是简单地“做 SVD”
-</h1><p>这一点很容易误解。</p>
+<h2 id="10-lora-并不是简单地做-svd">10. LoRA 并不是简单地“做 SVD”
+</h2><p>这一点很容易误解。</p>
 <p>LoRA 并不是：</p>
 <ol>
 <li>先完整 fine-tune；</li>
@@ -617,8 +630,8 @@
 \[\text{post-hoc matrix compression}.\]<p>区别非常重要。</p>
 <p>前者改变优化问题本身。</p>
 <hr>
-<h1 id="11-为什么--的训练动力学也很重要">11. 为什么 \(A,B\) 的训练动力学也很重要？
-</h1><details class="reveal">
+<h2 id="11-为什么--的训练动力学也很重要">11. 为什么 \(A,B\) 的训练动力学也很重要？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>把：</p>
@@ -639,8 +652,8 @@
 </details>
 
 <hr>
-<h1 id="12-lora-fa-又揭示了另一个系统问题参数少不等于-activation-少">12. LoRA-FA 又揭示了另一个系统问题：参数少，不等于 activation 少
-</h1><details class="reveal">
+<h2 id="12-lora-fa-又揭示了另一个系统问题参数少不等于-activation-少">12. LoRA-FA 又揭示了另一个系统问题：参数少，不等于 activation 少
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>普通 LoRA 虽然 trainable parameters 大幅减少，</p>
@@ -664,8 +677,8 @@
 </details>
 
 <hr>
-<h1 id="13-lora-真正有迁移价值的部分低秩更新不是低秩模型">13. LoRA 真正有迁移价值的部分：低秩“更新”，不是低秩“模型”
-</h1><p>这一点尤其值得区分。</p>
+<h2 id="13-lora-真正有迁移价值的部分低秩更新不是低秩模型">13. LoRA 真正有迁移价值的部分：低秩“更新”，不是低秩“模型”
+</h2><p>这一点尤其值得区分。</p>
 <p>LoRA 并没有假设：</p>
 \[W_0\]<p>本身低秩。</p>
 <p>事实上预训练权重可以是：</p>
@@ -675,8 +688,8 @@
 <p>这是一种非常强的建模思想：</p>
 \[\boxed{ \text{复杂系统本身可以是高维的， 但从一个已知良好状态到另一个邻近状态的变化可能是低维的。} }\]<p>这个思想远远不只属于 LLM。</p>
 <hr>
-<h1 id="14-这和有限元中的低秩更新高度相似">14. 这和有限元中的低秩更新高度相似
-</h1><p>设结构刚度矩阵：</p>
+<h2 id="14-这和有限元中的低秩更新高度相似">14. 这和有限元中的低秩更新高度相似
+</h2><p>设结构刚度矩阵：</p>
 \[K_0.\]<p>只有局部参数变化：</p>
 <ul>
 <li>一个连接点刚度变化；</li>
@@ -693,8 +706,8 @@
 \[(A+UCV)^{-1} = A^{-1} - A^{-1}U (C^{-1}+VA^{-1}U)^{-1} VA^{-1}.\]<p>也就是说：</p>
 \[\boxed{ \text{无需把整个系统重新当成一个全新问题。} }\]<p>LoRA 和这种思维非常接近：</p>
 \[\boxed{ \text{base operator} + \text{low-rank correction}. }\]<hr>
-<h1 id="15-这对代理模型也有一个非常好的启发">15. 这对代理模型也有一个非常好的启发
-</h1><p>假设已经有一个基础代理：</p>
+<h2 id="15-这对代理模型也有一个非常好的启发">15. 这对代理模型也有一个非常好的启发
+</h2><p>假设已经有一个基础代理：</p>
 \[f_0(x)\]<p>对应工况 A。</p>
 <p>现在工况 B：</p>
 <ul>
@@ -712,8 +725,8 @@
 <p>LoRA 提醒我们：</p>
 \[\boxed{ \text{迁移学习真正应该建模的， 往往是任务之间的“变化”， 而不是重新建模整个任务。} }\]<p>这是代理模型中非常值得吸收的一层。</p>
 <hr>
-<h1 id="16-对可靠性模型同样成立">16. 对可靠性模型同样成立
-</h1><p>假设已有一个极限状态代理：</p>
+<h2 id="16-对可靠性模型同样成立">16. 对可靠性模型同样成立
+</h2><p>假设已有一个极限状态代理：</p>
 \[g_0(x)\]<p>对应 nominal design。</p>
 <p>设计稍微变化：</p>
 \[d_0\rightarrow d_1.\]<p>通常会重新生成：</p>
@@ -729,8 +742,8 @@
 <p><strong>多工况、多设计、多 fidelity 的代理模型之间，真正需要独立学习的自由度到底有多少？</strong></p>
 </blockquote>
 <hr>
-<h1 id="17-对游戏引擎--agent-部署一个特别现实的价值共享-base动态挂-adapter">17. 对游戏引擎 / Agent 部署，一个特别现实的价值：共享 base，动态挂 adapter
-</h1><p>假设一个游戏中需要：</p>
+<h2 id="17-对游戏引擎--agent-部署一个特别现实的价值共享-base动态挂-adapter">17. 对游戏引擎 / Agent 部署，一个特别现实的价值：共享 base，动态挂 adapter
+</h2><p>假设一个游戏中需要：</p>
 <ul>
 <li>商人 NPC；</li>
 <li>战斗教官；</li>
@@ -742,17 +755,17 @@
 \[8B\]<p>模型通常不现实。</p>
 <p>LoRA 架构允许：</p>
 \[\boxed{ \text{同一个 base model} + \text{多个轻量 adapter}. }\]<p>服务端可以根据请求动态选择：</p>
-\[A_i,B_i.\]<p>这和前一期 <span class="term-anchor" data-term="paged-attention" tabindex="0">PagedAttention</span> 所体现的思路非常相似：</p>
+\[A_i,B_i.\]<p>这和<a class="link" href="../17-paged-attention/" >KV Cache 分页管理</a>中的 <span class="term-anchor" data-term="paged-attention" tabindex="0">PagedAttention</span> 所体现的思路非常相似：</p>
 <ul>
 <li>PagedAttention：共享/虚拟化 KV memory；</li>
 <li>LoRA：共享 base parameters，只保存任务增量。</li>
 </ul>
 <p>两者都是：</p>
-\[\boxed{ \text{把“大而稳定的公共部分” 与 “小而动态的差异部分” 分离。}\]<p>这是现代 AI serving 很核心的一种架构思想。</p>
+\[\boxed{ \text{把“大而稳定的公共部分” 与 “小而动态的差异部分” 分离。}}\]<p>这是现代 AI serving 很核心的一种架构思想。</p>
 <p>Hugging Face 当前 PEFT 已支持加载、切换、删除不同 LoRA adapters，并支持 tensor parallel 等部署场景。</p>
 <hr>
-<h1 id="18-lora-的局限低秩假设不是永远成立">18. LoRA 的局限：低秩假设不是永远成立
-</h1><p>如果新任务与 base model 相距很远：</p>
+<h2 id="18-lora-的局限低秩假设不是永远成立">18. LoRA 的局限：低秩假设不是永远成立
+</h2><p>如果新任务与 base model 相距很远：</p>
 \[\boxed{ \text{domain shift 很大} }\]<p>或者需要：</p>
 <ul>
 <li>大规模新知识；</li>
@@ -767,8 +780,8 @@
 <p>因此：</p>
 \[\boxed{ \text{LoRA 最适合“已有模型附近的任务适配”， 而不是所有形式的知识重建。} }\]<p>它依赖一个隐含条件：</p>
 \[\boxed{ \text{base representation 已经足够好。} }\]<hr>
-<h1 id="19-另一个局限低秩不等于低函数复杂度">19. 另一个局限：低秩不等于低函数复杂度
-</h1><p>即使：</p>
+<h2 id="19-另一个局限低秩不等于低函数复杂度">19. 另一个局限：低秩不等于低函数复杂度
+</h2><p>即使：</p>
 \[\Delta W\]<p>只有 rank 4，</p>
 <p>经过：</p>
 \[100\]<p>层网络、非线性、attention 后，</p>
@@ -779,8 +792,8 @@
 \[\boxed{ \text{单个权重更新矩阵的线性代数自由度} }\]<p>而不是最终模型行为的直接语义维数。</p>
 <p>这是理解 LoRA 时一个非常重要的边界。</p>
 <hr>
-<h1 id="20-一个很值得自己做的最小实验">20. 一个很值得自己做的最小实验
-</h1><details class="reveal">
+<h2 id="20-一个很值得自己做的最小实验">20. 一个很值得自己做的最小实验
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>即使不训练 LLM，也可以用一个小 MLP 理解 LoRA。</p>
@@ -804,8 +817,8 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>LoRA 最值得记住的并不是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>LoRA 最值得记住的并不是：</p>
 \[\Delta W=BA.\]<p>真正值得记住的是：</p>
 \[\boxed{ \text{一个系统可以极其高维， 但“从一个已经很好状态到另一个任务状态的变化” 可能只占据很小的低维子空间。} }\]<p>所以它在整个知识体系中的位置更应该理解成：</p>
 \[\text{Large pretrained model}\]\[\downarrow\]\[\boxed{\text{Low-rank update subspace}}\]\[\downarrow\]\[\text{Parameter-efficient adaptation}.\]<p>而这个思想可以迁移到很多地方：</p>
@@ -819,8 +832,8 @@
 <li>优化：在低维更新空间内搜索。</li>
 </ul>
 <p>它真正教会我们的，是一个非常普遍的工程原则：</p>
-\[\boxed{ \text{面对一个已经很复杂、但已经工作良好的系统， 优先学习“怎样改变它”， 而不一定重新学习“整个系统是什么”。} }\]<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+\[\boxed{ \text{面对一个已经很复杂、但已经工作良好的系统， 优先学习“怎样改变它”， 而不一定重新学习“整个系统是什么”。} }\]<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <ol>
@@ -1019,9 +1032,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

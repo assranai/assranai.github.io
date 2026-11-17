@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[\\boxed{ \\text{普通代理：学习 }x\\mapsto y }\\]而 Neural Operator 试图学习：\n\\[\\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} }\\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[x= (E,\\nu,F,\\text{gap})\\]输出：\n\\[y= \\sigma_{\\max}.\\]Kriging、MLP、XGBoost 都可以学习：\n\\[f:\\mathbb R^4\\rightarrow\\mathbb R.\\]这个问题本质上是：\n\\[\\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}}\\]即使输出不是一个标量，而是：\n\\[1000\\]个节点位移：\n\\[u\\in\\mathbb R^{3000},\\]你仍然是在学习：\n\\[\\mathbb R^4\\rightarrow\\mathbb R^{3000}.\\]问题是，这个：\n\\[3000\\]其实来自某一次具体网格离散。\n一旦：\n\\[3000\\rightarrow12000\\]节点数变了，普通网络的输出维度通常也跟着失效。\n这说明它真正学习的是：\n\\[\\boxed{\\text{某个离散问题}}\\]而不是：\n\\[\\boxed{\\text{连续物理问题本身}}\\]Neural Operator 正是在这一点上换了问题定义。\n">
 <title>Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/13-neural-operator/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Neural Operator：代理模型真正跨过的一道门槛，是从“学一个响应函数”变成“学一个求解器”">
 <meta property='og:description' content="主题：Neural Operator（神经算子），重点理解 FNO 的思想位置\n领域：有限元 × 数值方法 × 代理模型 × 科学机器学习 × AI 全栈工程\n推荐阅读时间：约 8–10 分钟\n今天选 Neural Operator，因为它和普通 Kriging、MLP surrogate 的差别非常根本：\n\\[\\boxed{ \\text{普通代理：学习 }x\\mapsto y }\\]而 Neural Operator 试图学习：\n\\[\\boxed{ \\mathcal G:\\text{输入函数}\\mapsto\\text{输出函数} }\\]这意味着它的目标不只是“预测几个标量结果”，而是逼近一整个 PDE 求解算子。Kovachki 等在 JMLR 2023 的系统论文中把 neural operator 明确定义为函数空间之间的映射，并强调其一个关键性质：模型参数可以独立于具体离散分辨率。\n这也是为什么它值得放在“代理模型”和“数值求解器”之间理解，而不只是当作一种新网络结构。\n1. 普通代理模型到底在学什么？ 假设有限元模型输入：\n\\[x= (E,\\nu,F,\\text{gap})\\]输出：\n\\[y= \\sigma_{\\max}.\\]Kriging、MLP、XGBoost 都可以学习：\n\\[f:\\mathbb R^4\\rightarrow\\mathbb R.\\]这个问题本质上是：\n\\[\\boxed{\\text{有限维向量}\\rightarrow\\text{有限维向量}}\\]即使输出不是一个标量，而是：\n\\[1000\\]个节点位移：\n\\[u\\in\\mathbb R^{3000},\\]你仍然是在学习：\n\\[\\mathbb R^4\\rightarrow\\mathbb R^{3000}.\\]问题是，这个：\n\\[3000\\]其实来自某一次具体网格离散。\n一旦：\n\\[3000\\rightarrow12000\\]节点数变了，普通网络的输出维度通常也跟着失效。\n这说明它真正学习的是：\n\\[\\boxed{\\text{某个离散问题}}\\]而不是：\n\\[\\boxed{\\text{连续物理问题本身}}\\]Neural Operator 正是在这一点上换了问题定义。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/13-neural-operator/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,14 +324,22 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-普通代理模型到底在学什么">1. 普通代理模型到底在学什么？</a></li>
-  </ol>
-
-  <ol>
-    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#2-pde-本来就是函数到函数的映射">2. PDE 本来就是“函数到函数”的映射</a></li>
+    <li><a href="#3-为什么这对-fem-surrogate-很关键">3. 为什么这对 FEM surrogate 很关键？</a></li>
+    <li><a href="#4-fno-是怎么做到这一点的">4. FNO 是怎么做到这一点的？</a></li>
+    <li><a href="#5-为什么-fourier-空间很适合-pde">5. 为什么 Fourier 空间很适合 PDE？</a></li>
+    <li><a href="#6-一个直观例子随机材料场到位移场">6. 一个直观例子：随机材料场到位移场</a></li>
+    <li><a href="#7-这与-pod--reduced-basis-的差别很值得分清">7. 这与 POD / Reduced Basis 的差别很值得分清</a></li>
+    <li><a href="#8-它学的是求解器这句话要怎么准确理解">8. “它学的是求解器”这句话要怎么准确理解？</a></li>
+    <li><a href="#9-为什么零样本超分辨率很吸引人">9. 为什么“零样本超分辨率”很吸引人？</a></li>
+    <li><a href="#10-但这件事有一个很重要的限制高频细节可能正是-fno-的弱点">10. 但这件事有一个很重要的限制：高频细节可能正是 FNO 的弱点</a></li>
+    <li><a href="#11-这对有限元问题尤其重要">11. 这对有限元问题尤其重要</a></li>
+    <li><a href="#12-它对可靠性研究的真正价值在哪里">12. 它对可靠性研究的真正价值在哪里？</a></li>
+    <li><a href="#13-对软体动力学也有一个很强的迁移">13. 对软体动力学也有一个很强的迁移</a></li>
+    <li><a href="#14-一个非常值得实践的最小实验">14. 一个非常值得实践的最小实验</a></li>
+    <li><a href="#15-最值得警惕的一点neural-operator-仍然没有真正理解-pde">15. 最值得警惕的一点：Neural Operator 仍然没有真正“理解 PDE”</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -427,8 +435,8 @@
 \[\boxed{\text{某个离散问题}}\]<p>而不是：</p>
 \[\boxed{\text{连续物理问题本身}}\]<p>Neural Operator 正是在这一点上换了问题定义。</p>
 <hr>
-<h1 id="2-pde-本来就是函数到函数的映射">2. PDE 本来就是“函数到函数”的映射
-</h1><p>考虑 Darcy 方程：</p>
+<h2 id="2-pde-本来就是函数到函数的映射">2. PDE 本来就是“函数到函数”的映射
+</h2><p>考虑 Darcy 方程：</p>
 \[-\nabla\cdot(a(x)\nabla u(x))=f(x).\]<p>输入并不只是几个数字。</p>
 <p>材料系数：</p>
 \[a(x)\]<p>本身就是一个空间函数。</p>
@@ -445,8 +453,8 @@
 \[N.\]<p>所以 Neural Operator 的真正跃迁在于：</p>
 \[\boxed{ \text{learning functions} \rightarrow \text{learning operators} }\]<p>DeepONet 和 Neural Operator/FNO 都建立在这一思想上。DeepONet 2021 直接从 operator universal approximation theorem 出发构造 branch/trunk 网络；Kovachki 等则给出了更统一的 neural operator 框架。</p>
 <hr>
-<h1 id="3-为什么这对-fem-surrogate-很关键">3. 为什么这对 FEM surrogate 很关键？
-</h1><p>假设你想代理：</p>
+<h2 id="3-为什么这对-fem-surrogate-很关键">3. 为什么这对 FEM surrogate 很关键？
+</h2><p>假设你想代理：</p>
 \[E(x)\rightarrow u(x).\]<p>传统做法可能把有限元场展平：</p>
 \[u= [u_1,u_2,\dots,u_N]\]<p>然后训练网络。</p>
 <p>这种方式的麻烦是：</p>
@@ -467,8 +475,8 @@
 </blockquote>
 <p>它主要指网络参数定义不依赖固定采样点数这一结构性质。</p>
 <hr>
-<h1 id="4-fno-是怎么做到这一点的">4. FNO 是怎么做到这一点的？
-</h1><p>Fourier Neural Operator 是目前最经典的一种 Neural Operator。</p>
+<h2 id="4-fno-是怎么做到这一点的">4. FNO 是怎么做到这一点的？
+</h2><p>Fourier Neural Operator 是目前最经典的一种 Neural Operator。</p>
 <p>它的一层可以粗略写成：</p>
 \[v_{l+1}(x) = \sigma \left[ Wv_l(x) + \mathcal K_\theta v_l(x) \right].\]<p>其中：</p>
 \[W\]<p>是局部线性变换，</p>
@@ -488,8 +496,8 @@
 <li>inverse transform。</li>
 </ol>
 <hr>
-<h1 id="5-为什么-fourier-空间很适合-pde">5. 为什么 Fourier 空间很适合 PDE？
-</h1><p>这里有两个原因。</p>
+<h2 id="5-为什么-fourier-空间很适合-pde">5. 为什么 Fourier 空间很适合 PDE？
+</h2><p>这里有两个原因。</p>
 <p>第一，FFT 很便宜。</p>
 <p>若物理空间做全局积分：</p>
 \[(\mathcal Kv)(x) = \int\kappa(x,y)v(y)dy,\]<p>离散后朴素成本可能接近：</p>
@@ -502,8 +510,8 @@
 \[\boxed{\text{learned spectral model reduction}}\]<p>所以 FNO 可以粗略理解成：</p>
 \[\boxed{ \text{谱方法的表示能力} + \text{神经网络学习未知算子} }\]<p>这也是它和传统 CNN 最大的不同之一：CNN 每层通常主要做局部邻域传播，而 FNO 的 Fourier convolution 一层就可以产生全局耦合。</p>
 <hr>
-<h1 id="6-一个直观例子随机材料场到位移场">6. 一个直观例子：随机材料场到位移场
-</h1><p>假设二维弹性体的 Young 模量不是一个标量，而是：</p>
+<h2 id="6-一个直观例子随机材料场到位移场">6. 一个直观例子：随机材料场到位移场
+</h2><p>假设二维弹性体的 Young 模量不是一个标量，而是：</p>
 \[E(x,y).\]<p>你可能有局部软区：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -537,8 +545,8 @@
 </ul>
 <p>的原因。</p>
 <hr>
-<h1 id="7-这与-pod--reduced-basis-的差别很值得分清">7. 这与 POD / Reduced Basis 的差别很值得分清
-</h1><p>前几期讲过 <span class="term-anchor" data-term="reduced-basis" tabindex="0">Reduced Basis</span>：</p>
+<h2 id="7-这与-pod--reduced-basis-的差别很值得分清">7. 这与 POD / Reduced Basis 的差别很值得分清
+</h2><p><span class="term-anchor" data-term="reduced-basis" tabindex="0">Reduced Basis</span>（<a class="link" href="../08-certified-reduced-basis/" >降阶基方法</a>）将解展开为</p>
 \[u(x;\mu) \approx \sum_{i=1}^r a_i(\mu)\phi_i(x).\]<p>它先构造：</p>
 \[\{\phi_i\}\]<p>这样的低维物理解空间。</p>
 <p>然后只学习：</p>
@@ -549,8 +557,8 @@
 \[\boxed{ \text{通常缺少传统 ROM 那样直接的误差认证和物理保证} }\]<p>因此两者在知识体系里并不是竞争关系。</p>
 <p>更适合这样理解：</p>
 \[\text{RB/POD} \quad\longleftrightarrow\quad \text{physics-driven model reduction}\]\[\text{Neural Operator} \quad\longleftrightarrow\quad \text{data-driven operator approximation}.\]<hr>
-<h1 id="8-它学的是求解器这句话要怎么准确理解">8. “它学的是求解器”这句话要怎么准确理解？
-</h1><p>假设 PDE 由参数：</p>
+<h2 id="8-它学的是求解器这句话要怎么准确理解">8. “它学的是求解器”这句话要怎么准确理解？
+</h2><p>假设 PDE 由参数：</p>
 \[a(x)\]<p>决定。</p>
 <p>传统数值求解器每来一个新输入：</p>
 \[a^{(i)}\]<p>都执行：</p>
@@ -573,8 +581,8 @@
 </ul>
 <p>这和 Reduced Basis 的使用场景其实非常相似。</p>
 <hr>
-<h1 id="9-为什么零样本超分辨率很吸引人">9. 为什么“零样本超分辨率”很吸引人？
-</h1><details class="reveal">
+<h2 id="9-为什么零样本超分辨率很吸引人">9. 为什么“零样本超分辨率”很吸引人？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>FNO 原始工作一个很著名的结果是：</p>
@@ -592,8 +600,8 @@
 </details>
 
 <hr>
-<h1 id="10-但这件事有一个很重要的限制高频细节可能正是-fno-的弱点">10. 但这件事有一个很重要的限制：高频细节可能正是 FNO 的弱点
-</h1><details class="reveal">
+<h2 id="10-但这件事有一个很重要的限制高频细节可能正是-fno-的弱点">10. 但这件事有一个很重要的限制：高频细节可能正是 FNO 的弱点
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>FNO 最常见的实现会截断高 Fourier modes：</p>
@@ -615,8 +623,8 @@
 </details>
 
 <hr>
-<h1 id="11-这对有限元问题尤其重要">11. 这对有限元问题尤其重要
-</h1><p>在很多结构问题中：</p>
+<h2 id="11-这对有限元问题尤其重要">11. 这对有限元问题尤其重要
+</h2><p>在很多结构问题中：</p>
 \[\text{global displacement}\]<p>其实很好预测。</p>
 <p>难的是：</p>
 \[\boxed{ \text{local stress concentration} }\]<p>例如孔边：</p>
@@ -637,8 +645,8 @@
 <p><strong>最终任务需要什么信息，代理模型就应该围绕什么误差训练和评价。</strong></p>
 </blockquote>
 <hr>
-<h1 id="12-它对可靠性研究的真正价值在哪里">12. 它对可靠性研究的真正价值在哪里？
-</h1><p>假设随机输入不再是：</p>
+<h2 id="12-它对可靠性研究的真正价值在哪里">12. 它对可靠性研究的真正价值在哪里？
+</h2><p>假设随机输入不再是：</p>
 \[X=(x_1,x_2,x_3),\]<p>而是随机场：</p>
 \[E(x,\omega),\]\[p(x,\omega),\]\[T(x,\omega).\]<p>传统 Kriging 很容易遭遇：</p>
 \[\boxed{\text{输入维数爆炸}}\]<p>因为随机场离散后：</p>
@@ -655,8 +663,8 @@
 <p>它更可能改变：</p>
 \[\boxed{\text{高维随机场可靠性}}\]<p>这一类问题的建模方式。</p>
 <hr>
-<h1 id="13-对软体动力学也有一个很强的迁移">13. 对软体动力学也有一个很强的迁移
-</h1><p>考虑：</p>
+<h2 id="13-对软体动力学也有一个很强的迁移">13. 对软体动力学也有一个很强的迁移
+</h2><p>考虑：</p>
 \[u(x,t)\]<p>或者：</p>
 \[x(X,t).\]<p>理论上可以训练 operator：</p>
 \[\boxed{ (x_t,v_t,\text{material},f_{\rm ext}) \mapsto (x_{t+\Delta t},v_{t+\Delta t}) }\]<p>这已经很接近：</p>
@@ -678,8 +686,8 @@
 <p>所以在实时物理里，更有吸引力的方向往往是：</p>
 \[\boxed{ \text{learned operator} + \text{physics constraints / correction / projection} }\]<p>而不是彻底删除 solver。</p>
 <hr>
-<h1 id="14-一个非常值得实践的最小实验">14. 一个非常值得实践的最小实验
-</h1><details class="reveal">
+<h2 id="14-一个非常值得实践的最小实验">14. 一个非常值得实践的最小实验
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>如果想真正理解 Neural Operator，我建议不要一开始做 Navier–Stokes。</p>
@@ -728,7 +736,7 @@
 \[\boxed{\text{128×128 测试}}\]<p>再检查：</p>
 \[L^2\text{ error},\]\[H^1\text{ error},\]<p>以及 PDE residual：</p>
 \[\|-\nabla\cdot(a\nabla\hat u)-f\|.\]<p>这样你会直接看见：</p>
-\[\boxed{ \text{“预测一个数组”}\]<p>和：</p>
+\[\boxed{ \text{“预测一个数组”}}\]<p>和：</p>
 \[\boxed{ \text{“学习一个离散无关算子”} }\]<p>之间到底差在哪里。</p>
 <p>官方 <code>neuraloperator</code> 项目已经提供 FNO、TFNO、训练流程和理论指南，适合作为直接实现入口。</p>
 
@@ -736,8 +744,8 @@
 </details>
 
 <hr>
-<h1 id="15-最值得警惕的一点neural-operator-仍然没有真正理解-pde">15. 最值得警惕的一点：Neural Operator 仍然没有真正“理解 PDE”
-</h1><p>这是科学机器学习里非常容易夸大的地方。</p>
+<h2 id="15-最值得警惕的一点neural-operator-仍然没有真正理解-pde">15. 最值得警惕的一点：Neural Operator 仍然没有真正“理解 PDE”
+</h2><p>这是科学机器学习里非常容易夸大的地方。</p>
 <p>如果训练数据全部来自某个：</p>
 \[\mathcal P_{\rm train},\]<p>那么网络实际学到的是：</p>
 \[\boxed{ \mathcal G \text{ 在训练分布附近的近似} }\]<p>它并不自动拥有：</p>
@@ -762,15 +770,15 @@
 <li>high-fidelity fallback；</li>
 <li>conservative physics correction。</li>
 </ul>
-<p>这也是 Neural Operator 和前几期 Certified Reduced Basis 可以很好互补的地方。</p>
+<p>这也是 Neural Operator 和 Certified Reduced Basis 可以很好互补的地方。</p>
 <hr>
 <h2 id="今天值得留下的一句话">今天值得留下的一句话
 </h2><p>Neural Operator 最深刻的地方，可以浓缩成：</p>
 \[\boxed{ \text{它试图代理的不是一个响应面，而是一整个“输入场到解场”的求解过程。} }\]<p>所以它在知识体系中的位置大约是：</p>
 \[\text{Kriging / MLP surrogate}\]\[\downarrow\]\[\boxed{\text{Neural Operator}}\]\[\downarrow\]\[\text{learned PDE solver / scientific foundation model}.\]<p>它真正值得学的原因并不是“FNO 很流行”，而是它迫使我们重新思考一个问题：</p>
 \[\boxed{ \text{代理模型究竟应该学习最终输出，还是学习产生这些输出的算子？} }\]<p>对于随机场可靠性、多工况有限元、数字孪生和 AI 驱动求解器，这个区别会越来越重要。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -973,9 +981,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

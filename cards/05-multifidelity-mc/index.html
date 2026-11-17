@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Multifidelity Monte Carlo（MFMC，多保真蒙特卡洛）\n领域：有限元 × 可靠性 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n这期选 MFMC，是因为它提供了一种和 AK-MCS 很不同的代理模型使用方式：\n\\[\\boxed{\\text{低保真模型不负责给最终答案，只负责让高保真统计估计更省样本}}\\]这点很重要。很多代理模型研究都在追求：\n\\[\\hat f(x)\\approx f_{\\rm HF}(x)\\]然后直接用 \\(\\hat f\\) 替代真实模型。但一旦 surrogate 有系统偏差，最终概率、均值或尾部统计量也会被带偏。\nMFMC 的思路更保守：\n始终让高保真模型留在估计器里，用低保真模型作为 control variate 降低方差。\nPeherstorfer、Willcox 和 Gunzburger 的 2016 年工作给出了经典 MFMC 的最优模型分配框架，并证明在一般条件下可以构造对高保真统计量仍保持无偏的估计器；其后 2018 年 SIAM Review 综述把这类方法放进完整的 multifidelity uncertainty quantification 体系中。\n1. 问题从哪里来？ 设真正关心的高保真模型为：\n\\[f_0(X),\\]例如一次高精度非线性 FEM 输出的最大应力。\n我们想估计：\n\\[\\mu_0=E[f_0(X)].\\]普通 Monte Carlo：\n\\[\\hat\\mu_{\\rm MC} = \\frac1N\\sum_{i=1}^N f_0(X_i),\\]其方差为：\n\\[\\mathrm{Var}(\\hat\\mu_{\\rm MC}) = \\frac{\\sigma_0^2}{N}.\\]问题非常直接：\n">
 <title>多保真 Monte Carlo 与 Control Variates：低保真模型提供的是可抵消的波动</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/05-multifidelity-mc/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="多保真 Monte Carlo 与 Control Variates：低保真模型提供的是可抵消的波动">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="多保真 Monte Carlo 与 Control Variates：低保真模型提供的是可抵消的波动">
 <meta property='og:description' content="主题：Multifidelity Monte Carlo（MFMC，多保真蒙特卡洛）\n领域：有限元 × 可靠性 × 不确定性量化 × 代理模型\n推荐阅读时间：约 8 分钟\n这期选 MFMC，是因为它提供了一种和 AK-MCS 很不同的代理模型使用方式：\n\\[\\boxed{\\text{低保真模型不负责给最终答案，只负责让高保真统计估计更省样本}}\\]这点很重要。很多代理模型研究都在追求：\n\\[\\hat f(x)\\approx f_{\\rm HF}(x)\\]然后直接用 \\(\\hat f\\) 替代真实模型。但一旦 surrogate 有系统偏差，最终概率、均值或尾部统计量也会被带偏。\nMFMC 的思路更保守：\n始终让高保真模型留在估计器里，用低保真模型作为 control variate 降低方差。\nPeherstorfer、Willcox 和 Gunzburger 的 2016 年工作给出了经典 MFMC 的最优模型分配框架，并证明在一般条件下可以构造对高保真统计量仍保持无偏的估计器；其后 2018 年 SIAM Review 综述把这类方法放进完整的 multifidelity uncertainty quantification 体系中。\n1. 问题从哪里来？ 设真正关心的高保真模型为：\n\\[f_0(X),\\]例如一次高精度非线性 FEM 输出的最大应力。\n我们想估计：\n\\[\\mu_0=E[f_0(X)].\\]普通 Monte Carlo：\n\\[\\hat\\mu_{\\rm MC} = \\frac1N\\sum_{i=1}^N f_0(X_i),\\]其方差为：\n\\[\\mathrm{Var}(\\hat\\mu_{\\rm MC}) = \\frac{\\sigma_0^2}{N}.\\]问题非常直接：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/05-multifidelity-mc/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,22 +324,40 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-问题从哪里来">1. 问题从哪里来？</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-control-variate-是整个方法的核心">2. Control Variate 是整个方法的核心</a></li>
+    <li><a href="#3-一个反直觉结论低保真模型可以很不准但仍然非常有用">3. 一个反直觉结论：低保真模型可以“很不准”，但仍然非常有用</a></li>
+    <li><a href="#4-真正的-mfmc不知道低保真均值怎么办">4. 真正的 MFMC：不知道低保真均值怎么办？</a></li>
+    <li><a href="#5-mfmc-真正精彩的地方模型价值可以量化">5. MFMC 真正精彩的地方：模型价值可以量化</a></li>
+    <li><a href="#6-它和-multilevel-monte-carlomlmc有什么区别">6. 它和 Multilevel Monte Carlo（MLMC）有什么区别？</a></li>
+    <li><a href="#7-为什么它对可靠性问题尤其有意思">7. 为什么它对可靠性问题尤其有意思？</a></li>
+    <li><a href="#8-它给代理模型研究一个很重要的评价范式">8. 它给代理模型研究一个很重要的评价范式</a></li>
+    <li><a href="#9-一个更现代的发展approximate-control-variates">9. 一个更现代的发展：Approximate Control Variates</a></li>
+    <li><a href="#10-对工程研究最值得迁移的一点">10. 对工程研究最值得迁移的一点</a></li>
+    <li><a href="#11-先把问题压缩成一个最简单的例子">11. 先把问题压缩成一个最简单的例子</a></li>
+    <li><a href="#12-它不关心-lf-是否知道答案而关心-lf-是否知道涨跌">12. 它不关心 LF 是否知道“答案”，而关心 LF 是否知道“涨跌”</a></li>
+    <li><a href="#13-这个信息到底怎样帮-monte-carlo">13. 这个信息到底怎样帮 Monte Carlo？</a></li>
+    <li><a href="#14-数学上其实就这么简单">14. 数学上其实就这么简单</a></li>
+    <li><a href="#15-所以-mfmc-从-lf-中获得的是三类信息">15. 所以 MFMC 从 LF 中获得的是三类信息</a></li>
+    <li><a href="#16-它最终服务的不是预测而是统计量估计">16. 它最终服务的不是“预测”，而是“统计量估计”</a></li>
+    <li><a href="#17-为什么不直接用-lf-做一个-hf-surrogate">17. 为什么不直接用 LF 做一个 HF surrogate？</a></li>
+    <li><a href="#18-放到可靠性问题里你会更容易看出它的边界">18. 放到可靠性问题里，你会更容易看出它的边界</a></li>
+    <li><a href="#19-如果相关系数-099会发生什么">19. 如果相关系数 0.99，会发生什么？</a></li>
+    <li><a href="#20-但多个低保真模型并不意味着收益自动叠加">20. 但多个低保真模型并不意味着收益自动叠加</a></li>
+    <li><a href="#21-对物理仿真也有一个非常具体的迁移">21. 对物理仿真也有一个非常具体的迁移</a></li>
+    <li><a href="#22-一个极小的实验就能真正理解-mfmc">22. 一个极小的实验就能真正理解 MFMC</a></li>
+    <li><a href="#23-为什么直接使用代理模型会产生统计偏差">23. 为什么直接使用代理模型会产生统计偏差？</a></li>
+    <li><a href="#24-核心构造利用相关误差相互抵消">24. 核心构造：利用相关误差相互抵消</a></li>
+    <li><a href="#25-为什么相关性比代理模型的绝对精度更重要">25. 为什么相关性比代理模型的绝对精度更重要？</a>
       <ol>
         <li><a href="#一个直观例子">一个直观例子</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#26-为什么-acv-比普通-control-variates-更适合工程仿真">26. 为什么 ACV 比普通 Control Variates 更适合工程仿真？</a></li>
+    <li><a href="#27-对可靠性分析存在一个必须注意的陷阱">27. 对可靠性分析，存在一个必须注意的陷阱</a></li>
+    <li><a href="#28-工程上怎样实现">28. 工程上怎样实现？</a></li>
+    <li><a href="#29-它与-krigingrommlmc-的关系">29. 它与 Kriging、ROM、MLMC 的关系</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -444,8 +462,8 @@
 </ul>
 <p>MFMC 的核心问题于是变成：</p>
 \[\boxed{\text{怎样把这些“不完全可信”的模型安全地利用起来？}}\]<hr>
-<h1 id="2-control-variate-是整个方法的核心">2. Control Variate 是整个方法的核心
-</h1><p>先只考虑一个低保真模型：</p>
+<h2 id="2-control-variate-是整个方法的核心">2. Control Variate 是整个方法的核心
+</h2><p>先只考虑一个低保真模型：</p>
 \[f_1(X).\]<p>如果它与高保真模型高度相关：</p>
 \[\rho=\mathrm{Corr}(f_0,f_1),\]<p>那么可以构造：</p>
 \[Y = f_0 - \alpha \left( f_1-E[f_1] \right).\]<p>因为：</p>
@@ -455,26 +473,22 @@
 <p>最优：</p>
 \[\alpha^* = \frac{\mathrm{Cov}(f_0,f_1)} {\mathrm{Var}(f_1)}\]<p>时：</p>
 \[\mathrm{Var}(Y) = \sigma_0^2(1-\rho^2).\]<p>这个公式非常值得记住：</p>
-\[\boxed{ \text{variance reduction} \sim 1-\rho^2 }\]<p>如果：</p>
+\[\boxed{ \frac{\mathrm{Var}(Y)}{\mathrm{Var}(f_0)}=1-\rho^2 }\]<p>如果：</p>
 \[\rho=0.99,\]<p>那么：</p>
 \[1-\rho^2\approx0.02.\]<p>即使低保真模型绝对误差并不小，只要它能<strong>跟随高保真模型的涨落趋势</strong>，就可能非常有价值。</p>
 <p>这和传统 surrogate evaluation 有明显区别。</p>
 <hr>
-<h1 id="3-一个反直觉结论低保真模型可以很不准但仍然非常有用">3. 一个反直觉结论：低保真模型可以“很不准”，但仍然非常有用
-</h1><p>假设真实 FEM 输出：</p>
-\[f_0(X)=100+10X.\]<p>粗糙模型：</p>
-\[f_1(X)=60+8X.\]<p>它存在巨大 bias：</p>
-\[f_1-f_0\approx-40.\]<p>如果直接把它当 surrogate：</p>
-\[E[f_1]\]<p>显然不能替代：</p>
-\[E[f_0].\]<p>但二者几乎完全线性相关：</p>
-\[\rho\approx1.\]<p>于是作为 control variate，它非常优秀。</p>
+<h2 id="3-一个反直觉结论低保真模型可以很不准但仍然非常有用">3. 一个反直觉结论：低保真模型可以“很不准”，但仍然非常有用
+</h2><p>假设 \(X\) 的均值为零、方差有限且非零。高、低保真输出分别为</p>
+\[f_0(X)=100+10X,\qquad f_1(X)=60+8X.\]<p>低保真均值比高保真均值低 40，但两者随同一个 \(X\) 线性变化，相关系数恰好为 1。若已知 \(E[f_1]=60\)，取最优系数 \(10/8\) 后，校正后的输出对每个样本都相同：</p>
+\[f_0(X)-\tfrac{10}{8}(f_1(X)-60)=100.\]<p>在这个例子里，一对高低保真输出就足以恢复高保真均值。</p>
 <p>这说明：</p>
 \[\boxed{ \text{surrogate accuracy} \neq \text{variance-reduction value} }\]<p>对于 MFMC，更重要的问题不是：</p>
 \[R^2 \text{ 是否接近 1？}\]<p>而是：</p>
 \[\boxed{ \text{相关性有多高，以及一次低保真调用有多便宜？} }\]<p>这是一种非常值得迁移的模型评价方式。</p>
 <hr>
-<h1 id="4-真正的-mfmc不知道低保真均值怎么办">4. 真正的 MFMC：不知道低保真均值怎么办？
-</h1><p>经典 control variate 假设：</p>
+<h2 id="4-真正的-mfmc不知道低保真均值怎么办">4. 真正的 MFMC：不知道低保真均值怎么办？
+</h2><p>经典 control variate 假设：</p>
 \[E[f_1]\]<p>已知。</p>
 <p>现实中通常不知道。</p>
 <p>MFMC 的做法是：</p>
@@ -492,8 +506,8 @@
 <p>这个估计器的关键性质是：</p>
 \[\boxed{E[\hat\mu_{\rm MF}]=E[f_0]}\]<p>即低保真模型即使没有误差界，也不必承担最终 bias。</p>
 <hr>
-<h1 id="5-mfmc-真正精彩的地方模型价值可以量化">5. MFMC 真正精彩的地方：模型价值可以量化
-</h1><p>假设第 \(i\) 个模型：</p>
+<h2 id="5-mfmc-真正精彩的地方模型价值可以量化">5. MFMC 真正精彩的地方：模型价值可以量化
+</h2><p>假设第 \(i\) 个模型：</p>
 <ul>
 <li>成本：\(c_i\)</li>
 <li>与高保真相关系数：\(\rho_i\)</li>
@@ -508,8 +522,8 @@
 <p>它只关心：</p>
 \[\boxed{成本 + 相关性}\]<p>因此一个便宜但“物理上很粗”的模型，有时会比一个昂贵但略微更准确的模型更有价值。</p>
 <hr>
-<h1 id="6-它和-multilevel-monte-carlomlmc有什么区别">6. 它和 Multilevel Monte Carlo（MLMC）有什么区别？
-</h1><p>两者名字很像，但逻辑不同。</p>
+<h2 id="6-它和-multilevel-monte-carlomlmc有什么区别">6. 它和 Multilevel Monte Carlo（MLMC）有什么区别？
+</h2><p>两者名字很像，但逻辑不同。</p>
 <p><span class="term-anchor" data-term="mlmc" tabindex="0">MLMC</span> 通常依赖一个自然层级：</p>
 \[h_0>h_1>\cdots>h_L,\]<p>例如：</p>
 \[\text{粗网格} \rightarrow \text{中网格} \rightarrow \text{细网格}.\]<p>利用 telescoping identity：</p>
@@ -518,8 +532,8 @@
 \[\boxed{ \text{模型之间不要求存在严格网格层级} }\]<p>你完全可以组合：</p>
 \[\text{FEM} + \text{ROM} + \text{Kriging} + \text{神经网络}.\]<p>这正是 multifidelity survey 强调的区别之一：一般的 multifidelity 模型集合未必具有明确误差衰减率和层级结构。</p>
 <hr>
-<h1 id="7-为什么它对可靠性问题尤其有意思">7. 为什么它对可靠性问题尤其有意思？
-</h1><p>失效概率本身也是一个期望：</p>
+<h2 id="7-为什么它对可靠性问题尤其有意思">7. 为什么它对可靠性问题尤其有意思？
+</h2><p>失效概率本身也是一个期望：</p>
 \[P_f = E[I(g(X)\le0)].\]<p>定义：</p>
 \[Y_0 = I(g_{\rm HF}(X)\le0).\]<p>低保真模型也可以形成：</p>
 \[Y_1 = I(g_{\rm LF}(X)\le0).\]<p>于是原则上可以把：</p>
@@ -535,8 +549,8 @@
 <p>对极小：</p>
 \[P_f\]<p>通常还需要 rare-event sampling 技术配合。</p>
 <hr>
-<h1 id="8-它给代理模型研究一个很重要的评价范式">8. 它给代理模型研究一个很重要的评价范式
-</h1><p>很多 surrogate 工作默认评价：</p>
+<h2 id="8-它给代理模型研究一个很重要的评价范式">8. 它给代理模型研究一个很重要的评价范式
+</h2><p>很多 surrogate 工作默认评价：</p>
 \[R^2,\ RMSE,\ MAE.\]<p>MFMC 会提出另一个问题：</p>
 \[\boxed{ \mathrm{Corr}(f_{\rm HF},f_{\rm LF}) }\]<p>以及：</p>
 \[\boxed{ \frac{\text{variance reduction}} {\text{computational cost}} }\]<p>可能才是最终任务真正需要的指标。</p>
@@ -552,8 +566,8 @@
 <p>反过来，一个：</p>
 \[R^2=0.98\]<p>但推理成本较高的复杂 surrogate，在 MFMC 框架里未必值得加入。</p>
 <hr>
-<h1 id="9-一个更现代的发展approximate-control-variates">9. 一个更现代的发展：Approximate Control Variates
-</h1><details class="reveal">
+<h2 id="9-一个更现代的发展approximate-control-variates">9. 一个更现代的发展：Approximate Control Variates
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p>经典 MFMC 的 recursive sampling 结构并不是理论极限。</p>
@@ -565,8 +579,8 @@
 </details>
 
 <hr>
-<h1 id="10-对工程研究最值得迁移的一点">10. 对工程研究最值得迁移的一点
-</h1><details class="reveal">
+<h2 id="10-对工程研究最值得迁移的一点">10. 对工程研究最值得迁移的一点
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>MFMC 最深刻的地方，其实是一种对代理模型定位的重新理解：</p>
@@ -596,8 +610,8 @@
 </blockquote>
 <p>你这个疑问正好触及 MFMC 最容易让人困惑的地方。</p>
 <p><strong>MFMC 并不是从低保真模型里“学习高保真模型长什么样”，它主要利用的是低保真模型与高保真模型之间的“共同波动”。</strong> 换句话说，它提取的是一种<strong>统计相关信息</strong>，然后用它降低 Monte Carlo 统计量的估计噪声。经典 MFMC 正是把低保真模型作为 control variates 来估计高保真输出统计量。</p>
-<h1 id="11-先把问题压缩成一个最简单的例子">11. 先把问题压缩成一个最简单的例子
-</h1><details class="reveal">
+<h2 id="11-先把问题压缩成一个最简单的例子">11. 先把问题压缩成一个最简单的例子
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设你研究某机构的不确定性传播。</p>
@@ -607,40 +621,40 @@
 \[\mu_H=E[Y_H]\]<p>例如平均最大驱动力。</p>
 <p>假设不同随机样本下结果是：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>样本</th>
-					<th style="text-align: right">HF 最大驱动力</th>
-					<th style="text-align: right">LF 最大驱动力</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>1</td>
-					<td style="text-align: right">103</td>
-					<td style="text-align: right">62</td>
-			</tr>
-			<tr>
-					<td>2</td>
-					<td style="text-align: right">119</td>
-					<td style="text-align: right">75</td>
-			</tr>
-			<tr>
-					<td>3</td>
-					<td style="text-align: right">97</td>
-					<td style="text-align: right">57</td>
-			</tr>
-			<tr>
-					<td>4</td>
-					<td style="text-align: right">141</td>
-					<td style="text-align: right">91</td>
-			</tr>
-			<tr>
-					<td>5</td>
-					<td style="text-align: right">112</td>
-					<td style="text-align: right">69</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>样本</th>
+          <th style="text-align: right">HF 最大驱动力</th>
+          <th style="text-align: right">LF 最大驱动力</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>1</td>
+          <td style="text-align: right">103</td>
+          <td style="text-align: right">62</td>
+      </tr>
+      <tr>
+          <td>2</td>
+          <td style="text-align: right">119</td>
+          <td style="text-align: right">75</td>
+      </tr>
+      <tr>
+          <td>3</td>
+          <td style="text-align: right">97</td>
+          <td style="text-align: right">57</td>
+      </tr>
+      <tr>
+          <td>4</td>
+          <td style="text-align: right">141</td>
+          <td style="text-align: right">91</td>
+      </tr>
+      <tr>
+          <td>5</td>
+          <td style="text-align: right">112</td>
+          <td style="text-align: right">69</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>LF 数值明显不准。</p>
 <p>但仔细看：</p>
@@ -651,8 +665,8 @@
 </details>
 
 <hr>
-<h1 id="12-它不关心-lf-是否知道答案而关心-lf-是否知道涨跌">12. 它不关心 LF 是否知道“答案”，而关心 LF 是否知道“涨跌”
-</h1><details class="reveal">
+<h2 id="12-它不关心-lf-是否知道答案而关心-lf-是否知道涨跌">12. 它不关心 LF 是否知道“答案”，而关心 LF 是否知道“涨跌”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设：</p>
@@ -678,8 +692,8 @@
 </details>
 
 <hr>
-<h1 id="13-这个信息到底怎样帮-monte-carlo">13. 这个信息到底怎样帮 Monte Carlo？
-</h1><details class="reveal">
+<h2 id="13-这个信息到底怎样帮-monte-carlo">13. 这个信息到底怎样帮 Monte Carlo？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>普通 Monte Carlo 用：</p>
@@ -707,8 +721,8 @@
 </details>
 
 <hr>
-<h1 id="14-数学上其实就这么简单">14. 数学上其实就这么简单
-</h1><details class="reveal">
+<h2 id="14-数学上其实就这么简单">14. 数学上其实就这么简单
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>构造：</p>
@@ -728,8 +742,8 @@
 </details>
 
 <hr>
-<h1 id="15-所以-mfmc-从-lf-中获得的是三类信息">15. 所以 MFMC 从 LF 中获得的是三类信息
-</h1><details class="reveal">
+<h2 id="15-所以-mfmc-从-lf-中获得的是三类信息">15. 所以 MFMC 从 LF 中获得的是三类信息
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>可以更准确地归纳为：</p>
@@ -750,8 +764,8 @@
 </details>
 
 <hr>
-<h1 id="16-它最终服务的不是预测而是统计量估计">16. 它最终服务的不是“预测”，而是“统计量估计”
-</h1><details class="reveal">
+<h2 id="16-它最终服务的不是预测而是统计量估计">16. 它最终服务的不是“预测”，而是“统计量估计”
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这一点特别重要。</p>
@@ -773,8 +787,8 @@
 </details>
 
 <hr>
-<h1 id="17-为什么不直接用-lf-做一个-hf-surrogate">17. 为什么不直接用 LF 做一个 HF surrogate？
-</h1><details class="reveal">
+<h2 id="17-为什么不直接用-lf-做一个-hf-surrogate">17. 为什么不直接用 LF 做一个 HF surrogate？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这正是 MFMC 最有价值的地方。</p>
@@ -793,8 +807,8 @@
 </details>
 
 <hr>
-<h1 id="18-放到可靠性问题里你会更容易看出它的边界">18. 放到可靠性问题里，你会更容易看出它的边界
-</h1><details class="reveal">
+<h2 id="18-放到可靠性问题里你会更容易看出它的边界">18. 放到可靠性问题里，你会更容易看出它的边界
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设你关心：</p>
@@ -830,15 +844,14 @@
 <p>因此：</p>
 \[\boxed{ \text{LF 提供的是“关于抽样误差的信息”， HF 提供的是“关于真实尺度的信息”。} }\]<p>这也是我认为理解 MFMC 最关键的一步。</p>
 <p>它的价值场景其实很明确：<strong>你已经认可 HF 是真值模型，但 Monte Carlo 需要调用 HF 太多次；同时手里存在一个便宜、与 HF 响应高度相关的模型。</strong> 这时候 MFMC 才真正有吸引力。SIAM 的综述也正是把这类方法定位在 UQ、推断和优化等需要反复调用模型的 outer-loop 问题中。</p>
-<p>如果你愿意继续往下追 MFMC，我认为下一步最值得讲的是一个更尖锐的问题：<strong>为什么“相关性高”就能知道 HF 的 Monte Carlo 抽样误差？</strong> 把 control variate 的方差公式从头推一遍之后，MFMC 基本就彻底透明了。</p>
-<h1 id="19-如果相关系数-099会发生什么">19. 如果相关系数 0.99，会发生什么？
-</h1><details class="reveal">
+<h2 id="19-如果相关系数-099会发生什么">19. 如果相关系数 0.99，会发生什么？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
-    \[\rho=0.99.\]<p>那么：</p>
+    \[\rho=0.99.\]<p>若低保真均值已知，并使用第 2 节的最优控制变量系数，则剩余方差比例为</p>
 \[1-\rho^2 = 0.0199.\]<p>也就是说剩余方差只有原来的：</p>
 \[\boxed{1.99\%}.\]<p>为了达到相同 Monte Carlo 精度，理论上高保真样本数大约可以缩小：</p>
-\[\frac1{1-\rho^2} \approx50.\]<p>这里出现了一个很反直觉的结论：</p>
+\[\frac1{1-\rho^2} \approx50.\]<p>这个倍数只计算高保真调用。若还要估计低保真均值，第 25 节给出了有限样本下的方差。</p>
 <p>低保真模型可以有明显 bias。</p>
 <p>它甚至不需要：</p>
 \[Y_L\approx Y_H.\]<p>真正需要的是：</p>
@@ -848,8 +861,8 @@
 </details>
 
 <hr>
-<h1 id="20-但多个低保真模型并不意味着收益自动叠加">20. 但多个低保真模型并不意味着收益自动叠加
-</h1><details class="reveal">
+<h2 id="20-但多个低保真模型并不意味着收益自动叠加">20. 但多个低保真模型并不意味着收益自动叠加
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设：</p>
@@ -867,8 +880,8 @@
 </details>
 
 <hr>
-<h1 id="21-对物理仿真也有一个非常具体的迁移">21. 对物理仿真也有一个非常具体的迁移
-</h1><details class="reveal">
+<h2 id="21-对物理仿真也有一个非常具体的迁移">21. 对物理仿真也有一个非常具体的迁移
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设高保真软体模型：</p>
@@ -886,8 +899,8 @@
 </details>
 
 <hr>
-<h1 id="22-一个极小的实验就能真正理解-mfmc">22. 一个极小的实验就能真正理解 MFMC
-</h1><details class="reveal">
+<h2 id="22-一个极小的实验就能真正理解-mfmc">22. 一个极小的实验就能真正理解 MFMC
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>构造：</p>
@@ -908,8 +921,8 @@
 </details>
 
 <hr>
-<h1 id="23-为什么直接使用代理模型会产生统计偏差">23. 为什么直接使用代理模型会产生统计偏差？
-</h1><p>设高保真模型为：</p>
+<h2 id="23-为什么直接使用代理模型会产生统计偏差">23. 为什么直接使用代理模型会产生统计偏差？
+</h2><p>设高保真模型为：</p>
 \[ Y_H=f_H(X), \]<p>代理模型为：</p>
 \[ Y_L=f_L(X). \]<p>目标是估计：</p>
 \[ \mu_H=\mathbb E[Y_H]. \]<p>如果直接用代理模型计算：</p>
@@ -920,8 +933,8 @@
 \[ \boxed{ \text{总估计误差} = \text{代理模型偏差} + \text{采样误差} } \]<p>这里的等式指估计误差的概念性分解；均方误差则满足偏差平方与方差相加的关系。</p>
 <p>ACV 的核心思想是：<strong>不要让代理模型单独决定最终统计量。</strong></p>
 <hr>
-<h1 id="24-核心构造利用相关误差相互抵消">24. 核心构造：利用相关误差相互抵消
-</h1><p>首先，使用 \(n\) 个相同输入样本，同时运行高、低保真模型：</p>
+<h2 id="24-核心构造利用相关误差相互抵消">24. 核心构造：利用相关误差相互抵消
+</h2><p>首先，使用 \(n\) 个相同输入样本，同时运行高、低保真模型：</p>
 \[ \bar Y_H=\frac1n\sum_{i=1}^nY_H(X_i), \]\[ \bar Y_L=\frac1n\sum_{i=1}^nY_L(X_i). \]<p>再独立生成 \(m\) 个输入样本，只运行低保真模型：</p>
 \[ \bar Y_L'=\frac1m\sum_{j=1}^mY_L(Z_j). \]<p>构造估计量：</p>
 \[ \boxed{ \hat\mu_{\mathrm{ACV}} = \bar Y_H - \beta(\bar Y_L-\bar Y_L'). } \]<p>其中 \(\beta\) 是控制变量系数。</p>
@@ -934,8 +947,8 @@
 <p><strong>代理模型的均值偏差在控制变量差值中被抵消了。</strong></p>
 <p>需要注意：如果直接用同一批估计样本拟合 \(\beta\)，严格的有限样本无偏性未必仍然成立。独立先导样本或适当的交叉拟合设计可以避免这一问题。</p>
 <hr>
-<h1 id="25-为什么相关性比代理模型的绝对精度更重要">25. 为什么相关性比代理模型的绝对精度更重要？
-</h1><p>对于上述独立样本设计，估计量方差为：</p>
+<h2 id="25-为什么相关性比代理模型的绝对精度更重要">25. 为什么相关性比代理模型的绝对精度更重要？
+</h2><p>对于上述独立样本设计，估计量方差为：</p>
 \[ \operatorname{Var}(\hat\mu_{\mathrm{ACV}}) = \frac{\sigma_H^2}{n} + \beta^2\sigma_L^2 \left(\frac1n+\frac1m\right) - 2\beta\frac{\operatorname{Cov}(Y_H,Y_L)}n. \]<p>选择最优系数：</p>
 \[ \boxed{ \beta^\star = \frac{\operatorname{Cov}(Y_H,Y_L)} {\operatorname{Var}(Y_L)} \frac{m}{n+m}. } \]<p>代入后得到：</p>
 \[ \boxed{ \operatorname{Var}(\hat\mu_{\mathrm{ACV}}) = \frac{\sigma_H^2}{n} \left( 1-\rho^2\frac{m}{n+m} \right). } \]<p>其中：</p>
@@ -957,8 +970,8 @@
 <p>一个代理模型即使不能准确预测每个样本的真实响应，只要能够较好地跟踪高保真响应的变化，就可能成为非常有效的统计计算工具。</p>
 </blockquote>
 <hr>
-<h1 id="26-为什么-acv-比普通-control-variates-更适合工程仿真">26. 为什么 ACV 比普通 Control Variates 更适合工程仿真？
-</h1><p>经典控制变量法通常要求知道低保真变量的真实期望：</p>
+<h2 id="26-为什么-acv-比普通-control-variates-更适合工程仿真">26. 为什么 ACV 比普通 Control Variates 更适合工程仿真？
+</h2><p>经典控制变量法通常要求知道低保真变量的真实期望：</p>
 \[ \mathbb E[Y_L]. \]<p>但实际工程中的代理模型、ROM 或简化物理模型，其输出均值往往也不知道。</p>
 <p>ACV 使用额外的低保真样本估计这个均值，从而避免了这一要求。</p>
 <p>进一步地，可以引入多个低保真模型：</p>
@@ -975,8 +988,8 @@
 <p>Gorodetsky 等人在 2020 年发表于 <em>Journal of Computational Physics</em> 的研究中，提出广义 ACV 框架，证明不同的采样共享方式会显著影响方差降低效果。</p>
 <p>一个重要发现是：<strong>简单地增加代理模型数量，并不保证获得更好的方差降低；如何组织模型之间的共享样本同样重要。</strong></p>
 <hr>
-<h1 id="27-对可靠性分析存在一个必须注意的陷阱">27. 对可靠性分析，存在一个必须注意的陷阱
-</h1><p>前面的公式针对一般随机响应的期望。</p>
+<h2 id="27-对可靠性分析存在一个必须注意的陷阱">27. 对可靠性分析，存在一个必须注意的陷阱
+</h2><p>前面的公式针对一般随机响应的期望。</p>
 <p>但可靠性分析关心的是：</p>
 \[ P_f=P[g_H(X)\leq0]. \]<p>可以定义高保真失效指示变量：</p>
 \[ Y_H=\mathbf1[g_H(X)\leq0]. \]<p>对应的低保真变量为：</p>
@@ -994,8 +1007,8 @@
 \[ \boxed{ \text{响应拟合精度} \neq \text{失效概率估计效率}. } \]<p>对于极小失效概率，通常需要将 ACV 与重要抽样等稀有事件方法结合。</p>
 <p>Pham 与 Gorodetsky 在 2022 年发表于 <em>SIAM/ASA Journal on Uncertainty Quantification</em> 的研究中，正是将 ACV 与多保真重要抽样结合，并分析了控制变量权重估计误差及先导样本数量的影响。</p>
 <hr>
-<h1 id="28-工程上怎样实现">28. 工程上怎样实现？
-</h1><details class="reveal">
+<h2 id="28-工程上怎样实现">28. 工程上怎样实现？
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>一个最小化的双模型 ACV 程序可以写成：</p>
@@ -1053,36 +1066,36 @@
 </details>
 
 <hr>
-<h1 id="29-它与-krigingrommlmc-的关系">29. 它与 Kriging、ROM、MLMC 的关系
-</h1><details class="reveal">
+<h2 id="29-它与-krigingrommlmc-的关系">29. 它与 Kriging、ROM、MLMC 的关系
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <p>这几种技术处于不同层次。</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>方法</th>
-					<th>解决的主要问题</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>Kriging</td>
-					<td>如何快速近似昂贵函数？</td>
-			</tr>
-			<tr>
-					<td>POD-ROM</td>
-					<td>如何降低动力学系统的计算维度？</td>
-			</tr>
-			<tr>
-					<td>Multilevel Monte Carlo</td>
-					<td>如何利用不同离散精度层级的差值减少计算成本？</td>
-			</tr>
-			<tr>
-					<td><strong>ACV</strong></td>
-					<td><strong>如何利用相关的廉价模型降低高保真统计估计方差？</strong></td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>方法</th>
+          <th>解决的主要问题</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Kriging</td>
+          <td>如何快速近似昂贵函数？</td>
+      </tr>
+      <tr>
+          <td>POD-ROM</td>
+          <td>如何降低动力学系统的计算维度？</td>
+      </tr>
+      <tr>
+          <td>Multilevel Monte Carlo</td>
+          <td>如何利用不同离散精度层级的差值减少计算成本？</td>
+      </tr>
+      <tr>
+          <td><strong>ACV</strong></td>
+          <td><strong>如何利用相关的廉价模型降低高保真统计估计方差？</strong></td>
+      </tr>
+  </tbody>
 </table></div>
 <p>ACV 的一个突出特点是：</p>
 <p><strong>它不要求低保真模型之间存在明确的精度层级。</strong></p>
@@ -1099,8 +1112,8 @@
 </h2>\[\boxed{ \text{低保真模型的价值，不取决于它离真值有多近， 而取决于它能以多低的成本解释多少高保真波动。} }\]<p>这也是 multifidelity 方法比“单纯做代理模型拟合”更值得研究的地方。</p>
 <p>它把问题从：</p>
 \[\text{怎样造一个更准的 surrogate？}\]<p>转成：</p>
-\[\boxed{ \text{怎样管理一整个模型生态，让有限计算预算产生最多信息？} }\]<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+\[\boxed{ \text{怎样管理一整个模型生态，让有限计算预算产生最多信息？} }\]<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1303,9 +1316,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

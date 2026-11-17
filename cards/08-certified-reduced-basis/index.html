@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Certified Reduced Basis Method（带认证的降阶模型）与 Residual-based A Posteriori Error Estimation\n领域：有限元 × 代理模型 × 可靠性 × 数值方法\n推荐阅读时间：约 8–10 分钟\n前几张卡片分别谈了 Randomized SVD、Probabilistic Numerics。今天继续沿着一个更贴近工程可靠性的方向推进：\n\\[\\boxed{\\text{昂贵有限元被降阶以后，我凭什么相信降阶结果？}}\\]普通代理模型常告诉你：\n\\[\\hat y(\\mu)=12.43.\\]Kriging 还能告诉你：\n\\[\\hat y(\\mu)\\pm1.96\\sigma(\\mu).\\]但这里的 \\(\\sigma\\) 是统计模型根据训练数据推断出来的 uncertainty，它通常不是一个严格数学保证。\nCertified Reduced Basis（RB）方法追求的是另一种东西：\n\\[\\boxed{ \\|u(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) }\\]其中：\n\\(u(\\mu)\\)：原始高维 FEM/PDE 解； \\(u_N(\\mu)\\)：低维 reduced-basis 解； \\(\\Delta_N(\\mu)\\)：在线可快速计算的确定性误差上界。 也就是说，它希望做到：\n\\[\\boxed{ \\text{快速计算} + \\text{每次计算自带质量证明}. }\\]这套思想是 reduced-basis model reduction 中非常核心的一支。Prud&rsquo;homme、Rovas、Veroy、Patera 等人在 2002 年的一系列经典工作中，将快速 RB approximation、a posteriori error estimation 和 offline/online decomposition 组合起来，使参数化 PDE 能同时实现快速求解和 rigorous output bounds。\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Certified Reduced Basis Method（带认证的降阶模型）与 Residual-based A Posteriori Error Estimation\n领域：有限元 × 代理模型 × 可靠性 × 数值方法\n推荐阅读时间：约 8–10 分钟\n随机化 SVD 讨论怎样构造低维空间，概率数值方法 讨论怎样描述计算误差。认证降阶模型关心的是误差能否被可靠地界定。\n\\[\\boxed{\\text{昂贵有限元被降阶以后，我凭什么相信降阶结果？}}\\]普通代理模型常告诉你：\n\\[\\hat y(\\mu)=12.43.\\]Kriging 还能告诉你：\n\\[\\hat y(\\mu)\\pm1.96\\sigma(\\mu).\\]但这里的 \\(\\sigma\\) 是统计模型根据训练数据推断出来的 uncertainty，它通常不是一个严格数学保证。\nCertified Reduced Basis（RB）方法追求的是另一种东西：\n\\[\\boxed{ \\|u(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) }\\]其中：\n\\(u(\\mu)\\)：原始高维 FEM/PDE 解； \\(u_N(\\mu)\\)：低维 reduced-basis 解； \\(\\Delta_N(\\mu)\\)：在线可快速计算的确定性误差上界。 也就是说，它希望做到：\n\\[\\boxed{ \\text{快速计算} + \\text{每次计算自带质量证明}. }\\]这套思想是 reduced-basis model reduction 中非常核心的一支。Prud&rsquo;homme、Rovas、Veroy、Patera 等人在 2002 年的一系列经典工作中，将快速 RB approximation、a posteriori error estimation 和 offline/online decomposition 组合起来，使参数化 PDE 能同时实现快速求解和 rigorous output bounds。\n">
 <title>Certified Reduced Basis / ROM：可认证的后验误差上界</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/08-certified-reduced-basis/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="Certified Reduced Basis / ROM：可认证的后验误差上界">
-<meta property='og:description' content="主题：Certified Reduced Basis Method（带认证的降阶模型）与 Residual-based A Posteriori Error Estimation\n领域：有限元 × 代理模型 × 可靠性 × 数值方法\n推荐阅读时间：约 8–10 分钟\n前几张卡片分别谈了 Randomized SVD、Probabilistic Numerics。今天继续沿着一个更贴近工程可靠性的方向推进：\n\\[\\boxed{\\text{昂贵有限元被降阶以后，我凭什么相信降阶结果？}}\\]普通代理模型常告诉你：\n\\[\\hat y(\\mu)=12.43.\\]Kriging 还能告诉你：\n\\[\\hat y(\\mu)\\pm1.96\\sigma(\\mu).\\]但这里的 \\(\\sigma\\) 是统计模型根据训练数据推断出来的 uncertainty，它通常不是一个严格数学保证。\nCertified Reduced Basis（RB）方法追求的是另一种东西：\n\\[\\boxed{ \\|u(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) }\\]其中：\n\\(u(\\mu)\\)：原始高维 FEM/PDE 解； \\(u_N(\\mu)\\)：低维 reduced-basis 解； \\(\\Delta_N(\\mu)\\)：在线可快速计算的确定性误差上界。 也就是说，它希望做到：\n\\[\\boxed{ \\text{快速计算} + \\text{每次计算自带质量证明}. }\\]这套思想是 reduced-basis model reduction 中非常核心的一支。Prud&rsquo;homme、Rovas、Veroy、Patera 等人在 2002 年的一系列经典工作中，将快速 RB approximation、a posteriori error estimation 和 offline/online decomposition 组合起来，使参数化 PDE 能同时实现快速求解和 rigorous output bounds。\n">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="Certified Reduced Basis / ROM：可认证的后验误差上界">
+<meta property='og:description' content="主题：Certified Reduced Basis Method（带认证的降阶模型）与 Residual-based A Posteriori Error Estimation\n领域：有限元 × 代理模型 × 可靠性 × 数值方法\n推荐阅读时间：约 8–10 分钟\n随机化 SVD 讨论怎样构造低维空间，概率数值方法 讨论怎样描述计算误差。认证降阶模型关心的是误差能否被可靠地界定。\n\\[\\boxed{\\text{昂贵有限元被降阶以后，我凭什么相信降阶结果？}}\\]普通代理模型常告诉你：\n\\[\\hat y(\\mu)=12.43.\\]Kriging 还能告诉你：\n\\[\\hat y(\\mu)\\pm1.96\\sigma(\\mu).\\]但这里的 \\(\\sigma\\) 是统计模型根据训练数据推断出来的 uncertainty，它通常不是一个严格数学保证。\nCertified Reduced Basis（RB）方法追求的是另一种东西：\n\\[\\boxed{ \\|u(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) }\\]其中：\n\\(u(\\mu)\\)：原始高维 FEM/PDE 解； \\(u_N(\\mu)\\)：低维 reduced-basis 解； \\(\\Delta_N(\\mu)\\)：在线可快速计算的确定性误差上界。 也就是说，它希望做到：\n\\[\\boxed{ \\text{快速计算} + \\text{每次计算自带质量证明}. }\\]这套思想是 reduced-basis model reduction 中非常核心的一支。Prud&rsquo;homme、Rovas、Veroy、Patera 等人在 2002 年的一系列经典工作中，将快速 RB approximation、a posteriori error estimation 和 offline/online decomposition 组合起来，使参数化 PDE 能同时实现快速求解和 rigorous output bounds。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/08-certified-reduced-basis/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='代理模型' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='数值方法' /><meta property='article:published_time' content='2026-09-16T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-09-16T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="Certified Reduced Basis / ROM：可认证的后验误差上界">
-<meta name="twitter:description" content="主题：Certified Reduced Basis Method（带认证的降阶模型）与 Residual-based A Posteriori Error Estimation\n领域：有限元 × 代理模型 × 可靠性 × 数值方法\n推荐阅读时间：约 8–10 分钟\n前几张卡片分别谈了 Randomized SVD、Probabilistic Numerics。今天继续沿着一个更贴近工程可靠性的方向推进：\n\\[\\boxed{\\text{昂贵有限元被降阶以后，我凭什么相信降阶结果？}}\\]普通代理模型常告诉你：\n\\[\\hat y(\\mu)=12.43.\\]Kriging 还能告诉你：\n\\[\\hat y(\\mu)\\pm1.96\\sigma(\\mu).\\]但这里的 \\(\\sigma\\) 是统计模型根据训练数据推断出来的 uncertainty，它通常不是一个严格数学保证。\nCertified Reduced Basis（RB）方法追求的是另一种东西：\n\\[\\boxed{ \\|u(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) }\\]其中：\n\\(u(\\mu)\\)：原始高维 FEM/PDE 解； \\(u_N(\\mu)\\)：低维 reduced-basis 解； \\(\\Delta_N(\\mu)\\)：在线可快速计算的确定性误差上界。 也就是说，它希望做到：\n\\[\\boxed{ \\text{快速计算} + \\text{每次计算自带质量证明}. }\\]这套思想是 reduced-basis model reduction 中非常核心的一支。Prud&rsquo;homme、Rovas、Veroy、Patera 等人在 2002 年的一系列经典工作中，将快速 RB approximation、a posteriori error estimation 和 offline/online decomposition 组合起来，使参数化 PDE 能同时实现快速求解和 rigorous output bounds。\n">
+<meta name="twitter:description" content="主题：Certified Reduced Basis Method（带认证的降阶模型）与 Residual-based A Posteriori Error Estimation\n领域：有限元 × 代理模型 × 可靠性 × 数值方法\n推荐阅读时间：约 8–10 分钟\n随机化 SVD 讨论怎样构造低维空间，概率数值方法 讨论怎样描述计算误差。认证降阶模型关心的是误差能否被可靠地界定。\n\\[\\boxed{\\text{昂贵有限元被降阶以后，我凭什么相信降阶结果？}}\\]普通代理模型常告诉你：\n\\[\\hat y(\\mu)=12.43.\\]Kriging 还能告诉你：\n\\[\\hat y(\\mu)\\pm1.96\\sigma(\\mu).\\]但这里的 \\(\\sigma\\) 是统计模型根据训练数据推断出来的 uncertainty，它通常不是一个严格数学保证。\nCertified Reduced Basis（RB）方法追求的是另一种东西：\n\\[\\boxed{ \\|u(\\mu)-u_N(\\mu)\\| \\le \\Delta_N(\\mu) }\\]其中：\n\\(u(\\mu)\\)：原始高维 FEM/PDE 解； \\(u_N(\\mu)\\)：低维 reduced-basis 解； \\(\\Delta_N(\\mu)\\)：在线可快速计算的确定性误差上界。 也就是说，它希望做到：\n\\[\\boxed{ \\text{快速计算} + \\text{每次计算自带质量证明}. }\\]这套思想是 reduced-basis model reduction 中非常核心的一支。Prud&rsquo;homme、Rovas、Veroy、Patera 等人在 2002 年的一系列经典工作中，将快速 RB approximation、a posteriori error estimation 和 offline/online decomposition 组合起来，使参数化 PDE 能同时实现快速求解和 rigorous output bounds。\n">
     </head>
     <body class="
     article-page">
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,23 +324,38 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-先看最简单的问题">1. 先看最简单的问题</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-最重要的量residual">2. 最重要的量：Residual</a></li>
+    <li><a href="#3-为什么小-residual-不一定意味着小-error">3. 为什么小 residual 不一定意味着小 error？</a></li>
+    <li><a href="#4-于是出现了-certified-rb-最经典的一条公式">4. 于是出现了 Certified RB 最经典的一条公式</a></li>
+    <li><a href="#5-这条公式其实包含一个很深的结构">5. 这条公式其实包含一个很深的结构</a></li>
+    <li><a href="#6-一个极简单的例子">6. 一个极简单的例子</a></li>
+    <li><a href="#7-为什么它叫-a-posteriori">7. 为什么它叫 <strong>a posteriori</strong>？</a>
       <ol>
         <li><a href="#a-priori-estimate">A priori estimate</a></li>
         <li><a href="#a-posteriori-estimate">A posteriori estimate</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#8-这和-kriging-variance-有本质区别">8. 这和 Kriging variance 有本质区别</a></li>
+    <li><a href="#9-一个特别重要的区别95-confidence-和-rigorous-bound">9. 一个特别重要的区别：95% confidence 和 rigorous bound</a></li>
+    <li><a href="#10-为什么这对-failure-classification-极有价值">10. 为什么这对 failure classification 极有价值？</a></li>
+    <li><a href="#11-它和-active-learning-可以天然组合">11. 它和 Active Learning 可以天然组合</a></li>
+    <li><a href="#12-certified-rb-还能自己决定basis-够不够">12. Certified RB 还能自己决定“basis 够不够”</a></li>
+    <li><a href="#13-但这里有一个计算悖论">13. 但这里有一个计算悖论</a></li>
+    <li><a href="#14-affine-decomposition-是经典解决方案">14. Affine decomposition 是经典解决方案</a></li>
+    <li><a href="#15-如果参数依赖不是-affine-呢">15. 如果参数依赖不是 affine 呢？</a></li>
+    <li><a href="#16-第二个难点coercivity-lower-bound-很难算">16. 第二个难点：coercivity lower bound 很难算</a></li>
+    <li><a href="#17-error-bound-也可能太保守">17. Error bound 也可能太保守</a></li>
+    <li><a href="#18-认证误差上界与概率数值方法有什么区别">18. 认证误差上界与概率数值方法有什么区别？</a></li>
+    <li><a href="#19-一个对代理模型研究非常值得迁移的想法">19. 一个对代理模型研究非常值得迁移的想法</a></li>
+    <li><a href="#20-对你的机构可靠性问题这个思想可以直接迁移">20. 对你的机构可靠性问题，这个思想可以直接迁移</a></li>
+    <li><a href="#21-对软体动力学也有一个很有价值的对应关系">21. 对软体动力学也有一个很有价值的对应关系</a></li>
+    <li><a href="#22-一个很适合自己实现的最小实验">22. 一个很适合自己实现的最小实验</a></li>
+    <li><a href="#23-为什么这个-error-estimator-会反过来指导学什么">23. 为什么这个 error estimator 会反过来指导“学什么”？</a></li>
+    <li><a href="#24-你会发现它和-ak-mcs-很像但学习目标不同">24. 你会发现它和 AK-MCS 很像，但学习目标不同</a></li>
+    <li><a href="#25-offlineonline-decomposition-才决定它是否真的快">25. Offline–Online decomposition 才决定它是否真的快</a></li>
+    <li><a href="#26-对实时物理引擎也有一个很有意思的启发">26. 对实时物理引擎也有一个很有意思的启发</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -415,7 +430,7 @@
     <p><strong>主题：Certified <span class="term-anchor" data-term="reduced-basis" tabindex="0">Reduced Basis</span> Method（带认证的降阶模型）与 Residual-based A Posteriori Error Estimation</strong><br>
 <strong>领域：有限元 × 代理模型 × 可靠性 × 数值方法</strong><br>
 <strong>推荐阅读时间：约 8–10 分钟</strong><br>
-前几张卡片分别谈了 Randomized SVD、Probabilistic Numerics。今天继续沿着一个更贴近工程可靠性的方向推进：</p>
+<a class="link" href="../31-randomized-nla/" >随机化 SVD</a> 讨论怎样构造低维空间，<a class="link" href="../32-probabilistic-numerics/" >概率数值方法</a> 讨论怎样描述计算误差。认证降阶模型关心的是误差能否被可靠地界定。</p>
 \[\boxed{\text{昂贵有限元被降阶以后，我凭什么相信降阶结果？}}\]<p>普通代理模型常告诉你：</p>
 \[\hat y(\mu)=12.43.\]<p><span class="term-anchor" data-term="kriging" tabindex="0">Kriging</span> 还能告诉你：</p>
 \[\hat y(\mu)\pm1.96\sigma(\mu).\]<p>但这里的 \(\sigma\) 是统计模型根据训练数据推断出来的 uncertainty，它通常不是一个严格数学保证。</p>
@@ -453,8 +468,8 @@
 <p>这部分与普通 ROM 没有什么神秘之处。</p>
 <p>真正的问题在后面：</p>
 \[\boxed{ u_N(\mu)=V_Na(\mu) \text{ 到底离 }u(\mu)\text{ 有多远？} }\]<hr>
-<h1 id="2-最重要的量residual">2. 最重要的量：Residual
-</h1><p>把 reduced solution 重新代回原方程：</p>
+<h2 id="2-最重要的量residual">2. 最重要的量：Residual
+</h2><p>把 reduced solution 重新代回原方程：</p>
 \[r(\mu) = f(\mu)-A(\mu)u_N(\mu).\]<p>如果：</p>
 \[r=0,\]<p>那么：</p>
 \[A u_N=f\]<p>所以：</p>
@@ -469,8 +484,8 @@
 <p>因为：</p>
 \[\|e\|\]<p>并不简单等于：</p>
 \[\|r\|.\]<hr>
-<h1 id="3-为什么小-residual-不一定意味着小-error">3. 为什么小 residual 不一定意味着小 error？
-</h1><p>假设：</p>
+<h2 id="3-为什么小-residual-不一定意味着小-error">3. 为什么小 residual 不一定意味着小 error？
+</h2><p>假设：</p>
 \[Ae=r.\]<p>那么：</p>
 \[e=A^{-1}r.\]<p>如果：</p>
 \[A\]<p>接近奇异：</p>
@@ -486,8 +501,8 @@
 \[A\]<p>离奇异还有多远。</p>
 \[\alpha\downarrow\]<p>意味着：</p>
 \[\boxed{\text{系统越来越敏感。}}\]<hr>
-<h1 id="4-于是出现了-certified-rb-最经典的一条公式">4. 于是出现了 Certified RB 最经典的一条公式
-</h1><p>利用误差方程：</p>
+<h2 id="4-于是出现了-certified-rb-最经典的一条公式">4. 于是出现了 Certified RB 最经典的一条公式
+</h2><p>利用误差方程：</p>
 \[a(e,v;\mu)=r(v;\mu),\]<p>取：</p>
 \[v=e,\]<p>得到：</p>
 \[a(e,e;\mu)=r(e;\mu).\]<p>利用 coercivity：</p>
@@ -503,8 +518,8 @@
 <p>当前 <a class="link" href="https://pymor.org/"  target="_blank" rel="noopener"
     >pyMOR</a> 的 coercive reduced-basis 实现也采用这一结构：计算 residual 的 dual norm，并结合 coercivity lower bound 构造 error estimator；其文档明确指出，只有提供合适的 coercivity lower bound 时，计算得到的 estimator 才保证是真正的 error upper bound。</p>
 <hr>
-<h1 id="5-这条公式其实包含一个很深的结构">5. 这条公式其实包含一个很深的结构
-</h1><p>把它写成：</p>
+<h2 id="5-这条公式其实包含一个很深的结构">5. 这条公式其实包含一个很深的结构
+</h2><p>把它写成：</p>
 \[\boxed{ \text{error} \le \frac{\text{equation violation}} {\text{problem stability}} }\]<p>就很好理解了。</p>
 <p>也就是说：</p>
 \[\boxed{ \text{误差大小} = \text{你违反方程多少} \times \text{系统会把这种违反放大多少}. }\]<p>Residual：</p>
@@ -522,8 +537,8 @@
 <p>必须加上：</p>
 \[\boxed{\text{stability information}.}\]<p>这个结构实际上远远超出 ROM，在 FEM a posteriori estimation、线性系统 condition number、PDE stability theory 中都反复出现。</p>
 <hr>
-<h1 id="6-一个极简单的例子">6. 一个极简单的例子
-</h1><p>考虑：</p>
+<h2 id="6-一个极简单的例子">6. 一个极简单的例子
+</h2><p>考虑：</p>
 \[A= \begin{bmatrix} 1&0\\ 0&10^{-6} \end{bmatrix}.\]<p>假设 residual：</p>
 \[r= \begin{bmatrix} 0\\ 10^{-4} \end{bmatrix}.\]<p>那么：</p>
 \[\|r\| = 10^{-4}.\]<p>看起来非常小。</p>
@@ -534,8 +549,8 @@
 \[\frac{\|r\|}{\alpha} = \frac{10^{-4}}{10^{-6}} = 100.\]<p>正好暴露了真实风险。</p>
 <p>因此：</p>
 \[\boxed{ \text{“solver residual 很小” 并不自动意味着 “工程量已经准确”。} }\]<hr>
-<h1 id="7-为什么它叫-a-posteriori">7. 为什么它叫 <strong>a posteriori</strong>？
-</h1><p>数值分析里经常区分：</p>
+<h2 id="7-为什么它叫-a-posteriori">7. 为什么它叫 <strong>a posteriori</strong>？
+</h2><p>数值分析里经常区分：</p>
 <h3 id="a-priori-estimate">A priori estimate
 </h3><p>在真正计算之前，根据：</p>
 <ul>
@@ -554,8 +569,8 @@
 \[\Delta_N(\mu_1), \quad \Delta_N(\mu_2).\]<p>这非常重要。</p>
 <p>因为 ROM 的可靠性往往：</p>
 \[\boxed{\text{强烈依赖参数位置。}}\]<hr>
-<h1 id="8-这和-kriging-variance-有本质区别">8. 这和 Kriging variance 有本质区别
-</h1><p>Kriging 给：</p>
+<h2 id="8-这和-kriging-variance-有本质区别">8. 这和 Kriging variance 有本质区别
+</h2><p>Kriging 给：</p>
 \[\hat f(x)\]<p>以及：</p>
 \[\sigma^2(x).\]<p>它表达的是：</p>
 \[\boxed{ \text{在 GP 模型假设和已有样本条件下， 预测还有多少统计不确定性。} }\]<p>Certified RB 给：</p>
@@ -566,8 +581,8 @@
 \[\Delta_{\rm RB}\]<p>属于：</p>
 \[\boxed{\text{deterministic certification bound}.}\]<p>二者不能互换。</p>
 <hr>
-<h1 id="9-一个特别重要的区别95-confidence-和-rigorous-bound">9. 一个特别重要的区别：95% confidence 和 rigorous bound
-</h1><p>假设 Kriging 给：</p>
+<h2 id="9-一个特别重要的区别95-confidence-和-rigorous-bound">9. 一个特别重要的区别：95% confidence 和 rigorous bound
+</h2><p>假设 Kriging 给：</p>
 \[y=10.0\pm0.2.\]<p>如果这是：</p>
 \[95\%\]<p>credible interval，</p>
 <p>仍意味着模型允许：</p>
@@ -577,8 +592,8 @@
 \[\boxed{\text{真实值就在这个区间里。}}\]<p>这两种 statement 的性质完全不同。</p>
 <p>可靠性分析中尤其如此。</p>
 <hr>
-<h1 id="10-为什么这对-failure-classification-极有价值">10. 为什么这对 failure classification 极有价值？
-</h1><p>假设极限状态：</p>
+<h2 id="10-为什么这对-failure-classification-极有价值">10. 为什么这对 failure classification 极有价值？
+</h2><p>假设极限状态：</p>
 \[g(\mu) = F_{\rm lim}-F(\mu).\]<p>ROM 给：</p>
 \[g_N(\mu)=0.04.\]<p>同时 certified error：</p>
 \[|g-g_N|\le0.01.\]<p>那么：</p>
@@ -597,8 +612,8 @@
 <p>这比简单规定：</p>
 \[R^2>0.99\]<p>后“全域相信代理模型”更符合 failure-probability 计算的真正需求。</p>
 <hr>
-<h1 id="11-它和-active-learning-可以天然组合">11. 它和 Active Learning 可以天然组合
-</h1><p>可靠性 active learning 通常寻找：</p>
+<h2 id="11-它和-active-learning-可以天然组合">11. 它和 Active Learning 可以天然组合
+</h2><p>可靠性 active learning 通常寻找：</p>
 \[\boxed{\text{靠近极限状态且 surrogate uncertainty 大的样本。}}\]<p>Certified ROM 可以定义：</p>
 \[L(\mu) = |g_N(\mu)|-\Delta_g(\mu).\]<p>如果：</p>
 \[L>0,\]<p>说明误差区间没有跨过：</p>
@@ -610,8 +625,8 @@
 <p>这比单独看：</p>
 \[\sigma_{\rm Kriging}\]<p>多了一层物理信息：</p>
 \[\boxed{\text{PDE residual}.}\]<hr>
-<h1 id="12-certified-rb-还能自己决定basis-够不够">12. Certified RB 还能自己决定“basis 够不够”
-</h1><details class="reveal">
+<h2 id="12-certified-rb-还能自己决定basis-够不够">12. Certified RB 还能自己决定“basis 够不够”
+</h2><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>假设有训练参数集：</p>
@@ -667,8 +682,8 @@
 </details>
 
 <hr>
-<h1 id="13-但这里有一个计算悖论">13. 但这里有一个计算悖论
-</h1><details class="reveal">
+<h2 id="13-但这里有一个计算悖论">13. 但这里有一个计算悖论
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>Residual：</p>
@@ -685,8 +700,8 @@
 </details>
 
 <hr>
-<h1 id="14-affine-decomposition-是经典解决方案">14. Affine decomposition 是经典解决方案
-</h1><details class="reveal">
+<h2 id="14-affine-decomposition-是经典解决方案">14. Affine decomposition 是经典解决方案
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设：</p>
@@ -703,8 +718,8 @@
 </details>
 
 <hr>
-<h1 id="15-如果参数依赖不是-affine-呢">15. 如果参数依赖不是 affine 呢？
-</h1><details class="reveal">
+<h2 id="15-如果参数依赖不是-affine-呢">15. 如果参数依赖不是 affine 呢？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>现实有限元经常是：</p>
@@ -727,8 +742,8 @@
 </details>
 
 <hr>
-<h1 id="16-第二个难点coercivity-lower-bound-很难算">16. 第二个难点：coercivity lower bound 很难算
-</h1><details class="reveal">
+<h2 id="16-第二个难点coercivity-lower-bound-很难算">16. 第二个难点：coercivity lower bound 很难算
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>理论需要：</p>
@@ -747,8 +762,8 @@
 </details>
 
 <hr>
-<h1 id="17-error-bound-也可能太保守">17. Error bound 也可能太保守
-</h1><details class="reveal">
+<h2 id="17-error-bound-也可能太保守">17. Error bound 也可能太保守
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>定义 effectivity：</p>
@@ -769,8 +784,8 @@
 </details>
 
 <hr>
-<h1 id="18-它和昨天-probabilistic-numerics-正好形成两种不同哲学">18. 它和昨天 Probabilistic Numerics 正好形成两种不同哲学
-</h1><details class="reveal">
+<h2 id="18-认证误差上界与概率数值方法有什么区别">18. 认证误差上界与概率数值方法有什么区别？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>Probabilistic Numerics：</p>
@@ -788,8 +803,8 @@
 </details>
 
 <hr>
-<h1 id="19-一个对代理模型研究非常值得迁移的想法">19. 一个对代理模型研究非常值得迁移的想法
-</h1><details class="reveal">
+<h2 id="19-一个对代理模型研究非常值得迁移的想法">19. 一个对代理模型研究非常值得迁移的想法
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>Kriging 的典型训练目标：</p>
@@ -820,8 +835,8 @@
 </details>
 
 <hr>
-<h1 id="20-对你的机构可靠性问题这个思想可以直接迁移">20. 对你的机构可靠性问题，这个思想可以直接迁移
-</h1><details class="reveal">
+<h2 id="20-对你的机构可靠性问题这个思想可以直接迁移">20. 对你的机构可靠性问题，这个思想可以直接迁移
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设未来有一个机构模型：</p>
@@ -849,8 +864,8 @@
 </details>
 
 <hr>
-<h1 id="21-对软体动力学也有一个很有价值的对应关系">21. 对软体动力学也有一个很有价值的对应关系
-</h1><details class="reveal">
+<h2 id="21-对软体动力学也有一个很有价值的对应关系">21. 对软体动力学也有一个很有价值的对应关系
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>自研求解器经常检查：</p>
@@ -882,8 +897,8 @@
 </details>
 
 <hr>
-<h1 id="22-一个很适合自己实现的最小实验">22. 一个很适合自己实现的最小实验
-</h1><details class="reveal">
+<h2 id="22-一个很适合自己实现的最小实验">22. 一个很适合自己实现的最小实验
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>构造参数化 SPD 系统：</p>
@@ -914,8 +929,8 @@
 </details>
 
 <hr>
-<h1 id="23-为什么这个-error-estimator-会反过来指导学什么">23. 为什么这个 error estimator 会反过来指导“学什么”？
-</h1><details class="reveal">
+<h2 id="23-为什么这个-error-estimator-会反过来指导学什么">23. 为什么这个 error estimator 会反过来指导“学什么”？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这是 RB 特别漂亮的地方。</p>
@@ -939,8 +954,8 @@
 </details>
 
 <hr>
-<h1 id="24-你会发现它和-ak-mcs-很像但学习目标不同">24. 你会发现它和 AK-MCS 很像，但学习目标不同
-</h1><details class="reveal">
+<h2 id="24-你会发现它和-ak-mcs-很像但学习目标不同">24. 你会发现它和 AK-MCS 很像，但学习目标不同
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p><span class="term-anchor" data-term="ak-mcs" tabindex="0">AK-MCS</span>：</p>
@@ -957,8 +972,8 @@
 </details>
 
 <hr>
-<h1 id="25-offlineonline-decomposition-才决定它是否真的快">25. Offline–Online decomposition 才决定它是否真的快
-</h1><details class="reveal">
+<h2 id="25-offlineonline-decomposition-才决定它是否真的快">25. Offline–Online decomposition 才决定它是否真的快
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这里还有一个重要工程条件。</p>
@@ -982,8 +997,8 @@
 </details>
 
 <hr>
-<h1 id="26-对实时物理引擎也有一个很有意思的启发">26. 对实时物理引擎也有一个很有意思的启发
-</h1><details class="reveal">
+<h2 id="26-对实时物理引擎也有一个很有意思的启发">26. 对实时物理引擎也有一个很有意思的启发
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>假设游戏里同时拥有：</p>
@@ -999,14 +1014,14 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>Certified Reduced Basis 最值得记住的不是：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>Certified Reduced Basis 最值得记住的不是：</p>
 \[\Delta= \frac{\|r\|} {\alpha}.\]<p>真正重要的是：</p>
 \[\boxed{ \text{快速近似真正进入可靠工程系统的关键， 往往不是“它平均有多准”， 而是“系统能否知道这一次近似是否可信”。} }\]<p>它在整个知识体系中的位置可以理解成：</p>
 \[\text{Full FEM/PDE}\]\[\downarrow\]\[\text{Reduced Basis / ROM}\]\[\downarrow\]\[\boxed{\text{Residual-based a posteriori estimator}}\]\[+\]\[\boxed{\text{Stability bound}}\]\[\downarrow\]\[\boxed{\text{Certified ROM}}\]\[\downarrow\]\[\text{reliability / optimization / real-time decision}.\]<p>对可靠性和代理建模最值得迁移的一点尤其明确：</p>
-\[\boxed{ \text{以后评价代理模型时， 可以逐渐把问题从“R² 有多高” 升级成“它能不能可靠地告诉我自己什么时候不可信”。} }\]<p>这个能力，在失效概率、接触动力学和安全关键仿真中，往往比把平均拟合精度再提高一个小数点更有工程价值。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+\[\boxed{ \text{以后评价代理模型时， 可以逐渐把问题从“}R^2\text{ 有多高” 升级成“它能不能可靠地告诉我自己什么时候不可信”。} }\]<p>这个能力，在失效概率、接触动力学和安全关键仿真中，往往比把平均拟合精度再提高一个小数点更有工程价值。</p>
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -1209,9 +1224,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Multilevel Monte Carlo（MLMC，多层蒙特卡洛）\n领域：有限元 × 可靠性 × 不确定性量化\n推荐阅读时间：约 8 分钟\n上一期 MFMC 的核心是：\n\\[\\boxed{\\text{利用不同模型之间的相关性}}\\]今天的 MLMC 看起来名字很像，但思想更“有限元化”：\n\\[\\boxed{\\text{利用不同离散精度之间的差值越来越小}}\\]它最适合这样的场景：\n\\[\\text{粗网格 FEM} \\rightarrow \\text{中网格 FEM} \\rightarrow \\text{细网格 FEM}.\\]Michael Giles 在 2008 年系统提出经典 MLMC 方法，并在 2015 年的 Acta Numerica 长篇综述中总结了其理论与大量应用。MLMC 的基本目标是：把大量 Monte Carlo 样本放在便宜的粗模型上，只用少量样本计算昂贵的细模型修正。\n1. 最直接的问题：为什么 Monte Carlo 浪费计算量？ 假设你有一个有限元模型：\n\\[Q_h(X),\\]其中：\n\\(X\\)：随机输入； \\(h\\)：网格尺度； \\(Q_h\\)：某个输出，例如最大位移、应力或固有频率。 你真正希望得到：\n\\[E[Q].\\]但实际上只能计算最细网格：\n\\[Q_{h_L}.\\]普通 Monte Carlo 会做：\n\\[\\hat Q = \\frac1N\\sum_{i=1}^{N}Q_{h_L}(X_i).\\]这意味着：\n\\[\\boxed{\\text{每一个随机样本都跑最贵的有限元模型}}\\]哪怕绝大多数样本只是为了消除 Monte Carlo 抽样噪声。\n这正是 MLMC 认为非常浪费的地方。\n2. MLMC 的核心只是一条恒等式 定义多个离散层级：\n">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：Multilevel Monte Carlo（MLMC，多层蒙特卡洛）\n领域：有限元 × 可靠性 × 不确定性量化\n推荐阅读时间：约 8 分钟\nMFMC（多保真 Monte Carlo）的核心是：\n\\[\\boxed{\\text{利用不同模型之间的相关性}}\\]今天的 MLMC 看起来名字很像，但思想更“有限元化”：\n\\[\\boxed{\\text{利用不同离散精度之间的差值越来越小}}\\]它最适合这样的场景：\n\\[\\text{粗网格 FEM} \\rightarrow \\text{中网格 FEM} \\rightarrow \\text{细网格 FEM}.\\]Michael Giles 在 2008 年系统提出经典 MLMC 方法，并在 2015 年的 Acta Numerica 长篇综述中总结了其理论与大量应用。MLMC 的基本目标是：把大量 Monte Carlo 样本放在便宜的粗模型上，只用少量样本计算昂贵的细模型修正。\n1. 最直接的问题：为什么 Monte Carlo 浪费计算量？ 假设你有一个有限元模型：\n\\[Q_h(X),\\]其中：\n\\(X\\)：随机输入； \\(h\\)：网格尺度； \\(Q_h\\)：某个输出，例如最大位移、应力或固有频率。 你真正希望得到：\n\\[E[Q].\\]但实际上只能计算最细网格：\n\\[Q_{h_L}.\\]普通 Monte Carlo 会做：\n\\[\\hat Q = \\frac1N\\sum_{i=1}^{N}Q_{h_L}(X_i).\\]这意味着：\n\\[\\boxed{\\text{每一个随机样本都跑最贵的有限元模型}}\\]哪怕绝大多数样本只是为了消除 Monte Carlo 抽样噪声。\n这正是 MLMC 认为非常浪费的地方。\n">
 <title>MLMC：为什么“绝大多数随机样本根本没必要跑最细网格”</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/07-mlmc/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="MLMC：为什么“绝大多数随机样本根本没必要跑最细网格”">
-<meta property='og:description' content="主题：Multilevel Monte Carlo（MLMC，多层蒙特卡洛）\n领域：有限元 × 可靠性 × 不确定性量化\n推荐阅读时间：约 8 分钟\n上一期 MFMC 的核心是：\n\\[\\boxed{\\text{利用不同模型之间的相关性}}\\]今天的 MLMC 看起来名字很像，但思想更“有限元化”：\n\\[\\boxed{\\text{利用不同离散精度之间的差值越来越小}}\\]它最适合这样的场景：\n\\[\\text{粗网格 FEM} \\rightarrow \\text{中网格 FEM} \\rightarrow \\text{细网格 FEM}.\\]Michael Giles 在 2008 年系统提出经典 MLMC 方法，并在 2015 年的 Acta Numerica 长篇综述中总结了其理论与大量应用。MLMC 的基本目标是：把大量 Monte Carlo 样本放在便宜的粗模型上，只用少量样本计算昂贵的细模型修正。\n1. 最直接的问题：为什么 Monte Carlo 浪费计算量？ 假设你有一个有限元模型：\n\\[Q_h(X),\\]其中：\n\\(X\\)：随机输入； \\(h\\)：网格尺度； \\(Q_h\\)：某个输出，例如最大位移、应力或固有频率。 你真正希望得到：\n\\[E[Q].\\]但实际上只能计算最细网格：\n\\[Q_{h_L}.\\]普通 Monte Carlo 会做：\n\\[\\hat Q = \\frac1N\\sum_{i=1}^{N}Q_{h_L}(X_i).\\]这意味着：\n\\[\\boxed{\\text{每一个随机样本都跑最贵的有限元模型}}\\]哪怕绝大多数样本只是为了消除 Monte Carlo 抽样噪声。\n这正是 MLMC 认为非常浪费的地方。\n2. MLMC 的核心只是一条恒等式 定义多个离散层级：\n">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="MLMC：为什么“绝大多数随机样本根本没必要跑最细网格”">
+<meta property='og:description' content="主题：Multilevel Monte Carlo（MLMC，多层蒙特卡洛）\n领域：有限元 × 可靠性 × 不确定性量化\n推荐阅读时间：约 8 分钟\nMFMC（多保真 Monte Carlo）的核心是：\n\\[\\boxed{\\text{利用不同模型之间的相关性}}\\]今天的 MLMC 看起来名字很像，但思想更“有限元化”：\n\\[\\boxed{\\text{利用不同离散精度之间的差值越来越小}}\\]它最适合这样的场景：\n\\[\\text{粗网格 FEM} \\rightarrow \\text{中网格 FEM} \\rightarrow \\text{细网格 FEM}.\\]Michael Giles 在 2008 年系统提出经典 MLMC 方法，并在 2015 年的 Acta Numerica 长篇综述中总结了其理论与大量应用。MLMC 的基本目标是：把大量 Monte Carlo 样本放在便宜的粗模型上，只用少量样本计算昂贵的细模型修正。\n1. 最直接的问题：为什么 Monte Carlo 浪费计算量？ 假设你有一个有限元模型：\n\\[Q_h(X),\\]其中：\n\\(X\\)：随机输入； \\(h\\)：网格尺度； \\(Q_h\\)：某个输出，例如最大位移、应力或固有频率。 你真正希望得到：\n\\[E[Q].\\]但实际上只能计算最细网格：\n\\[Q_{h_L}.\\]普通 Monte Carlo 会做：\n\\[\\hat Q = \\frac1N\\sum_{i=1}^{N}Q_{h_L}(X_i).\\]这意味着：\n\\[\\boxed{\\text{每一个随机样本都跑最贵的有限元模型}}\\]哪怕绝大多数样本只是为了消除 Monte Carlo 抽样噪声。\n这正是 MLMC 认为非常浪费的地方。\n">
 <meta property='og:url' content='https://assranai.github.io/cards/07-mlmc/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
 <meta property='og:type' content='article'><meta property='article:section' content='Cards' /><meta property='article:tag' content='有限元' /><meta property='article:tag' content='可靠性' /><meta property='article:tag' content='不确定性量化' /><meta property='article:published_time' content='2026-08-20T00:00:00&#43;00:00'/><meta property='article:modified_time' content='2026-08-20T00:00:00&#43;00:00'/>
 <meta name="twitter:title" content="MLMC：为什么“绝大多数随机样本根本没必要跑最细网格”">
-<meta name="twitter:description" content="主题：Multilevel Monte Carlo（MLMC，多层蒙特卡洛）\n领域：有限元 × 可靠性 × 不确定性量化\n推荐阅读时间：约 8 分钟\n上一期 MFMC 的核心是：\n\\[\\boxed{\\text{利用不同模型之间的相关性}}\\]今天的 MLMC 看起来名字很像，但思想更“有限元化”：\n\\[\\boxed{\\text{利用不同离散精度之间的差值越来越小}}\\]它最适合这样的场景：\n\\[\\text{粗网格 FEM} \\rightarrow \\text{中网格 FEM} \\rightarrow \\text{细网格 FEM}.\\]Michael Giles 在 2008 年系统提出经典 MLMC 方法，并在 2015 年的 Acta Numerica 长篇综述中总结了其理论与大量应用。MLMC 的基本目标是：把大量 Monte Carlo 样本放在便宜的粗模型上，只用少量样本计算昂贵的细模型修正。\n1. 最直接的问题：为什么 Monte Carlo 浪费计算量？ 假设你有一个有限元模型：\n\\[Q_h(X),\\]其中：\n\\(X\\)：随机输入； \\(h\\)：网格尺度； \\(Q_h\\)：某个输出，例如最大位移、应力或固有频率。 你真正希望得到：\n\\[E[Q].\\]但实际上只能计算最细网格：\n\\[Q_{h_L}.\\]普通 Monte Carlo 会做：\n\\[\\hat Q = \\frac1N\\sum_{i=1}^{N}Q_{h_L}(X_i).\\]这意味着：\n\\[\\boxed{\\text{每一个随机样本都跑最贵的有限元模型}}\\]哪怕绝大多数样本只是为了消除 Monte Carlo 抽样噪声。\n这正是 MLMC 认为非常浪费的地方。\n2. MLMC 的核心只是一条恒等式 定义多个离散层级：\n">
+<meta name="twitter:description" content="主题：Multilevel Monte Carlo（MLMC，多层蒙特卡洛）\n领域：有限元 × 可靠性 × 不确定性量化\n推荐阅读时间：约 8 分钟\nMFMC（多保真 Monte Carlo）的核心是：\n\\[\\boxed{\\text{利用不同模型之间的相关性}}\\]今天的 MLMC 看起来名字很像，但思想更“有限元化”：\n\\[\\boxed{\\text{利用不同离散精度之间的差值越来越小}}\\]它最适合这样的场景：\n\\[\\text{粗网格 FEM} \\rightarrow \\text{中网格 FEM} \\rightarrow \\text{细网格 FEM}.\\]Michael Giles 在 2008 年系统提出经典 MLMC 方法，并在 2015 年的 Acta Numerica 长篇综述中总结了其理论与大量应用。MLMC 的基本目标是：把大量 Monte Carlo 样本放在便宜的粗模型上，只用少量样本计算昂贵的细模型修正。\n1. 最直接的问题：为什么 Monte Carlo 浪费计算量？ 假设你有一个有限元模型：\n\\[Q_h(X),\\]其中：\n\\(X\\)：随机输入； \\(h\\)：网格尺度； \\(Q_h\\)：某个输出，例如最大位移、应力或固有频率。 你真正希望得到：\n\\[E[Q].\\]但实际上只能计算最细网格：\n\\[Q_{h_L}.\\]普通 Monte Carlo 会做：\n\\[\\hat Q = \\frac1N\\sum_{i=1}^{N}Q_{h_L}(X_i).\\]这意味着：\n\\[\\boxed{\\text{每一个随机样本都跑最贵的有限元模型}}\\]哪怕绝大多数样本只是为了消除 Monte Carlo 抽样噪声。\n这正是 MLMC 认为非常浪费的地方。\n">
     </head>
     <body class="
     article-page">
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,23 +324,24 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-最直接的问题为什么-monte-carlo-浪费计算量">1. 最直接的问题：为什么 Monte Carlo 浪费计算量？</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-mlmc-的核心只是一条恒等式">2. MLMC 的核心只是一条恒等式</a></li>
+    <li><a href="#3-为什么差值--特别有价值">3. 为什么差值  特别有价值？</a></li>
+    <li><a href="#4-最重要的一步同一随机输入必须在相邻层配对">4. 最重要的一步：同一随机输入必须在相邻层配对</a></li>
+    <li><a href="#5-然后发生一件很漂亮的事情不同层需要的样本数完全不同">5. 然后发生一件很漂亮的事情：不同层需要的样本数完全不同</a></li>
+    <li><a href="#6-一个有限元例子">6. 一个有限元例子</a></li>
+    <li><a href="#7-mlmc-与-mfmc-的真正区别">7. MLMC 与 MFMC 的真正区别</a></li>
+    <li><a href="#8-mlmc-的真正目标是同时攻击两种误差">8. MLMC 的真正目标是同时攻击两种误差</a>
       <ol>
         <li><a href="#离散误差">离散误差</a></li>
         <li><a href="#monte-carlo-统计误差">Monte Carlo 统计误差</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a>
-      <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
-      </ol>
-    </li>
+    <li><a href="#9-为什么它特别适合-fempde">9. 为什么它特别适合 FEM/PDE？</a></li>
+    <li><a href="#10-一个-2026-年仍然很活跃的方向复杂几何上的层级构造">10. 一个 2026 年仍然很活跃的方向：复杂几何上的层级构造</a></li>
+    <li><a href="#11-mlmc-对可靠性分析有没有用">11. MLMC 对可靠性分析有没有用？</a></li>
+    <li><a href="#12-对工程研究最值得迁移的一点">12. 对工程研究最值得迁移的一点</a></li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -415,7 +416,7 @@
     <p><strong>主题：Multilevel Monte Carlo（<span class="term-anchor" data-term="mlmc" tabindex="0">MLMC</span>，多层蒙特卡洛）</strong><br>
 <strong>领域：有限元 × 可靠性 × 不确定性量化</strong><br>
 <strong>推荐阅读时间：约 8 分钟</strong></p>
-<p>上一期 <span class="term-anchor" data-term="mfmc" tabindex="0">MFMC</span> 的核心是：</p>
+<p><span class="term-anchor" data-term="mfmc" tabindex="0">MFMC</span>（<a class="link" href="../05-multifidelity-mc/" >多保真 Monte Carlo</a>）的核心是：</p>
 \[\boxed{\text{利用不同模型之间的相关性}}\]<p>今天的 MLMC 看起来名字很像，但思想更“有限元化”：</p>
 \[\boxed{\text{利用不同离散精度之间的差值越来越小}}\]<p>它最适合这样的场景：</p>
 \[\text{粗网格 FEM} \rightarrow \text{中网格 FEM} \rightarrow \text{细网格 FEM}.\]<p>Michael Giles 在 2008 年系统提出经典 MLMC 方法，并在 2015 年的 Acta Numerica 长篇综述中总结了其理论与大量应用。MLMC 的基本目标是：<strong>把大量 Monte Carlo 样本放在便宜的粗模型上，只用少量样本计算昂贵的细模型修正。</strong></p>
@@ -435,16 +436,16 @@
 \[\boxed{\text{每一个随机样本都跑最贵的有限元模型}}\]<p>哪怕绝大多数样本只是为了消除 Monte Carlo 抽样噪声。</p>
 <p>这正是 MLMC 认为非常浪费的地方。</p>
 <hr>
-<h1 id="2-mlmc-的核心只是一条恒等式">2. MLMC 的核心只是一条恒等式
-</h1><p>定义多个离散层级：</p>
+<h2 id="2-mlmc-的核心只是一条恒等式">2. MLMC 的核心只是一条恒等式
+</h2><p>定义多个离散层级：</p>
 \[Q_0,Q_1,\ldots,Q_L,\]<p>其中：</p>
 \[Q_0=\text{很粗}, \qquad Q_L=\text{最细}.\]<p>然后利用：</p>
 \[Q_L = Q_0 + (Q_1-Q_0) + (Q_2-Q_1) +\cdots+ (Q_L-Q_{L-1}).\]<p>取期望：</p>
 \[\boxed{ E[Q_L] = E[Q_0] + \sum_{\ell=1}^{L} E[Q_\ell-Q_{\ell-1}] }\]<p>这就是 MLMC 的全部数学起点。Giles 的经典论文正是利用这种 telescoping sum，将高精度期望拆成粗层统计量与逐级修正。</p>
 <p>表面看只是代数变形，但它改变了计算资源的分配方式。</p>
 <hr>
-<h1 id="3-为什么差值--特别有价值">3. 为什么差值 \(Q_\ell-Q_{\ell-1}\) 特别有价值？
-</h1><p>假设细化网格以后模型逐渐收敛：</p>
+<h2 id="3-为什么差值--特别有价值">3. 为什么差值 \(Q_\ell-Q_{\ell-1}\) 特别有价值？
+</h2><p>假设细化网格以后模型逐渐收敛：</p>
 \[Q_\ell\rightarrow Q.\]<p>那么相邻两层越来越接近：</p>
 \[Q_\ell-Q_{\ell-1}\rightarrow0.\]<p>更重要的是，其随机方差通常也会下降：</p>
 \[\boxed{ V_\ell = \operatorname{Var}(Q_\ell-Q_{\ell-1}) \downarrow }\]<p>随着：</p>
@@ -459,8 +460,8 @@
 \[\boxed{ Q_3-Q_2\approx0.05 }\]<p>这样的小修正。</p>
 <p>这就是 MLMC 能省计算的根本原因。</p>
 <hr>
-<h1 id="4-最重要的一步同一随机输入必须在相邻层配对">4. 最重要的一步：同一随机输入必须在相邻层配对
-</h1><p>计算：</p>
+<h2 id="4-最重要的一步同一随机输入必须在相邻层配对">4. 最重要的一步：同一随机输入必须在相邻层配对
+</h2><p>计算：</p>
 \[Y_\ell = Q_\ell(X)-Q_{\ell-1}(X)\]<p>时，要让两层使用<strong>同一个 \(X\)</strong>。</p>
 <p>例如随机 Young 模量：</p>
 \[E=E(X),\]<p>粗网格和细网格都必须使用相同材料 realization。</p>
@@ -469,11 +470,11 @@
 \[Q_{\ell-1}(X)\]<p>会高度相关。</p>
 <p>于是虽然两者自身方差可能很大：</p>
 \[\operatorname{Var}(Q_\ell)\gg0,\]<p>但：</p>
-\[\boxed{ \operatorname{Var}(Q_\ell-Q_{\ell-1}) \ll \operatorname{Var}(Q_\ell) }\]<p>这其实和上一期 MFMC 中的 <span class="term-anchor" data-term="control-variate" tabindex="0">control variate</span> 思想有亲缘关系：</p>
+\[\boxed{ \operatorname{Var}(Q_\ell-Q_{\ell-1}) \ll \operatorname{Var}(Q_\ell) }\]<p>这与 MFMC 中的 <span class="term-anchor" data-term="control-variate" tabindex="0">control variate</span> 思想有亲缘关系：</p>
 \[\boxed{\text{利用相关性消掉共同波动}}\]<p>只是 MLMC 的相关模型具有天然的离散层级结构。Giles 的分析正是建立在这种 coupled fine/coarse sample 上。</p>
 <hr>
-<h1 id="5-然后发生一件很漂亮的事情不同层需要的样本数完全不同">5. 然后发生一件很漂亮的事情：不同层需要的样本数完全不同
-</h1><p>MLMC 估计器：</p>
+<h2 id="5-然后发生一件很漂亮的事情不同层需要的样本数完全不同">5. 然后发生一件很漂亮的事情：不同层需要的样本数完全不同
+</h2><p>MLMC 估计器：</p>
 \[\hat Q_{\rm ML} = \frac1{N_0} \sum_{i=1}^{N_0}Q_0^{(i)} + \sum_{\ell=1}^{L} \frac1{N_\ell} \sum_{i=1}^{N_\ell} \left( Q_\ell^{(i)} - Q_{\ell-1}^{(i)} \right).\]<p>对于每一层：</p>
 \[\mathrm{Var} \left[ \frac1{N_\ell} \sum Y_\ell \right] = \frac{V_\ell}{N_\ell}.\]<p>但随着网格细化：</p>
 \[V_\ell\downarrow,\]<p>同时单次计算成本：</p>
@@ -484,43 +485,43 @@
 </blockquote>
 <p>这就是 MLMC 真正的计算结构。</p>
 <hr>
-<h1 id="6-一个有限元例子">6. 一个有限元例子
-</h1><p>假设有四层网格：</p>
+<h2 id="6-一个有限元例子">6. 一个有限元例子
+</h2><p>假设有四层网格：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>层级</th>
-					<th style="text-align: right">单次成本</th>
-					<th style="text-align: right">correction 方差</th>
-					<th style="text-align: right">样本数</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>\(L_0\)</td>
-					<td style="text-align: right">1</td>
-					<td style="text-align: right">10</td>
-					<td style="text-align: right">100000</td>
-			</tr>
-			<tr>
-					<td>\(L_1\)</td>
-					<td style="text-align: right">8</td>
-					<td style="text-align: right">2</td>
-					<td style="text-align: right">20000</td>
-			</tr>
-			<tr>
-					<td>\(L_2\)</td>
-					<td style="text-align: right">64</td>
-					<td style="text-align: right">0.2</td>
-					<td style="text-align: right">3000</td>
-			</tr>
-			<tr>
-					<td>\(L_3\)</td>
-					<td style="text-align: right">512</td>
-					<td style="text-align: right">0.01</td>
-					<td style="text-align: right">200</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>层级</th>
+          <th style="text-align: right">单次成本</th>
+          <th style="text-align: right">correction 方差</th>
+          <th style="text-align: right">样本数</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>\(L_0\)</td>
+          <td style="text-align: right">1</td>
+          <td style="text-align: right">10</td>
+          <td style="text-align: right">100000</td>
+      </tr>
+      <tr>
+          <td>\(L_1\)</td>
+          <td style="text-align: right">8</td>
+          <td style="text-align: right">2</td>
+          <td style="text-align: right">20000</td>
+      </tr>
+      <tr>
+          <td>\(L_2\)</td>
+          <td style="text-align: right">64</td>
+          <td style="text-align: right">0.2</td>
+          <td style="text-align: right">3000</td>
+      </tr>
+      <tr>
+          <td>\(L_3\)</td>
+          <td style="text-align: right">512</td>
+          <td style="text-align: right">0.01</td>
+          <td style="text-align: right">200</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>普通 Monte Carlo 如果使用：</p>
 \[100000\]<p>个最细网格：</p>
@@ -533,8 +534,8 @@
 <p>所以只需要几百次。</p>
 <p>在结构工程有限元案例中，MLMC 已被用于静力、动力和弹塑性随机响应；相关研究报告，在其测试问题上，与经典 Monte Carlo 相比可获得从显著到数个数量级的计算加速。</p>
 <hr>
-<h1 id="7-mlmc-与-mfmc-的真正区别">7. MLMC 与 MFMC 的真正区别
-</h1><p>这是最值得理清的部分。</p>
+<h2 id="7-mlmc-与-mfmc-的真正区别">7. MLMC 与 MFMC 的真正区别
+</h2><p>这是最值得理清的部分。</p>
 <p>MFMC 可以有：</p>
 \[\text{FEM} + \text{Kriging} + \text{ROM} + \text{刚体模型}.\]<p>它主要关心：</p>
 \[\rho(Q_H,Q_L)\]<p>和计算成本。</p>
@@ -544,8 +545,8 @@
 <p>例如：</p>
 \[h_\ell=2^{-\ell}h_0.\]<p>所以可以简单记：</p>
 \[\boxed{ \text{MFMC：不同模型的相关性} }\]\[\boxed{ \text{MLMC：同一模型的离散层级} }\]<hr>
-<h1 id="8-mlmc-的真正目标是同时攻击两种误差">8. MLMC 的真正目标是同时攻击两种误差
-</h1><p>普通有限元 Monte Carlo 有两类误差。</p>
+<h2 id="8-mlmc-的真正目标是同时攻击两种误差">8. MLMC 的真正目标是同时攻击两种误差
+</h2><p>普通有限元 Monte Carlo 有两类误差。</p>
 <h3 id="离散误差">离散误差
 </h3>\[E[Q-Q_L].\]<p>网格越细：</p>
 \[h_L\downarrow\]<p>通常越小。</p>
@@ -559,8 +560,8 @@
 \[\boxed{ \text{让细网格负责控制 bias， 让粗网格负责控制 sampling variance} }\]<p>这句话几乎可以视为 MLMC 最重要的理解。</p>
 <p>Giles 的复杂度理论正是分析 discretization bias、level variance 和 computational cost 三者的衰减/增长速度，并据此判断 MLMC 相比标准 MC 可以获得多大的复杂度改善。</p>
 <hr>
-<h1 id="9-为什么它特别适合-fempde">9. 为什么它特别适合 FEM/PDE？
-</h1><p>因为有限元天然就有：</p>
+<h2 id="9-为什么它特别适合-fempde">9. 为什么它特别适合 FEM/PDE？
+</h2><p>因为有限元天然就有：</p>
 \[\boxed{\text{mesh hierarchy}}\]<p>例如：</p>
 \[10^3\text{ DOF} \rightarrow 10^4 \rightarrow 10^5 \rightarrow 10^6.\]<p>而且随着网格收敛：</p>
 \[Q_\ell-Q_{\ell-1}\]<p>通常越来越小。</p>
@@ -574,8 +575,8 @@
 <p>它们都遵循一个共同原则：</p>
 \[\boxed{ \text{不同尺度的问题，不应该付相同的计算成本} }\]<p>早期随机 PDE 工作已经把 MLMC 应用于随机系数椭圆 PDE；后续大量工作继续发展 MLMC-FEM、MLQMC 等方法。</p>
 <hr>
-<h1 id="10-一个-2026-年仍然很活跃的方向复杂几何上的层级构造">10. 一个 2026 年仍然很活跃的方向：复杂几何上的层级构造
-</h1><details class="reveal">
+<h2 id="10-一个-2026-年仍然很活跃的方向复杂几何上的层级构造">10. 一个 2026 年仍然很活跃的方向：复杂几何上的层级构造
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>MLMC 理论很漂亮，但工程实现有一个实际困难：</p>
@@ -590,8 +591,8 @@
 </details>
 
 <hr>
-<h1 id="11-mlmc-对可靠性分析有没有用">11. MLMC 对可靠性分析有没有用？
-</h1><p>可以，但需要谨慎。</p>
+<h2 id="11-mlmc-对可靠性分析有没有用">11. MLMC 对可靠性分析有没有用？
+</h2><p>可以，但需要谨慎。</p>
 <p>失效概率：</p>
 \[P_f = E[I(g(X)\le0)].\]<p>可以定义：</p>
 \[Q_\ell = I(g_\ell(X)\le0).\]<p>然后：</p>
@@ -604,8 +605,8 @@
 \[\boxed{\text{把高保真样本集中在 }g\approx0}\]<p>MLMC reliability 则是：</p>
 \[\boxed{ \text{让高精度模型主要纠正 coarse/fine disagreement} }\]<p>二者本质上都在减少：</p>
 \[\boxed{\text{昂贵计算用于“显然答案”的次数}}\]<hr>
-<h1 id="12-对工程研究最值得迁移的一点">12. 对工程研究最值得迁移的一点
-</h1><p>MLMC 最深刻的地方其实不是 telescoping identity。</p>
+<h2 id="12-对工程研究最值得迁移的一点">12. 对工程研究最值得迁移的一点
+</h2><p>MLMC 最深刻的地方其实不是 telescoping identity。</p>
 <p>而是一个计算资源分配原则：</p>
 \[\boxed{ \text{精度应该被当作一种可分配资源。} }\]<p>我们常常默认一次仿真只有两种状态：</p>
 \[\text{算} \quad/\quad \text{不算}.\]<p>MLMC 则把它改写为：</p>
@@ -626,8 +627,8 @@
 </h2><p>如果说 MFMC 的核心是：</p>
 \[\boxed{ \text{“便宜模型虽然不准，但能告诉我昂贵模型的涨跌。”} }\]<p>那么 MLMC 的核心就是：</p>
 \[\boxed{ \text{“粗模型负责大部分统计，高精度模型只负责修正粗模型不知道的那一点。”} }\]<p>所以它真正改变的不是 Monte Carlo 本身，而是：</p>
-\[\boxed{\text{计算精度与采样数量之间的资源配置方式。}}\]<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+\[\boxed{\text{计算精度与采样数量之间的资源配置方式。}}\]<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -827,9 +828,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>

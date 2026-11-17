@@ -5,7 +5,7 @@
         <link>https://assranai.github.io/tags/gpu-%E7%B3%BB%E7%BB%9F/</link>
         <description>Recent content in GPU 系统 on Assranai&#39;s 手账</description>
         <generator>Hugo -- gohugo.io</generator>
-        <language>en-us</language>
+        <language>zh-cn</language>
         <copyright>Assranai</copyright>
         <lastBuildDate>Sun, 04 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://assranai.github.io/tags/gpu-%E7%B3%BB%E7%BB%9F/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>PagedAttention：LLM 推理的关键突破，有时不是“更快算 Attention”，而是“像操作系统一样管理显存”</title>
@@ -17,7 +17,8 @@
 &lt;strong&gt;领域：AI 全栈工程 × 大模型推理 × GPU 系统&lt;/strong&gt;
 &lt;strong&gt;推荐阅读时间：约 8–10 分钟&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;PagedAttention 值得深入理解，因为它展示了一个很典型的系统工程现象：&lt;/p&gt;
-$$\boxed{\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}$$&lt;p&gt;vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 &lt;strong&gt;20.4%–38.2%&lt;/strong&gt;；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 &lt;strong&gt;2–4× serving throughput&lt;/strong&gt;。([arXiv][1])&lt;/p&gt;
+$$\boxed{\text{模型算法没有变，显存管理方式变了，吞吐量却能成倍提高。}}$$&lt;p&gt;vLLM 团队在 SOSP 2023 的论文中指出，当时很多 LLM serving 系统中真正存储有效 token KV 的空间只有 KV Cache 预留空间的 &lt;strong&gt;20.4%–38.2%&lt;/strong&gt;；大量显存被预留、内部碎片和外部碎片占据。PagedAttention 借鉴操作系统的 virtual memory / paging，把连续的“逻辑 KV Cache”映射到不连续的物理显存块。原论文实验中，vLLM 在相近延迟水平下获得了约 &lt;strong&gt;2–4× serving throughput&lt;/strong&gt;。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;更值得学的是它背后的思想：&lt;/p&gt;
 $$\boxed{\text{资源布局本身，也是算法的一部分。}}$$&lt;hr&gt;
 &lt;h2 id=&#34;1-为什么-llm-推理会突然变成内存管理问题&#34;&gt;1. 为什么 LLM 推理会突然变成“内存管理问题”？
@@ -31,13 +32,14 @@ $$K,V.$$&lt;p&gt;下一步只计算新 token 的：&lt;/p&gt;
 $$K_t,V_t$$&lt;p&gt;再读取历史 cache。&lt;/p&gt;
 &lt;p&gt;因此 decode 阶段大致变成：&lt;/p&gt;
 $$\text{计算一个新 token} + \boxed{\text{读取越来越大的历史 KV}}$$&lt;p&gt;而且生成过程严格自回归：&lt;/p&gt;
-$$x_1\rightarrow x_2\rightarrow\cdots$$&lt;p&gt;单请求的 GPU 并行度并不高。原始 vLLM 论文指出，这使 generation/decode 阶段高度 memory-bound，提高吞吐量的关键之一是同时 batch 更多请求。([arXiv][1])&lt;/p&gt;
+$$x_1\rightarrow x_2\rightarrow\cdots$$&lt;p&gt;单请求的 GPU 并行度并不高。原始 vLLM 论文指出，这使 generation/decode 阶段高度 memory-bound，提高吞吐量的关键之一是同时 batch 更多请求。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;于是产生了一个链条：&lt;/p&gt;
 $$\boxed{ \text{KV Cache 占用} \rightarrow \text{能容纳多少并发 sequence} \rightarrow \text{batch size} \rightarrow \text{GPU utilization} \rightarrow \text{吞吐量} }$$&lt;p&gt;所以浪费 10 GB 显存并不只是“浪费 10 GB”。&lt;/p&gt;
 &lt;p&gt;它可能意味着：&lt;/p&gt;
 $$\boxed{\text{少跑一大批并发请求。}}$$&lt;hr&gt;
-&lt;h1 id=&#34;2-kv-cache-到底有多大&#34;&gt;2. KV Cache 到底有多大？
-&lt;/h1&gt;&lt;p&gt;对于传统 multi-head/GQA Transformer，一个 token 的 KV Cache 大致为：&lt;/p&gt;
+&lt;h2 id=&#34;2-kv-cache-到底有多大&#34;&gt;2. KV Cache 到底有多大？
+&lt;/h2&gt;&lt;p&gt;对于传统 multi-head/GQA Transformer，一个 token 的 KV Cache 大致为：&lt;/p&gt;
 $$M_{\rm token} = 2 \times L \times H_{\rm KV} \times d_{\rm head} \times b$$&lt;p&gt;其中：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;\(2\)：Key + Value；&lt;/li&gt;
@@ -49,16 +51,17 @@ $$M_{\rm token} = 2 \times L \times H_{\rm KV} \times d_{\rm head} \times b$$&lt
 &lt;p&gt;举一个示意模型：&lt;/p&gt;
 $$L=32,\quad H_{\rm KV}=8,\quad d_{\rm head}=128,$$&lt;p&gt;BF16：&lt;/p&gt;
 $$b=2.$$&lt;p&gt;那么：&lt;/p&gt;
-$$M_{\rm token} = 2\times32\times8\times128\times2 = 128\text{ KB/token}.$$&lt;p&gt;一个：&lt;/p&gt;
+$$M_{\rm token} = 2\times32\times8\times128\times2 = 131072\text{ B/token} = 128\text{ KiB/token}.$$&lt;p&gt;一个：&lt;/p&gt;
 $$8192$$&lt;p&gt;token sequence 就大约需要：&lt;/p&gt;
-$$\boxed{1\text{ GB KV Cache}}$$&lt;p&gt;这还只是一个请求。&lt;/p&gt;
+$$\boxed{1\text{ GiB KV Cache}}$$&lt;p&gt;这还只是一个请求。&lt;/p&gt;
 &lt;p&gt;如果同时服务：&lt;/p&gt;
 $$40$$&lt;p&gt;条长 sequence：&lt;/p&gt;
-$$\approx40\text{ GB}.$$&lt;p&gt;所以长上下文时代，KV Cache 很容易从“附属数据”变成 inference infrastructure 的核心资源。&lt;/p&gt;
-&lt;p&gt;vLLM 原论文举的历史例子更夸张：OPT-13B FP16 每 token KV 约 800 KB，因此长度 2048 的单个请求最大约需 1.6 GB KV Cache。([arXiv][1])&lt;/p&gt;
+$$\approx40\text{ GiB}.$$&lt;p&gt;所以长上下文时代，KV Cache 很容易从“附属数据”变成 inference infrastructure 的核心资源。&lt;/p&gt;
+&lt;p&gt;vLLM 原论文举的历史例子更夸张：OPT-13B FP16 每 token KV 约 800 KB，因此长度 2048 的单个请求最大约需 1.6 GB KV Cache。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;3-真正麻烦的还不是大而是长度事先不知道&#34;&gt;3. 真正麻烦的还不是“大”，而是长度事先不知道
-&lt;/h1&gt;&lt;p&gt;假设用户请求：&lt;/p&gt;
+&lt;h2 id=&#34;3-真正麻烦的还不是大而是长度事先不知道&#34;&gt;3. 真正麻烦的还不是“大”，而是长度事先不知道
+&lt;/h2&gt;&lt;p&gt;假设用户请求：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -116,11 +119,12 @@ $$50？ \quad500？ \quad2000？$$&lt;p&gt;token。&lt;/p&gt;
 &lt;li&gt;释放。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;这就是经典动态内存管理问题：&lt;/p&gt;
-$$\boxed{ \text{internal fragmentation} + \text{external fragmentation} }$$&lt;p&gt;vLLM 团队测得，当时一些连续分配方案中真正用于 token state 的 KV 空间比例最低只有约 20.4%。([arXiv][1])&lt;/p&gt;
+$$\boxed{ \text{internal fragmentation} + \text{external fragmentation} }$$&lt;p&gt;vLLM 团队测得，当时一些连续分配方案中真正用于 token state 的 KV 空间比例最低只有约 20.4%。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;这时继续优化矩阵乘 kernel 已经无法解决根本问题。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;4-pagedattention-的核心其实来自操作系统&#34;&gt;4. PagedAttention 的核心其实来自操作系统
-&lt;/h1&gt;&lt;p&gt;操作系统几十年前遇到过几乎同样的问题。&lt;/p&gt;
+&lt;h2 id=&#34;4-pagedattention-的核心其实来自操作系统&#34;&gt;4. PagedAttention 的核心其实来自操作系统
+&lt;/h2&gt;&lt;p&gt;操作系统几十年前遇到过几乎同样的问题。&lt;/p&gt;
 &lt;p&gt;一个进程认为自己拥有连续虚拟地址：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -155,34 +159,34 @@ $$\boxed{ \text{internal fragmentation} + \text{external fragmentation} }$$&lt;p
 $$\boxed{\text{page table}}$$&lt;p&gt;建立：&lt;/p&gt;
 $$\text{logical page} \rightarrow \text{physical frame}.$$&lt;p&gt;PagedAttention 把这个思想迁移过来：&lt;/p&gt;
 &lt;table&gt;
-	&lt;thead&gt;
-			&lt;tr&gt;
-					&lt;th&gt;OS&lt;/th&gt;
-					&lt;th&gt;LLM&lt;/th&gt;
-			&lt;/tr&gt;
-	&lt;/thead&gt;
-	&lt;tbody&gt;
-			&lt;tr&gt;
-					&lt;td&gt;process&lt;/td&gt;
-					&lt;td&gt;sequence/request&lt;/td&gt;
-			&lt;/tr&gt;
-			&lt;tr&gt;
-					&lt;td&gt;virtual page&lt;/td&gt;
-					&lt;td&gt;logical KV block&lt;/td&gt;
-			&lt;/tr&gt;
-			&lt;tr&gt;
-					&lt;td&gt;physical frame&lt;/td&gt;
-					&lt;td&gt;GPU KV block&lt;/td&gt;
-			&lt;/tr&gt;
-			&lt;tr&gt;
-					&lt;td&gt;page table&lt;/td&gt;
-					&lt;td&gt;block table&lt;/td&gt;
-			&lt;/tr&gt;
-			&lt;tr&gt;
-					&lt;td&gt;bytes&lt;/td&gt;
-					&lt;td&gt;token KV states&lt;/td&gt;
-			&lt;/tr&gt;
-	&lt;/tbody&gt;
+  &lt;thead&gt;
+      &lt;tr&gt;
+          &lt;th&gt;OS&lt;/th&gt;
+          &lt;th&gt;LLM&lt;/th&gt;
+      &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+      &lt;tr&gt;
+          &lt;td&gt;process&lt;/td&gt;
+          &lt;td&gt;sequence/request&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;virtual page&lt;/td&gt;
+          &lt;td&gt;logical KV block&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;physical frame&lt;/td&gt;
+          &lt;td&gt;GPU KV block&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;page table&lt;/td&gt;
+          &lt;td&gt;block table&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;bytes&lt;/td&gt;
+          &lt;td&gt;token KV states&lt;/td&gt;
+      &lt;/tr&gt;
+  &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;于是一个 sequence：&lt;/p&gt;
 $$[1,2,3,4,5,\ldots]$$&lt;p&gt;逻辑上连续，&lt;/p&gt;
@@ -205,10 +209,11 @@ $$[1,2,3,4,5,\ldots]$$&lt;p&gt;逻辑上连续，&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;attention kernel 根据 block table 去取。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;物理连续性不再是逻辑连续性的必要条件。&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;这就是 PagedAttention 最核心的突破。([arXiv][1])&lt;/p&gt;
+&lt;p&gt;这就是 PagedAttention 最核心的突破。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;5-它并没有近似-attention&#34;&gt;5. 它并没有近似 Attention
-&lt;/h1&gt;&lt;p&gt;这是一个很重要的澄清。&lt;/p&gt;
+&lt;h2 id=&#34;5-它并没有近似-attention&#34;&gt;5. 它并没有近似 Attention
+&lt;/h2&gt;&lt;p&gt;这是一个很重要的澄清。&lt;/p&gt;
 &lt;p&gt;正常 attention：&lt;/p&gt;
 $$a_{ij} = \operatorname{softmax} \left( \frac{q_i^Tk_j}{\sqrt d} \right).$$&lt;p&gt;PagedAttention 仍然读取这些：&lt;/p&gt;
 $$K,V$$&lt;p&gt;完成 attention。&lt;/p&gt;
@@ -216,10 +221,11 @@ $$K,V$$&lt;p&gt;完成 attention。&lt;/p&gt;
 $$\boxed{\text{这些 }K,V\text{ 在物理显存中的布局}}$$&lt;p&gt;因此它本质上属于：&lt;/p&gt;
 $$\boxed{\text{memory virtualization}}$$&lt;p&gt;而不是：&lt;/p&gt;
 $$\text{sparse attention}$$&lt;p&gt;或：&lt;/p&gt;
-$$\text{approximate attention}.$$&lt;p&gt;vLLM 官方当前实现仍以固定 token 数的 cache block 为基本管理单元，其 cache 配置中明确包含 &lt;code&gt;block_size&lt;/code&gt;、KV Cache memory size、prefix caching、KV offloading 等参数。([vLLM][2])&lt;/p&gt;
+$$\text{approximate attention}.$$&lt;p&gt;vLLM 官方当前实现仍以固定 token 数的 cache block 为基本管理单元，其 cache 配置中明确包含 &lt;code&gt;block_size&lt;/code&gt;、KV Cache memory size、prefix caching、KV offloading 等参数。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/config/cache/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;6-为什么分页以后碎片突然变得容易控制&#34;&gt;6. 为什么分页以后碎片突然变得容易控制？
-&lt;/h1&gt;&lt;p&gt;假设 block size 为：&lt;/p&gt;
+&lt;h2 id=&#34;6-为什么分页以后碎片突然变得容易控制&#34;&gt;6. 为什么分页以后碎片突然变得容易控制？
+&lt;/h2&gt;&lt;p&gt;假设 block size 为：&lt;/p&gt;
 $$B=16\text{ tokens}.$$&lt;p&gt;一个 100 token 请求需要：&lt;/p&gt;
 $$\left\lceil\frac{100}{16}\right\rceil=7$$&lt;p&gt;个 block。&lt;/p&gt;
 &lt;p&gt;真正浪费只发生在最后一个 block：&lt;/p&gt;
@@ -234,10 +240,11 @@ $$\boxed{&lt;1\text{ block/request}}$$&lt;p&gt;同时所有 physical block 都�
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;任何释放出来的 block 都可以供另一个 sequence 使用。&lt;/p&gt;
-&lt;p&gt;这基本消除了经典意义上的 external fragmentation。原论文正是通过固定大小 block、按需分配实现 near-zero KV Cache memory waste。([arXiv][1])&lt;/p&gt;
+&lt;p&gt;这基本消除了经典意义上的 external fragmentation。原论文正是通过固定大小 block、按需分配实现 near-zero KV Cache memory waste。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;7-更厉害的是page-还能共享&#34;&gt;7. 更厉害的是：page 还能共享
-&lt;/h1&gt;&lt;p&gt;假设用户要求：&lt;/p&gt;
+&lt;h2 id=&#34;7-更厉害的是page-还能共享&#34;&gt;7. 更厉害的是：page 还能共享
+&lt;/h2&gt;&lt;p&gt;假设用户要求：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;对同一个 prompt 生成 8 个候选答案。&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -277,12 +284,14 @@ $$K,V$$&lt;p&gt;被复制 8 份。&lt;/p&gt;
 &lt;p&gt;只有发生分叉后才分配自己的 block。&lt;/p&gt;
 &lt;p&gt;这其实就是：&lt;/p&gt;
 $$\boxed{\text{Copy-on-Write}}$$&lt;p&gt;思想。&lt;/p&gt;
-&lt;p&gt;原论文在 beam search 场景中报告，block sharing 在其测试中最高可以节省约 55% 的 KV memory。([arXiv][1])&lt;/p&gt;
+&lt;p&gt;原论文在 beam search 场景中报告，block sharing 在其测试中最高可以节省约 55% 的 KV memory。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;这个能力后来也自然演化出了：&lt;/p&gt;
-$$\boxed{\text{Prefix Caching}}$$&lt;p&gt;如果不同请求拥有完全相同的 prefix，就可以复用已经计算好的 KV blocks。vLLM 官方实现使用 block tokens 与此前 prefix 来标识 cache block。([vLLM][3])&lt;/p&gt;
+$$\boxed{\text{Prefix Caching}}$$&lt;p&gt;如果不同请求拥有完全相同的 prefix，就可以复用已经计算好的 KV blocks。vLLM 官方实现使用 block tokens 与此前 prefix 来标识 cache block。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;8-pagedattention-和-continuous-batching-为什么经常一起出现&#34;&gt;8. PagedAttention 和 Continuous Batching 为什么经常一起出现？
-&lt;/h1&gt;&lt;p&gt;这是理解 serving stack 的关键。&lt;/p&gt;
+&lt;h2 id=&#34;8-pagedattention-和-continuous-batching-为什么经常一起出现&#34;&gt;8. PagedAttention 和 Continuous Batching 为什么经常一起出现？
+&lt;/h2&gt;&lt;p&gt;这是理解 serving stack 的关键。&lt;/p&gt;
 &lt;p&gt;Continuous batching 做的是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;一个 request 完成，就立即把新 request 加入执行 batch。&lt;/p&gt;
@@ -330,20 +339,23 @@ $$\boxed{\text{Prefix Caching}}$$&lt;p&gt;如果不同请求拥有完全相同�
 &lt;p&gt;PagedAttention 提供：&lt;/p&gt;
 $$\boxed{\text{细粒度可组合显存}}$$&lt;p&gt;Continuous batching 提供：&lt;/p&gt;
 $$\boxed{\text{细粒度 request scheduling}}$$&lt;p&gt;二者结合后才真正形成：&lt;/p&gt;
-$$\boxed{ \text{空出来一点资源} \Rightarrow \text{马上拿去服务另一个请求} }$$&lt;p&gt;vLLM 官方目前仍把 PagedAttention 和 continuous batching 同时列为其高吞吐 serving 的核心能力。([vLLM][4])&lt;/p&gt;
+$$\boxed{ \text{空出来一点资源} \Rightarrow \text{马上拿去服务另一个请求} }$$&lt;p&gt;vLLM 官方目前仍把 PagedAttention 和 continuous batching 同时列为其高吞吐 serving 的核心能力。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.10.0/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;9-它和-flashattention-到底是什么关系&#34;&gt;9. 它和 FlashAttention 到底是什么关系？
-&lt;/h1&gt;&lt;p&gt;这两个名字很容易混在一起，但解决的是不同层的问题。&lt;/p&gt;
+&lt;h2 id=&#34;9-它和-flashattention-到底是什么关系&#34;&gt;9. 它和 FlashAttention 到底是什么关系？
+&lt;/h2&gt;&lt;p&gt;这两个名字很容易混在一起，但解决的是不同层的问题。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;FlashAttention&lt;/strong&gt; 问：&lt;/p&gt;
-$$\boxed{ \text{一次 attention computation 怎样减少 HBM↔SRAM 数据搬运？} }$$&lt;p&gt;它通过 tiling、kernel fusion 等方式降低 GPU 内存层级间的 IO，是：&lt;/p&gt;
-$$\boxed{\text{kernel / algorithmic IO optimization}}$$&lt;p&gt;。([arXiv][5])&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;PagedAttention&lt;/strong&gt; 问：&lt;/p&gt;
+$$\boxed{ \text{一次 attention computation 怎样减少 HBM↔SRAM 数据搬运？} }$$&lt;p&gt;它通过 tiling、kernel fusion 等方式降低 GPU 内存层级间的 IO。&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2205.14135&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;FlashAttention 论文&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;它的优化对象是&lt;/p&gt;
+$$\boxed{\text{kernel / algorithmic IO optimization}}$$&lt;p&gt;&lt;strong&gt;PagedAttention&lt;/strong&gt; 问：&lt;/p&gt;
 $$\boxed{ \text{几百个动态 sequence 的历史 KV 到底怎样放进 GPU memory？} }$$&lt;p&gt;它属于：&lt;/p&gt;
 $$\boxed{\text{serving memory management}}$$&lt;p&gt;所以可以简单记成：&lt;/p&gt;
-$$\boxed{ \text{FlashAttention：一次 Attention 怎样算得更高效} }$$$$\boxed{ \text{PagedAttention：大量请求的 KV 怎样活得更高效} }$$&lt;p&gt;现代系统完全可以同时使用两类优化；当前 vLLM 文档也明确列出了 FlashAttention/FlashInfer 等 optimized kernel 与其 KV Cache 管理能力。([vLLM][4])&lt;/p&gt;
+$$\boxed{ \text{FlashAttention：一次 Attention 怎样算得更高效} }$$$$\boxed{ \text{PagedAttention：大量请求的 KV 怎样活得更高效} }$$&lt;p&gt;现代系统完全可以同时使用两类优化；当前 vLLM 文档也明确列出了 FlashAttention/FlashInfer 等 optimized kernel 与其 KV Cache 管理能力。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.10.0/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;10-pagedattention-真正改变的是容量--吞吐的转换率&#34;&gt;10. PagedAttention 真正改变的是“容量 → 吞吐”的转换率
-&lt;/h1&gt;&lt;p&gt;假设 GPU 能给 KV Cache 留：&lt;/p&gt;
+&lt;h2 id=&#34;10-pagedattention-真正改变的是容量--吞吐的转换率&#34;&gt;10. PagedAttention 真正改变的是“容量 → 吞吐”的转换率
+&lt;/h2&gt;&lt;p&gt;假设 GPU 能给 KV Cache 留：&lt;/p&gt;
 $$40\text{ GB}.$$&lt;p&gt;方案 A 的有效利用率只有：&lt;/p&gt;
 $$40\%.$$&lt;p&gt;真正保存 token states：&lt;/p&gt;
 $$16\text{ GB}.$$&lt;p&gt;方案 B 达到：&lt;/p&gt;
@@ -358,10 +370,11 @@ $$38\text{ GB}.$$&lt;p&gt;即使：&lt;/p&gt;
 $$&gt;2\times.$$&lt;p&gt;decode 又恰恰需要 batch 才能有效利用 GPU。&lt;/p&gt;
 &lt;p&gt;所以：&lt;/p&gt;
 $$\boxed{ \text{memory utilization} \rightarrow \text{batch capacity} \rightarrow \text{compute utilization} }$$&lt;p&gt;形成乘法效应。&lt;/p&gt;
-&lt;p&gt;这解释了为什么一个“内存分配算法”能最终体现为明显的 tokens/s 提升。原始 vLLM 实验报告的 2–4× throughput 增益本质上正来自这种系统级连锁。([arXiv][1])&lt;/p&gt;
+&lt;p&gt;这解释了为什么一个“内存分配算法”能最终体现为明显的 tokens/s 提升。原始 vLLM 实验报告的 2–4× throughput 增益本质上正来自这种系统级连锁。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;11-这个方法的代价是什么&#34;&gt;11. 这个方法的代价是什么？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;11-这个方法的代价是什么&#34;&gt;11. 这个方法的代价是什么？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看代码与实现&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;Paging 绝不是免费午餐。&lt;/p&gt;
@@ -394,8 +407,8 @@ $$\boxed{ \text{用一点访问复杂度， 换取大量更有价值的并发容
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;12-它也没有解决长上下文的所有问题&#34;&gt;12. 它也没有解决长上下文的所有问题
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;12-它也没有解决长上下文的所有问题&#34;&gt;12. 它也没有解决长上下文的所有问题
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;PagedAttention 解决：&lt;/p&gt;
@@ -415,7 +428,8 @@ $$1M\text{ token KV}$$&lt;p&gt;还是 1M token KV。&lt;/p&gt;
 &lt;li&gt;CPU/NVMe KV offloading；&lt;/li&gt;
 &lt;li&gt;disaggregated prefill/decode。&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;当前 vLLM 稳定版配置已经显式支持 KV Cache dtype、memory bytes、prefix caching 和 KV offloading 等机制。([vLLM][2])&lt;/p&gt;
+&lt;p&gt;当前 vLLM 稳定版配置已经显式支持 KV Cache dtype、memory bytes、prefix caching 和 KV offloading 等机制。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/config/cache/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;p&gt;所以 PagedAttention 更准确的位置是：&lt;/p&gt;
 $$\boxed{ \text{KV Cache 系统架构的基础设施层} }$$&lt;p&gt;而不是长上下文问题的终点。&lt;/p&gt;
 
@@ -423,8 +437,8 @@ $$\boxed{ \text{KV Cache 系统架构的基础设施层} }$$&lt;p&gt;而不是�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;13-对-ai-agent-系统尤其有价值的启发&#34;&gt;13. 对 AI Agent 系统尤其有价值的启发
-&lt;/h1&gt;&lt;p&gt;Agent workload 往往不是简单：&lt;/p&gt;
+&lt;h2 id=&#34;13-对-ai-agent-系统尤其有价值的启发&#34;&gt;13. 对 AI Agent 系统尤其有价值的启发
+&lt;/h2&gt;&lt;p&gt;Agent workload 往往不是简单：&lt;/p&gt;
 $$\text{prompt}\rightarrow\text{一次回答}.$$&lt;p&gt;而可能是：&lt;/p&gt;
 $$\text{system prompt} +\text{长历史} +\text{工具调用} +\text{新 observation} +\text{继续推理}.$$&lt;p&gt;于是大量请求可能共享：&lt;/p&gt;
 $$\boxed{\text{相同或部分相同的 prefix}}$$&lt;p&gt;例如同一 Agent 的：&lt;/p&gt;
@@ -446,8 +460,8 @@ $$\boxed{\text{它已经不只是 inference 临时内存，而是一种可复用
 &lt;p&gt;这越来越像：&lt;/p&gt;
 $$\text{数据库} + \text{操作系统} + \text{分布式缓存}$$&lt;p&gt;问题，而不只是深度学习问题。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;14-对物理引擎科学计算也有一个很强的迁移&#34;&gt;14. 对物理引擎/科学计算也有一个很强的迁移
-&lt;/h1&gt;&lt;p&gt;PagedAttention 最深层的思想其实与 Attention 无关：&lt;/p&gt;
+&lt;h2 id=&#34;14-对物理引擎科学计算也有一个很强的迁移&#34;&gt;14. 对物理引擎/科学计算也有一个很强的迁移
+&lt;/h2&gt;&lt;p&gt;PagedAttention 最深层的思想其实与 Attention 无关：&lt;/p&gt;
 $$\boxed{ \text{logical continuity 不需要 physical continuity。} }$$&lt;p&gt;这在大型 simulation system 中也很有价值。&lt;/p&gt;
 &lt;p&gt;例如：&lt;/p&gt;
 &lt;ul&gt;
@@ -473,8 +487,8 @@ $$\boxed{ \text{逻辑数据结构} \quad\neq\quad \text{物理内存布局} }$$
 $$\boxed{\text{indirection layer}}$$&lt;p&gt;以后，调度器获得了巨大的自由度。&lt;/p&gt;
 &lt;p&gt;这是一种极其通用的高性能系统设计方法。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h2 id=&#34;一个很实用的部署诊断思路&#34;&gt;一个很实用的部署诊断思路
-&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h3 id=&#34;一个很实用的部署诊断思路&#34;&gt;一个很实用的部署诊断思路
+&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看代码与实现&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;如果以后部署自己的 LLM/Agent 服务，不要只监控：&lt;/p&gt;
@@ -501,8 +515,8 @@ $$\boxed{\text{serving memory capacity / scheduling}}$$&lt;p&gt;这一层。&lt;
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h1&gt;&lt;p&gt;PagedAttention 最值得记住的并不是：&lt;/p&gt;
+&lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h2&gt;&lt;p&gt;PagedAttention 最值得记住的并不是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“把 KV Cache 分成 block。”&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -515,38 +529,33 @@ $$\boxed{\text{virtual memory}}$$&lt;p&gt;重新映射到：&lt;/p&gt;
 $$\boxed{\text{KV Cache}}$$&lt;p&gt;上。&lt;/p&gt;
 &lt;p&gt;最后得到的启发非常普遍：&lt;/p&gt;
 $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确定、存在共享机会”的特点时， 优先考虑把逻辑地址与物理存储解耦。} }$$&lt;p&gt;这是一个远远超出 LLM serving 的工程思想。&lt;/p&gt;
-&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
-&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看扩展内容&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;ol&gt;
 &lt;li&gt;
-&lt;p&gt;&lt;strong&gt;Kwon et al., &lt;em&gt;Efficient Memory Management for Large Language Model Serving with PagedAttention&lt;/em&gt;, SOSP 2023&lt;/strong&gt;。原始论文，也是今天最值得读的来源；重点建议看 §3 Memory Challenges、§4 PagedAttention/KV Cache Manager 和评估中的 memory waste。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  title=&#34;Efficient Memory Management for Large Language Model Serving with PagedAttention&#34;
-     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;&lt;strong&gt;Kwon et al., &lt;em&gt;Efficient Memory Management for Large Language Model Serving with PagedAttention&lt;/em&gt;, SOSP 2023&lt;/strong&gt;。原始论文，也是今天最值得读的来源；重点建议看 §3 Memory Challenges、§4 PagedAttention/KV Cache Manager 和评估中的 memory waste。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)
-&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2309.06180&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;论文页面&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;&lt;strong&gt;vLLM 官方 PagedAttention / KV Cache 文档&lt;/strong&gt;。适合从概念进入现在的工程实现，官方 API 已经直接暴露 block size、KV Cache memory、cache dtype、prefix caching 和 offloading 等配置。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.16.0/api/vllm/v1/attention/ops/paged_attn/?utm_source=chatgpt.com&#34;  title=&#34;paged_attn - vLLM&#34;
-     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;&lt;strong&gt;vLLM 官方 PagedAttention / KV Cache 文档&lt;/strong&gt;。适合从概念进入现在的工程实现，官方 API 已经直接暴露 block size、KV Cache memory、cache dtype、prefix caching 和 offloading 等配置。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.16.0/api/vllm/v1/attention/ops/paged_attn/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)
-&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/?utm_source=chatgpt.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM 官方文档&lt;/a&gt;&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;&lt;strong&gt;vLLM Automatic Prefix Caching Implementation&lt;/strong&gt;。很适合继续理解“paged memory → block sharing → prefix caching”这条演化路线，以及 block 如何通过 token/prefix 被唯一识别。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html&#34;  title=&#34;Implementation — vLLM&#34;
-     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;&lt;strong&gt;vLLM Automatic Prefix Caching Implementation&lt;/strong&gt;。很适合继续理解“paged memory → block sharing → prefix caching”这条演化路线，以及 block 如何通过 token/prefix 被唯一识别。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/v0.6.1/automatic_prefix_caching/details.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;&lt;strong&gt;Dao et al., &lt;em&gt;FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness&lt;/em&gt;, NeurIPS 2022&lt;/strong&gt;。建议与 PagedAttention 对照阅读：前者优化 attention kernel 的 HBM↔SRAM IO，后者优化 serving 时 KV Cache 的生命周期与物理布局。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com&#34;  title=&#34;FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness&#34;
-     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;&lt;strong&gt;Dao et al., &lt;em&gt;FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness&lt;/em&gt;, NeurIPS 2022&lt;/strong&gt;。建议与 PagedAttention 对照阅读：前者优化 attention kernel 的 HBM↔SRAM IO，后者优化 serving 时 KV Cache 的生命周期与物理布局。(&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2205.14135&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;arXiv&lt;/a&gt;)&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;如果继续追近期 KV 系统方向，可以关注 &lt;strong&gt;KV Cache quantization、eviction、offloading、prefix caching 和 prefill/decode disaggregation&lt;/strong&gt;；当前 vLLM 已经把其中多项纳入生产 serving stack，这条线比单独研究某一个 CUDA kernel 更接近现代 LLM inference system 的全貌。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/?utm_source=chatgpt.com&#34;  title=&#34;vllm - vLLM&#34;
-     target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;如果继续追近期 KV 系统方向，可以关注 &lt;strong&gt;KV Cache quantization、eviction、offloading、prefix caching 和 prefill/decode disaggregation&lt;/strong&gt;；当前 vLLM 已经把其中多项纳入生产 serving stack，这条线比单独研究某一个 CUDA kernel 更接近现代 LLM inference system 的全貌。(&lt;a class=&#34;link&#34; href=&#34;https://docs.vllm.ai/en/stable/api/vllm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;vLLM&lt;/a&gt;)&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
@@ -634,8 +643,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[\boxed{ \text{batch occupancy 随生成过程不断下降。} }\]&lt;p&gt;而刚结束的槽位却不能立即给排队的新请求使用。&lt;/p&gt;
 &lt;p&gt;Orca 论文正是针对这种 generative workload 的 multi-iteration 特性提出 iteration-level scheduling。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;2-continuous-batching-的核心操作其实非常简单&#34;&gt;2. Continuous Batching 的核心操作其实非常简单
-&lt;/h1&gt;&lt;p&gt;假设 GPU 最大允许：&lt;/p&gt;
+&lt;h2 id=&#34;2-continuous-batching-的核心操作其实非常简单&#34;&gt;2. Continuous Batching 的核心操作其实非常简单
+&lt;/h2&gt;&lt;p&gt;假设 GPU 最大允许：&lt;/p&gt;
 \[B_{\max}=4.\]&lt;p&gt;初始：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -698,8 +707,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[\boxed{ B_t= \{\text{第 }t\text{ 次迭代被调度的活跃 sequences}\} }\]&lt;p&gt;并且：&lt;/p&gt;
 \[B_t\neq B_{t+1}.\]&lt;p&gt;Hugging Face 当前 ContinuousBatchingManager 的行为就是每轮检查已完成请求，并立即用队列中的请求补充 GPU 容量。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;3-为什么一次-token-iteration才是自然的调度单位&#34;&gt;3. 为什么“一次 token iteration”才是自然的调度单位？
-&lt;/h1&gt;&lt;p&gt;因为 autoregressive decode 的最小同步计算单位就是：&lt;/p&gt;
+&lt;h2 id=&#34;3-为什么一次-token-iteration才是自然的调度单位&#34;&gt;3. 为什么“一次 token iteration”才是自然的调度单位？
+&lt;/h2&gt;&lt;p&gt;因为 autoregressive decode 的最小同步计算单位就是：&lt;/p&gt;
 \[\boxed{\text{每个活跃 sequence 生成一个 token}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;假设当前有：&lt;/p&gt;
 \[B\]&lt;p&gt;个 sequence。&lt;/p&gt;
@@ -725,8 +734,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;调度粒度应该匹配工作负载真正可以被抢占和重组的粒度。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;4-但问题随即出现不同-sequence-的长度根本不一样&#34;&gt;4. 但问题随即出现：不同 sequence 的长度根本不一样
-&lt;/h1&gt;&lt;p&gt;假设：&lt;/p&gt;
+&lt;h2 id=&#34;4-但问题随即出现不同-sequence-的长度根本不一样&#34;&gt;4. 但问题随即出现：不同 sequence 的长度根本不一样
+&lt;/h2&gt;&lt;p&gt;假设：&lt;/p&gt;
 \[A\]&lt;p&gt;已经生成到 1000 token，&lt;/p&gt;
 &lt;p&gt;而：&lt;/p&gt;
 \[B\]&lt;p&gt;才 50 token。&lt;/p&gt;
@@ -741,8 +750,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/ul&gt;
 &lt;p&gt;这也是为什么 Orca 不只是“写一个队列”——真正困难的是让变长 sequence 在 Transformer execution engine 里能够高效共存。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;5-这正好解释了-pagedattention-为什么后来如此重要&#34;&gt;5. 这正好解释了 PagedAttention 为什么后来如此重要
-&lt;/h1&gt;&lt;p&gt;前面知识卡片讲过 &lt;span class=&#34;term-anchor&#34; data-term=&#34;paged-attention&#34; tabindex=&#34;0&#34;&gt;PagedAttention&lt;/span&gt;。&lt;/p&gt;
+&lt;h2 id=&#34;5-这正好解释了-pagedattention-为什么后来如此重要&#34;&gt;5. 这正好解释了 PagedAttention 为什么后来如此重要
+&lt;/h2&gt;&lt;p&gt;前面知识卡片讲过 &lt;span class=&#34;term-anchor&#34; data-term=&#34;paged-attention&#34; tabindex=&#34;0&#34;&gt;PagedAttention&lt;/span&gt;。&lt;/p&gt;
 &lt;p&gt;Continuous Batching 解决：&lt;/p&gt;
 \[\boxed{\text{谁什么时候进入 GPU 计算}}\]&lt;p&gt;PagedAttention 解决：&lt;/p&gt;
 \[\boxed{\text{这些不断加入/退出的请求，其 KV Cache 放在哪里}}\]&lt;p&gt;。&lt;/p&gt;
@@ -765,8 +774,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[\boxed{ \text{Continuous Batching = computation scheduling} }\]\[\boxed{ \text{PagedAttention = state-memory virtualization} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;二者共同组成现代 LLM serving 的基础。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;6-continuous-batching-真正困难的地方在-prefill-和-decode-混在了一起&#34;&gt;6. Continuous Batching 真正困难的地方，在 Prefill 和 Decode 混在了一起
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;6-continuous-batching-真正困难的地方在-prefill-和-decode-混在了一起&#34;&gt;6. Continuous Batching 真正困难的地方，在 Prefill 和 Decode 混在了一起
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;一个 LLM 请求有两个性质完全不同的阶段。&lt;/p&gt;
@@ -791,8 +800,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;7-一个长-prefill-可以把所有正在聊天的人卡住&#34;&gt;7. 一个长 Prefill 可以把所有正在聊天的人“卡住”
-&lt;/h1&gt;&lt;p&gt;假设 GPU 当前正在给 32 个用户 decode：&lt;/p&gt;
+&lt;h2 id=&#34;7-一个长-prefill-可以把所有正在聊天的人卡住&#34;&gt;7. 一个长 Prefill 可以把所有正在聊天的人“卡住”
+&lt;/h2&gt;&lt;p&gt;假设 GPU 当前正在给 32 个用户 decode：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -835,8 +844,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[\boxed{ \text{prefill 与 decode 如何共享 GPU 时间} }\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;这就是现代 LLM scheduler 的真正核心。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;8-chunked-prefill把一个大任务切碎让-decode-穿插进去&#34;&gt;8. Chunked Prefill：把一个大任务切碎，让 decode 穿插进去
-&lt;/h1&gt;&lt;p&gt;Sarathi 提出的关键方法之一是：&lt;/p&gt;
+&lt;h2 id=&#34;8-chunked-prefill把一个大任务切碎让-decode-穿插进去&#34;&gt;8. Chunked Prefill：把一个大任务切碎，让 decode 穿插进去
+&lt;/h2&gt;&lt;p&gt;Sarathi 提出的关键方法之一是：&lt;/p&gt;
 \[\boxed{\text{chunked prefill}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;p&gt;例如原 prompt：&lt;/p&gt;
 \[8192\text{ tokens}\]&lt;p&gt;不要一次运行：&lt;/p&gt;
@@ -875,8 +884,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[\boxed{\text{decode-maximal batching}}\]&lt;p&gt;——尽量保留大量 decode，再用 prefill chunk 填充 GPU 的计算能力。&lt;/p&gt;
 &lt;p&gt;其论文实验报告，例如 LLaMA-13B/A6000 条件下 decode throughput 最高提升约 10×，端到端吞吐最高提升约 1.33×；后来的 Sarathi-Serve 进一步针对真实 serving 中 throughput-latency tradeoff 优化调度。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;9-为什么-chunked-prefill-这么巧&#34;&gt;9. 为什么 Chunked Prefill 这么巧？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;9-为什么-chunked-prefill-这么巧&#34;&gt;9. 为什么 Chunked Prefill 这么巧？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;因为 prefill 和 decode 正好存在互补性。&lt;/p&gt;
@@ -894,8 +903,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;10-所以现代-scheduler-更像一个token-budget-分配器&#34;&gt;10. 所以现代 scheduler 更像一个“token budget 分配器”
-&lt;/h1&gt;&lt;p&gt;传统 batch size：&lt;/p&gt;
+&lt;h2 id=&#34;10-所以现代-scheduler-更像一个token-budget-分配器&#34;&gt;10. 所以现代 scheduler 更像一个“token budget 分配器”
+&lt;/h2&gt;&lt;p&gt;传统 batch size：&lt;/p&gt;
 \[B=32.\]&lt;p&gt;但 LLM 中一个 request 在当前 iteration 可能需要：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;decode：1 个新 token；&lt;/li&gt;
@@ -912,8 +921,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[\boxed{\text{“这一批有多少请求？”}}\]&lt;p&gt;进化成：&lt;/p&gt;
 \[\boxed{\text{“这一轮 GPU 应该处理多少 token，以及属于哪些请求？”}}\]&lt;p&gt;。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;11-为什么只看-tokenss-会误判-serving-系统&#34;&gt;11. 为什么只看 tokens/s 会误判 serving 系统？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;11-为什么只看-tokenss-会误判-serving-系统&#34;&gt;11. 为什么只看 tokens/s 会误判 serving 系统？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;假设系统 A：&lt;/p&gt;
@@ -935,8 +944,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;12-continuous-batching-其实引入了一个排队论问题&#34;&gt;12. Continuous Batching 其实引入了一个排队论问题
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;12-continuous-batching-其实引入了一个排队论问题&#34;&gt;12. Continuous Batching 其实引入了一个排队论问题
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;设请求到达率：&lt;/p&gt;
@@ -961,8 +970,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;13-continuous-batching-和-cuda-graph-又存在天然冲突&#34;&gt;13. Continuous Batching 和 CUDA Graph 又存在天然冲突
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;13-continuous-batching-和-cuda-graph-又存在天然冲突&#34;&gt;13. Continuous Batching 和 CUDA Graph 又存在天然冲突
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;GPU 喜欢固定形状：&lt;/p&gt;
@@ -988,8 +997,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;14-一个容易忽视的问题公平性&#34;&gt;14. 一个容易忽视的问题：公平性
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;14-一个容易忽视的问题公平性&#34;&gt;14. 一个容易忽视的问题：公平性
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;假设队列中有：&lt;/p&gt;
@@ -1024,8 +1033,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;15-为什么-reasoning-model-会让这个问题更严重&#34;&gt;15. 为什么 reasoning model 会让这个问题更严重？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;15-为什么-reasoning-model-会让这个问题更严重&#34;&gt;15. 为什么 reasoning model 会让这个问题更严重？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;传统聊天可能输出：&lt;/p&gt;
@@ -1055,8 +1064,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;16-一个很值得自己实现的最小模拟器&#34;&gt;16. 一个很值得自己实现的最小模拟器
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;16-一个很值得自己实现的最小模拟器&#34;&gt;16. 一个很值得自己实现的最小模拟器
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看代码与实现&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;根本不需要 GPU。&lt;/p&gt;
@@ -1140,8 +1149,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;17-对-ai-agent-系统它还有一个更深的意义&#34;&gt;17. 对 AI Agent 系统，它还有一个更深的意义
-&lt;/h1&gt;&lt;p&gt;Agent 请求并不像普通 chat request。&lt;/p&gt;
+&lt;h2 id=&#34;17-对-ai-agent-系统它还有一个更深的意义&#34;&gt;17. 对 AI Agent 系统，它还有一个更深的意义
+&lt;/h2&gt;&lt;p&gt;Agent 请求并不像普通 chat request。&lt;/p&gt;
 &lt;p&gt;它可能：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1183,8 +1192,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;所以 Continuous Batching 也是理解：&lt;/p&gt;
 \[\boxed{\text{Agent runtime infrastructure}}\]&lt;p&gt;很好的入口。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;18-对游戏-ai-部署尤其有现实意义&#34;&gt;18. 对游戏 AI 部署尤其有现实意义
-&lt;/h1&gt;&lt;p&gt;假设游戏服务器同时运行：&lt;/p&gt;
+&lt;h2 id=&#34;18-对游戏-ai-部署尤其有现实意义&#34;&gt;18. 对游戏 AI 部署尤其有现实意义
+&lt;/h2&gt;&lt;p&gt;假设游戏服务器同时运行：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;40 个 NPC 对话；&lt;/li&gt;
 &lt;li&gt;5 个任务规划 Agent；&lt;/li&gt;
@@ -1233,8 +1242,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;一旦进入本地/私有模型部署：&lt;/p&gt;
 \[\boxed{ \text{KV memory + batching + scheduling} }\]&lt;p&gt;都会直接决定成本。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;19-它给其他工程领域一个很强的迁移启发重新寻找最小可调度工作单元&#34;&gt;19. 它给其他工程领域一个很强的迁移启发：重新寻找“最小可调度工作单元”
-&lt;/h1&gt;&lt;p&gt;Continuous Batching 最深的地方其实并不限于 LLM。&lt;/p&gt;
+&lt;h2 id=&#34;19-它给其他工程领域一个很强的迁移启发重新寻找最小可调度工作单元&#34;&gt;19. 它给其他工程领域一个很强的迁移启发：重新寻找“最小可调度工作单元”
+&lt;/h2&gt;&lt;p&gt;Continuous Batching 最深的地方其实并不限于 LLM。&lt;/p&gt;
 &lt;p&gt;原来系统认为一个不可分割任务是：&lt;/p&gt;
 \[\boxed{\text{request}}\]&lt;p&gt;Orca 发现真正可以安全重组的是：&lt;/p&gt;
 \[\boxed{\text{iteration}}\]&lt;p&gt;。&lt;/p&gt;
@@ -1255,8 +1264,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;有时性能问题不是 kernel 太慢，&lt;/p&gt;
 &lt;p&gt;而是：&lt;/p&gt;
 \[\boxed{\text{scheduler 根本看不到足够细的可重组工作。}}\]&lt;hr&gt;
-&lt;h1 id=&#34;20-这和-gpu-物理引擎甚至有一个很直接的类比&#34;&gt;20. 这和 GPU 物理引擎甚至有一个很直接的类比
-&lt;/h1&gt;&lt;p&gt;假设有 100 个 physics islands。&lt;/p&gt;
+&lt;h2 id=&#34;20-这和-gpu-物理引擎甚至有一个很直接的类比&#34;&gt;20. 这和 GPU 物理引擎甚至有一个很直接的类比
+&lt;/h2&gt;&lt;p&gt;假设有 100 个 physics islands。&lt;/p&gt;
 &lt;p&gt;传统方式：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1279,8 +1288,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;虽然具体 GPU 数据布局会复杂很多，但思维与 Orca 几乎一致：&lt;/p&gt;
 \[\boxed{ \text{variable-length iterative workloads 需要 iteration-aware scheduling。} }\]&lt;p&gt;这就是这张卡片对物理求解器最值得迁移的一点。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h1&gt;&lt;p&gt;Continuous Batching 最值得记住的不是：&lt;/p&gt;
+&lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h2&gt;&lt;p&gt;Continuous Batching 最值得记住的不是：&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;“请求完成以后立即补一个新请求。”&lt;/p&gt;
 &lt;/blockquote&gt;
@@ -1290,8 +1299,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[\boxed{ \text{吞吐} \leftrightarrow \text{TTFT} \leftrightarrow \text{inter-token latency} \leftrightarrow \text{fairness} }\]&lt;p&gt;之间的多目标权衡。&lt;/p&gt;
 &lt;p&gt;所以 Continuous Batching 的地位有点类似操作系统中的进程调度：它自身不改变模型任何一个权重，却可能让同一块 GPU 的有效服务能力相差数倍乃至更多。&lt;/p&gt;
 &lt;p&gt;这也是 AI 全栈工程里一个很值得长期保留的视角：&lt;/p&gt;
-\[\boxed{ \text{模型性能决定“一个请求能做到什么”； 调度系统决定“同一份硬件同时能为多少人做到”。} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
-&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+\[\boxed{ \text{模型性能决定“一个请求能做到什么”； 调度系统决定“同一份硬件同时能为多少人做到”。} }\]&lt;h2 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看扩展内容&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;ol&gt;
@@ -1336,7 +1345,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
         <description>&lt;p&gt;&lt;strong&gt;主题：Matrix-Free / Partial Assembly 与 Sum Factorization&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;领域：有限元 × GPU/HPC × 求解器架构&lt;/strong&gt;&lt;br&gt;
 &lt;strong&gt;推荐阅读时间：约 8 分钟&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;今天选一个和前几张 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;PD&lt;/span&gt;、AVI、&lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt; 都不同，但对“以后自己写真正高性能求解器”很关键的概念：&lt;strong&gt;Matrix-Free FEM（无矩阵有限元）&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;要实现高性能有限元求解器，除了理解 &lt;span class=&#34;term-anchor&#34; data-term=&#34;pd&#34; tabindex=&#34;0&#34;&gt;PD&lt;/span&gt;、AVI、&lt;span class=&#34;term-anchor&#34; data-term=&#34;dwr&#34; tabindex=&#34;0&#34;&gt;DWR&lt;/span&gt;，还需要考虑算子如何在硬件上执行。本卡讨论&lt;strong&gt;Matrix-Free FEM（无矩阵有限元）&lt;/strong&gt;。&lt;/p&gt;
 &lt;p&gt;传统有限元的标准流程几乎已经形成条件反射：&lt;/p&gt;
 \[\text{单元积分}\rightarrow K_e \rightarrow\text{组装全局 }K \rightarrow Ku.\]&lt;p&gt;Matrix-Free 方法却问：&lt;/p&gt;
 \[\boxed{\text{如果最终只是想计算 }y=Ku,\text{ 为什么一定要先把 }K\text{ 存下来？}}\]&lt;p&gt;它直接从弱形式重新计算 \(Ku\)，甚至在高阶有限元和 GPU 上，比读取已经组装好的稀疏矩阵更快。&lt;/p&gt;
@@ -1371,8 +1380,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;现代 CPU/GPU 的浮点吞吐增长速度远快于内存带宽，于是 SpMV 很容易成为：&lt;/p&gt;
 \[\boxed{\text{memory-bandwidth bound}.}\]&lt;p&gt;Kronbichler 与 Kormann 对 matrix-free DG 的性能分析甚至发现，完整 operator evaluation 的性能经常已经接近机器可用 memory bandwidth 的极限。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;2-matrix-free-做了一件看起来反效率的事&#34;&gt;2. Matrix-Free 做了一件看起来“反效率”的事
-&lt;/h1&gt;&lt;p&gt;不存：&lt;/p&gt;
+&lt;h2 id=&#34;2-matrix-free-做了一件看起来反效率的事&#34;&gt;2. Matrix-Free 做了一件看起来“反效率”的事
+&lt;/h2&gt;&lt;p&gt;不存：&lt;/p&gt;
 \[K.\]&lt;p&gt;每次需要：&lt;/p&gt;
 \[y=Kx\]&lt;p&gt;时，重新执行有限元积分。&lt;/p&gt;
 &lt;p&gt;对于一个典型双线性型：&lt;/p&gt;
@@ -1384,15 +1393,15 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;在现代硬件上：&lt;/p&gt;
 \[\boxed{\text{多算一点，可能比多读一点更便宜。}}\]&lt;p&gt;这正是 Matrix-Free 最反直觉也最重要的地方。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;3-更准确地说有限元算子本来就不是一块矩阵&#34;&gt;3. 更准确地说，有限元算子本来就不是“一块矩阵”
-&lt;/h1&gt;&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://mfem.org/performance/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;h2 id=&#34;3-更准确地说有限元算子本来就不是一块矩阵&#34;&gt;3. 更准确地说，有限元算子本来就不是“一块矩阵”
+&lt;/h2&gt;&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://mfem.org/performance/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;MFEM 官方 Partial Assembly 文档&lt;/a&gt; 把有限元算子分解得非常漂亮：&lt;/p&gt;
 \[\boxed{ A=P^TG^TB^TDBG P. }\]&lt;p&gt;这里可以粗略理解为：&lt;/p&gt;
 \[P:\text{全局/并行自由度映射}\]\[G:\text{global DOF}\rightarrow\text{element DOF}\]\[B:\text{element DOF}\rightarrow\text{quadrature point}\]\[D:\text{积分点上的几何与物理作用}.\]&lt;p&gt;所以一个 FEM operator 实际上是：&lt;/p&gt;
 \[\boxed{ \text{global} \rightarrow \text{element} \rightarrow \text{quadrature} \rightarrow \text{physics} \rightarrow \text{element} \rightarrow \text{global}. }\]&lt;p&gt;全局 sparse matrix \(A\) 只是把整个计算过程&lt;strong&gt;提前展开并缓存后的结果&lt;/strong&gt;。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;4-partial-assembly-是中间路线&#34;&gt;4. Partial Assembly 是中间路线
-&lt;/h1&gt;&lt;p&gt;这里有一个很重要的层次：&lt;/p&gt;
+&lt;h2 id=&#34;4-partial-assembly-是中间路线&#34;&gt;4. Partial Assembly 是中间路线
+&lt;/h2&gt;&lt;p&gt;这里有一个很重要的层次：&lt;/p&gt;
 \[\text{Full Assembly}\]&lt;p&gt;存整个：&lt;/p&gt;
 \[A.\]&lt;p&gt;Element Assembly：&lt;/p&gt;
 &lt;p&gt;存：&lt;/p&gt;
@@ -1402,14 +1411,14 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;连更多中间量也动态计算。&lt;/p&gt;
 &lt;p&gt;所以你可以把 assembly 看成一条连续谱：&lt;/p&gt;
 \[\boxed{ \text{更多预计算/更多内存} \longleftrightarrow \text{更少存储/更多在线计算}. }\]&lt;p&gt;MFEM 当前明确提供 FULL、ELEMENT、PARTIAL 等不同 assembly level；其 partial assembly 的核心就是只保存 \(D\) 或其一部分，而把 \(P,G,B\) 等操作在线执行。&lt;/p&gt;
-&lt;p&gt;这其实与昨天 PD 的思想形成一个很漂亮的反差：&lt;/p&gt;
+&lt;p&gt;这里可以和&lt;a class=&#34;link&#34; href=&#34;../03-projective-dynamics/&#34; &gt;投影动力学（PD）&lt;/a&gt;的全局求解步对照。&lt;/p&gt;
 &lt;p&gt;PD：&lt;/p&gt;
 \[\boxed{\text{尽量预计算固定结构}}\]&lt;p&gt;Matrix-Free：&lt;/p&gt;
 \[\boxed{\text{当预计算结果太大时，宁愿重算}}\]&lt;p&gt;两者并不矛盾。&lt;/p&gt;
 &lt;p&gt;真正原则是：&lt;/p&gt;
 \[\boxed{\text{缓存那些“重算比搬运贵”的东西。}}\]&lt;hr&gt;
-&lt;h1 id=&#34;5-但如果每次都老老实实算高阶-fem计算量不会爆炸吗&#34;&gt;5. 但如果每次都老老实实算高阶 FEM，计算量不会爆炸吗？
-&lt;/h1&gt;&lt;p&gt;会。&lt;/p&gt;
+&lt;h2 id=&#34;5-但如果每次都老老实实算高阶-fem计算量不会爆炸吗&#34;&gt;5. 但如果每次都老老实实算高阶 FEM，计算量不会爆炸吗？
+&lt;/h2&gt;&lt;p&gt;会。&lt;/p&gt;
 &lt;p&gt;所以 Matrix-Free 高阶 FEM 的另一个核心技术叫：&lt;/p&gt;
 \[\boxed{\text{Sum Factorization}.}\]&lt;p&gt;考虑三维六面体高阶单元。&lt;/p&gt;
 &lt;p&gt;每个方向有：&lt;/p&gt;
@@ -1423,8 +1432,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[w_{q_xq_yk} = \sum_jB_{q_yj}v_{q_xjk},\]&lt;p&gt;最后：&lt;/p&gt;
 \[u_{q_xq_yq_z} = \sum_kB_{q_zk}w_{q_xq_yk}.\]&lt;p&gt;这就是 sum factorization。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;6-它改变了高阶-fem-的复杂度&#34;&gt;6. 它改变了高阶 FEM 的复杂度
-&lt;/h1&gt;&lt;p&gt;三维情况下，直接 dense element operation 的复杂度大致会随：&lt;/p&gt;
+&lt;h2 id=&#34;6-它改变了高阶-fem-的复杂度&#34;&gt;6. 它改变了高阶 FEM 的复杂度
+&lt;/h2&gt;&lt;p&gt;三维情况下，直接 dense element operation 的复杂度大致会随：&lt;/p&gt;
 \[O(p^6)\]&lt;p&gt;增长。&lt;/p&gt;
 &lt;p&gt;利用 tensor-product sum factorization 后，可降到大约：&lt;/p&gt;
 \[\boxed{O(p^4)}.\]&lt;p&gt;这两个幂次的差距在：&lt;/p&gt;
@@ -1433,8 +1442,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 \[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} }\]&lt;p&gt;才真正构成现代 high-order FEM 的高性能组合。&lt;/p&gt;
 &lt;p&gt;Kronbichler 与 Kormann 的工作正是系统研究这种 matrix-free + sum-factorization operator evaluation，并展示经过向量化的一维 tensor kernels 可以达到很高的 CPU 算术吞吐。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;7-一个直观类比&#34;&gt;7. 一个直观类比
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;7-一个直观类比&#34;&gt;7. 一个直观类比
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;假设你每天需要：&lt;/p&gt;
@@ -1456,8 +1465,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;8-这会产生一个很重要的-roofline-视角&#34;&gt;8. 这会产生一个很重要的 Roofline 视角
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;8-这会产生一个很重要的-roofline-视角&#34;&gt;8. 这会产生一个很重要的 Roofline 视角
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;性能不应该只看 FLOPs。&lt;/p&gt;
@@ -1476,8 +1485,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;9-这对-gpu-求解器架构特别重要&#34;&gt;9. 这对 GPU 求解器架构特别重要
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;9-这对-gpu-求解器架构特别重要&#34;&gt;9. 这对 GPU 求解器架构特别重要
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;Matrix-Free 的典型 kernel 很适合 GPU：&lt;/p&gt;
@@ -1504,8 +1513,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;10-那为什么低阶四面体-fem-不一定值得-matrix-free&#34;&gt;10. 那为什么低阶四面体 FEM 不一定值得 Matrix-Free？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;10-那为什么低阶四面体-fem-不一定值得-matrix-free&#34;&gt;10. 那为什么低阶四面体 FEM 不一定值得 Matrix-Free？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;这是一个重要边界。&lt;/p&gt;
@@ -1529,8 +1538,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;11-matrix-free-最大的问题预条件器怎么办&#34;&gt;11. Matrix-Free 最大的问题：预条件器怎么办？
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;11-matrix-free-最大的问题预条件器怎么办&#34;&gt;11. Matrix-Free 最大的问题：预条件器怎么办？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;如果你有：&lt;/p&gt;
@@ -1562,8 +1571,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;12-这和-multigrid-的结合尤其漂亮&#34;&gt;12. 这和 Multigrid 的结合尤其漂亮
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;12-这和-multigrid-的结合尤其漂亮&#34;&gt;12. 这和 Multigrid 的结合尤其漂亮
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;高阶问题：&lt;/p&gt;
@@ -1580,8 +1589,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;13-对非线性软体-fem-更有意思&#34;&gt;13. 对非线性软体 FEM 更有意思
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;13-对非线性软体-fem-更有意思&#34;&gt;13. 对非线性软体 FEM 更有意思
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;考虑 Neo-Hookean：&lt;/p&gt;
@@ -1604,8 +1613,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;14-这里还能和上一张-pd-卡片形成一个很有价值的对照&#34;&gt;14. 这里还能和上一张 PD 卡片形成一个很有价值的对照
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;14-与投影动力学的对照何时值得预计算&#34;&gt;14. 与投影动力学的对照：何时值得预计算？
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;PD 的核心优势：&lt;/p&gt;
@@ -1622,8 +1631,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;15-对自研软体求解器最值得迁移的思想&#34;&gt;15. 对自研软体求解器最值得迁移的思想
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;15-对自研软体求解器最值得迁移的思想&#34;&gt;15. 对自研软体求解器最值得迁移的思想
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;即使当前使用 &lt;span class=&#34;term-anchor&#34; data-term=&#34;xpbd&#34; tabindex=&#34;0&#34;&gt;XPBD&lt;/span&gt;，而不是 FEM，Matrix-Free 的思想仍然非常有价值。&lt;/p&gt;
@@ -1648,8 +1657,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;16-一个值得自己做的小实验&#34;&gt;16. 一个值得自己做的小实验
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;16-一个值得自己做的小实验&#34;&gt;16. 一个值得自己做的小实验
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;做一个规则六面体 Poisson 问题。&lt;/p&gt;
@@ -1675,15 +1684,15 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;/details&gt;
 
 &lt;hr&gt;
-&lt;h1 id=&#34;17-它还给-ai-工程一个很强的迁移原则&#34;&gt;17. 它还给 AI 工程一个很强的迁移原则
-&lt;/h1&gt;&lt;p&gt;现代 LLM 推理也越来越受：&lt;/p&gt;
+&lt;h2 id=&#34;17-它还给-ai-工程一个很强的迁移原则&#34;&gt;17. 它还给 AI 工程一个很强的迁移原则
+&lt;/h2&gt;&lt;p&gt;现代 LLM 推理也越来越受：&lt;/p&gt;
 \[\boxed{\text{memory bandwidth}}\]&lt;p&gt;限制。&lt;/p&gt;
 &lt;p&gt;很多 kernel fusion、FlashAttention、activation recomputation，本质上都在做类似交易：&lt;/p&gt;
 \[\boxed{\text{多做计算，少搬数据}.}\]&lt;p&gt;所以 Matrix-Free FEM、FlashAttention、checkpoint recomputation 看起来属于完全不同领域，却共享一个现代计算原则：&lt;/p&gt;
-\[\boxed{ \text{在算力相对便宜、内存流量昂贵的机器上， “避免重复计算”已经不再是无条件正确的优化目标。}\]&lt;p&gt;这是 Matrix-Free FEM 最值得迁移出去的一层认识。&lt;/p&gt;
+\[\boxed{ \text{在算力相对便宜、内存流量昂贵的机器上， “避免重复计算”已经不再是无条件正确的优化目标。}}\]&lt;p&gt;这是 Matrix-Free FEM 最值得迁移出去的一层认识。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h1 id=&#34;18-为什么-partial-assembly-还没有完全取代传统-fem&#34;&gt;18. 为什么 Partial Assembly 还没有完全取代传统 FEM
-&lt;/h1&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;18-为什么-partial-assembly-还没有完全取代传统-fem&#34;&gt;18. 为什么 Partial Assembly 还没有完全取代传统 FEM
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看完整推导与细节&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;主要存在三个限制。&lt;/p&gt;
@@ -1700,16 +1709,21 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;例如 Neo-Hookean 材料：&lt;/p&gt;
 \[ P=\frac{\partial\Psi}{\partial F}. \]&lt;p&gt;如果形变梯度 \(F\) 每步都变化，那么积分点上的材料响应也需要更新。&lt;/p&gt;
 &lt;p&gt;此时是否预存 \(D\)，以及预存哪些部分，就成为需要针对具体物理模型优化的问题。&lt;/p&gt;
-&lt;h1 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
-&lt;/h1&gt;&lt;p&gt;Matrix-Free FEM 最值得记住的并不是：&lt;/p&gt;
+
+  &lt;/div&gt;
+&lt;/details&gt;
+
+&lt;hr&gt;
+&lt;h2 id=&#34;今天值得留下的一句话&#34;&gt;今天值得留下的一句话
+&lt;/h2&gt;&lt;p&gt;Matrix-Free FEM 最值得记住的并不是：&lt;/p&gt;
 \[\boxed{\text{“不存刚度矩阵”}.}\]&lt;p&gt;真正重要的是：&lt;/p&gt;
 \[\boxed{ \text{矩阵只是一个算子的某种物化形式； 如果物化后的数据比重新执行算子本身更昂贵， 那就没有必要把它物化。} }\]&lt;p&gt;它在知识体系中的位置可以画成：&lt;/p&gt;
 \[\text{Weak Form}\]\[\downarrow\]\[\text{Finite Element Operator}\]\[\begin{array}{ccc} \swarrow &amp;&amp; \searrow\\ \text{Assembly} &amp;&amp; \text{Matrix-Free} \end{array}\]\[\begin{array}{ccc} K\text{ sparse} &amp;&amp; P^TG^TB^TDBG P \end{array}\]&lt;p&gt;而高阶 FEM 再加入：&lt;/p&gt;
 \[\boxed{\text{tensor product}}\]\[\downarrow\]\[\boxed{\text{sum factorization}}\]&lt;p&gt;最终得到：&lt;/p&gt;
 \[\boxed{ \text{Matrix-Free} + \text{Sum Factorization} + \text{Multigrid} }\]&lt;p&gt;这已经成为现代高性能高阶有限元的一条核心技术路线。&lt;/p&gt;
 &lt;p&gt;对于以后真正写 GPU 物理求解器，这张卡片最值得留下的工程判断是：&lt;/p&gt;
-\[\boxed{ \text{看到一个可以预计算并缓存的大数组时， 先不要问“怎么把它存得更紧凑”， 先问“我真的需要存它吗？”} }\]&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
-&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+\[\boxed{ \text{看到一个可以预计算并缓存的大数组时， 先不要问“怎么把它存得更紧凑”， 先问“我真的需要存它吗？”} }\]&lt;h2 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看扩展内容&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;ol&gt;
@@ -1733,8 +1747,6 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;Arndt et al., &lt;strong&gt;ExaDG: High-Order Discontinuous Galerkin for the Exa-scale&lt;/strong&gt;。如果想看这一整套技术怎样组成真正的大规模求解器：matrix-free operator + sum factorization + massively parallel multigrid + optimized smoothers，就是很好的系统案例；相关工作报告实际软件贡献在不同硬件上带来约 3–4× 加速。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ol&gt;
-  &lt;/div&gt;
-&lt;/details&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;
@@ -1770,7 +1782,7 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;Agent 在完成 \(B\) 后，需要保存：&lt;/p&gt;
 \[ \text{state}=\text{B completed}. \]&lt;p&gt;但可能发生以下事件：&lt;/p&gt;
 \[ \underbrace{\text{服务器接受任务}}_{t_1} \rightarrow \underbrace{\text{Agent 崩溃}}_{t_2} \rightarrow \underbrace{\text{状态写入数据库}}_{t_3} \]&lt;p&gt;由于：&lt;/p&gt;
-\[ t_2&lt;t_3, \]&lt;p&gt;状态数据库仍然认为：&lt;/p&gt;
+\[ t_2\lt t_3, \]&lt;p&gt;状态数据库仍然认为：&lt;/p&gt;
 \[ B=\text{未完成}. \]&lt;p&gt;如果 Agent 直接重试 \(B\)，就可能产生两个仿真任务。&lt;/p&gt;
 &lt;p&gt;这里存在一个重要的分布式系统事实：&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;外部操作的执行与本地状态的保存，通常无法天然组成一个原子事务。&lt;/strong&gt;&lt;/p&gt;
@@ -1849,30 +1861,30 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;分布式系统经常使用三种执行语义：&lt;/p&gt;
 &lt;table&gt;
-	&lt;thead&gt;
-			&lt;tr&gt;
-					&lt;th&gt;语义&lt;/th&gt;
-					&lt;th&gt;含义&lt;/th&gt;
-					&lt;th&gt;主要风险&lt;/th&gt;
-			&lt;/tr&gt;
-	&lt;/thead&gt;
-	&lt;tbody&gt;
-			&lt;tr&gt;
-					&lt;td&gt;At-most-once&lt;/td&gt;
-					&lt;td&gt;最多执行一次&lt;/td&gt;
-					&lt;td&gt;失败后可能丢失任务&lt;/td&gt;
-			&lt;/tr&gt;
-			&lt;tr&gt;
-					&lt;td&gt;At-least-once&lt;/td&gt;
-					&lt;td&gt;至少执行一次&lt;/td&gt;
-					&lt;td&gt;可能重复执行&lt;/td&gt;
-			&lt;/tr&gt;
-			&lt;tr&gt;
-					&lt;td&gt;Exactly-once effect&lt;/td&gt;
-					&lt;td&gt;业务效果恰好发生一次&lt;/td&gt;
-					&lt;td&gt;需要额外去重与一致性机制&lt;/td&gt;
-			&lt;/tr&gt;
-	&lt;/tbody&gt;
+  &lt;thead&gt;
+      &lt;tr&gt;
+          &lt;th&gt;语义&lt;/th&gt;
+          &lt;th&gt;含义&lt;/th&gt;
+          &lt;th&gt;主要风险&lt;/th&gt;
+      &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+      &lt;tr&gt;
+          &lt;td&gt;At-most-once&lt;/td&gt;
+          &lt;td&gt;最多执行一次&lt;/td&gt;
+          &lt;td&gt;失败后可能丢失任务&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;At-least-once&lt;/td&gt;
+          &lt;td&gt;至少执行一次&lt;/td&gt;
+          &lt;td&gt;可能重复执行&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td&gt;Exactly-once effect&lt;/td&gt;
+          &lt;td&gt;业务效果恰好发生一次&lt;/td&gt;
+          &lt;td&gt;需要额外去重与一致性机制&lt;/td&gt;
+      &lt;/tr&gt;
+  &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;对于工业 Agent，常见的合理选择是：&lt;/p&gt;
 \[ \boxed{ \text{At-least-once execution} + \text{Idempotency} \Rightarrow \text{Exactly-once effect} } \]&lt;p&gt;这里的箭头表示一种&lt;strong&gt;需要满足严格条件才能实现的工程设计目标&lt;/strong&gt;，并非无条件的数学保证。&lt;/p&gt;
@@ -1992,8 +2004,8 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;工业 Agent 的可靠性，不取决于它永远不失败，而取决于它能否在失败发生后，准确判断哪些事情已经完成、哪些事情可以重试，以及哪些事情绝不能重复。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;hr&gt;
-&lt;h3 id=&#34;拓展阅读&#34;&gt;拓展阅读
-&lt;/h3&gt;&lt;details class=&#34;reveal&#34;&gt;
+&lt;h2 id=&#34;拓展阅读&#34;&gt;拓展阅读
+&lt;/h2&gt;&lt;details class=&#34;reveal&#34;&gt;
   &lt;summary&gt;查看扩展内容&lt;/summary&gt;
   &lt;div class=&#34;reveal-body&#34;&gt;
     &lt;p&gt;&lt;strong&gt;1. Temporal — Event History&lt;/strong&gt;&lt;/p&gt;
@@ -2012,10 +2024,6 @@ $$\boxed{ \text{当一种资源具有“大小动态变化、生命周期不确�
 &lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;AWS 官方架构指南与实现示例&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;适合进一步理解数据库事务、事件发布和重复消息处理之间的一致性问题。&lt;/p&gt;
-&lt;hr&gt;
-&lt;p&gt;&lt;strong&gt;知识卡片注册表更新：第 56 张。&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;新增主题：Durable Execution 与幂等性设计。所属方向：Agent 工业应用 / 分布式系统 / AI 全栈工程。核心问题：如何使长期运行的 Agent 在进程崩溃、网络中断和外部任务状态不确定的情况下安全恢复。&lt;/p&gt;
-&lt;p&gt;与此前的数值求解器、ROM 和可靠性方法卡片无主题重复；它补充的是&lt;strong&gt;科研自动化系统自身的执行可靠性&lt;/strong&gt;。&lt;/p&gt;
 
   &lt;/div&gt;
 &lt;/details&gt;

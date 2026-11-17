@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-us" dir="ltr">
+<html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="主题：IMEX（Implicit–Explicit，隐显式混合时间积分）\n领域：有限元 × 物理引擎 × 软体动力学 × 数值方法\n推荐阅读时间：约 8 分钟\nIMEX 值得学，因为它针对一个非常普遍的工程矛盾：\n\\[\\boxed{ \\text{显式方法便宜，但受刚性限制；隐式方法稳定，但每一步太贵。} }\\]IMEX 的基本策略非常直接：\n\\[\\boxed{ \\text{stiff terms 隐式处理} + \\text{non-stiff terms 显式处理} }\\]Ascher、Ruuth 和 Spiteri 在 1997 年的经典工作系统发展了 IMEX Runge–Kutta 方法，用于同时包含不同时间尺度、不同数值刚性的 PDE；核心出发点就是“不同类型的项应该使用不同的时间离散”。\n这类思想至今仍活跃。2025 年的 JCP 工作仍在用 IMEX 处理 CFD 中由极小网格单元引起的 geometry-induced stiffness，因为全显式受 CFL 限制，而全隐式又需要昂贵的大规模线性化、预条件和求解。\n1. “刚性”到底是什么意思？ 考虑最简单的方程：\n\\[\\dot x=-kx.\\]真实解：\n\\[x(t)=x_0e^{-kt}.\\]使用显式 Euler：\n\\[x_{n+1} = (1-kh)x_n.\\]稳定要求：\n\\[|1-kh|\\le1,\\]所以：\n\\[\\boxed{ h\\le\\frac{2}{k} }\\]如果：\n\\[k=10^6,\\]那么时间步必须大约：\n\\[h<2\\times10^{-6}.\\]但系统中你真正关心的宏观运动可能只有：\n\\[1\\sim10\\text{ Hz}.\\]于是出现一个很荒唐的情况：\n你为了追踪一个并不重要、衰减极快的高频模式，被迫把整个模拟的时间步缩小几万倍。\n这就是数值刚性最重要的直觉：\n\\[\\boxed{ \\text{系统中某些快速模式控制了数值稳定性，却并不控制我们关心的物理时间尺度。} }\\] 2. 软体有限元为什么特别容易 stiff？ 空间离散以后，弹性体可以写成：\n">
 <title>IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式</title>
 
 <link rel='canonical' href='https://assranai.github.io/cards/12-imex/'>
 
-<link rel="stylesheet" href="/scss/style.min.d477f4db43488f2ffd5efe9542b27ccc3f528eb73b5837d57053ee61176268b3.css"><meta property='og:title' content="IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式">
+<link rel="stylesheet" href="/scss/style.min.572810da822bec4b0544b6c13e904c95c10365fee8c1f9d08450b8710d84cfeb.css"><meta property='og:title' content="IMEX：为什么“刚的部分隐式算、软的部分显式算”是一种很强的求解器设计模式">
 <meta property='og:description' content="主题：IMEX（Implicit–Explicit，隐显式混合时间积分）\n领域：有限元 × 物理引擎 × 软体动力学 × 数值方法\n推荐阅读时间：约 8 分钟\nIMEX 值得学，因为它针对一个非常普遍的工程矛盾：\n\\[\\boxed{ \\text{显式方法便宜，但受刚性限制；隐式方法稳定，但每一步太贵。} }\\]IMEX 的基本策略非常直接：\n\\[\\boxed{ \\text{stiff terms 隐式处理} + \\text{non-stiff terms 显式处理} }\\]Ascher、Ruuth 和 Spiteri 在 1997 年的经典工作系统发展了 IMEX Runge–Kutta 方法，用于同时包含不同时间尺度、不同数值刚性的 PDE；核心出发点就是“不同类型的项应该使用不同的时间离散”。\n这类思想至今仍活跃。2025 年的 JCP 工作仍在用 IMEX 处理 CFD 中由极小网格单元引起的 geometry-induced stiffness，因为全显式受 CFL 限制，而全隐式又需要昂贵的大规模线性化、预条件和求解。\n1. “刚性”到底是什么意思？ 考虑最简单的方程：\n\\[\\dot x=-kx.\\]真实解：\n\\[x(t)=x_0e^{-kt}.\\]使用显式 Euler：\n\\[x_{n+1} = (1-kh)x_n.\\]稳定要求：\n\\[|1-kh|\\le1,\\]所以：\n\\[\\boxed{ h\\le\\frac{2}{k} }\\]如果：\n\\[k=10^6,\\]那么时间步必须大约：\n\\[h<2\\times10^{-6}.\\]但系统中你真正关心的宏观运动可能只有：\n\\[1\\sim10\\text{ Hz}.\\]于是出现一个很荒唐的情况：\n你为了追踪一个并不重要、衰减极快的高频模式，被迫把整个模拟的时间步缩小几万倍。\n这就是数值刚性最重要的直觉：\n\\[\\boxed{ \\text{系统中某些快速模式控制了数值稳定性，却并不控制我们关心的物理时间尺度。} }\\] 2. 软体有限元为什么特别容易 stiff？ 空间离散以后，弹性体可以写成：\n">
 <meta property='og:url' content='https://assranai.github.io/cards/12-imex/'>
 <meta property='og:site_name' content='Assranai&#39;s 手账'>
@@ -55,7 +55,7 @@
                     
                     
                         
-                        <img src="/img/avatar_hu_7d70d9a336b4e0d9.png" width="300"
+                        <img src="/img/avatar_hu_f509edb42ecc0ebd.png" width="300"
                             height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
                 
@@ -324,27 +324,31 @@
             <nav id="TableOfContents">
   <ol>
     <li><a href="#1-刚性到底是什么意思">1. “刚性”到底是什么意思？</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#2-软体有限元为什么特别容易-stiff">2. 软体有限元为什么特别容易 stiff？</a></li>
+    <li><a href="#3-全隐式当然可以解决稳定性问题但代价很大">3. 全隐式当然可以解决稳定性问题，但代价很大</a></li>
+    <li><a href="#4-imex-问了一个更聪明的问题">4. IMEX 问了一个更聪明的问题</a></li>
+    <li><a href="#5-一个极简单但很能说明问题的例子">5. 一个极简单但很能说明问题的例子</a></li>
+    <li><a href="#6-放到弹性体里可以怎样拆">6. 放到弹性体里，可以怎样拆？</a></li>
+    <li><a href="#7-更进一步甚至可以按空间区域拆">7. 更进一步：甚至可以按空间区域拆</a></li>
+    <li><a href="#8-imex-与-semi-implicit-euler-不是一回事">8. IMEX 与 semi-implicit Euler 不是一回事</a></li>
+    <li><a href="#9-imex-真正难的地方怎么拆">9. IMEX 真正难的地方：怎么拆？</a></li>
+    <li><a href="#10-一个更深的理解stiffness-是方向相关的">10. 一个更深的理解：stiffness 是“方向相关”的</a></li>
+    <li><a href="#11-imex-和-substepping-有什么区别">11. IMEX 和 substepping 有什么区别？</a>
       <ol>
         <li><a href="#substepping">substepping</a></li>
         <li><a href="#imex">IMEX</a></li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
-    <li><a href="#一个很值得做的工程诊断stiffness-census">一个很值得做的工程诊断：stiffness census</a></li>
-  </ol>
-
-  <ol>
-    <li>
+    <li><a href="#12-imex-为什么不等于无条件稳定">12. IMEX 为什么不等于“无条件稳定”？</a></li>
+    <li><a href="#13-对自研软体求解器一个很实用的思考框架">13. 对自研软体求解器，一个很实用的思考框架</a></li>
+    <li><a href="#14-它和-xpbd-其实有一个有意思的联系">14. 它和 XPBD 其实有一个有意思的联系</a></li>
+    <li><a href="#15-对物理引擎最值得迁移的一点">15. 对物理引擎最值得迁移的一点</a>
       <ol>
-        <li><a href="#拓展阅读">拓展阅读</a></li>
+        <li><a href="#一个很值得做的工程诊断stiffness-census">一个很值得做的工程诊断：stiffness census</a></li>
       </ol>
     </li>
+    <li><a href="#今天值得留下的一句话">今天值得留下的一句话</a></li>
+    <li><a href="#拓展阅读">拓展阅读</a></li>
   </ol>
 </nav>
         </div>
@@ -439,8 +443,8 @@
 </blockquote>
 <p>这就是数值刚性最重要的直觉：</p>
 \[\boxed{ \text{系统中某些快速模式控制了数值稳定性，却并不控制我们关心的物理时间尺度。} }\]<hr>
-<h1 id="2-软体有限元为什么特别容易-stiff">2. 软体有限元为什么特别容易 stiff？
-</h1><p>空间离散以后，弹性体可以写成：</p>
+<h2 id="2-软体有限元为什么特别容易-stiff">2. 软体有限元为什么特别容易 stiff？
+</h2><p>空间离散以后，弹性体可以写成：</p>
 \[M\ddot x+f_{\rm int}(x)=f_{\rm ext}.\]<p>在线性附近：</p>
 \[M\ddot x+Kx=f.\]<p>做模态分解：</p>
 \[K\phi_i = \omega_i^2M\phi_i.\]<p>于是系统中存在：</p>
@@ -459,8 +463,8 @@
 <p>所以一个局部极硬区域就可能迫使：</p>
 \[\boxed{\text{整个世界使用极小 timestep}}\]<p>这也是显式有限元中网格最小尺寸极其敏感的原因。</p>
 <hr>
-<h1 id="3-全隐式当然可以解决稳定性问题但代价很大">3. 全隐式当然可以解决稳定性问题，但代价很大
-</h1><p>Backward Euler 对：</p>
+<h2 id="3-全隐式当然可以解决稳定性问题但代价很大">3. 全隐式当然可以解决稳定性问题，但代价很大
+</h2><p>Backward Euler 对：</p>
 \[\dot x=f(x)\]<p>写成：</p>
 \[x_{n+1} = x_n + h f(x_{n+1}).\]<p>因为未知量出现在右边，所以必须求解：</p>
 \[F(x_{n+1})=0.\]<p>对非线性 FEM 通常意味着：</p>
@@ -469,8 +473,8 @@
 \[\left[ M-h\frac{\partial f}{\partial v} -h^2\frac{\partial f}{\partial x} \right]\Delta v = b.\]<p>Pixar 的公开课程材料明确说明，这种隐式框架长期以来一直是其 cloth/volume simulator 的基础，但每个时间步仍要组装并迭代求解大型稀疏系统。</p>
 <p>因此：</p>
 \[\boxed{ \text{implicit：稳定性换计算量} }\]<hr>
-<h1 id="4-imex-问了一个更聪明的问题">4. IMEX 问了一个更聪明的问题
-</h1><p>假设动力学可以拆成：</p>
+<h2 id="4-imex-问了一个更聪明的问题">4. IMEX 问了一个更聪明的问题
+</h2><p>假设动力学可以拆成：</p>
 \[\dot y = f(y)+g(y).\]<p>其中：</p>
 \[f=\text{non-stiff},\]\[g=\text{stiff}.\]<p>为什么一定要：</p>
 \[\boxed{\text{所有项都显式}}\]<p>或者：</p>
@@ -479,8 +483,8 @@
 \[\boxed{ \text{cheap/non-stiff term：显式} }\]\[\boxed{ \text{stiff term：隐式} }\]<p>于是只为真正制造稳定性问题的部分支付 implicit solve 的成本。</p>
 <p>这就是 IMEX 的核心。</p>
 <hr>
-<h1 id="5-一个极简单但很能说明问题的例子">5. 一个极简单但很能说明问题的例子
-</h1><p>考虑：</p>
+<h2 id="5-一个极简单但很能说明问题的例子">5. 一个极简单但很能说明问题的例子
+</h2><p>考虑：</p>
 \[\dot x = -\underbrace{kx}_{\text{stiff}} + \underbrace{\sin t}_{\text{non-stiff}}.\]<p>IMEX Euler：</p>
 \[\frac{x_{n+1}-x_n}{h} = -kx_{n+1}+\sin t_n.\]<p>于是：</p>
 \[x_{n+1} = \frac{x_n+h\sin t_n} {1+hk}.\]<p>即使：</p>
@@ -490,8 +494,8 @@
 \[\sin t\]<p>完全不用进入隐式求解。</p>
 <p>这就是 IMEX 最简单的“只为 stiffness 买单”。</p>
 <hr>
-<h1 id="6-放到弹性体里可以怎样拆">6. 放到弹性体里，可以怎样拆？
-</h1><p>设：</p>
+<h2 id="6-放到弹性体里可以怎样拆">6. 放到弹性体里，可以怎样拆？
+</h2><p>设：</p>
 \[M\dot v = f_{\rm stiff}(x) + f_{\rm soft}(x,v) + f_{\rm ext}.\]<p>一个最直观的 IMEX 设计可能是：</p>
 \[f_{\rm stiff} \rightarrow \text{implicit},\]<p>而：</p>
 \[f_{\rm soft},f_{\rm ext} \rightarrow \text{explicit}.\]<p>例如：</p>
@@ -502,8 +506,8 @@
 \[\text{internal elasticity} \rightarrow\text{implicit},\]\[\text{external smooth forces} \rightarrow\text{explicit}.\]<p>这里的关键不是某种固定拆法。</p>
 <p>而是：</p>
 \[\boxed{ \text{哪个 term 决定 timestep stability？} }\]<hr>
-<h1 id="7-更进一步甚至可以按空间区域拆">7. 更进一步：甚至可以按空间区域拆
-</h1><p>假设一个 FEM 网格中：</p>
+<h2 id="7-更进一步甚至可以按空间区域拆">7. 更进一步：甚至可以按空间区域拆
+</h2><p>假设一个 FEM 网格中：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -520,8 +524,8 @@
 \[\boxed{ \Omega_{\rm regular}\rightarrow\text{explicit} }\]<p>2025 年关于 geometry-induced stiffness 的 IMEX 工作正是在做这种思想：极小单元导致显式 CFL 过严，因此把 stiff 部分隐式处理，而其他区域保持显式，从而避免全域 implicit solve 的成本。</p>
 <p>这一点对复杂 FEM 特别有价值：</p>
 \[\boxed{ \text{一个坏网格单元不一定必须拖慢整个模型。} }\]<hr>
-<h1 id="8-imex-与-semi-implicit-euler-不是一回事">8. IMEX 与 semi-implicit Euler 不是一回事
-</h1><p>这一点很容易混淆。</p>
+<h2 id="8-imex-与-semi-implicit-euler-不是一回事">8. IMEX 与 semi-implicit Euler 不是一回事
+</h2><p>这一点很容易混淆。</p>
 <p>游戏物理里经常使用：</p>
 \[v_{n+1} = v_n+h a(x_n),\]\[x_{n+1} = x_n+h v_{n+1}.\]<p>这通常叫：</p>
 \[\text{semi-implicit Euler}\]<p>或：</p>
@@ -537,8 +541,8 @@
 \[\boxed{ \text{semi-implicit Euler} \neq \text{一般意义上的 IMEX} }\]<p>虽然两者都在混合“旧状态/新状态”。</p>
 <p>Simbody 的官方说明也特别指出，游戏中常见的 semi-explicit Euler 在没有 velocity-dependent force 时可以完全显式实现；真正含 damping、Coriolis 等项时，严格处理仍可能需要 implicit solve。</p>
 <hr>
-<h1 id="9-imex-真正难的地方怎么拆">9. IMEX 真正难的地方：怎么拆？
-</h1><details class="reveal">
+<h2 id="9-imex-真正难的地方怎么拆">9. IMEX 真正难的地方：怎么拆？
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>这是它的核心局限。</p>
@@ -560,8 +564,8 @@
 </details>
 
 <hr>
-<h1 id="10-一个更深的理解stiffness-是方向相关的">10. 一个更深的理解：stiffness 是“方向相关”的
-</h1><details class="reveal">
+<h2 id="10-一个更深的理解stiffness-是方向相关的">10. 一个更深的理解：stiffness 是“方向相关”的
+</h2><details class="reveal">
   <summary>查看完整推导与细节</summary>
   <div class="reveal-body">
     <p>考虑 Hessian：</p>
@@ -588,8 +592,8 @@
 </details>
 
 <hr>
-<h1 id="11-imex-和-substepping-有什么区别">11. IMEX 和 substepping 有什么区别？
-</h1><p>假设：</p>
+<h2 id="11-imex-和-substepping-有什么区别">11. IMEX 和 substepping 有什么区别？
+</h2><p>假设：</p>
 \[\Delta t_{\rm game} = 1/60\text{s}.\]<p>但 stiff spring 需要：</p>
 \[\Delta t=1/1000\text{s}.\]<p>最简单方案：</p>
 \[\boxed{\text{substep 17 次}}\]<p>即所有力都计算 17 次。</p>
@@ -602,8 +606,8 @@
 \[\text{数值稳定性被 stiff term 限制}.\]<p>两者甚至可以组合：</p>
 \[\boxed{ \text{IMEX} + \text{multirate/subcycling} }\]<p>这是现代多尺度时间积分很自然的一条路线。</p>
 <hr>
-<h1 id="12-imex-为什么不等于无条件稳定">12. IMEX 为什么不等于“无条件稳定”？
-</h1><p>这是很重要的限制。</p>
+<h2 id="12-imex-为什么不等于无条件稳定">12. IMEX 为什么不等于“无条件稳定”？
+</h2><p>这是很重要的限制。</p>
 <p>虽然 stiff 部分隐式了，但：</p>
 \[f_E\]<p>仍然是显式的。</p>
 <p>所以总体 timestep 仍然必须满足：</p>
@@ -612,66 +616,66 @@
 <p>而且 explicit 与 implicit 两部分相互耦合时，整体稳定域并不是两个方法简单相加。</p>
 <p>这正是为什么 Ascher–Ruuth–Spiteri 的经典工作要专门设计 <strong>IMEX Runge–Kutta pairs</strong>，而不是任意拿一个 explicit RK 和一个 implicit RK 拼起来。论文的重要贡献之一就是设计具有良好组合稳定域的成对方法。</p>
 <hr>
-<h1 id="13-对自研软体求解器一个很实用的思考框架">13. 对自研软体求解器，一个很实用的思考框架
-</h1><p>假设一个时间步里有：</p>
+<h2 id="13-对自研软体求解器一个很实用的思考框架">13. 对自研软体求解器，一个很实用的思考框架
+</h2><p>假设一个时间步里有：</p>
 \[f = f_{\rm stretch} + f_{\rm bend} + f_{\rm volume} + f_{\rm contact} + f_{\rm damping} + f_{\rm external}.\]<p>不要先问：</p>
 <blockquote>
 <p>“整个 solver 应该 explicit 还是 implicit？”</p>
 </blockquote>
 <p>先给每个 term 做三项体检：</p>
 <div class="table-wrapper"><table>
-	<thead>
-			<tr>
-					<th>项</th>
-					<th style="text-align: right">局部刚性</th>
-					<th style="text-align: right">隐式求解成本</th>
-					<th style="text-align: right">非光滑性</th>
-			</tr>
-	</thead>
-	<tbody>
-			<tr>
-					<td>stretch</td>
-					<td style="text-align: right">高</td>
-					<td style="text-align: right">中</td>
-					<td style="text-align: right">低</td>
-			</tr>
-			<tr>
-					<td>bending</td>
-					<td style="text-align: right">中</td>
-					<td style="text-align: right">中</td>
-					<td style="text-align: right">低</td>
-			</tr>
-			<tr>
-					<td>volume</td>
-					<td style="text-align: right">很高</td>
-					<td style="text-align: right">中</td>
-					<td style="text-align: right">低</td>
-			</tr>
-			<tr>
-					<td>gravity</td>
-					<td style="text-align: right">很低</td>
-					<td style="text-align: right">无</td>
-					<td style="text-align: right">低</td>
-			</tr>
-			<tr>
-					<td>contact</td>
-					<td style="text-align: right">很高/非光滑</td>
-					<td style="text-align: right">高</td>
-					<td style="text-align: right">高</td>
-			</tr>
-			<tr>
-					<td>damping</td>
-					<td style="text-align: right">可能高</td>
-					<td style="text-align: right">低~中</td>
-					<td style="text-align: right">低</td>
-			</tr>
-	</tbody>
+  <thead>
+      <tr>
+          <th>项</th>
+          <th style="text-align: right">局部刚性</th>
+          <th style="text-align: right">隐式求解成本</th>
+          <th style="text-align: right">非光滑性</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>stretch</td>
+          <td style="text-align: right">高</td>
+          <td style="text-align: right">中</td>
+          <td style="text-align: right">低</td>
+      </tr>
+      <tr>
+          <td>bending</td>
+          <td style="text-align: right">中</td>
+          <td style="text-align: right">中</td>
+          <td style="text-align: right">低</td>
+      </tr>
+      <tr>
+          <td>volume</td>
+          <td style="text-align: right">很高</td>
+          <td style="text-align: right">中</td>
+          <td style="text-align: right">低</td>
+      </tr>
+      <tr>
+          <td>gravity</td>
+          <td style="text-align: right">很低</td>
+          <td style="text-align: right">无</td>
+          <td style="text-align: right">低</td>
+      </tr>
+      <tr>
+          <td>contact</td>
+          <td style="text-align: right">很高/非光滑</td>
+          <td style="text-align: right">高</td>
+          <td style="text-align: right">高</td>
+      </tr>
+      <tr>
+          <td>damping</td>
+          <td style="text-align: right">可能高</td>
+          <td style="text-align: right">低~中</td>
+          <td style="text-align: right">低</td>
+      </tr>
+  </tbody>
 </table></div>
 <p>然后再决定：</p>
 \[\boxed{ \text{哪部分 implicit} }\]\[\boxed{ \text{哪部分 explicit} }\]\[\boxed{ \text{哪部分根本不该用普通 ODE integration，而应该用 constraint/contact solve} }\]<p>这个分层思维比“统一换一个更高级 integrator”更有工程价值。</p>
 <hr>
-<h1 id="14-它和-xpbd-其实有一个有意思的联系">14. 它和 XPBD 其实有一个有意思的联系
-</h1><p><span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 并不通常被称作 IMEX。</p>
+<h2 id="14-它和-xpbd-其实有一个有意思的联系">14. 它和 XPBD 其实有一个有意思的联系
+</h2><p><span class="term-anchor" data-term="xpbd" tabindex="0">XPBD</span> 并不通常被称作 IMEX。</p>
 <p>但从设计哲学看，它也在进行某种：</p>
 \[\boxed{\text{难处理物理与容易处理动力学的分裂}}\]<p>例如：</p>
 <ol>
@@ -687,8 +691,8 @@
 <p>区别在于 XPBD 把 stiff elasticity 转换成：</p>
 \[C(x)=0\]<p>附近的 constraint solve，而标准 IMEX 仍从 ODE/PDE time discretization 出发。</p>
 <hr>
-<h1 id="15-对物理引擎最值得迁移的一点">15. 对物理引擎最值得迁移的一点
-</h1><p>IMEX 真正值得记住的并不是某个 Butcher tableau。</p>
+<h2 id="15-对物理引擎最值得迁移的一点">15. 对物理引擎最值得迁移的一点
+</h2><p>IMEX 真正值得记住的并不是某个 Butcher tableau。</p>
 <p>而是：</p>
 \[\boxed{ \text{不要因为系统的一小部分难算， 就用最昂贵的方法处理整个系统。} }\]<p>如果问题中存在多个物理尺度：</p>
 \[\text{slow} + \text{fast},\]<p>多个空间尺度：</p>
@@ -703,8 +707,8 @@
 </ul>
 <p>背后都是：</p>
 \[\boxed{ \text{不要对异质问题使用均匀资源。} }\]<hr>
-<h2 id="一个很值得做的工程诊断stiffness-census">一个很值得做的工程诊断：stiffness census
-</h2><details class="reveal">
+<h3 id="一个很值得做的工程诊断stiffness-census">一个很值得做的工程诊断：stiffness census
+</h3><details class="reveal">
   <summary>查看代码与实现</summary>
   <div class="reveal-body">
     <p>对于一个软体模型，可以估算各模块的局部最高频率：</p>
@@ -735,13 +739,13 @@
 </details>
 
 <hr>
-<h1 id="今天值得留下的一句话">今天值得留下的一句话
-</h1><p>IMEX 的核心可以浓缩成：</p>
+<h2 id="今天值得留下的一句话">今天值得留下的一句话
+</h2><p>IMEX 的核心可以浓缩成：</p>
 \[\boxed{ \text{稳定性瓶颈应该被局部处理，而不是让整个系统为它买单。} }\]<p>更深一层：</p>
 \[\boxed{ \text{“显式还是隐式”通常不是系统级二选一，而可以是 term-level、mode-level、region-level 的资源分配问题。} }\]<p>一旦接受这一点，很多更先进的时间积分方法就会自然连起来：</p>
 \[\text{IMEX} \rightarrow \text{operator splitting} \rightarrow \text{multirate integration} \rightarrow \text{local time stepping} \rightarrow \text{stiff-subspace methods}.\]<p>这条路线对于大规模 FEM、软体求解器和实时游戏物理都非常值得继续往下学。</p>
-<h3 id="拓展阅读">拓展阅读
-</h3><details class="reveal">
+<h2 id="拓展阅读">拓展阅读
+</h2><details class="reveal">
   <summary>查看扩展内容</summary>
   <div class="reveal-body">
     <ol>
@@ -940,9 +944,8 @@
         (d.head || d.body).appendChild(s);
     })();
 </script>
-		<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-		<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-	
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="https://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
 </div>
 
 <style>
